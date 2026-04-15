@@ -204,7 +204,7 @@ func runCalendarListEvents(cmd *cobra.Command, args []string) error {
 
 	if flagJSON {
 		out, _ := json.MarshalIndent(eventsResp, "", "  ")
-		os.Stdout.Write(out)
+		_, _ = os.Stdout.Write(out)
 		fmt.Println()
 		return nil
 	}
@@ -302,7 +302,7 @@ func runCalendarGetEvent(cmd *cobra.Command, args []string) error {
 
 	if flagJSON {
 		out, _ := json.MarshalIndent(eventResp, "", "  ")
-		os.Stdout.Write(out)
+		_, _ = os.Stdout.Write(out)
 		fmt.Println()
 		return nil
 	}
@@ -379,10 +379,7 @@ func runCalendarUpdateEvent(cmd *cobra.Command, args []string) error {
 	ev := eventResp.Event
 
 	var currentTitle, currentLocation string
-	var cards []map[string]interface{}
-	for _, s := range ev.SharedEvents {
-		cards = append(cards, s)
-	}
+	cards := append([]map[string]interface{}{}, ev.SharedEvents...)
 	decrypted, _ := crypto.DecryptEventCards(cards, calKeys, ev.SharedKeyPacket)
 	for _, d := range decrypted {
 		for _, line := range strings.Split(d, "\n") {

@@ -45,7 +45,7 @@ func runDriveLs(cmd *cobra.Command, args []string) error {
 
 	if flagJSON {
 		out, _ := json.MarshalIndent(children, "", "  ")
-		os.Stdout.Write(out)
+		_, _ = os.Stdout.Write(out)
 		fmt.Println()
 		return nil
 	}

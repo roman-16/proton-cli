@@ -92,7 +92,7 @@ func runMailSend(cmd *cobra.Command, args []string) error {
 	messageID := draftResult.Message.ID
 
 	cleanupDraft := func() {
-		c.Do(ctx, "DELETE", "/mail/v4/messages/delete", nil,
+		_, _, _ = c.Do(ctx, "DELETE", "/mail/v4/messages/delete", nil,
 			fmt.Sprintf(`{"IDs":["%s"]}`, messageID), "", "")
 	}
 
@@ -110,7 +110,7 @@ func runMailSend(cmd *cobra.Command, args []string) error {
 			Keys []struct{ PublicKey string }
 		}
 	}
-	json.Unmarshal(recipientKeysBody, &keysResult)
+	_ = json.Unmarshal(recipientKeysBody, &keysResult)
 
 	isInternal := len(keysResult.Address.Keys) > 0
 

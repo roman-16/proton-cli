@@ -147,9 +147,7 @@ func DecryptEventCards(cards []map[string]interface{}, calKeys *CalendarKeys, sh
 			results = append(results, dec)
 
 		case 2: // Signed only
-			if err := verifyCard(data, signature, calKeys.AddrKR); err != nil {
-				// Verification failure is non-fatal, still return data
-			}
+			_ = verifyCard(data, signature, calKeys.AddrKR) // Non-fatal
 			results = append(results, data)
 
 		case 3: // Encrypted and signed

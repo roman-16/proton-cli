@@ -84,13 +84,13 @@ func runMailLabelsList(cmd *cobra.Command, args []string) error {
 
 	var labelsRes struct{ Labels []labelEntry }
 	var foldersRes struct{ Labels []labelEntry }
-	json.Unmarshal(labelsBody, &labelsRes)
-	json.Unmarshal(foldersBody, &foldersRes)
+	_ = json.Unmarshal(labelsBody, &labelsRes)
+	_ = json.Unmarshal(foldersBody, &foldersRes)
 
 	if flagJSON {
 		combined := map[string]interface{}{"Labels": labelsRes.Labels, "Folders": foldersRes.Labels}
 		out, _ := json.MarshalIndent(combined, "", "  ")
-		os.Stdout.Write(out)
+		_, _ = os.Stdout.Write(out)
 		fmt.Println()
 		return nil
 	}

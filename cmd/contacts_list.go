@@ -70,7 +70,7 @@ func runContactsList(cmd *cobra.Command, args []string) error {
 
 	if flagJSON {
 		out, _ := json.MarshalIndent(output, "", "  ")
-		os.Stdout.Write(out)
+		_, _ = os.Stdout.Write(out)
 		fmt.Println()
 		return nil
 	}
@@ -144,7 +144,7 @@ func runContactsGet(cmd *cobra.Command, args []string) error {
 	if flagJSON {
 		result := map[string]interface{}{"ID": res.Contact.ID, "Cards": decrypted}
 		out, _ := json.MarshalIndent(result, "", "  ")
-		os.Stdout.Write(out)
+		_, _ = os.Stdout.Write(out)
 		fmt.Println()
 		return nil
 	}

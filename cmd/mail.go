@@ -62,7 +62,7 @@ func init() {
 
 	// move
 	mailMoveCmd.Flags().StringVar(&mailMoveFolder, "folder", "", "Destination folder (inbox, sent, drafts, trash, spam, archive, starred)")
-	mailMoveCmd.MarkFlagRequired("folder")
+	_ = mailMoveCmd.MarkFlagRequired("folder")
 
 	// mark
 	mailMarkCmd.Flags().BoolVar(&mailMarkRead, "read", false, "Mark as read")

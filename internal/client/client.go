@@ -130,7 +130,7 @@ func (c *Client) Do(ctx context.Context, method, path string, query map[string]s
 			return respBody, statusCode, ErrUnauthorized
 		}
 		// Save refreshed tokens.
-		session.Save(c.Session())
+		_ = session.Save(c.Session())
 
 		respBody, statusCode, err = c.doOnce(ctx, method, path, query, body, hvToken, hvTokenType)
 		if err != nil {
@@ -237,7 +237,7 @@ func (c *Client) refreshAuth(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)

@@ -76,7 +76,7 @@ func handleHumanVerification(ctx context.Context, c *client.Client, hvErr *clien
 	openBrowser(hvErr.WebURL)
 
 	fmt.Fprintf(os.Stderr, "\nComplete verification in your browser, then press Enter to retry...")
-	bufio.NewReader(os.Stdin).ReadBytes('\n')
+	_, _ = bufio.NewReader(os.Stdin).ReadBytes('\n')
 
 	tokenType := "ownership-email"
 	if len(hvErr.Methods) > 0 {
@@ -91,9 +91,9 @@ func printJSON(body []byte) {
 	if json.Unmarshal(body, &prettyJSON) == nil {
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
-		enc.Encode(prettyJSON)
+		_ = enc.Encode(prettyJSON)
 	} else {
-		os.Stdout.Write(body)
+		_, _ = os.Stdout.Write(body)
 	}
 }
 
@@ -107,5 +107,5 @@ func openBrowser(url string) {
 	default:
 		cmd = exec.Command("xdg-open", url)
 	}
-	cmd.Start()
+	_ = cmd.Start()
 }

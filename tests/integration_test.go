@@ -22,7 +22,7 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "failed to create temp dir: %v\n", err)
 		os.Exit(1)
 	}
-	defer os.RemoveAll(dir)
+	defer func() { _ = os.RemoveAll(dir) }()
 
 	binaryPath = filepath.Join(dir, "proton-cli")
 	cmd := exec.Command("go", "build", "-o", binaryPath, "..")
@@ -152,12 +152,12 @@ func cleanup(t *testing.T, description string, fn func() error) {
 	t.Helper()
 	t.Cleanup(func() {
 		if err := fn(); err != nil {
-			t.Logf("\n" +
-				"╔══════════════════════════════════════════════════════════════╗\n" +
-				"║  ⚠️  CLEANUP FAILED — MANUAL ACTION REQUIRED                ║\n" +
-				"╠══════════════════════════════════════════════════════════════╣\n" +
-				"║  %s\n" +
-				"║  Error: %s\n" +
+			t.Logf("\n"+
+				"╔══════════════════════════════════════════════════════════════╗\n"+
+				"║  ⚠️  CLEANUP FAILED — MANUAL ACTION REQUIRED                ║\n"+
+				"╠══════════════════════════════════════════════════════════════╣\n"+
+				"║  %s\n"+
+				"║  Error: %s\n"+
 				"╚══════════════════════════════════════════════════════════════╝",
 				description, err)
 		}
@@ -181,18 +181,6 @@ func truncateOutput(s string) string {
 		return s[:500] + "...(truncated)"
 	}
 	return s
-}
-
-// firstMessageID returns the first message ID from mail list in a given folder.
-func firstMessageID(t *testing.T, folder string) string {
-	t.Helper()
-	data := runJSON(t, "mail", "list", "--folder", folder)
-	messages, ok := data["Messages"].([]interface{})
-	if !ok || len(messages) == 0 {
-		t.Fatalf("no messages found in %s", folder)
-	}
-	msg := messages[0].(map[string]interface{})
-	return msg["ID"].(string)
 }
 
 // selfEmail returns the PROTON_USER email.

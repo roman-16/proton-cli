@@ -69,7 +69,7 @@ func TestDriveUploadAndLs(t *testing.T) {
 
 	// Create temp file
 	tmpFile := filepath.Join(t.TempDir(), "upload-test.txt")
-	os.WriteFile(tmpFile, []byte("upload integration test content"), 0644)
+	_ = os.WriteFile(tmpFile, []byte("upload integration test content"), 0644)
 
 	// Upload
 	runOK(t, "drive", "upload", tmpFile, "/"+folder)
@@ -83,7 +83,7 @@ func TestDriveUploadToRoot(t *testing.T) {
 	skipIfNoCredentials(t)
 	fileName := testID() + "-rootfile.txt"
 	tmpFile := filepath.Join(t.TempDir(), fileName)
-	os.WriteFile(tmpFile, []byte("root upload test"), 0644)
+	_ = os.WriteFile(tmpFile, []byte("root upload test"), 0644)
 
 	runOK(t, "drive", "upload", tmpFile)
 	cleanupRun(t, fmt.Sprintf("Delete file: proton-cli drive rm /%s", fileName),
@@ -102,7 +102,7 @@ func TestDriveDownloadToFile(t *testing.T) {
 
 	content := "download test content 12345"
 	tmpFile := filepath.Join(t.TempDir(), "dl-source.txt")
-	os.WriteFile(tmpFile, []byte(content), 0644)
+	_ = os.WriteFile(tmpFile, []byte(content), 0644)
 	runOK(t, "drive", "upload", tmpFile, "/"+folder)
 
 	// Download
@@ -127,7 +127,7 @@ func TestDriveDownloadToStdout(t *testing.T) {
 
 	content := "stdout download test"
 	tmpFile := filepath.Join(t.TempDir(), "stdout-src.txt")
-	os.WriteFile(tmpFile, []byte(content), 0644)
+	_ = os.WriteFile(tmpFile, []byte(content), 0644)
 	runOK(t, "drive", "upload", tmpFile, "/"+folder)
 
 	stdout := runOK(t, "drive", "download", "/"+folder+"/stdout-src.txt")
@@ -144,7 +144,7 @@ func TestDriveRename(t *testing.T) {
 		"drive", "rm", "/"+folder)
 
 	tmpFile := filepath.Join(t.TempDir(), "before.txt")
-	os.WriteFile(tmpFile, []byte("rename test"), 0644)
+	_ = os.WriteFile(tmpFile, []byte("rename test"), 0644)
 	runOK(t, "drive", "upload", tmpFile, "/"+folder)
 
 	// Rename
@@ -186,7 +186,7 @@ func TestDriveMv(t *testing.T) {
 		"drive", "rm", "/"+folderB)
 
 	tmpFile := filepath.Join(t.TempDir(), "moveme.txt")
-	os.WriteFile(tmpFile, []byte("move test"), 0644)
+	_ = os.WriteFile(tmpFile, []byte("move test"), 0644)
 	runOK(t, "drive", "upload", tmpFile, "/"+folderA)
 
 	// Move from A to B
@@ -207,7 +207,7 @@ func TestDriveRm(t *testing.T) {
 	// No cleanup needed — we're testing rm itself
 
 	tmpFile := filepath.Join(t.TempDir(), "deleteme.txt")
-	os.WriteFile(tmpFile, []byte("delete test"), 0644)
+	_ = os.WriteFile(tmpFile, []byte("delete test"), 0644)
 	runOK(t, "drive", "upload", tmpFile, "/"+folder)
 
 	// Delete file
@@ -227,7 +227,7 @@ func TestDriveRmPermanent(t *testing.T) {
 	runOK(t, "drive", "mkdir", "/"+folder)
 
 	tmpFile := filepath.Join(t.TempDir(), "permdel.txt")
-	os.WriteFile(tmpFile, []byte("permanent delete test"), 0644)
+	_ = os.WriteFile(tmpFile, []byte("permanent delete test"), 0644)
 	runOK(t, "drive", "upload", tmpFile, "/"+folder)
 
 	// Permanent delete

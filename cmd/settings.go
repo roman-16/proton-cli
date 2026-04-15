@@ -61,17 +61,17 @@ func runSettingsGet(cmd *cobra.Command, args []string) error {
 				Notify int
 				Reset  int
 			}
-			Locale       string
-			LogAuth      int
-			Density      int
-			WeekStart    int
-			DateFormat   int
-			TimeFormat   int
-			EarlyAccess  int
-			Telemetry    int
-			CrashReports int
+			Locale        string
+			LogAuth       int
+			Density       int
+			WeekStart     int
+			DateFormat    int
+			TimeFormat    int
+			EarlyAccess   int
+			Telemetry     int
+			CrashReports  int
 			HideSidePanel int
-			HighSecurity struct {
+			HighSecurity  struct {
 				Eligible int
 				Value    int
 			}
@@ -133,27 +133,27 @@ func runSettingsMail(cmd *cobra.Command, args []string) error {
 
 	var res struct {
 		MailSettings struct {
-			DisplayName      string
-			PMSignature      int
-			AutoSaveContacts int
-			ComposerMode     int
-			ViewMode         int
-			ViewLayout       int
-			SwipeLeft        int
-			SwipeRight       int
-			PageSize         int
-			HideRemoteImages int
-			HideEmbeddedImages int
-			Shortcuts        int
-			DraftMIMEType    string
-			Sign             int
-			AttachPublicKey  int
-			ConfirmLink      int
-			DelaySendSeconds int
-			StickyLabels     int
-			FontFace         string
-			FontSize         int
-			SpamAction       *int
+			DisplayName                string
+			PMSignature                int
+			AutoSaveContacts           int
+			ComposerMode               int
+			ViewMode                   int
+			ViewLayout                 int
+			SwipeLeft                  int
+			SwipeRight                 int
+			PageSize                   int
+			HideRemoteImages           int
+			HideEmbeddedImages         int
+			Shortcuts                  int
+			DraftMIMEType              string
+			Sign                       int
+			AttachPublicKey            int
+			ConfirmLink                int
+			DelaySendSeconds           int
+			StickyLabels               int
+			FontFace                   string
+			FontSize                   int
+			SpamAction                 *int
 			AutoDeleteSpamAndTrashDays int
 		}
 	}

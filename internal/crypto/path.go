@@ -108,7 +108,6 @@ func ResolvePath(ctx context.Context, c *client.Client, driveKeys *DriveKeys, pa
 				}
 
 				currentLinkID = child.LinkID
-				parentKR = currentKR
 				currentKR = childKR
 				break
 			}

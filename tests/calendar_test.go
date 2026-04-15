@@ -33,7 +33,7 @@ func TestCalendarListEventsDateRange(t *testing.T) {
 	skipIfNoCredentials(t)
 	// Create an event on a known date
 	title := testID() + "-range"
-	start := time.Now().Add(48 * time.Hour).Format("2006-01-02") + "T10:00"
+	start := time.Now().Add(48*time.Hour).Format("2006-01-02") + "T10:00"
 
 	runOK(t, "calendar", "create-event", "--title", title, "--start", start, "--duration", "1h")
 
@@ -61,7 +61,7 @@ func TestCalendarCreateDeleteEvent(t *testing.T) {
 	title := testID() + "-event"
 
 	// Create
-	start := time.Now().Add(24 * time.Hour).Format("2006-01-02") + "T14:00"
+	start := time.Now().Add(24*time.Hour).Format("2006-01-02") + "T14:00"
 	runOK(t, "calendar", "create-event", "--title", title, "--start", start, "--duration", "1h")
 
 	cleanupRun(t, fmt.Sprintf("Delete event: proton-cli calendar delete-event %q", title),
@@ -75,7 +75,7 @@ func TestCalendarCreateDeleteEvent(t *testing.T) {
 func TestCalendarCreateEventWithLocation(t *testing.T) {
 	skipIfNoCredentials(t)
 	title := testID() + "-loc"
-	start := time.Now().Add(24 * time.Hour).Format("2006-01-02") + "T15:00"
+	start := time.Now().Add(24*time.Hour).Format("2006-01-02") + "T15:00"
 
 	runOK(t, "calendar", "create-event", "--title", title, "--location", "Vienna", "--start", start, "--duration", "2h")
 
@@ -91,7 +91,7 @@ func TestCalendarCreateEventWithLocation(t *testing.T) {
 func TestCalendarGetEventByTitle(t *testing.T) {
 	skipIfNoCredentials(t)
 	title := testID() + "-gettitle"
-	start := time.Now().Add(24 * time.Hour).Format("2006-01-02") + "T16:00"
+	start := time.Now().Add(24*time.Hour).Format("2006-01-02") + "T16:00"
 
 	runOK(t, "calendar", "create-event", "--title", title, "--start", start, "--duration", "30m")
 
@@ -107,7 +107,7 @@ func TestCalendarGetEventByTitle(t *testing.T) {
 func TestCalendarGetEventByID(t *testing.T) {
 	skipIfNoCredentials(t)
 	title := testID() + "-getid"
-	start := time.Now().Add(24 * time.Hour).Format("2006-01-02") + "T17:00"
+	start := time.Now().Add(24*time.Hour).Format("2006-01-02") + "T17:00"
 
 	runOK(t, "calendar", "create-event", "--title", title, "--start", start, "--duration", "1h")
 
@@ -148,7 +148,7 @@ func TestCalendarGetEventByID(t *testing.T) {
 func TestCalendarDeleteEventByTitle(t *testing.T) {
 	skipIfNoCredentials(t)
 	title := testID() + "-deltitle"
-	start := time.Now().Add(24 * time.Hour).Format("2006-01-02") + "T18:00"
+	start := time.Now().Add(24*time.Hour).Format("2006-01-02") + "T18:00"
 
 	runOK(t, "calendar", "create-event", "--title", title, "--start", start, "--duration", "1h")
 

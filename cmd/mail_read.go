@@ -74,7 +74,7 @@ func runMailRead(cmd *cobra.Command, args []string) error {
 	}
 
 	out, _ := json.MarshalIndent(result, "", "  ")
-	os.Stdout.Write(out)
+	_, _ = os.Stdout.Write(out)
 	fmt.Println()
 	return nil
 }

@@ -78,7 +78,7 @@ func runAPI(cmd *cobra.Command, args []string) error {
 
 	if errors.Is(err, client.ErrUnauthorized) {
 		fmt.Fprintf(os.Stderr, "Session expired, re-authenticating...\n")
-		session.Clear()
+		_ = session.Clear()
 		if err := doLogin(ctx, c); err != nil {
 			return err
 		}

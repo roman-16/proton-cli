@@ -121,7 +121,7 @@ func UnlockNode(l *link, parentKR *pgp.KeyRing, addrKR *pgp.KeyRing) (*pgp.KeyRi
 	if l.NodePassphraseSignature != "" {
 		sig, err := pgp.NewPGPSignatureFromArmored(l.NodePassphraseSignature)
 		if err == nil {
-			addrKR.VerifyDetached(dec, sig, pgp.GetUnixTime()) // Non-fatal
+			_ = addrKR.VerifyDetached(dec, sig, pgp.GetUnixTime()) // Non-fatal
 		}
 	}
 
@@ -181,7 +181,7 @@ func DecryptFolderChildren(ctx context.Context, c *client.Client, shareID, linkI
 		}
 
 		var entry map[string]interface{}
-		json.Unmarshal(raw, &entry)
+		_ = json.Unmarshal(raw, &entry)
 		entry["DecryptedName"] = name
 		results = append(results, entry)
 	}

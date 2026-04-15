@@ -61,7 +61,7 @@ func runMailAttachmentsList(cmd *cobra.Command, args []string) error {
 
 	if flagJSON {
 		out, _ := json.MarshalIndent(res.Message.Attachments, "", "  ")
-		os.Stdout.Write(out)
+		_, _ = os.Stdout.Write(out)
 		fmt.Println()
 		return nil
 	}

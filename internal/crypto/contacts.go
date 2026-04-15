@@ -54,7 +54,7 @@ func DecryptContactCards(cards []map[string]interface{}, addrKR *pgp.KeyRing) ([
 			if signature != "" {
 				sig, err := pgp.NewPGPSignatureFromArmored(signature)
 				if err == nil {
-					addrKR.VerifyDetached(pgp.NewPlainMessageFromString(data), sig, pgp.GetUnixTime()) // Non-fatal
+					_ = addrKR.VerifyDetached(pgp.NewPlainMessageFromString(data), sig, pgp.GetUnixTime()) // Non-fatal
 				}
 			}
 			results = append(results, data)

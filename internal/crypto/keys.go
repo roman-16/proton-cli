@@ -54,7 +54,7 @@ func UnlockKeys(ctx context.Context, c *client.Client, password string) (*KeyRin
 
 	if saltedKeyPass == "" {
 		if password == "" {
-			return nil, fmt.Errorf("password required for encrypted operations.\nSet PROTON_PASSWORD environment variable or use --password flag.\nThe raw 'api' command works without a password.")
+			return nil, fmt.Errorf("password required for encrypted operations;\nset PROTON_PASSWORD environment variable or use --password flag;\nthe raw 'api' command works without a password")
 		}
 
 		skp, err := deriveSaltedKeyPass(ctx, c, password)
@@ -66,7 +66,7 @@ func UnlockKeys(ctx context.Context, c *client.Client, password string) (*KeyRin
 
 		// Persist to session file
 		sess := c.Session()
-		session.Save(sess)
+		_ = session.Save(sess)
 	}
 
 	user, err := getUser(ctx, c)

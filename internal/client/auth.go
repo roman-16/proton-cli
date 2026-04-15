@@ -55,7 +55,7 @@ func (c *Client) createSession(ctx context.Context) (*sessionResponse, error) {
 	if err != nil {
 		return nil, fmt.Errorf("session creation failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -91,7 +91,7 @@ func (c *Client) getAuthInfo(ctx context.Context, username string) (*authInfoRes
 	if err != nil {
 		return nil, fmt.Errorf("auth info failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -142,7 +142,7 @@ func (c *Client) srpLogin(ctx context.Context, username string, password []byte,
 	if err != nil {
 		return nil, fmt.Errorf("SRP auth failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -187,7 +187,7 @@ func (c *Client) auth2FA(ctx context.Context, totp string) error {
 	if err != nil {
 		return fmt.Errorf("2FA request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -253,7 +253,7 @@ func (c *Client) UnlockPasswordScope(ctx context.Context, username string, passw
 	if err != nil {
 		return fmt.Errorf("scope unlock request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

@@ -107,7 +107,7 @@ func runDriveTrashList(cmd *cobra.Command, args []string) error {
 				Name    string
 			}
 		}
-		json.Unmarshal(linkBody, &linkRes)
+		_ = json.Unmarshal(linkBody, &linkRes)
 		l := linkRes.Link
 
 		typeStr := "FILE"

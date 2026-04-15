@@ -166,7 +166,7 @@ func runDriveUpload(cmd *cobra.Command, args []string) error {
 	// Step 1: Create file
 	createReq := map[string]interface{}{
 		"Name": encName, "Hash": hash,
-		"ParentLinkID": parent.LinkID,
+		"ParentLinkID":   parent.LinkID,
 		"NodePassphrase": nodePassphrase, "NodePassphraseSignature": nodePassphraseSig,
 		"SignatureAddress": driveKeys.AddrEmail, "NodeKey": nodeKey,
 		"MIMEType":                  "application/octet-stream",
@@ -317,7 +317,7 @@ func runDriveUpload(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("upload block %d failed: %w", i+1, err)
 		}
 		respBody, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if resp.StatusCode >= 400 {
 			return fmt.Errorf("upload block %d returned %d: %s", i+1, resp.StatusCode, string(respBody))
 		}
@@ -393,7 +393,7 @@ func runDriveDownload(cmd *cobra.Command, args []string) error {
 			}
 		}
 	}
-	json.Unmarshal(linkBody, &linkResp)
+	_ = json.Unmarshal(linkBody, &linkResp)
 	fileProps := linkResp.Link.FileProperties
 
 	sessionKeyDec, err := crypto.GetFileSessionKey(fileProps.ContentKeyPacket, resolved.NodeKR)
@@ -436,7 +436,7 @@ func runDriveDownload(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("download block %d failed: %w", i+1, err)
 		}
 		encData, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if err != nil {
 			return err
 		}
@@ -455,7 +455,7 @@ func runDriveDownload(cmd *cobra.Command, args []string) error {
 		}
 		fmt.Fprintf(os.Stderr, "Downloaded to %s (%d bytes)\n", outputPath, len(fileData))
 	} else {
-		os.Stdout.Write(fileData)
+		_, _ = os.Stdout.Write(fileData)
 	}
 
 	return nil
