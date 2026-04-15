@@ -217,6 +217,48 @@ func GetLink(ctx context.Context, c *client.Client, shareID, linkID string) (*li
 	return &res.Link, nil
 }
 
+// ReEncryptName re-encrypts a link name for a move operation.
+// Matches WebClients: decrypt session key from old encrypted name, then
+// re-encrypt plaintext with same session key + new parent's public key.
+func ReEncryptName(encryptedName string, plainName string, oldParentKR *pgp.KeyRing, newParentKR *pgp.KeyRing, addrKR *pgp.KeyRing) (string, error) {
+	encMsg, err := pgp.NewPGPMessageFromArmored(encryptedName)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse encrypted name: %w", err)
+	}
+
+	// Split to get key packet, then decrypt session key with old parent
+	split, err := encMsg.SplitMessage()
+	if err != nil {
+		return "", fmt.Errorf("failed to split encrypted name: %w", err)
+	}
+
+	sessionKey, err := oldParentKR.DecryptSessionKey(split.GetBinaryKeyPacket())
+	if err != nil {
+		return "", fmt.Errorf("failed to decrypt name session key: %w", err)
+	}
+
+	// Re-encrypt: wrap session key with new parent's public key
+	newKeyPacket, err := newParentKR.EncryptSessionKey(sessionKey)
+	if err != nil {
+		return "", fmt.Errorf("failed to re-encrypt name session key: %w", err)
+	}
+
+	// Re-encrypt plaintext with same session key + sign with address key
+	plainMsg := pgp.NewPlainMessageFromString(plainName)
+	dataPacket, err := sessionKey.EncryptAndSign(plainMsg, addrKR)
+	if err != nil {
+		return "", fmt.Errorf("failed to encrypt name data: %w", err)
+	}
+
+	newMsg := pgp.NewPGPSplitMessage(newKeyPacket, dataPacket).GetPGPMessage()
+	armored, err := newMsg.GetArmored()
+	if err != nil {
+		return "", err
+	}
+
+	return armored, nil
+}
+
 // EncryptName encrypts a file/folder name with the parent's public key.
 func EncryptName(name string, parentKR *pgp.KeyRing, addrKR *pgp.KeyRing) (string, error) {
 	pubKey, err := parentKR.GetKey(0)
@@ -393,6 +435,64 @@ func GetFileSessionKey(contentKeyPacket string, nodeKR *pgp.KeyRing) (*pgp.Sessi
 		return nil, err
 	}
 	return nodeKR.DecryptSessionKey(kp)
+}
+
+// ReEncryptNodePassphrase re-encrypts a node passphrase for a move operation.
+// Matches WebClients: decrypt session key + plaintext from old passphrase,
+// then re-encrypt with same session key + new parent's public key.
+func ReEncryptNodePassphrase(l *link, oldParentKR *pgp.KeyRing, newParentKR *pgp.KeyRing, addrKR *pgp.KeyRing) (string, string, error) {
+	enc, err := pgp.NewPGPMessageFromArmored(l.NodePassphrase)
+	if err != nil {
+		return "", "", err
+	}
+
+	// Split message to get key packet
+	split, err := enc.SplitMessage()
+	if err != nil {
+		return "", "", fmt.Errorf("failed to split passphrase message: %w", err)
+	}
+
+	// Decrypt session key with old parent
+	sessionKey, err := oldParentKR.DecryptSessionKey(split.GetBinaryKeyPacket())
+	if err != nil {
+		return "", "", fmt.Errorf("failed to decrypt passphrase session key: %w", err)
+	}
+
+	// Decrypt plaintext passphrase
+	dec, err := oldParentKR.Decrypt(enc, nil, pgp.GetUnixTime())
+	if err != nil {
+		return "", "", fmt.Errorf("failed to decrypt node passphrase: %w", err)
+	}
+
+	// Re-encrypt: wrap same session key with new parent's public key
+	newKeyPacket, err := newParentKR.EncryptSessionKey(sessionKey)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to re-encrypt passphrase session key: %w", err)
+	}
+
+	// Re-encrypt data with same session key
+	dataPacket, err := sessionKey.Encrypt(dec)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to encrypt passphrase data: %w", err)
+	}
+
+	newMsg := pgp.NewPGPSplitMessage(newKeyPacket, dataPacket).GetPGPMessage()
+	newPassphrase, err := newMsg.GetArmored()
+	if err != nil {
+		return "", "", err
+	}
+
+	// Detached signature with address key (matches encryptPassphrase detached:true)
+	sig, err := addrKR.SignDetached(dec)
+	if err != nil {
+		return "", "", err
+	}
+	newSig, err := sig.GetArmored()
+	if err != nil {
+		return "", "", err
+	}
+
+	return newPassphrase, newSig, nil
 }
 
 // GenerateFileKeys generates session key and content key packet for a new file.

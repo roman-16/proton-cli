@@ -4,6 +4,7 @@
     "go@latest",
     "gopls@latest",
     "golangci-lint@latest",
-    "nodejs@latest"
+    "nodejs@latest",
+    "just@latest"
   ]
 }

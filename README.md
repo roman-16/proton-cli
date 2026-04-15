@@ -1,6 +1,6 @@
 # proton-cli
 
-A command-line tool for interacting with the Proton API (Drive, Calendar, Mail, Contacts). Handles SRP authentication and end-to-end encryption automatically.
+A command-line tool for interacting with the Proton API (Mail, Drive, Calendar, Contacts). Handles SRP authentication and end-to-end encryption automatically.
 
 ## Install
 
@@ -17,9 +17,7 @@ direnv allow
 go build .
 ```
 
-## Usage
-
-### Authentication
+## Authentication
 
 ```bash
 export PROTON_USER=alice@proton.me
@@ -27,9 +25,62 @@ export PROTON_PASSWORD='your-password'
 # export PROTON_TOTP=123456  # if 2FA is enabled
 ```
 
-The session is saved to `~/.config/proton-cli/session.json` and reused automatically.
+The session is saved to `~/.config/proton-cli/session.json` and reused automatically. The raw `api` command works without a password; encrypted commands (mail read, drive, calendar, contacts) require it.
 
-### Drive
+## Mail
+
+```bash
+# List messages
+proton-cli mail list
+proton-cli mail list --folder sent
+proton-cli mail list --folder drafts --page 1 --page-size 10
+proton-cli mail list --unread
+
+# Search messages
+proton-cli mail search --keyword "invoice"
+proton-cli mail search --from "amazon" --after 2026-01-01
+proton-cli mail search --subject "order" --folder inbox --limit 50
+
+# Read a message (decrypted)
+proton-cli mail read MESSAGE_ID
+
+# Send a message
+proton-cli mail send --to "recipient@example.com" --subject "Hello" --body "Message text"
+
+# Move, trash, delete
+proton-cli mail move --folder archive MESSAGE_ID
+proton-cli mail trash MESSAGE_ID
+proton-cli mail delete MESSAGE_ID                      # permanent
+
+# Mark messages
+proton-cli mail mark --read MESSAGE_ID
+proton-cli mail mark --unread MESSAGE_ID
+proton-cli mail mark --starred MESSAGE_ID
+proton-cli mail mark --unstar MESSAGE_ID
+
+# Attachments
+proton-cli mail attachments list MESSAGE_ID
+proton-cli mail attachments download MESSAGE_ID ATTACHMENT_ID ./output.pdf
+
+# Labels and folders
+proton-cli mail labels list
+proton-cli mail labels create --name "Important" --color "#8080FF"
+proton-cli mail labels create --name "Projects" --folder --color "#1DA583"
+proton-cli mail labels delete LABEL_ID
+
+# Addresses
+proton-cli mail addresses list
+
+# Filters
+proton-cli mail filters list
+proton-cli mail filters create --name "Archive invoices" \
+  --sieve 'require ["fileinto"]; if header :contains "Subject" "invoice" { fileinto "Archive"; }'
+proton-cli mail filters enable FILTER_ID
+proton-cli mail filters disable FILTER_ID
+proton-cli mail filters delete FILTER_ID
+```
+
+## Drive
 
 ```bash
 # List files
@@ -50,15 +101,34 @@ proton-cli drive download /Photos/pic.jpg              # to stdout
 
 # Rename
 proton-cli drive rename /Documents/old-name.txt new-name.txt
+
+# Move
+proton-cli drive mv /Documents/report.pdf /Archive
+
+# Delete (move to trash)
+proton-cli drive rm /Documents/old-report.pdf
+proton-cli drive rm --permanent /Documents/secret.txt  # permanent delete
+
+# Trash management
+proton-cli drive trash list
+proton-cli drive trash restore LINK_ID
+proton-cli drive trash empty
 ```
 
-### Calendar
+## Calendar
 
 ```bash
+# List calendars
+proton-cli calendar list
+
 # List events
 proton-cli calendar list-events
 proton-cli calendar list-events --start 2026-04-15 --end 2026-04-20
 proton-cli calendar list-events --calendar "Work"
+
+# Get event details (by IDs or title search)
+proton-cli calendar get-event CALENDAR_ID EVENT_ID
+proton-cli calendar get-event "Meeting"
 
 # Create event
 proton-cli calendar create-event \
@@ -72,34 +142,48 @@ proton-cli calendar update-event CALENDAR_ID EVENT_ID \
   --title "Updated Meeting" \
   --location "Graz"
 
-# Get event details
-proton-cli calendar get-event CALENDAR_ID EVENT_ID
+# Delete event (by IDs or title search)
+proton-cli calendar delete-event CALENDAR_ID EVENT_ID
+proton-cli calendar delete-event "Meeting"
+
+# Create / delete calendars
+proton-cli calendar create --name "Work" --color "#8080FF"
+proton-cli calendar delete CALENDAR_ID  # requires PROTON_PASSWORD (password re-auth)
 ```
 
-### Contacts
+## Contacts
 
 ```bash
-# List contacts (decrypted)
+# List contacts
 proton-cli contacts list
 
-# Get contact details
+# Get contact (by ID or name/email search)
 proton-cli contacts get CONTACT_ID
+proton-cli contacts get "John Doe"
+proton-cli contacts get "john@example"
 
 # Create contact
 proton-cli contacts create --name "John Doe" --email "john@example.com" --phone "+1234567890"
+
+# Update contact
+proton-cli contacts update "John Doe" --email "new@example.com" --phone "+0987654321"
+
+# Delete contact
+proton-cli contacts delete "John Doe"
+proton-cli contacts delete CONTACT_ID
 ```
 
-### Mail
+## Settings
 
 ```bash
-# Read a message (decrypted)
-proton-cli mail read MESSAGE_ID
+# Account settings
+proton-cli settings get
 
-# Send a message
-proton-cli mail send --to "recipient@example.com" --subject "Hello" --body "Message text"
+# Mail settings
+proton-cli settings mail
 ```
 
-### Raw API Access
+## Raw API Access
 
 For any endpoint not covered by the high-level commands:
 
@@ -115,7 +199,17 @@ Pipe through `jq` for formatting:
 
 ```bash
 proton-cli api GET /calendar/v1 | jq '.Calendars[].ID'
-proton-cli drive ls /Documents | head -5
+```
+
+## Output Format
+
+All commands default to human-readable table output. Pass `--json` for machine-readable JSON:
+
+```bash
+proton-cli mail list --json
+proton-cli contacts list --json
+proton-cli calendar list-events --json
+proton-cli drive ls --json
 ```
 
 ## API Reference
@@ -152,7 +246,7 @@ See [`scripts/README.md`](scripts/README.md) for details on the generator.
 | Variable | Description |
 |---|---|
 | `PROTON_USER` | Proton account email |
-| `PROTON_PASSWORD` | Account password (needed for encrypted operations) |
+| `PROTON_PASSWORD` | Account password (needed for encrypted operations and calendar delete) |
 | `PROTON_TOTP` | TOTP code (if 2FA is enabled) |
 | `PROTON_API_URL` | API base URL (default: `https://mail.proton.me/api`) |
 | `PROTON_APP_VERSION` | App version header (default: `web-account@5.0.364.0`) |

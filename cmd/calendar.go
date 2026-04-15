@@ -15,20 +15,7 @@ import (
 
 var calendarCmd = &cobra.Command{
 	Use:   "calendar",
-	Short: "Calendar operations (encrypted)",
-}
-
-var calendarListEventsCmd = &cobra.Command{
-	Use:   "list-events",
-	Short: "List calendar events (decrypted)",
-	RunE:  runCalendarListEvents,
-}
-
-var calendarGetEventCmd = &cobra.Command{
-	Use:   "get-event CALENDAR_ID EVENT_ID",
-	Short: "Get a calendar event (decrypted)",
-	Args:  cobra.ExactArgs(2),
-	RunE:  runCalendarGetEvent,
+	Short: "Calendar operations",
 }
 
 var (
@@ -38,32 +25,18 @@ var (
 	calEventStart    string
 	calEventDuration string
 	calEventAllDay   bool
-)
 
-var calendarCreateEventCmd = &cobra.Command{
-	Use:   "create-event",
-	Short: "Create a calendar event",
-	RunE:  runCalendarCreateEvent,
-}
-
-var calendarUpdateEventCmd = &cobra.Command{
-	Use:   "update-event CALENDAR_ID EVENT_ID",
-	Short: "Update a calendar event",
-	Args:  cobra.ExactArgs(2),
-	RunE:  runCalendarUpdateEvent,
-}
-
-var (
 	calUpdateTitle    string
 	calUpdateLocation string
 	calUpdateStart    string
 	calUpdateDuration string
-)
 
-var (
 	calListCalendar string
 	calListStart    string
 	calListEnd      string
+
+	calCreateName  string
+	calCreateColor string
 )
 
 func init() {
@@ -83,239 +56,14 @@ func init() {
 	calendarUpdateEventCmd.Flags().StringVar(&calUpdateStart, "start", "", "New start time")
 	calendarUpdateEventCmd.Flags().StringVar(&calUpdateDuration, "duration", "", "New duration")
 
-	calendarCmd.AddCommand(calendarCreateEventCmd, calendarListEventsCmd, calendarGetEventCmd, calendarUpdateEventCmd)
+	calendarCreateCmd.Flags().StringVar(&calCreateName, "name", "", "Calendar name")
+	calendarCreateCmd.Flags().StringVar(&calCreateColor, "color", "#8080FF", "Calendar color (hex)")
+
+	calendarCmd.AddCommand(calendarCreateEventCmd, calendarListEventsCmd, calendarGetEventCmd, calendarUpdateEventCmd, calendarDeleteEventCmd, calendarListCalendarsCmd, calendarCreateCmd, calendarDeleteCmd)
 	rootCmd.AddCommand(calendarCmd)
 }
 
-func runCalendarCreateEvent(cmd *cobra.Command, args []string) error {
-	if calEventTitle == "" {
-		return fmt.Errorf("--title is required")
-	}
-	if calEventStart == "" {
-		return fmt.Errorf("--start is required")
-	}
-
-	ctx := context.Background()
-	c, err := getAuthenticatedClient(ctx)
-	if err != nil {
-		return err
-	}
-
-	password := getFlag(flagPassword, "PROTON_PASSWORD")
-	kr, err := crypto.UnlockKeys(ctx, c, password)
-	if err != nil {
-		return err
-	}
-
-	calendarID, err := resolveCalendarID(ctx, c, calEventCalendar)
-	if err != nil {
-		return err
-	}
-
-	calKeys, err := crypto.UnlockCalendar(ctx, c, calendarID, kr)
-	if err != nil {
-		return err
-	}
-
-	// Parse times
-	startTime, err := parseTime(calEventStart)
-	if err != nil {
-		return fmt.Errorf("invalid --start: %w", err)
-	}
-	duration, err := time.ParseDuration(calEventDuration)
-	if err != nil {
-		return fmt.Errorf("invalid --duration: %w", err)
-	}
-	endTime := startTime.Add(duration)
-
-	// Build VEVENTs — signed part (times) and encrypted part (title, location)
-	signedVevent := buildSignedVEVENT(startTime, endTime, calEventAllDay)
-	encryptedVevent := buildEncryptedVEVENT(calEventTitle, calEventLocation)
-
-	// Encrypt
-	signedCard, encryptedCard, sharedKeyPacket, err := crypto.EncryptEventCards(signedVevent, encryptedVevent, calKeys, "")
-	if err != nil {
-		return err
-	}
-
-	// Get member ID
-	members, err := getCalendarMembersForSync(ctx, c, calendarID, kr)
-	if err != nil {
-		return err
-	}
-
-	// Build sync request
-	syncData := map[string]interface{}{
-		"MemberID": members.memberID,
-		"Events": []map[string]interface{}{
-			{
-				"Overwrite": 0,
-				"Event": map[string]interface{}{
-					"Permissions":        63,
-					"IsOrganizer":        1,
-					"SharedKeyPacket":    sharedKeyPacket,
-					"SharedEventContent": []interface{}{signedCard, encryptedCard},
-					"Notifications":      nil,
-					"Color":              nil,
-				},
-			},
-		},
-	}
-
-	body, _ := json.Marshal(syncData)
-
-	resp, statusCode, err := c.Do(ctx, "PUT", "/calendar/v1/"+calendarID+"/events/sync", nil, string(body), "", "")
-	if err != nil {
-		return err
-	}
-
-	if statusCode >= 400 {
-		fmt.Fprintf(os.Stderr, "Error: %s\n", string(resp))
-		os.Exit(1)
-	}
-
-	fmt.Fprintf(os.Stderr, "Event created.\n")
-	printJSON(resp)
-	return nil
-}
-
-func runCalendarListEvents(cmd *cobra.Command, args []string) error {
-	ctx := context.Background()
-	c, err := getAuthenticatedClient(ctx)
-	if err != nil {
-		return err
-	}
-
-	password := getFlag(flagPassword, "PROTON_PASSWORD")
-	kr, err := crypto.UnlockKeys(ctx, c, password)
-	if err != nil {
-		return err
-	}
-
-	calendarID, err := resolveCalendarID(ctx, c, calListCalendar)
-	if err != nil {
-		return err
-	}
-
-	calKeys, err := crypto.UnlockCalendar(ctx, c, calendarID, kr)
-	if err != nil {
-		return err
-	}
-
-	// Default time range: today to 30 days from now
-	start, end := defaultTimeRange()
-	if calListStart != "" {
-		t, err := time.Parse("2006-01-02", calListStart)
-		if err != nil {
-			return fmt.Errorf("invalid --start: %w", err)
-		}
-		start = t.Unix()
-	}
-	if calListEnd != "" {
-		t, err := time.Parse("2006-01-02", calListEnd)
-		if err != nil {
-			return fmt.Errorf("invalid --end: %w", err)
-		}
-		end = t.Unix()
-	}
-
-	query := map[string]string{
-		"Start":    fmt.Sprintf("%d", start),
-		"End":      fmt.Sprintf("%d", end),
-		"Timezone": "UTC",
-		"Type":     "0",
-	}
-
-	resp, _, err := c.Do(ctx, "GET", "/calendar/v1/"+calendarID+"/events", query, "", "", "")
-	if err != nil {
-		return err
-	}
-
-	var eventsResp struct {
-		Events []map[string]interface{}
-	}
-	if err := json.Unmarshal(resp, &eventsResp); err != nil {
-		return err
-	}
-
-	// Decrypt each event's SharedEvents
-	for i, event := range eventsResp.Events {
-		sharedKeyPacket, _ := event["SharedKeyPacket"].(string)
-		if shared, ok := event["SharedEvents"].([]interface{}); ok {
-			var cards []map[string]interface{}
-			for _, s := range shared {
-				if m, ok := s.(map[string]interface{}); ok {
-					cards = append(cards, m)
-				}
-			}
-			decrypted, err := crypto.DecryptEventCards(cards, calKeys, sharedKeyPacket)
-			if err == nil {
-				eventsResp.Events[i]["DecryptedSharedEvents"] = decrypted
-			}
-		}
-	}
-
-	out, _ := json.MarshalIndent(eventsResp, "", "  ")
-	os.Stdout.Write(out)
-	fmt.Println()
-	return nil
-}
-
-func runCalendarGetEvent(cmd *cobra.Command, args []string) error {
-	calendarID := args[0]
-	eventID := args[1]
-
-	ctx := context.Background()
-	c, err := getAuthenticatedClient(ctx)
-	if err != nil {
-		return err
-	}
-
-	password := getFlag(flagPassword, "PROTON_PASSWORD")
-	kr, err := crypto.UnlockKeys(ctx, c, password)
-	if err != nil {
-		return err
-	}
-
-	calKeys, err := crypto.UnlockCalendar(ctx, c, calendarID, kr)
-	if err != nil {
-		return err
-	}
-
-	resp, _, err := c.Do(ctx, "GET", "/calendar/v1/"+calendarID+"/events/"+eventID, nil, "", "", "")
-	if err != nil {
-		return err
-	}
-
-	var eventResp struct {
-		Event map[string]interface{}
-	}
-	if err := json.Unmarshal(resp, &eventResp); err != nil {
-		return err
-	}
-
-	event := eventResp.Event
-	sharedKeyPacket, _ := event["SharedKeyPacket"].(string)
-	if shared, ok := event["SharedEvents"].([]interface{}); ok {
-		var cards []map[string]interface{}
-		for _, s := range shared {
-			if m, ok := s.(map[string]interface{}); ok {
-				cards = append(cards, m)
-			}
-		}
-		decrypted, err := crypto.DecryptEventCards(cards, calKeys, sharedKeyPacket)
-		if err == nil {
-			event["DecryptedSharedEvents"] = decrypted
-		}
-	}
-
-	out, _ := json.MarshalIndent(eventResp, "", "  ")
-	os.Stdout.Write(out)
-	fmt.Println()
-	return nil
-}
-
-// ── Helpers ──
+// ── Shared helpers ──
 
 type memberInfo struct {
 	memberID string
@@ -345,7 +93,6 @@ func getCalendarMembersForSync(ctx context.Context, cl *client.Client, calendarI
 
 func resolveCalendarID(ctx context.Context, cl *client.Client, nameOrID string) (string, error) {
 	if nameOrID == "" {
-		// Use first calendar
 		resp, _, err := cl.Do(ctx, "GET", "/calendar/v1", nil, "", "", "")
 		if err != nil {
 			return "", err
@@ -365,12 +112,10 @@ func resolveCalendarID(ctx context.Context, cl *client.Client, nameOrID string) 
 		return res.Calendars[0].ID, nil
 	}
 
-	// If it looks like an ID (long base64), use directly
 	if len(nameOrID) > 20 {
 		return nameOrID, nil
 	}
 
-	// Otherwise search by name
 	resp, _, err := cl.Do(ctx, "GET", "/calendar/v1", nil, "", "", "")
 	if err != nil {
 		return "", err
@@ -417,11 +162,9 @@ func defaultTimeRange() (int64, int64) {
 	return start.Unix(), end.Unix()
 }
 
-// buildSignedVEVENT creates the cleartext-signed part (Type 2): times, UID, sequence.
 func buildSignedVEVENT(start, end time.Time, allDay bool) string {
 	uid := fmt.Sprintf("%d@proton-cli", time.Now().UnixNano())
 	dtstamp := time.Now().UTC().Format("20060102T150405Z")
-
 	var dtstart, dtend string
 	if allDay {
 		dtstart = fmt.Sprintf("DTSTART;VALUE=DATE:%s", start.Format("20060102"))
@@ -430,45 +173,31 @@ func buildSignedVEVENT(start, end time.Time, allDay bool) string {
 		dtstart = fmt.Sprintf("DTSTART:%s", start.UTC().Format("20060102T150405Z"))
 		dtend = fmt.Sprintf("DTEND:%s", end.UTC().Format("20060102T150405Z"))
 	}
-
 	lines := []string{
-		"BEGIN:VCALENDAR",
-		"VERSION:2.0",
-		"PRODID:-//proton-cli//EN",
+		"BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//proton-cli//EN",
 		"BEGIN:VEVENT",
-		fmt.Sprintf("UID:%s", uid),
-		fmt.Sprintf("DTSTAMP:%s", dtstamp),
-		dtstart,
-		dtend,
-		"SEQUENCE:0",
-		"END:VEVENT",
-		"END:VCALENDAR",
+		fmt.Sprintf("UID:%s", uid), fmt.Sprintf("DTSTAMP:%s", dtstamp),
+		dtstart, dtend, "SEQUENCE:0",
+		"END:VEVENT", "END:VCALENDAR",
 	}
 	return strings.Join(lines, "\r\n")
 }
 
-// buildEncryptedVEVENT creates the encrypted part (Type 3): title, location, description.
 func buildEncryptedVEVENT(title, location string) string {
 	lines := []string{
-		"BEGIN:VCALENDAR",
-		"VERSION:2.0",
-		"PRODID:-//proton-cli//EN",
+		"BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//proton-cli//EN",
 		"BEGIN:VEVENT",
 		fmt.Sprintf("SUMMARY:%s", title),
 	}
-
 	if location != "" {
 		lines = append(lines, fmt.Sprintf("LOCATION:%s", location))
 	}
-
 	lines = append(lines, "END:VEVENT", "END:VCALENDAR")
 	return strings.Join(lines, "\r\n")
 }
 
-// buildSignedVEVENTWithUID creates a signed part reusing an existing UID.
 func buildSignedVEVENTWithUID(uid string, start, end time.Time, allDay bool, sequence int) string {
 	dtstamp := time.Now().UTC().Format("20060102T150405Z")
-
 	var dtstart, dtend string
 	if allDay {
 		dtstart = fmt.Sprintf("DTSTART;VALUE=DATE:%s", start.Format("20060102"))
@@ -477,163 +206,95 @@ func buildSignedVEVENTWithUID(uid string, start, end time.Time, allDay bool, seq
 		dtstart = fmt.Sprintf("DTSTART:%s", start.UTC().Format("20060102T150405Z"))
 		dtend = fmt.Sprintf("DTEND:%s", end.UTC().Format("20060102T150405Z"))
 	}
-
 	lines := []string{
-		"BEGIN:VCALENDAR",
-		"VERSION:2.0",
-		"PRODID:-//proton-cli//EN",
+		"BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//proton-cli//EN",
 		"BEGIN:VEVENT",
-		fmt.Sprintf("UID:%s", uid),
-		fmt.Sprintf("DTSTAMP:%s", dtstamp),
-		dtstart,
-		dtend,
-		fmt.Sprintf("SEQUENCE:%d", sequence),
-		"END:VEVENT",
-		"END:VCALENDAR",
+		fmt.Sprintf("UID:%s", uid), fmt.Sprintf("DTSTAMP:%s", dtstamp),
+		dtstart, dtend, fmt.Sprintf("SEQUENCE:%d", sequence),
+		"END:VEVENT", "END:VCALENDAR",
 	}
 	return strings.Join(lines, "\r\n")
 }
 
-func runCalendarUpdateEvent(cmd *cobra.Command, args []string) error {
-	calendarID := args[0]
-	eventID := args[1]
-
-	ctx := context.Background()
-	c, err := getAuthenticatedClient(ctx)
+func searchEventByTitle(ctx context.Context, cl *client.Client, kr *crypto.KeyRings, search string) (string, string, error) {
+	resp, _, err := cl.Do(ctx, "GET", "/calendar/v1", nil, "", "", "")
 	if err != nil {
-		return err
+		return "", "", err
+	}
+	var calRes struct {
+		Calendars []struct{ ID string }
+	}
+	if err := json.Unmarshal(resp, &calRes); err != nil {
+		return "", "", err
 	}
 
-	password := getFlag(flagPassword, "PROTON_PASSWORD")
-	kr, err := crypto.UnlockKeys(ctx, c, password)
-	if err != nil {
-		return err
+	start, end := defaultTimeRange()
+	query := map[string]string{
+		"Start": fmt.Sprintf("%d", start), "End": fmt.Sprintf("%d", end),
+		"Timezone": "UTC", "Type": "0",
 	}
 
-	calKeys, err := crypto.UnlockCalendar(ctx, c, calendarID, kr)
-	if err != nil {
-		return err
+	type match struct {
+		calID, eventID, title string
+		startTime             time.Time
 	}
+	var matches []match
 
-	// Fetch existing event to get UID, times, etc.
-	resp, _, err := c.Do(ctx, "GET", "/calendar/v1/"+calendarID+"/events/"+eventID, nil, "", "", "")
-	if err != nil {
-		return err
-	}
-
-	var eventResp struct {
-		Event struct {
-			UID           string
-			StartTime     int64
-			EndTime       int64
-			FullDay       int
-			SharedEvents  []map[string]interface{}
-			SharedKeyPacket string
-		}
-	}
-	if err := json.Unmarshal(resp, &eventResp); err != nil {
-		return err
-	}
-
-	ev := eventResp.Event
-
-	// Decrypt existing encrypted part to get current title/location
-	var currentTitle, currentLocation string
-	var cards []map[string]interface{}
-	for _, s := range ev.SharedEvents {
-		cards = append(cards, s)
-	}
-	decrypted, _ := crypto.DecryptEventCards(cards, calKeys, ev.SharedKeyPacket)
-	for _, d := range decrypted {
-		for _, line := range strings.Split(d, "\n") {
-			line = strings.TrimSpace(line)
-			if strings.HasPrefix(line, "SUMMARY:") {
-				currentTitle = strings.TrimPrefix(line, "SUMMARY:")
-			}
-			if strings.HasPrefix(line, "LOCATION:") {
-				currentLocation = strings.TrimPrefix(line, "LOCATION:")
-			}
-		}
-	}
-
-	// Apply updates
-	title := currentTitle
-	if calUpdateTitle != "" {
-		title = calUpdateTitle
-	}
-	location := currentLocation
-	if calUpdateLocation != "" {
-		location = calUpdateLocation
-	}
-
-	startTime := time.Unix(ev.StartTime, 0)
-	endTime := time.Unix(ev.EndTime, 0)
-	if calUpdateStart != "" {
-		startTime, err = parseTime(calUpdateStart)
+	for _, cal := range calRes.Calendars {
+		calKeys, err := crypto.UnlockCalendar(ctx, cl, cal.ID, kr)
 		if err != nil {
-			return fmt.Errorf("invalid --start: %w", err)
+			continue
 		}
-		if calUpdateDuration != "" {
-			d, err := time.ParseDuration(calUpdateDuration)
+		evResp, _, err := cl.Do(ctx, "GET", "/calendar/v1/"+cal.ID+"/events", query, "", "", "")
+		if err != nil {
+			continue
+		}
+		var eventsRes struct {
+			Events []map[string]interface{}
+		}
+		if err := json.Unmarshal(evResp, &eventsRes); err != nil {
+			continue
+		}
+
+		for _, ev := range eventsRes.Events {
+			sharedKP, _ := ev["SharedKeyPacket"].(string)
+			shared, ok := ev["SharedEvents"].([]interface{})
+			if !ok {
+				continue
+			}
+			var cards []map[string]interface{}
+			for _, s := range shared {
+				if m, ok := s.(map[string]interface{}); ok {
+					cards = append(cards, m)
+				}
+			}
+			decrypted, err := crypto.DecryptEventCards(cards, calKeys, sharedKP)
 			if err != nil {
-				return fmt.Errorf("invalid --duration: %w", err)
+				continue
 			}
-			endTime = startTime.Add(d)
-		} else {
-			// Keep same duration
-			origDuration := time.Unix(ev.EndTime, 0).Sub(time.Unix(ev.StartTime, 0))
-			endTime = startTime.Add(origDuration)
+			for _, d := range decrypted {
+				title := parseICalField(d, "SUMMARY")
+				if title != "" && strings.Contains(strings.ToLower(title), strings.ToLower(search)) {
+					startTS, _ := ev["StartTime"].(float64)
+					matches = append(matches, match{
+						calID: cal.ID, eventID: ev["ID"].(string),
+						title: title, startTime: time.Unix(int64(startTS), 0),
+					})
+				}
+			}
 		}
-	} else if calUpdateDuration != "" {
-		d, err := time.ParseDuration(calUpdateDuration)
-		if err != nil {
-			return fmt.Errorf("invalid --duration: %w", err)
+	}
+
+	if len(matches) == 0 {
+		return "", "", fmt.Errorf("no event matching %q found in the next 30 days", search)
+	}
+	if len(matches) > 1 {
+		fmt.Fprintf(os.Stderr, "Multiple matches for %q:\n", search)
+		for _, m := range matches {
+			fmt.Fprintf(os.Stderr, "  %s  %s  (calendar %s, event %s)\n",
+				m.startTime.Local().Format("2006-01-02 15:04"), m.title, m.calID, m.eventID)
 		}
-		endTime = startTime.Add(d)
+		return "", "", fmt.Errorf("ambiguous: %d events match %q, use CALENDAR_ID EVENT_ID", len(matches), search)
 	}
-
-	allDay := ev.FullDay == 1
-	signedVevent := buildSignedVEVENTWithUID(ev.UID, startTime, endTime, allDay, 1)
-	encryptedVevent := buildEncryptedVEVENT(title, location)
-
-	signedCard, encryptedCard, _, err := crypto.EncryptEventCards(signedVevent, encryptedVevent, calKeys, ev.SharedKeyPacket)
-	if err != nil {
-		return err
-	}
-
-	members, err := getCalendarMembersForSync(ctx, c, calendarID, kr)
-	if err != nil {
-		return err
-	}
-
-	syncData := map[string]interface{}{
-		"MemberID": members.memberID,
-		"Events": []map[string]interface{}{
-			{
-				"ID": eventID,
-				"Event": map[string]interface{}{
-					"Permissions":        63,
-					"IsOrganizer":        1,
-					"SharedEventContent": []interface{}{signedCard, encryptedCard},
-					"Notifications":      nil,
-					"Color":              nil,
-				},
-			},
-		},
-	}
-
-	body, _ := json.Marshal(syncData)
-	result, statusCode, err := c.Do(ctx, "PUT", "/calendar/v1/"+calendarID+"/events/sync", nil, string(body), "", "")
-	if err != nil {
-		return err
-	}
-
-	if statusCode >= 400 {
-		fmt.Fprintf(os.Stderr, "Error: %s\n", string(result))
-		os.Exit(1)
-	}
-
-	fmt.Fprintf(os.Stderr, "Event updated.\n")
-	printJSON(result)
-	return nil
+	return matches[0].calID, matches[0].eventID, nil
 }

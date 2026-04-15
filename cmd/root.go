@@ -12,12 +12,13 @@ var (
 	flagTOTP       string
 	flagAPIURL     string
 	flagAppVersion string
+	flagJSON       bool
 )
 
 var rootCmd = &cobra.Command{
 	Use:   "proton-cli",
 	Short: "CLI for the Proton API",
-	Long:  "A command-line tool for interacting with the Proton API (Drive, Calendar, and more). Handles SRP authentication automatically.",
+	Long:  "A command-line tool for interacting with the Proton API (Drive, Calendar, Mail, Contacts). Handles SRP authentication and end-to-end encryption automatically.",
 }
 
 func init() {
@@ -25,7 +26,9 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&flagPassword, "password", "", "Account password (env: PROTON_PASSWORD)")
 	rootCmd.PersistentFlags().StringVar(&flagTOTP, "totp", "", "TOTP 2FA code (env: PROTON_TOTP)")
 	rootCmd.PersistentFlags().StringVar(&flagAPIURL, "api-url", "", "API base URL (env: PROTON_API_URL, default: https://mail.proton.me/api)")
-	rootCmd.PersistentFlags().StringVar(&flagAppVersion, "app-version", "", "App version header (env: PROTON_APP_VERSION, default: {os}-bridge@3.23.1)")
+	rootCmd.PersistentFlags().StringVar(&flagAppVersion, "app-version", "", "App version header (env: PROTON_APP_VERSION)")
+	rootCmd.PersistentFlags().BoolVar(&flagJSON, "json", false, "Output raw JSON instead of human-readable format")
+	rootCmd.CompletionOptions.DisableDefaultCmd = true
 }
 
 // Execute runs the root command.

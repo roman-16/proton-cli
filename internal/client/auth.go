@@ -208,6 +208,72 @@ func (c *Client) auth2FA(ctx context.Context, totp string) error {
 	return nil
 }
 
+// UnlockPasswordScope performs SRP re-authentication against the current session
+// to unlock the "locked" scope needed for sensitive operations (e.g. calendar delete).
+// This is equivalent to the web client's "Enter your password" modal.
+func (c *Client) UnlockPasswordScope(ctx context.Context, username string, password []byte) error {
+	// Step 1: Get auth info within the existing session.
+	info, err := c.getAuthInfo(ctx, username)
+	if err != nil {
+		return fmt.Errorf("scope unlock failed: %w", err)
+	}
+
+	// Step 2: SRP proof.
+	srpAuth, err := srp.NewAuth(info.Version, username, password, info.Salt, info.Modulus, info.ServerEphemeral)
+	if err != nil {
+		return fmt.Errorf("scope unlock SRP setup failed: %w", err)
+	}
+
+	proofs, err := srpAuth.GenerateProofs(2048)
+	if err != nil {
+		return fmt.Errorf("scope unlock SRP proof failed: %w", err)
+	}
+
+	reqBody, _ := json.Marshal(map[string]interface{}{
+		"ClientProof":     base64.StdEncoding.EncodeToString(proofs.ClientProof),
+		"ClientEphemeral": base64.StdEncoding.EncodeToString(proofs.ClientEphemeral),
+		"SRPSession":      info.SRPSession,
+	})
+
+	c.mu.RLock()
+	uid := c.uid
+	acc := c.acc
+	c.mu.RUnlock()
+
+	req, err := http.NewRequestWithContext(ctx, "PUT", c.baseURL+"/core/v4/users/password", strings.NewReader(string(reqBody)))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-pm-appversion", c.appVersion)
+	req.Header.Set("x-pm-uid", uid)
+	req.Header.Set("Authorization", "Bearer "+acc)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("scope unlock request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	var result struct {
+		Code int
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return fmt.Errorf("scope unlock parse error: %w", err)
+	}
+
+	if result.Code != 1000 {
+		return fmt.Errorf("scope unlock failed (code %d): %s", result.Code, string(body))
+	}
+
+	return nil
+}
+
 // Login performs the full web-style auth flow:
 // 1. Create unauthenticated session
 // 2. Get SRP auth info
