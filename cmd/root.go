@@ -7,6 +7,8 @@ import (
 )
 
 var (
+	version = "dev"
+
 	flagUser       string
 	flagPassword   string
 	flagTOTP       string
@@ -16,9 +18,10 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "proton-cli",
-	Short: "CLI for the Proton API",
-	Long:  "A command-line tool for interacting with the Proton API (Drive, Calendar, Mail, Contacts). Handles SRP authentication and end-to-end encryption automatically.",
+	Use:     "proton-cli",
+	Short:   "CLI for the Proton API",
+	Long:    "A command-line tool for interacting with the Proton API (Drive, Calendar, Mail, Contacts). Handles SRP authentication and end-to-end encryption automatically.",
+	Version: version,
 }
 
 func init() {
