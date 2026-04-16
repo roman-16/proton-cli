@@ -12,12 +12,19 @@ func TestContactsList(t *testing.T) {
 	assertContains(t, stdout, "ID")
 	assertContains(t, stdout, "NAME")
 	assertContains(t, stdout, "EMAIL")
+	assertContains(t, stdout, "PHONE")
 }
 
 func TestContactsListJSON(t *testing.T) {
 	skipIfNoCredentials(t)
 	arr := runJSONArray(t, "contacts", "list")
-	_ = arr
+	if len(arr) == 0 {
+		t.Skip("no contacts found")
+	}
+	c := arr[0].(map[string]interface{})
+	if c["ID"] == nil || c["ID"] == "" {
+		t.Error("contact missing ID")
+	}
 }
 
 // createTestContact creates a contact and registers cleanup. Returns contact ID.
@@ -49,18 +56,21 @@ func TestContactsCreateGetDelete(t *testing.T) {
 
 	contactID := createTestContact(t, name, email)
 
-	// Get by ID
+	// Get by ID — verify exact fields
 	getOut := runOK(t, "contacts", "get", contactID)
-	assertContains(t, getOut, name)
-	assertContains(t, getOut, email)
+	assertField(t, getOut, "ID:", contactID)
+	assertField(t, getOut, "Name:", name)
+	assertField(t, getOut, "Email:", email)
 
-	// Get by name
+	// Get by name — same email
 	getOut2 := runOK(t, "contacts", "get", name)
-	assertContains(t, getOut2, email)
+	assertField(t, getOut2, "Email:", email)
+	assertField(t, getOut2, "Name:", name)
 
-	// Get by email
+	// Get by email — same name
 	getOut3 := runOK(t, "contacts", "get", email)
-	assertContains(t, getOut3, name)
+	assertField(t, getOut3, "Name:", name)
+	assertField(t, getOut3, "Email:", email)
 }
 
 func TestContactsGetByName(t *testing.T) {
@@ -68,12 +78,11 @@ func TestContactsGetByName(t *testing.T) {
 	name := testID() + "-getname"
 	email := testID() + "@example.com"
 
-	contactID := createTestContact(t, name, email)
-	_ = contactID
+	createTestContact(t, name, email)
 
 	out := runOK(t, "contacts", "get", name)
-	assertContains(t, out, "Name:")
-	assertContains(t, out, name)
+	assertField(t, out, "Name:", name)
+	assertField(t, out, "Email:", email)
 }
 
 func TestContactsUpdate(t *testing.T) {
@@ -87,9 +96,11 @@ func TestContactsUpdate(t *testing.T) {
 	newName := name + "-v2"
 	runOK(t, "contacts", "update", contactID, "--name", newName)
 
-	// Verify
+	// Verify new name, email preserved
 	out := runOK(t, "contacts", "get", contactID)
-	assertContains(t, out, newName)
+	assertField(t, out, "Name:", newName)
+	assertField(t, out, "Email:", email)
+	assertNotContains(t, out, name+"\n") // old name gone (but newName contains old name as prefix, so match on line boundary)
 }
 
 func TestContactsUpdatePhone(t *testing.T) {
@@ -102,9 +113,11 @@ func TestContactsUpdatePhone(t *testing.T) {
 	// Add phone
 	runOK(t, "contacts", "update", contactID, "--phone", "+43999888777")
 
-	// Verify
-	out := runOK(t, "contacts", "get", contactID, "--json")
-	assertContains(t, out, "+43999888777")
+	// Verify phone added, other fields intact
+	out := runOK(t, "contacts", "get", contactID)
+	assertField(t, out, "Name:", name)
+	assertField(t, out, "Email:", email)
+	assertField(t, out, "Phone:", "+43999888777")
 }
 
 func TestContactsDeleteByName(t *testing.T) {

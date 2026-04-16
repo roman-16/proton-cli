@@ -146,6 +146,24 @@ func assertNotContains(t *testing.T, stdout, substr string) {
 	}
 }
 
+// assertField checks that a "Key: Value" line in the output has the expected value.
+// Matches lines like "Name:     some value" with flexible whitespace.
+func assertField(t *testing.T, stdout, field, expected string) {
+	t.Helper()
+	for _, line := range strings.Split(stdout, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, field) {
+			value := strings.TrimSpace(strings.TrimPrefix(line, field))
+			if value == expected {
+				return
+			}
+			t.Errorf("field %s: got %q, want %q", field, value, expected)
+			return
+		}
+	}
+	t.Errorf("field %s not found in output:\n%s", field, truncateOutput(stdout))
+}
+
 // cleanup registers a cleanup function that logs a loud error if it fails.
 // The description should tell the user exactly what to delete manually.
 func cleanup(t *testing.T, description string, fn func() error) {

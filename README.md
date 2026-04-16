@@ -1,6 +1,6 @@
 # proton-cli
 
-A command-line tool for [Proton](https://proton.me) — Mail, Drive, Calendar, and Contacts from your terminal.
+A command-line tool for [Proton](https://proton.me) — Mail, Drive, Calendar, Pass, and Contacts from your terminal.
 
 Implements the same authentication and encryption as the [Proton web client](https://github.com/ProtonMail/WebClients): SRP login, PGP key hierarchy, and full end-to-end encryption using [go-srp](https://github.com/ProtonMail/go-srp) and [gopenpgp](https://github.com/ProtonMail/gopenpgp).
 
@@ -224,6 +224,41 @@ proton-cli contacts delete "John Doe"
 proton-cli contacts delete CONTACT_ID
 ```
 
+### Pass (Password Manager)
+
+```bash
+# List vaults
+proton-cli pass vaults list
+
+# List all items
+proton-cli pass list
+proton-cli pass list --vault "Work"
+
+# Get item (by IDs or name/URL search)
+proton-cli pass get SHARE_ID ITEM_ID
+proton-cli pass get "github.com"
+proton-cli pass get "My Login"
+
+# Create items
+proton-cli pass create --type login --name "GitHub" --username "me" --password "secret" --url "github.com"
+proton-cli pass create --type note --name "My Note" --note "Some text"
+proton-cli pass create --type card --name "Visa" --holder "Roman" --number "4111..." --expiry "2028-12"
+
+# Edit item
+proton-cli pass edit SHARE_ID ITEM_ID --password "new-secret"
+proton-cli pass edit "GitHub" --username "new-me"
+
+# Trash / restore / delete
+proton-cli pass trash SHARE_ID ITEM_ID
+proton-cli pass restore SHARE_ID ITEM_ID
+proton-cli pass delete SHARE_ID ITEM_ID
+proton-cli pass delete "GitHub"
+
+# Manage vaults
+proton-cli pass vaults create --name "Work"
+proton-cli pass vaults delete SHARE_ID
+```
+
 ### Settings
 
 ```bash
@@ -288,6 +323,8 @@ proton-cli drive ls --json
 | Drive names | Parent node key | Address key |
 | Contacts | User key | User key |
 | Mail | Session key | Address key |
+| Pass items | AES-256-GCM (item key) | N/A (symmetric) |
+| Pass vaults | AES-256-GCM (vault key) | N/A (symmetric) |
 
 ## API Reference
 

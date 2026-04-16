@@ -20,7 +20,7 @@ var (
 var rootCmd = &cobra.Command{
 	Use:     "proton-cli",
 	Short:   "CLI for the Proton API",
-	Long:    "A command-line tool for interacting with the Proton API (Drive, Calendar, Mail, Contacts). Handles SRP authentication and end-to-end encryption automatically.",
+	Long:    "A command-line tool for interacting with the Proton API (Mail, Drive, Calendar, Pass, and Contacts). Handles SRP authentication and end-to-end encryption automatically.",
 	Version: version,
 }
 

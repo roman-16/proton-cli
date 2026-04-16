@@ -12,13 +12,22 @@ func TestCalendarList(t *testing.T) {
 	stdout := runOK(t, "calendar", "list")
 	assertContains(t, stdout, "ID")
 	assertContains(t, stdout, "NAME")
+	assertContains(t, stdout, "COLOR")
 }
 
 func TestCalendarListJSON(t *testing.T) {
 	skipIfNoCredentials(t)
 	data := runJSON(t, "calendar", "list")
-	if _, ok := data["Calendars"]; !ok {
-		t.Error("expected Calendars in JSON output")
+	calendars, ok := data["Calendars"].([]interface{})
+	if !ok {
+		t.Fatal("expected Calendars array in JSON output")
+	}
+	if len(calendars) == 0 {
+		t.Skip("no calendars found")
+	}
+	cal := calendars[0].(map[string]interface{})
+	if cal["ID"] == nil || cal["ID"] == "" {
+		t.Error("calendar missing ID")
 	}
 }
 
@@ -27,21 +36,19 @@ func TestCalendarListEvents(t *testing.T) {
 	stdout := runOK(t, "calendar", "list-events")
 	assertContains(t, stdout, "DATE")
 	assertContains(t, stdout, "TITLE")
+	assertContains(t, stdout, "DURATION")
 }
 
 func TestCalendarListEventsDateRange(t *testing.T) {
 	skipIfNoCredentials(t)
-	// Create an event on a known date
 	title := testID() + "-range"
 	start := time.Now().Add(48*time.Hour).Format("2006-01-02") + "T10:00"
 
 	runOK(t, "calendar", "create-event", "--title", title, "--start", start, "--duration", "1h")
 
-	// Cleanup: delete by title
 	cleanupRun(t, fmt.Sprintf("Delete event: proton-cli calendar delete-event %q", title),
 		"calendar", "delete-event", title)
 
-	// List with date range that includes it
 	startDate := time.Now().Format("2006-01-02")
 	endDate := time.Now().Add(72 * time.Hour).Format("2006-01-02")
 	stdout := runOK(t, "calendar", "list-events", "--start", startDate, "--end", endDate)
@@ -60,16 +67,15 @@ func TestCalendarCreateDeleteEvent(t *testing.T) {
 	skipIfNoCredentials(t)
 	title := testID() + "-event"
 
-	// Create
 	start := time.Now().Add(24*time.Hour).Format("2006-01-02") + "T14:00"
 	runOK(t, "calendar", "create-event", "--title", title, "--start", start, "--duration", "1h")
 
 	cleanupRun(t, fmt.Sprintf("Delete event: proton-cli calendar delete-event %q", title),
 		"calendar", "delete-event", title)
 
-	// Verify in list
 	stdout := runOK(t, "calendar", "list-events")
 	assertContains(t, stdout, title)
+	assertContains(t, stdout, "1h")
 }
 
 func TestCalendarCreateEventWithLocation(t *testing.T) {
@@ -82,10 +88,10 @@ func TestCalendarCreateEventWithLocation(t *testing.T) {
 	cleanupRun(t, fmt.Sprintf("Delete event: proton-cli calendar delete-event %q", title),
 		"calendar", "delete-event", title)
 
-	// Get by title and verify location
 	stdout := runOK(t, "calendar", "get-event", title)
-	assertContains(t, stdout, title)
-	assertContains(t, stdout, "Vienna")
+	assertField(t, stdout, "Event:", title)
+	assertField(t, stdout, "Location:", "Vienna")
+	assertField(t, stdout, "Duration:", "2h")
 }
 
 func TestCalendarGetEventByTitle(t *testing.T) {
@@ -99,9 +105,8 @@ func TestCalendarGetEventByTitle(t *testing.T) {
 		"calendar", "delete-event", title)
 
 	stdout := runOK(t, "calendar", "get-event", title)
-	assertContains(t, stdout, "Event:")
-	assertContains(t, stdout, title)
-	assertContains(t, stdout, "Duration:")
+	assertField(t, stdout, "Event:", title)
+	assertField(t, stdout, "Duration:", "30m")
 }
 
 func TestCalendarGetEventByID(t *testing.T) {
@@ -120,7 +125,6 @@ func TestCalendarGetEventByID(t *testing.T) {
 	var calID, evtID string
 	for _, e := range events {
 		ev := e.(map[string]interface{})
-		// Match by decrypted title
 		if decrypted, ok := ev["DecryptedSharedEvents"].([]interface{}); ok {
 			for _, d := range decrypted {
 				if ds, ok := d.(string); ok {
@@ -140,9 +144,11 @@ func TestCalendarGetEventByID(t *testing.T) {
 		t.Fatal("could not find created event in list-events --json")
 	}
 
-	// Get by IDs
 	stdout := runOK(t, "calendar", "get-event", calID, evtID)
-	assertContains(t, stdout, title)
+	assertField(t, stdout, "Event:", title)
+	assertField(t, stdout, "Duration:", "1h")
+	assertField(t, stdout, "ID:", evtID)
+	assertField(t, stdout, "Calendar:", calID)
 }
 
 func TestCalendarDeleteEventByTitle(t *testing.T) {
@@ -152,10 +158,8 @@ func TestCalendarDeleteEventByTitle(t *testing.T) {
 
 	runOK(t, "calendar", "create-event", "--title", title, "--start", start, "--duration", "1h")
 
-	// Delete by title
 	runOK(t, "calendar", "delete-event", title)
 
-	// Verify gone
 	stdout := runOK(t, "calendar", "list-events")
 	assertNotContains(t, stdout, title)
 }
@@ -178,9 +182,9 @@ func TestCalendarCreateDeleteCalendar(t *testing.T) {
 	cleanupRun(t, fmt.Sprintf("Delete calendar: proton-cli calendar delete %s", calID),
 		"calendar", "delete", calID)
 
-	// Verify in list
 	listOut := runOK(t, "calendar", "list")
 	assertContains(t, listOut, calID)
+	assertContains(t, listOut, name)
 }
 
 // contains checks if a string contains a substring (used for iCal content).

@@ -5,6 +5,7 @@
     "gopls@latest",
     "golangci-lint@latest",
     "nodejs@latest",
-    "just@latest"
+    "just@latest",
+    "protobuf@latest"
   ]
 }

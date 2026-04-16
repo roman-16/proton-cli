@@ -16,6 +16,7 @@ func TestMailList(t *testing.T) {
 	assertContains(t, stdout, "ID")
 	assertContains(t, stdout, "FROM")
 	assertContains(t, stdout, "SUBJECT")
+	assertContains(t, stdout, "DATE")
 }
 
 func TestMailListSent(t *testing.T) {
@@ -27,8 +28,21 @@ func TestMailListSent(t *testing.T) {
 func TestMailListJSON(t *testing.T) {
 	skipIfNoCredentials(t)
 	data := runJSON(t, "mail", "list")
-	if _, ok := data["Messages"]; !ok {
-		t.Error("expected Messages in JSON output")
+	messages, ok := data["Messages"].([]interface{})
+	if !ok {
+		t.Fatal("expected Messages array in JSON output")
+	}
+	if _, ok := data["Total"]; !ok {
+		t.Error("expected Total in JSON output")
+	}
+	if len(messages) > 0 {
+		msg := messages[0].(map[string]interface{})
+		if msg["ID"] == nil || msg["ID"] == "" {
+			t.Error("message missing ID")
+		}
+		if msg["Subject"] == nil {
+			t.Error("message missing Subject")
+		}
 	}
 }
 
@@ -51,7 +65,6 @@ func TestMailSearch(t *testing.T) {
 
 func TestMailSearchFrom(t *testing.T) {
 	skipIfNoCredentials(t)
-	// Search for something that likely exists
 	runOK(t, "mail", "search", "--from", selfEmail())
 }
 
@@ -66,7 +79,7 @@ func TestMailSearchEmpty(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("search should not fail on empty results, exit %d", code)
 	}
-	_ = stdout // empty results are fine
+	_ = stdout
 }
 
 // ── mail send + read ──
@@ -76,10 +89,25 @@ func TestMailSendAndRead(t *testing.T) {
 	subject := testID() + "-send-read"
 	msgID := sendTestMail(t, subject)
 
-	// Read it
 	stdout := runOK(t, "mail", "read", msgID)
 	assertContains(t, stdout, subject)
 	assertContains(t, stdout, "DecryptedBody")
+	assertContains(t, stdout, selfEmail())
+
+	// JSON structure check
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(stdout), &result); err != nil {
+		t.Fatalf("mail read output is not valid JSON: %v", err)
+	}
+	if result["ID"] != msgID {
+		t.Errorf("ID: got %v, want %s", result["ID"], msgID)
+	}
+	if result["Subject"] != subject {
+		t.Errorf("Subject: got %v, want %s", result["Subject"], subject)
+	}
+	if result["DecryptedBody"] == nil || result["DecryptedBody"] == "" {
+		t.Error("DecryptedBody is empty")
+	}
 }
 
 // ── mail mark ──
@@ -99,6 +127,9 @@ func TestMailMarkUnreadRead(t *testing.T) {
 	for _, m := range messages {
 		if m.(map[string]interface{})["ID"].(string) == msgID {
 			found = true
+			if m.(map[string]interface{})["Unread"].(float64) != 1 {
+				t.Error("message should have Unread=1")
+			}
 			break
 		}
 	}
@@ -132,8 +163,12 @@ func TestMailMarkStarUnstar(t *testing.T) {
 	messages := data["Messages"].([]interface{})
 	found := false
 	for _, m := range messages {
-		if m.(map[string]interface{})["ID"].(string) == msgID {
+		msg := m.(map[string]interface{})
+		if msg["ID"].(string) == msgID {
 			found = true
+			if msg["Subject"].(string) != subject {
+				t.Errorf("starred message Subject: got %v, want %s", msg["Subject"], subject)
+			}
 			break
 		}
 	}
@@ -160,8 +195,12 @@ func TestMailMoveArchiveAndBack(t *testing.T) {
 	messages := data["Messages"].([]interface{})
 	found := false
 	for _, m := range messages {
-		if m.(map[string]interface{})["ID"].(string) == msgID {
+		msg := m.(map[string]interface{})
+		if msg["ID"].(string) == msgID {
 			found = true
+			if msg["Subject"].(string) != subject {
+				t.Errorf("archived message Subject: got %v, want %s", msg["Subject"], subject)
+			}
 			break
 		}
 	}
@@ -192,7 +231,7 @@ func TestMailTrash(t *testing.T) {
 		}
 	}
 
-	// Move back (cleanup already handles permanent delete)
+	// Move back
 	runOK(t, "mail", "move", "--folder", "inbox", "--", msgID)
 }
 
@@ -201,7 +240,6 @@ func TestMailTrash(t *testing.T) {
 func TestMailAttachmentsList(t *testing.T) {
 	skipIfNoCredentials(t)
 
-	// Find a message with attachments
 	data := runJSON(t, "mail", "list")
 	messages := data["Messages"].([]interface{})
 	var msgID string
@@ -219,12 +257,13 @@ func TestMailAttachmentsList(t *testing.T) {
 	stdout := runOK(t, "mail", "attachments", "list", msgID)
 	assertContains(t, stdout, "ID")
 	assertContains(t, stdout, "NAME")
+	assertContains(t, stdout, "SIZE")
+	assertContains(t, stdout, "TYPE")
 }
 
 func TestMailAttachmentsDownload(t *testing.T) {
 	skipIfNoCredentials(t)
 
-	// Find a message with attachments
 	data := runJSON(t, "mail", "list")
 	messages := data["Messages"].([]interface{})
 	var msgID string
@@ -239,7 +278,6 @@ func TestMailAttachmentsDownload(t *testing.T) {
 		t.Skip("no messages with attachments found")
 	}
 
-	// Get first attachment ID
 	attOut := runOK(t, "mail", "attachments", "list", msgID, "--json")
 	var atts []map[string]interface{}
 	if err := json.Unmarshal([]byte(attOut), &atts); err != nil {
@@ -249,8 +287,8 @@ func TestMailAttachmentsDownload(t *testing.T) {
 		t.Skip("message has no parseable attachments")
 	}
 	attID := atts[0]["ID"].(string)
+	attName := atts[0]["Name"].(string)
 
-	// Download
 	outPath := filepath.Join(t.TempDir(), "test-attachment")
 	runOK(t, "mail", "attachments", "download", msgID, attID, outPath)
 
@@ -259,7 +297,7 @@ func TestMailAttachmentsDownload(t *testing.T) {
 		t.Fatalf("downloaded file not found: %v", err)
 	}
 	if info.Size() == 0 {
-		t.Error("downloaded attachment is empty")
+		t.Errorf("downloaded attachment %q is empty", attName)
 	}
 }
 
@@ -270,6 +308,8 @@ func TestMailLabelsList(t *testing.T) {
 	stdout := runOK(t, "mail", "labels", "list")
 	assertContains(t, stdout, "ID")
 	assertContains(t, stdout, "TYPE")
+	assertContains(t, stdout, "NAME")
+	assertContains(t, stdout, "COLOR")
 }
 
 func TestMailLabelsCreateDeleteLabel(t *testing.T) {
@@ -278,7 +318,6 @@ func TestMailLabelsCreateDeleteLabel(t *testing.T) {
 
 	stdout := runOK(t, "mail", "labels", "create", "--name", name, "--color", "#8080FF")
 
-	// Extract label ID
 	var result map[string]interface{}
 	if err := json.Unmarshal([]byte(stdout), &result); err != nil {
 		t.Fatalf("failed to parse create output: %v", err)
@@ -287,13 +326,17 @@ func TestMailLabelsCreateDeleteLabel(t *testing.T) {
 	if labelID == "" {
 		t.Fatal("no Label.ID in create response")
 	}
+	labelName := jsonField(result, "Label", "Name")
+	if labelName != name {
+		t.Errorf("Label.Name: got %q, want %q", labelName, name)
+	}
 
 	cleanupRun(t, fmt.Sprintf("Delete label: proton-cli mail labels delete %s", labelID),
 		"mail", "labels", "delete", labelID)
 
-	// Verify it exists
 	listOut := runOK(t, "mail", "labels", "list")
 	assertContains(t, listOut, name)
+	assertContains(t, listOut, labelID)
 }
 
 func TestMailLabelsCreateDeleteFolder(t *testing.T) {
@@ -316,6 +359,7 @@ func TestMailLabelsCreateDeleteFolder(t *testing.T) {
 
 	listOut := runOK(t, "mail", "labels", "list")
 	assertContains(t, listOut, name)
+	assertContains(t, listOut, "FOLDER")
 }
 
 // ── mail addresses ──
@@ -325,6 +369,7 @@ func TestMailAddressesList(t *testing.T) {
 	stdout := runOK(t, "mail", "addresses", "list")
 	assertContains(t, stdout, "EMAIL")
 	assertContains(t, stdout, selfEmail())
+	assertContains(t, stdout, "active")
 }
 
 // ── mail filters ──
@@ -346,16 +391,23 @@ func TestMailFiltersCRUD(t *testing.T) {
 	if filterID == "" {
 		t.Fatal("no Filter.ID in create response")
 	}
+	filterName := jsonField(result, "Filter", "Name")
+	if filterName != name {
+		t.Errorf("Filter.Name: got %q, want %q", filterName, name)
+	}
 
 	cleanupRun(t, fmt.Sprintf("Delete filter: proton-cli mail filters delete %s", filterID),
 		"mail", "filters", "delete", filterID)
 
-	// List
+	// List — verify name and enabled status
 	listOut := runOK(t, "mail", "filters", "list")
 	assertContains(t, listOut, name)
+	assertContains(t, listOut, "enabled")
 
 	// Disable
 	runOK(t, "mail", "filters", "disable", filterID)
+	listOut2 := runOK(t, "mail", "filters", "list")
+	assertContains(t, listOut2, "disabled")
 
 	// Enable
 	runOK(t, "mail", "filters", "enable", filterID)

@@ -10,28 +10,34 @@ import (
 func TestDriveLsRoot(t *testing.T) {
 	skipIfNoCredentials(t)
 	stdout := runOK(t, "drive", "ls")
-	// Root should have at least some entries
 	if len(stdout) < 10 {
 		t.Error("expected non-empty ls output for root")
 	}
+	// Root listing should show FILE or DIR entries
+	assertContains(t, stdout, "DIR")
 }
 
 func TestDriveLsSubfolder(t *testing.T) {
 	skipIfNoCredentials(t)
-	// Create a folder to list
 	name := testID() + "-lssub"
 	runOK(t, "drive", "mkdir", "/"+name)
 	cleanupRun(t, fmt.Sprintf("Delete folder: proton-cli drive rm /%s", name),
 		"drive", "rm", "/"+name)
 
-	stdout := runOK(t, "drive", "ls", "/"+name)
-	_ = stdout // empty folder is fine
+	// Empty folder — should exit 0 with no error
+	runOK(t, "drive", "ls", "/"+name)
 }
 
 func TestDriveLsJSON(t *testing.T) {
 	skipIfNoCredentials(t)
 	arr := runJSONArray(t, "drive", "ls")
-	_ = arr // just verify it's valid JSON array
+	if len(arr) == 0 {
+		t.Skip("root is empty")
+	}
+	entry := arr[0].(map[string]interface{})
+	if entry["DecryptedName"] == nil || entry["DecryptedName"] == "" {
+		t.Error("entry missing DecryptedName")
+	}
 }
 
 func TestDriveMkdirRoot(t *testing.T) {
@@ -58,6 +64,7 @@ func TestDriveMkdirNested(t *testing.T) {
 
 	stdout := runOK(t, "drive", "ls", "/"+parent)
 	assertContains(t, stdout, child)
+	assertContains(t, stdout, "DIR")
 }
 
 func TestDriveUploadAndLs(t *testing.T) {
@@ -67,16 +74,14 @@ func TestDriveUploadAndLs(t *testing.T) {
 	cleanupRun(t, fmt.Sprintf("Delete folder: proton-cli drive rm /%s", folder),
 		"drive", "rm", "/"+folder)
 
-	// Create temp file
 	tmpFile := filepath.Join(t.TempDir(), "upload-test.txt")
 	_ = os.WriteFile(tmpFile, []byte("upload integration test content"), 0644)
 
-	// Upload
 	runOK(t, "drive", "upload", tmpFile, "/"+folder)
 
-	// Verify
 	stdout := runOK(t, "drive", "ls", "/"+folder)
 	assertContains(t, stdout, "upload-test.txt")
+	assertContains(t, stdout, "FILE")
 }
 
 func TestDriveUploadToRoot(t *testing.T) {
@@ -105,7 +110,6 @@ func TestDriveDownloadToFile(t *testing.T) {
 	_ = os.WriteFile(tmpFile, []byte(content), 0644)
 	runOK(t, "drive", "upload", tmpFile, "/"+folder)
 
-	// Download
 	outPath := filepath.Join(t.TempDir(), "dl-output.txt")
 	runOK(t, "drive", "download", "/"+folder+"/dl-source.txt", outPath)
 
@@ -114,7 +118,7 @@ func TestDriveDownloadToFile(t *testing.T) {
 		t.Fatalf("failed to read downloaded file: %v", err)
 	}
 	if string(data) != content {
-		t.Errorf("downloaded content mismatch: got %q, want %q", string(data), content)
+		t.Errorf("downloaded content: got %q, want %q", string(data), content)
 	}
 }
 
@@ -132,7 +136,7 @@ func TestDriveDownloadToStdout(t *testing.T) {
 
 	stdout := runOK(t, "drive", "download", "/"+folder+"/stdout-src.txt")
 	if stdout != content {
-		t.Errorf("stdout download mismatch: got %q, want %q", stdout, content)
+		t.Errorf("stdout download: got %q, want %q", stdout, content)
 	}
 }
 
@@ -147,7 +151,6 @@ func TestDriveRename(t *testing.T) {
 	_ = os.WriteFile(tmpFile, []byte("rename test"), 0644)
 	runOK(t, "drive", "upload", tmpFile, "/"+folder)
 
-	// Rename
 	runOK(t, "drive", "rename", "/"+folder+"/before.txt", "after.txt")
 
 	stdout := runOK(t, "drive", "ls", "/"+folder)
@@ -161,7 +164,6 @@ func TestDriveRenameFolder(t *testing.T) {
 	renamed := testID() + "-renamed"
 
 	runOK(t, "drive", "mkdir", "/"+original)
-	// Cleanup uses renamed name since that's what it'll be after the test
 	cleanupRun(t, fmt.Sprintf("Delete folder: proton-cli drive rm /%s", renamed),
 		"drive", "rm", "/"+renamed)
 
@@ -189,10 +191,8 @@ func TestDriveMv(t *testing.T) {
 	_ = os.WriteFile(tmpFile, []byte("move test"), 0644)
 	runOK(t, "drive", "upload", tmpFile, "/"+folderA)
 
-	// Move from A to B
 	runOK(t, "drive", "mv", "/"+folderA+"/moveme.txt", "/"+folderB)
 
-	// Verify
 	outA := runOK(t, "drive", "ls", "/"+folderA)
 	assertNotContains(t, outA, "moveme.txt")
 
@@ -204,7 +204,6 @@ func TestDriveRm(t *testing.T) {
 	skipIfNoCredentials(t)
 	folder := testID() + "-rm"
 	runOK(t, "drive", "mkdir", "/"+folder)
-	// No cleanup needed — we're testing rm itself
 
 	tmpFile := filepath.Join(t.TempDir(), "deleteme.txt")
 	_ = os.WriteFile(tmpFile, []byte("delete test"), 0644)
@@ -230,12 +229,10 @@ func TestDriveRmPermanent(t *testing.T) {
 	_ = os.WriteFile(tmpFile, []byte("permanent delete test"), 0644)
 	runOK(t, "drive", "upload", tmpFile, "/"+folder)
 
-	// Permanent delete
 	runOK(t, "drive", "rm", "--permanent", "/"+folder+"/permdel.txt")
 	stdout := runOK(t, "drive", "ls", "/"+folder)
 	assertNotContains(t, stdout, "permdel.txt")
 
-	// Cleanup folder
 	runOK(t, "drive", "rm", "/"+folder)
 }
 
@@ -244,17 +241,14 @@ func TestDriveTrashList(t *testing.T) {
 	folder := testID() + "-trashls"
 	runOK(t, "drive", "mkdir", "/"+folder)
 
-	// Trash it
 	runOK(t, "drive", "rm", "/"+folder)
 
-	// List trash
 	stdout, _, code := run(t, "drive", "trash", "list")
 	if code != 0 {
 		t.Fatalf("trash list failed: exit %d", code)
 	}
-	_ = stdout // just verify it runs
+	_ = stdout
 
-	// Empty trash to clean up
 	runOK(t, "drive", "trash", "empty")
 }
 
@@ -264,6 +258,5 @@ func TestDriveTrashEmpty(t *testing.T) {
 	runOK(t, "drive", "mkdir", "/"+folder)
 	runOK(t, "drive", "rm", "/"+folder)
 
-	// Empty — just verify it exits 0
 	runOK(t, "drive", "trash", "empty")
 }

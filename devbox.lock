@@ -2,8 +2,8 @@
   "lockfile_version": "1",
   "packages": {
     "github:NixOS/nixpkgs/nixpkgs-unstable": {
-      "last_modified": "2026-04-11T06:17:25Z",
-      "resolved": "github:NixOS/nixpkgs/13043924aaa7375ce482ebe2494338e058282925?lastModified=1775888245&narHash=sha256-nwASzrRDD1JBEu%2Fo8ekKYEXm%2FoJW6EMCzCRdrwcLe90%3D"
+      "last_modified": "2026-04-15T12:22:54Z",
+      "resolved": "github:NixOS/nixpkgs/566acc07c54dc807f91625bb286cb9b321b5f42a?lastModified=1776255774&narHash=sha256-psVTpH6PK3q1htMJpmdz1hLF5pQgEshu7gQWgKO6t6Y%3D"
     },
     "go@latest": {
       "last_modified": "2026-03-21T07:29:51Z",
@@ -279,6 +279,62 @@
             }
           ],
           "store_path": "/nix/store/dqxjqyvh6w8kh3azd4zr7k4dfw8b7lxp-nodejs-25.9.0"
+        }
+      }
+    },
+    "protobuf@latest": {
+      "last_modified": "2026-03-21T07:29:51Z",
+      "resolved": "github:NixOS/nixpkgs/09061f748ee21f68a089cd5d91ec1859cd93d0be#protobuf",
+      "source": "devbox-search",
+      "version": "34.0",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/6dh73i14i05iv9m5jqjzbn7ahnsm6pgy-protobuf-34.0",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/6dh73i14i05iv9m5jqjzbn7ahnsm6pgy-protobuf-34.0"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/pmkqamcl1ckjak3bgjyi4zfp23am0bmv-protobuf-34.0",
+              "default": true
+            },
+            {
+              "name": "debug",
+              "path": "/nix/store/3avm02p9dm6rqsl5xkk0igagcy316n9d-protobuf-34.0-debug"
+            }
+          ],
+          "store_path": "/nix/store/pmkqamcl1ckjak3bgjyi4zfp23am0bmv-protobuf-34.0"
+        },
+        "x86_64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/16jc846yhrs2ikz0cbpaa0gmy0d3wj7r-protobuf-34.0",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/16jc846yhrs2ikz0cbpaa0gmy0d3wj7r-protobuf-34.0"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/m6q48f6svqnfbvyqkis60a6vw5ww0v57-protobuf-34.0",
+              "default": true
+            },
+            {
+              "name": "debug",
+              "path": "/nix/store/9w04sh10i0v43iv9i4vjk2s9la46984d-protobuf-34.0-debug"
+            }
+          ],
+          "store_path": "/nix/store/m6q48f6svqnfbvyqkis60a6vw5ww0v57-protobuf-34.0"
         }
       }
     }
