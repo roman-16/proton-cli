@@ -16,7 +16,7 @@ import (
 
 const (
 	defaultBaseURL    = "https://mail.proton.me/api"
-	defaultAppVersion = "web-account@5.0.364.0"
+	defaultAppVersion = "Other"
 )
 
 // Client is an authenticated Proton API client.

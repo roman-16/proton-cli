@@ -1,6 +1,8 @@
 # proton-cli
 
-A command-line tool for [Proton](https://proton.me) — Mail, Drive, Calendar, Pass, and Contacts from your terminal.
+> **Disclaimer:** This is an unofficial, community-built tool and is not endorsed by or affiliated with Proton AG. Use at your own risk.
+
+An unofficial command-line tool for [Proton](https://proton.me) — Mail, Drive, Calendar, Pass, and Contacts from your terminal.
 
 Implements the same authentication and encryption as the [Proton web client](https://github.com/ProtonMail/WebClients): SRP login, PGP key hierarchy, and full end-to-end encryption using [go-srp](https://github.com/ProtonMail/go-srp) and [gopenpgp](https://github.com/ProtonMail/gopenpgp).
 
@@ -303,7 +305,7 @@ proton-cli drive ls --json
 | `PROTON_PASSWORD` | Account password (needed for encrypted operations) |
 | `PROTON_TOTP` | TOTP code (if 2FA is enabled) |
 | `PROTON_API_URL` | API base URL (default: `https://mail.proton.me/api`) |
-| `PROTON_APP_VERSION` | App version header (default: `web-account@5.0.364.0`) |
+| `PROTON_APP_VERSION` | App version header (default: `Other`) |
 
 ## How It Works
 
