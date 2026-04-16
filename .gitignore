@@ -1,3 +1,4 @@
 **/node_modules/
 .devbox/
+dist/
 proton-cli

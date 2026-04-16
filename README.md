@@ -1,23 +1,56 @@
 # proton-cli
 
-A command-line tool for interacting with the Proton API (Mail, Drive, Calendar, Contacts). Handles SRP authentication and end-to-end encryption automatically.
+A command-line tool for [Proton](https://proton.me) — Mail, Drive, Calendar, and Contacts from your terminal.
+
+Implements the same authentication and encryption as the [Proton web client](https://github.com/ProtonMail/WebClients): SRP login, PGP key hierarchy, and full end-to-end encryption using [go-srp](https://github.com/ProtonMail/go-srp) and [gopenpgp](https://github.com/ProtonMail/gopenpgp).
 
 ## Install
+
+### Download a binary (recommended)
+
+Grab the latest binary for your platform from [**GitHub Releases**](https://github.com/roman-16/proton-cli/releases/latest).
+
+| Platform | Binary |
+|---|---|
+| Linux (x86_64) | `proton-cli_VERSION_linux_amd64` |
+| Linux (ARM64) | `proton-cli_VERSION_linux_arm64` |
+| macOS (Apple Silicon) | `proton-cli_VERSION_darwin_arm64` |
+| macOS (Intel) | `proton-cli_VERSION_darwin_amd64` |
+| Windows (x86_64) | `proton-cli_VERSION_windows_amd64.exe` |
+| Windows (ARM64) | `proton-cli_VERSION_windows_arm64.exe` |
+
+**Linux / macOS:**
+
+```bash
+# Download (replace URL with the latest release)
+curl -LO https://github.com/roman-16/proton-cli/releases/latest/download/proton-cli_VERSION_linux_amd64
+
+# Make executable and move to PATH
+chmod +x proton-cli_*
+sudo mv proton-cli_* /usr/local/bin/proton-cli
+```
+
+**Windows:** download the `.exe` from the [releases page](https://github.com/roman-16/proton-cli/releases/latest) and add it to your PATH.
+
+### Install with Go
+
+If you have Go installed:
 
 ```bash
 go install github.com/roman-16/proton-cli@latest
 ```
 
-Or build from source:
+### Build from source
 
 ```bash
 git clone https://github.com/roman-16/proton-cli.git
 cd proton-cli
-direnv allow
 go build .
 ```
 
-## Authentication
+## Quick Start
+
+### 1. Set your credentials
 
 ```bash
 export PROTON_USER=alice@proton.me
@@ -27,7 +60,25 @@ export PROTON_PASSWORD='your-password'
 
 The session is saved to `~/.config/proton-cli/session.json` and reused automatically. The raw `api` command works without a password; encrypted commands (mail read, drive, calendar, contacts) require it.
 
-## Mail
+### 2. Try it
+
+```bash
+# List your inbox
+proton-cli mail list
+
+# Read a message
+proton-cli mail read MESSAGE_ID
+
+# List your drive files
+proton-cli drive ls
+
+# See all commands
+proton-cli --help
+```
+
+## Commands
+
+### Mail
 
 ```bash
 # List messages
@@ -80,7 +131,7 @@ proton-cli mail filters disable FILTER_ID
 proton-cli mail filters delete FILTER_ID
 ```
 
-## Drive
+### Drive
 
 ```bash
 # List files
@@ -115,7 +166,7 @@ proton-cli drive trash restore LINK_ID
 proton-cli drive trash empty
 ```
 
-## Calendar
+### Calendar
 
 ```bash
 # List calendars
@@ -148,10 +199,10 @@ proton-cli calendar delete-event "Meeting"
 
 # Create / delete calendars
 proton-cli calendar create --name "Work" --color "#8080FF"
-proton-cli calendar delete CALENDAR_ID  # requires PROTON_PASSWORD (password re-auth)
+proton-cli calendar delete CALENDAR_ID
 ```
 
-## Contacts
+### Contacts
 
 ```bash
 # List contacts
@@ -173,17 +224,14 @@ proton-cli contacts delete "John Doe"
 proton-cli contacts delete CONTACT_ID
 ```
 
-## Settings
+### Settings
 
 ```bash
-# Account settings
-proton-cli settings get
-
-# Mail settings
-proton-cli settings mail
+proton-cli settings get       # account settings
+proton-cli settings mail      # mail settings
 ```
 
-## Raw API Access
+### Raw API Access
 
 For any endpoint not covered by the high-level commands:
 
@@ -212,20 +260,20 @@ proton-cli calendar list-events --json
 proton-cli drive ls --json
 ```
 
-## API Reference
+## Environment Variables
 
-See [`openapi.yaml`](openapi.yaml) for the complete API spec covering ~740 endpoints. To regenerate from the latest Proton source:
-
-```bash
-cd scripts && npm install && npm run generate-openapi
-```
-
-See [`scripts/README.md`](scripts/README.md) for details on the generator.
+| Variable | Description |
+|---|---|
+| `PROTON_USER` | Proton account email |
+| `PROTON_PASSWORD` | Account password (needed for encrypted operations) |
+| `PROTON_TOTP` | TOTP code (if 2FA is enabled) |
+| `PROTON_API_URL` | API base URL (default: `https://mail.proton.me/api`) |
+| `PROTON_APP_VERSION` | App version header (default: `web-account@5.0.364.0`) |
 
 ## How It Works
 
-1. **Session creation** — creates an unauthenticated session via `POST /auth/v4/sessions` (same as Proton web clients)
-2. **SRP authentication** — Secure Remote Password login using [go-srp](https://github.com/ProtonMail/go-srp), with 2FA/TOTP support
+1. **Session creation** — creates an unauthenticated session via `POST /auth/v4/sessions`
+2. **SRP authentication** — Secure Remote Password login with [go-srp](https://github.com/ProtonMail/go-srp), with 2FA/TOTP support
 3. **Session persistence** — saves tokens + salted key password to `~/.config/proton-cli/session.json`
 4. **Key hierarchy** — unlocks User key → Address keys → per-service keys (Calendar, Drive, Contacts)
 5. **End-to-end encryption** — encrypts/decrypts using [gopenpgp](https://github.com/ProtonMail/gopenpgp)
@@ -241,15 +289,15 @@ See [`scripts/README.md`](scripts/README.md) for details on the generator.
 | Contacts | User key | User key |
 | Mail | Session key | Address key |
 
-## Environment Variables
+## API Reference
 
-| Variable | Description |
-|---|---|
-| `PROTON_USER` | Proton account email |
-| `PROTON_PASSWORD` | Account password (needed for encrypted operations and calendar delete) |
-| `PROTON_TOTP` | TOTP code (if 2FA is enabled) |
-| `PROTON_API_URL` | API base URL (default: `https://mail.proton.me/api`) |
-| `PROTON_APP_VERSION` | App version header (default: `web-account@5.0.364.0`) |
+See [`openapi.yaml`](openapi.yaml) for the complete API spec covering ~740 endpoints. To regenerate from the latest Proton source:
+
+```bash
+cd scripts && npm install && npm run generate-openapi
+```
+
+See [`scripts/README.md`](scripts/README.md) for details on the generator.
 
 ## Development
 

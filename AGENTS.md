@@ -1,5 +1,13 @@
 # Agent Guidelines
 
+## Project Context
+
+This is an open-source CLI tool used by other people. All changes should consider:
+- **Backwards compatibility** — consider impact on existing users when changing command syntax or flags, but don't let it block improvements
+- **Cross-platform** — must work on Linux, macOS, and Windows (amd64 + arm64)
+- **User-facing quality** — README, help text, and error messages should be clear and helpful
+- **Distribution** — binaries are published as GitHub Releases via GoReleaser; users install by downloading a binary or via `go install`
+
 ## Reference Source
 
 The Proton WebClients TypeScript source is available at `/tmp/proton-webclient-openapi/` (cloned from https://github.com/ProtonMail/WebClients). Use it as the primary reference for:
