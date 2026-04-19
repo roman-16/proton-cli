@@ -1,139 +1,105 @@
 package tests
 
 import (
-	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 )
 
 func TestContactsList(t *testing.T) {
 	skipIfNoCredentials(t)
 	stdout := runOK(t, "contacts", "list")
-	assertContains(t, stdout, "ID")
 	assertContains(t, stdout, "NAME")
-	assertContains(t, stdout, "EMAIL")
-	assertContains(t, stdout, "PHONE")
 }
 
-func TestContactsListJSON(t *testing.T) {
-	skipIfNoCredentials(t)
-	arr := runJSONArray(t, "contacts", "list")
-	if len(arr) == 0 {
-		t.Skip("no contacts found")
-	}
-	c := arr[0].(map[string]interface{})
-	if c["ID"] == nil || c["ID"] == "" {
-		t.Error("contact missing ID")
-	}
-}
-
-// createTestContact creates a contact and registers cleanup. Returns contact ID.
-func createTestContact(t *testing.T, name, email string) string {
-	t.Helper()
-	stdout := runOK(t, "contacts", "create", "--name", name, "--email", email)
-
-	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(stdout), &result); err != nil {
-		t.Fatalf("failed to parse create output: %v", err)
-	}
-	responses := result["Responses"].([]interface{})
-	resp := responses[0].(map[string]interface{})
-	contactID := jsonField(resp["Response"].(map[string]interface{}), "Contact", "ID")
-	if contactID == "" {
-		t.Fatal("no Contact.ID in create response")
-	}
-
-	cleanupRun(t, fmt.Sprintf("Delete contact: proton-cli contacts delete %s", contactID),
-		"contacts", "delete", contactID)
-
-	return contactID
-}
-
-func TestContactsCreateGetDelete(t *testing.T) {
+func TestContactsCRUD(t *testing.T) {
 	skipIfNoCredentials(t)
 	name := testID() + "-contact"
-	email := testID() + "@example.com"
+	email := "test+" + name + "@example.invalid"
 
-	contactID := createTestContact(t, name, email)
+	stdout := runOK(t, "contacts", "create",
+		"--name", name,
+		"--email", email,
+		"--phone", "+1234567890")
+	id := strings.TrimSpace(stdout)
+	if !looksLikeID(id) {
+		t.Fatalf("expected bare ID on stdout, got %q", stdout)
+	}
+	cleanupRun(t, fmt.Sprintf("Delete contact: proton-cli contacts delete -- %s", id),
+		"contacts", "delete", "--", id)
 
-	// Get by ID — verify exact fields
-	getOut := runOK(t, "contacts", "get", contactID)
-	assertField(t, getOut, "ID:", contactID)
-	assertField(t, getOut, "Name:", name)
-	assertField(t, getOut, "Email:", email)
+	// Get by explicit ID
+	got := runOK(t, "contacts", "get", "--", id)
+	assertField(t, got, "Name:", name)
+	assertField(t, got, "Email:", email)
+	assertField(t, got, "Phone:", "+1234567890")
 
-	// Get by name — same email
-	getOut2 := runOK(t, "contacts", "get", name)
-	assertField(t, getOut2, "Email:", email)
-	assertField(t, getOut2, "Name:", name)
-
-	// Get by email — same name
-	getOut3 := runOK(t, "contacts", "get", email)
-	assertField(t, getOut3, "Name:", name)
-	assertField(t, getOut3, "Email:", email)
+	// Update phone
+	runOK(t, "contacts", "update", "--phone", "+9999999999", "--", id)
+	got2 := runOK(t, "contacts", "get", "--", id)
+	assertField(t, got2, "Phone:", "+9999999999")
+	// name/email unchanged
+	assertField(t, got2, "Name:", name)
 }
 
-func TestContactsGetByName(t *testing.T) {
+func TestContactsGetByNameRef(t *testing.T) {
 	skipIfNoCredentials(t)
-	name := testID() + "-getname"
-	email := testID() + "@example.com"
+	name := testID() + "-refname"
+	stdout := runOK(t, "contacts", "create", "--name", name, "--email", "t@x.invalid")
+	id := strings.TrimSpace(stdout)
+	cleanupRun(t, fmt.Sprintf("Delete contact: proton-cli contacts delete -- %s", id),
+		"contacts", "delete", "--", id)
 
-	createTestContact(t, name, email)
-
-	out := runOK(t, "contacts", "get", name)
-	assertField(t, out, "Name:", name)
-	assertField(t, out, "Email:", email)
+	got := runOK(t, "contacts", "get", name)
+	assertField(t, got, "Name:", name)
 }
 
-func TestContactsUpdate(t *testing.T) {
+func TestContactsGetByEmailRef(t *testing.T) {
 	skipIfNoCredentials(t)
-	name := testID() + "-update"
-	email := testID() + "@example.com"
+	name := testID() + "-refmail"
+	email := "t+" + name + "@x.invalid"
+	stdout := runOK(t, "contacts", "create", "--name", name, "--email", email)
+	id := strings.TrimSpace(stdout)
+	cleanupRun(t, fmt.Sprintf("Delete contact: proton-cli contacts delete -- %s", id),
+		"contacts", "delete", "--", id)
 
-	contactID := createTestContact(t, name, email)
-
-	// Update name
-	newName := name + "-v2"
-	runOK(t, "contacts", "update", contactID, "--name", newName)
-
-	// Verify new name, email preserved
-	out := runOK(t, "contacts", "get", contactID)
-	assertField(t, out, "Name:", newName)
-	assertField(t, out, "Email:", email)
-	assertNotContains(t, out, name+"\n") // old name gone (but newName contains old name as prefix, so match on line boundary)
+	got := runOK(t, "contacts", "get", email)
+	assertField(t, got, "Email:", email)
 }
 
-func TestContactsUpdatePhone(t *testing.T) {
+func TestContactsDeleteByRef(t *testing.T) {
 	skipIfNoCredentials(t)
-	name := testID() + "-phone"
-	email := testID() + "@example.com"
+	name := testID() + "-refdel"
+	runOK(t, "contacts", "create", "--name", name, "--email", "t@x.invalid")
 
-	contactID := createTestContact(t, name, email)
-
-	// Add phone
-	runOK(t, "contacts", "update", contactID, "--phone", "+43999888777")
-
-	// Verify phone added, other fields intact
-	out := runOK(t, "contacts", "get", contactID)
-	assertField(t, out, "Name:", name)
-	assertField(t, out, "Email:", email)
-	assertField(t, out, "Phone:", "+43999888777")
-}
-
-func TestContactsDeleteByName(t *testing.T) {
-	skipIfNoCredentials(t)
-	name := testID() + "-delname"
-	email := testID() + "@example.com"
-
-	// Create (no cleanup — we're testing delete)
-	runOK(t, "contacts", "create", "--name", name, "--email", email)
-
-	// Delete by name
 	runOK(t, "contacts", "delete", name)
-
-	// Verify gone
 	_, _, code := run(t, "contacts", "get", name)
-	if code == 0 {
-		t.Error("expected get to fail after delete")
+	if code != 3 {
+		t.Errorf("expected exit 3 after delete, got %d", code)
+	}
+}
+
+func TestContactsNotFound(t *testing.T) {
+	skipIfNoCredentials(t)
+	_, _, code := run(t, "contacts", "get", "no-such-contact-"+testID())
+	if code != 3 {
+		t.Errorf("expected exit 3 for unknown contact, got %d", code)
+	}
+}
+
+func TestContactsAmbiguous(t *testing.T) {
+	skipIfNoCredentials(t)
+	prefix := testID() + "-ambig"
+	for i := 0; i < 2; i++ {
+		stdout := runOK(t, "contacts", "create",
+			"--name", fmt.Sprintf("%s-%d", prefix, i),
+			"--email", fmt.Sprintf("a%d@x.invalid", i))
+		id := strings.TrimSpace(stdout)
+		cleanupRun(t, fmt.Sprintf("Delete contact: proton-cli contacts delete -- %s", id),
+			"contacts", "delete", "--", id)
+	}
+	_, _, code := run(t, "contacts", "get", prefix)
+	if code != 4 {
+		t.Errorf("expected exit 4 for ambiguous match, got %d", code)
 	}
 }

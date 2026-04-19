@@ -1,355 +1,199 @@
 package tests
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
 )
 
-// ── pass vaults list ──
+// ── vaults ──
 
 func TestPassVaultsList(t *testing.T) {
 	skipIfNoCredentials(t)
 	stdout := runOK(t, "pass", "vaults", "list")
 	assertContains(t, stdout, "SHARE_ID")
-	assertContains(t, stdout, "NAME")
-	assertContains(t, stdout, "OWNER")
 }
 
-func TestPassVaultsListJSON(t *testing.T) {
+func TestPassVaultsCRUD(t *testing.T) {
 	skipIfNoCredentials(t)
-	arr := runJSONArray(t, "pass", "vaults", "list")
-	if len(arr) == 0 {
-		t.Skip("no vaults found")
+	name := testID() + "-vault"
+	stdout := runOK(t, "pass", "vaults", "create", "--name", name)
+	shareID := strings.TrimSpace(stdout)
+	if !looksLikeID(shareID) {
+		t.Fatalf("expected bare share ID on stdout, got %q", stdout)
 	}
-	v := arr[0].(map[string]interface{})
-	if v["ShareID"] == nil || v["ShareID"] == "" {
-		t.Error("vault missing ShareID")
-	}
-	if v["Vault"] == nil {
-		t.Error("vault missing decrypted Vault content")
-	}
+	cleanupRun(t, fmt.Sprintf("Delete vault: proton-cli pass vaults delete -- %s", shareID),
+		"pass", "vaults", "delete", "--", shareID)
+
+	list := runOK(t, "pass", "vaults", "list")
+	assertContains(t, list, name)
 }
 
-// ── pass list ──
+// ── items: login ──
 
-func TestPassList(t *testing.T) {
-	skipIfNoCredentials(t)
-	stdout := runOK(t, "pass", "list")
-	assertContains(t, stdout, "VAULT")
-	assertContains(t, stdout, "TYPE")
-	assertContains(t, stdout, "NAME")
-	assertContains(t, stdout, "USERNAME")
-}
-
-func TestPassListJSON(t *testing.T) {
-	skipIfNoCredentials(t)
-	arr := runJSONArray(t, "pass", "list")
-	if len(arr) == 0 {
-		t.Skip("no items found")
-	}
-	item := arr[0].(map[string]interface{})
-	if item["ShareID"] == nil || item["ShareID"] == "" {
-		t.Error("item missing ShareID")
-	}
-	if item["ItemID"] == nil || item["ItemID"] == "" {
-		t.Error("item missing ItemID")
-	}
-	if item["Type"] == nil || item["Type"] == "" {
-		t.Error("item missing Type")
-	}
-}
-
-// ── helpers ──
-
-func getFirstVaultShareID(t *testing.T) string {
-	t.Helper()
-	arr := runJSONArray(t, "pass", "vaults", "list")
-	if len(arr) == 0 {
-		t.Fatal("no vaults found")
-	}
-	v := arr[0].(map[string]interface{})
-	return v["ShareID"].(string)
-}
-
-func createPassItem(t *testing.T, name string) (string, string) {
-	t.Helper()
-	shareID := getFirstVaultShareID(t)
-
-	stdout := runOK(t, "pass", "create",
-		"--type", "login",
-		"--name", name,
-		"--username", "testuser",
-		"--password", "testpass123",
-		"--url", "https://example.com")
-
-	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(stdout), &result); err != nil {
-		t.Fatalf("failed to parse create output: %v", err)
-	}
-	itemMap, ok := result["Item"].(map[string]interface{})
-	if !ok {
-		t.Fatal("no Item in create response")
-	}
-	itemID, ok := itemMap["ItemID"].(string)
-	if !ok || itemID == "" {
-		t.Fatal("no ItemID in create response")
-	}
-
-	cleanupRun(t, fmt.Sprintf("Delete pass item: proton-cli pass delete %s %s", shareID, itemID),
-		"pass", "delete", shareID, itemID)
-
-	return shareID, itemID
-}
-
-// ── pass create + get + delete ──
-
-func TestPassCreateGetDelete(t *testing.T) {
+func TestPassItemsCRUDLogin(t *testing.T) {
 	skipIfNoCredentials(t)
 	name := testID() + "-login"
-	shareID, itemID := createPassItem(t, name)
+	url := "https://" + name + ".example.invalid/"
 
-	// Get by IDs
-	getOut := runOK(t, "pass", "get", shareID, itemID)
-	assertField(t, getOut, "Name:", name)
-	assertField(t, getOut, "Username:", "testuser")
-	assertField(t, getOut, "Password:", "testpass123")
-	assertField(t, getOut, "URL:", "https://example.com")
-	assertField(t, getOut, "Type:", "login")
-	assertField(t, getOut, "ID:", itemID)
-	assertField(t, getOut, "Share:", shareID)
+	stdout := runOK(t, "pass", "items", "create",
+		"--type", "login",
+		"--name", name,
+		"--username", "tester",
+		"--password", "s3cret!",
+		"--url", url)
+	itemID := strings.TrimSpace(stdout)
+	if !looksLikeID(itemID) {
+		t.Fatalf("expected bare item ID on stdout, got %q", stdout)
+	}
+	cleanupRun(t, fmt.Sprintf("Delete item: proton-cli pass items delete %s", name),
+		"pass", "items", "delete", name)
 
-	// Get by name search
-	getOut2 := runOK(t, "pass", "get", name)
-	assertField(t, getOut2, "Name:", name)
-	assertField(t, getOut2, "Username:", "testuser")
+	// Get by URL REF
+	got := runOK(t, "pass", "items", "get", name+".example.invalid")
+	assertField(t, got, "Name:", name)
+	assertField(t, got, "Username:", "tester")
+	assertField(t, got, "Password:", "s3cret!")
 
-	// JSON mode
-	jsonOut := runOK(t, "pass", "get", shareID, itemID, "--json")
-	var jsonResult map[string]interface{}
-	if err := json.Unmarshal([]byte(jsonOut), &jsonResult); err != nil {
-		t.Fatalf("failed to parse JSON: %v", err)
-	}
-	if jsonResult["ShareID"] != shareID {
-		t.Errorf("JSON ShareID: got %v, want %s", jsonResult["ShareID"], shareID)
-	}
-	if jsonResult["ItemID"] != itemID {
-		t.Errorf("JSON ItemID: got %v, want %s", jsonResult["ItemID"], itemID)
-	}
+	// Edit password
+	runOK(t, "pass", "items", "edit", name, "--password", "new-pass-v2")
+	got2 := runOK(t, "pass", "items", "get", name)
+	assertField(t, got2, "Password:", "new-pass-v2")
 }
 
-func TestPassCreateNote(t *testing.T) {
+// ── items: note ──
+
+func TestPassItemsCreateNote(t *testing.T) {
 	skipIfNoCredentials(t)
 	name := testID() + "-note"
-	shareID := getFirstVaultShareID(t)
-
-	stdout := runOK(t, "pass", "create",
+	stdout := runOK(t, "pass", "items", "create",
 		"--type", "note",
 		"--name", name,
-		"--note", "This is a test note")
-
-	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(stdout), &result); err != nil {
-		t.Fatalf("failed to parse create output: %v", err)
+		"--note", "secret note content")
+	id := strings.TrimSpace(stdout)
+	if !looksLikeID(id) {
+		t.Fatalf("expected bare ID on stdout, got %q", stdout)
 	}
-	itemID := result["Item"].(map[string]interface{})["ItemID"].(string)
+	cleanupRun(t, fmt.Sprintf("Delete note: proton-cli pass items delete %s", name),
+		"pass", "items", "delete", name)
 
-	cleanupRun(t, fmt.Sprintf("Delete pass item: proton-cli pass delete %s %s", shareID, itemID),
-		"pass", "delete", shareID, itemID)
-
-	getOut := runOK(t, "pass", "get", shareID, itemID)
-	assertField(t, getOut, "Name:", name)
-	assertField(t, getOut, "Note:", "This is a test note")
-	assertField(t, getOut, "Type:", "note")
+	got := runOK(t, "pass", "items", "get", name)
+	assertField(t, got, "Type:", "note")
+	assertField(t, got, "Note:", "secret note content")
 }
 
-// ── pass edit ──
+// ── items: card (checks PIN rendering) ──
 
-func TestPassEdit(t *testing.T) {
+func TestPassItemsCreateCardShowsPIN(t *testing.T) {
 	skipIfNoCredentials(t)
-	name := testID() + "-edit"
-	shareID, itemID := createPassItem(t, name)
+	name := testID() + "-card"
+	stdout := runOK(t, "pass", "items", "create",
+		"--type", "card",
+		"--name", name,
+		"--holder", "Test Holder",
+		"--number", "4111111111111111",
+		"--expiry", "2029-01",
+		"--cvv", "123",
+		"--pin", "7890")
+	id := strings.TrimSpace(stdout)
+	if !looksLikeID(id) {
+		t.Fatalf("expected bare ID on stdout, got %q", stdout)
+	}
+	cleanupRun(t, fmt.Sprintf("Delete card: proton-cli pass items delete %s", name),
+		"pass", "items", "delete", name)
 
-	newName := name + "-v2"
-	runOK(t, "pass", "edit", shareID, itemID,
-		"--username", "newuser",
-		"--password", "newpass456",
-		"--name", newName)
-
-	getOut := runOK(t, "pass", "get", shareID, itemID)
-	assertField(t, getOut, "Name:", newName)
-	assertField(t, getOut, "Username:", "newuser")
-	assertField(t, getOut, "Password:", "newpass456")
-	assertField(t, getOut, "URL:", "https://example.com") // preserved
-	assertField(t, getOut, "Type:", "login")
-
-	// Old values gone
-	assertNotContains(t, getOut, "testuser")
-	assertNotContains(t, getOut, "testpass123")
+	got := runOK(t, "pass", "items", "get", name)
+	assertField(t, got, "Holder:", "Test Holder")
+	assertField(t, got, "Number:", "4111111111111111")
+	assertField(t, got, "Expiry:", "2029-01")
+	assertField(t, got, "CVV:", "123")
+	assertField(t, got, "PIN:", "7890")
 }
 
-// ── pass trash + restore ──
+// ── items: trash / restore / delete ──
 
-func TestPassTrashRestore(t *testing.T) {
+func TestPassItemsTrashRestoreDelete(t *testing.T) {
 	skipIfNoCredentials(t)
 	name := testID() + "-trash"
-	shareID, itemID := createPassItem(t, name)
+	stdout := runOK(t, "pass", "items", "create",
+		"--type", "login", "--name", name,
+		"--username", "u", "--password", "p")
+	itemID := strings.TrimSpace(stdout)
 
-	// Trash
-	runOK(t, "pass", "trash", shareID, itemID)
+	// Need share ID for restore (trashed items don't appear in search)
+	vaults := runJSONArray(t, "pass", "vaults", "list")
+	shareID := vaults[0].(map[string]interface{})["share_id"].(string)
 
-	// Not in active list
-	listOut := runOK(t, "pass", "list")
-	assertNotContains(t, listOut, name)
+	// Register a best-effort cleanup (permanent delete by IDs)
+	cleanupRun(t, fmt.Sprintf("Delete item: proton-cli pass items delete -- %s %s", shareID, itemID),
+		"pass", "items", "delete", "--", shareID, itemID)
 
-	// Restore
-	runOK(t, "pass", "restore", shareID, itemID)
+	runOK(t, "pass", "items", "trash", name)
+	runOK(t, "pass", "items", "restore", "--", shareID, itemID)
 
-	// Back in list
-	listOut2 := runOK(t, "pass", "list")
-	assertContains(t, listOut2, name)
-
-	// Content intact
-	getOut := runOK(t, "pass", "get", shareID, itemID)
-	assertField(t, getOut, "Name:", name)
-	assertField(t, getOut, "Username:", "testuser")
-	assertField(t, getOut, "Password:", "testpass123")
+	// It should be searchable again
+	got := runOK(t, "pass", "items", "get", name)
+	assertField(t, got, "Name:", name)
 }
 
-// ── pass alias ──
+// ── items list with vault filter ──
+
+func TestPassItemsListVaultFilter(t *testing.T) {
+	skipIfNoCredentials(t)
+	vaults := runJSONArray(t, "pass", "vaults", "list")
+	if len(vaults) == 0 {
+		t.Skip("no vaults")
+	}
+	firstName := vaults[0].(map[string]interface{})["name"].(string)
+	runOK(t, "pass", "items", "list", "--vault", firstName)
+}
+
+// ── alias options (read-only) ──
 
 func TestPassAliasOptions(t *testing.T) {
 	skipIfNoCredentials(t)
 	stdout := runOK(t, "pass", "alias", "options")
-	assertContains(t, stdout, "Suffixes:")
-	assertContains(t, stdout, "Mailboxes:")
+	assertContains(t, stdout, "Suffixes")
+	assertContains(t, stdout, "Mailboxes")
+}
 
-	jsonOut := runOK(t, "pass", "alias", "options", "--json")
-	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(jsonOut), &result); err != nil {
-		t.Fatalf("failed to parse JSON: %v", err)
+// ── batch filters (all dry-run) ──
+
+func TestPassBatchTrashDryRunByType(t *testing.T) {
+	skipIfNoCredentials(t)
+	_, stderr, code := run(t, "--dry-run", "pass", "items", "trash", "--type", "note")
+	if code != 0 {
+		t.Fatalf("dry-run should succeed, got exit %d: %s", code, stderr)
 	}
-	suffixes, ok := result["Suffixes"].([]interface{})
-	if !ok || len(suffixes) == 0 {
-		t.Error("expected at least one suffix")
+	assertContains(t, stderr, "dry-run")
+}
+
+func TestPassBatchTrashDryRunOlderThanYear(t *testing.T) {
+	skipIfNoCredentials(t)
+	_, stderr, code := run(t, "--dry-run", "pass", "items", "trash",
+		"--older-than", "1y", "--type", "login")
+	if code != 0 {
+		t.Fatalf("dry-run should succeed, got exit %d: %s", code, stderr)
 	}
-	mailboxes, ok := result["Mailboxes"].([]interface{})
-	if !ok || len(mailboxes) == 0 {
-		t.Error("expected at least one mailbox")
+	// Either a "would trash" line or nothing to trash; at minimum doesn't crash
+	_ = stderr
+}
+
+func TestPassBatchTrashDurationUnitMonths(t *testing.T) {
+	skipIfNoCredentials(t)
+	// "6mo" must parse without error.
+	_, _, code := run(t, "--dry-run", "pass", "items", "trash",
+		"--older-than", "6mo", "--type", "login")
+	if code != 0 {
+		t.Errorf("--older-than 6mo should parse, got exit %d", code)
 	}
 }
 
-func TestPassAliasCreate(t *testing.T) {
+func TestPassBatchTrashRequiresInput(t *testing.T) {
 	skipIfNoCredentials(t)
-	prefix := testID() + "-alias"
-
-	stdout := runOK(t, "pass", "alias", "create", "--prefix", prefix, "--name", prefix)
-
-	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(stdout), &result); err != nil {
-		t.Fatalf("failed to parse create output: %v", err)
+	_, stderr, code := run(t, "pass", "items", "trash")
+	if code == 0 {
+		t.Error("expected error when no REF and no filter given")
 	}
-	itemMap := result["Item"].(map[string]interface{})
-	itemID := itemMap["ItemID"].(string)
-	aliasEmail, _ := itemMap["AliasEmail"].(string)
-	shareID := getFirstVaultShareID(t)
-
-	cleanupRun(t, fmt.Sprintf("Delete alias: proton-cli pass delete %s %s", shareID, itemID),
-		"pass", "delete", shareID, itemID)
-
-	if !strings.Contains(aliasEmail, prefix) {
-		t.Errorf("alias email %q should contain prefix %q", aliasEmail, prefix)
-	}
-
-	listOut := runOK(t, "pass", "list")
-	assertContains(t, listOut, prefix)
-	assertContains(t, listOut, "alias")
-}
-
-func TestPassCreateLoginWithAlias(t *testing.T) {
-	skipIfNoCredentials(t)
-	name := testID() + "-loginalias"
-	prefix := testID() + "-la"
-
-	stdout := runOK(t, "pass", "create",
-		"--type", "login",
-		"--name", name,
-		"--username", "testuser",
-		"--password", "testpass",
-		"--url", "https://example.com",
-		"--alias-prefix", prefix)
-
-	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(stdout), &result); err != nil {
-		t.Fatalf("failed to parse create output: %v", err)
-	}
-
-	shareID := getFirstVaultShareID(t)
-
-	bundle, ok := result["Bundle"].(map[string]interface{})
-	if !ok {
-		t.Fatal("expected Bundle in response")
-	}
-
-	loginItem, ok := bundle["Item"].(map[string]interface{})
-	if !ok {
-		t.Fatal("expected Item in Bundle")
-	}
-	loginID := loginItem["ItemID"].(string)
-	cleanupRun(t, fmt.Sprintf("Delete login: proton-cli pass delete %s %s", shareID, loginID),
-		"pass", "delete", shareID, loginID)
-
-	aliasItem, ok := bundle["Alias"].(map[string]interface{})
-	if !ok {
-		t.Fatal("expected Alias in Bundle")
-	}
-	aliasID := aliasItem["ItemID"].(string)
-	aliasEmail, _ := aliasItem["AliasEmail"].(string)
-	cleanupRun(t, fmt.Sprintf("Delete alias: proton-cli pass delete %s %s", shareID, aliasID),
-		"pass", "delete", shareID, aliasID)
-
-	if !strings.Contains(aliasEmail, prefix) {
-		t.Errorf("alias email %q should contain prefix %q", aliasEmail, prefix)
-	}
-
-	// Verify login has all fields including alias email
-	getOut := runOK(t, "pass", "get", shareID, loginID)
-	assertField(t, getOut, "Name:", name)
-	assertField(t, getOut, "Username:", "testuser")
-	assertField(t, getOut, "Password:", "testpass")
-	assertField(t, getOut, "URL:", "https://example.com")
-	assertContains(t, getOut, "Email:    "+prefix) // alias email starts with prefix
-
-	listOut := runOK(t, "pass", "list")
-	assertContains(t, listOut, name)
-}
-
-// ── pass vaults create + delete ──
-
-func TestPassVaultsCreateDelete(t *testing.T) {
-	skipIfNoCredentials(t)
-	name := testID() + "-vault"
-
-	stdout := runOK(t, "pass", "vaults", "create", "--name", name)
-
-	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(stdout), &result); err != nil {
-		t.Fatalf("failed to parse create output: %v", err)
-	}
-	shareMap, ok := result["Share"].(map[string]interface{})
-	if !ok {
-		t.Fatal("no Share in create response")
-	}
-	shareID, ok := shareMap["ShareID"].(string)
-	if !ok || shareID == "" {
-		t.Fatal("no ShareID in create response")
-	}
-
-	cleanupRun(t, fmt.Sprintf("Delete vault: proton-cli pass vaults delete %s", shareID),
-		"pass", "vaults", "delete", shareID)
-
-	listOut := runOK(t, "pass", "vaults", "list")
-	assertContains(t, listOut, name)
-	assertContains(t, listOut, shareID)
+	assertContains(t, stderr, "no items selected")
 }

@@ -2,103 +2,85 @@
 
 ## Overview
 
-All tests are **integration tests** that run the real `proton-cli` binary against the live Proton API. There are no unit tests or mocks — every test creates real data, verifies it, and cleans it up.
+All tests are **integration tests** that run the real `proton-cli` binary against the live Proton API. There are no mocks — every test creates real data, verifies it, and cleans up.
+
+Unit tests live alongside the code they test (e.g. `internal/render/html_test.go`).
 
 ## Running Tests
 
 ```bash
-# All tests (requires credentials in env)
+# All integration tests (require credentials in env)
 just test
 
 # Single test
-just test-one TestDriveMv
+just test-one TestDriveItemsMove
 ```
 
 Tests skip automatically if `PROTON_USER` and `PROTON_PASSWORD` are not set.
 
+## Layout
+
+```
+tests/
+├── integration_test.go      TestMain + helpers
+├── settings_test.go
+├── mail_test.go             messages, attachments, labels, filters, addresses, batch filters
+├── drive_test.go            items, folders, trash, streaming, recursive, batch filters
+├── calendar_test.go         calendars, events, scope-unlock delete
+├── contacts_test.go         CRUD, REF resolution, exit codes
+├── pass_test.go             vaults, items, alias, batch filters
+├── output_test.go           --output text / json / yaml
+├── exit_codes_test.go       0 / 1 / 3 / 4 mapping
+├── profile_test.go          --profile + config.toml multi-account
+├── api_test.go              raw `api` escape hatch
+├── dry_run_test.go          --dry-run does not mutate
+└── stdout_id_test.go        stdout=ID convention across creates
+```
+
 ## How Tests Work
 
-1. `TestMain` in `integration_test.go` builds the binary once into a temp directory
-2. Each test calls the binary as a subprocess via `run()` / `runOK()` / `runJSON()`
-3. The binary picks up `PROTON_USER` and `PROTON_PASSWORD` from the environment
-4. Tests are sequential (no parallelism) to avoid API rate limits and shared state conflicts
+1. `TestMain` in `integration_test.go` builds the binary once into a temp directory.
+2. Each test calls the binary as a subprocess via `run()` / `runOK()` / `runJSON()`.
+3. The binary picks up `PROTON_USER` / `PROTON_PASSWORD` from the environment.
+4. Tests are sequential (no `t.Parallel()`) to avoid rate limits and shared-state conflicts.
 
 ## Writing a Test
 
-Follow the **Arrange → Act → Assert** pattern. Every test that creates data must register cleanup.
+Follow **Arrange → Act → Assert**. Every test that creates data must register cleanup **immediately after creation**, before any assertion that might fail.
 
 ```go
-func TestDriveExample(t *testing.T) {
+func TestDriveItemsFoo(t *testing.T) {
     skipIfNoCredentials(t)
 
-    // Arrange: create test data
-    folder := testID() + "-example"
-    runOK(t, "drive", "mkdir", "/"+folder)
-    cleanupRun(t, fmt.Sprintf("Delete folder: proton-cli drive rm /%s", folder),
-        "drive", "rm", "/"+folder)
+    // Arrange
+    folder := "/" + testID() + "-foo"
+    runOK(t, "drive", "folders", "create", folder)
+    cleanupRun(t, fmt.Sprintf("Delete: proton-cli drive items delete --permanent %s", folder),
+        "drive", "items", "delete", "--permanent", folder)
 
-    // Act: run the command being tested
-    stdout := runOK(t, "drive", "ls", "/"+folder)
+    // Act
+    stdout := runOK(t, "drive", "items", "list", folder)
 
-    // Assert: verify the output
-    assertContains(t, stdout, "something-expected")
-}
-```
-
-## Arrange Creates What the Test Needs
-
-If a command needs something to exist first, the **Arrange** step creates it. Never rely on pre-existing data in the account.
-
-- Testing `drive download`? Upload a file first.
-- Testing `drive mv`? Create two folders and upload a file.
-- Testing `mail mark`? Send a mail to self first via `sendTestMail()`.
-- Testing `contacts update`? Create a contact first.
-
-Every piece of test data created in Arrange must have a matching cleanup registered **immediately after creation**, before the Act step. This way, if the test fails during Act or Assert, the data still gets cleaned up.
-
-```go
-func TestDriveDownloadToFile(t *testing.T) {
-    skipIfNoCredentials(t)
-
-    // Arrange: create folder + upload file
-    folder := testID() + "-download"
-    runOK(t, "drive", "mkdir", "/"+folder)
-    cleanupRun(t, fmt.Sprintf("Delete folder: proton-cli drive rm /%s", folder),
-        "drive", "rm", "/"+folder)
-
-    tmpFile := filepath.Join(t.TempDir(), "source.txt")
-    _ = os.WriteFile(tmpFile, []byte("test content"), 0644)
-    runOK(t, "drive", "upload", tmpFile, "/"+folder)
-
-    // Act: download the file we just uploaded
-    outPath := filepath.Join(t.TempDir(), "output.txt")
-    runOK(t, "drive", "download", "/"+folder+"/source.txt", outPath)
-
-    // Assert: content matches
-    data, _ := os.ReadFile(outPath)
-    if string(data) != "test content" {
-        t.Errorf("content mismatch")
-    }
+    // Assert
+    assertContains(t, stdout, "expected-string")
 }
 ```
 
 ## Cleanup Rules
 
-- **Always register cleanup**, even if the test is about deletion — the test might fail before reaching the delete step
-- Use `cleanupRun()` for CLI commands or `cleanup()` for custom functions
-- Cleanup runs even on test failure (`t.Cleanup()` guarantees this)
-- If cleanup fails, a loud box is printed with the exact manual command to run:
+- **Always register cleanup**, even for tests about deletion — the test might fail before reaching the delete step.
+- Use `cleanupRun()` for CLI commands, `cleanup()` for custom functions.
+- `t.Cleanup()` guarantees cleanup runs even on test failure.
+- Cleanup failures print a loud box with a copy-pasteable command the user can run manually:
 
-```
-╔══════════════════════════════════════════════════════════════╗
-║  ⚠️  CLEANUP FAILED — MANUAL ACTION REQUIRED                ║
-╠══════════════════════════════════════════════════════════════╣
-║  Delete folder: proton-cli drive rm /test-folder-xyz
-║  Error: exit 1: ...
-╚══════════════════════════════════════════════════════════════╝
-```
-
-- The description in `cleanupRun()` must be a copy-pasteable command so the user can fix it manually
+  ```
+  ╔══════════════════════════════════════════════════════════════╗
+  ║  ⚠️  CLEANUP FAILED — MANUAL ACTION REQUIRED                ║
+  ╠══════════════════════════════════════════════════════════════╣
+  ║  Delete folder: proton-cli drive items delete --permanent /test-xxx
+  ║  Error: exit 1: ...
+  ╚══════════════════════════════════════════════════════════════╝
+  ```
 
 ## Helpers
 
@@ -106,61 +88,108 @@ func TestDriveDownloadToFile(t *testing.T) {
 |---|---|
 | `skipIfNoCredentials(t)` | Skip test if env vars not set |
 | `run(t, args...)` | Run binary, return stdout/stderr/exitCode |
-| `runOK(t, args...)` | Run binary, fail test if exit != 0, return stdout |
-| `runJSON(t, args...)` | Run with `--json`, parse as `map[string]interface{}` |
-| `runJSONArray(t, args...)` | Run with `--json`, parse as `[]interface{}` |
-| `testID()` | Generate unique `proton-cli-test-{timestamp}-{random}` prefix |
-| `cleanupRun(t, description, args...)` | Register cleanup that runs a CLI command |
-| `cleanup(t, description, func() error)` | Register cleanup with custom function |
+| `runOK(t, args...)` | Run binary, fail test on non-zero exit, return stdout |
+| `runOKStderr(t, args...)` | Same as `runOK` but also returns stderr |
+| `runWithStdin(t, stdin, args...)` | Run with a custom stdin reader |
+| `runJSON(t, args...)` | Adds `--output json`, parses stdout as JSON **object** |
+| `runJSONArray(t, args...)` | Adds `--output json`, parses stdout as JSON **array** |
+| `testID()` | Unique `proton-cli-test-{ms}-{rand}` prefix |
+| `cleanupRun(t, desc, args...)` | Register cleanup that runs the CLI |
+| `cleanup(t, desc, func)` | Register cleanup with a custom function |
 | `assertContains(t, stdout, substr)` | Assert stdout contains substring |
 | `assertNotContains(t, stdout, substr)` | Assert stdout does not contain substring |
-| `jsonField(data, "path", "to", "field")` | Extract string from nested JSON map |
-| `sendTestMail(t, subject)` | Send a mail to self, register cleanup, return inbox message ID |
-| `selfEmail()` | Return `PROTON_USER` value |
+| `assertField(t, stdout, field, expected)` | Assert `Key: Value` line matches |
+| `sendTestMail(t, subject)` | Send a mail to self, register cleanup, return inbox ID |
+| `selfEmail()` | Return `PROTON_USER` |
+| `looksLikeID(s)` | Heuristic: Proton base64 IDs end in `==` |
 
-## Naming Conventions
+## Conventions the tests rely on
 
-- Test artifacts use `proton-cli-test-{timestamp}-{random}-{purpose}` names (via `testID()`)
-- This makes them identifiable in the Proton UI if cleanup fails
-- Never use short or common names that could collide with real data
+These are stable CLI guarantees that tests verify:
 
-## Cobra and Message IDs
+### stdout = new ID on create
 
-Proton message IDs can start with `-` which cobra interprets as flags. Always use `--` before positional ID arguments:
+Every create command writes **just the new ID** (one line, no JSON, no trailing text) to stdout and `✓ …` to stderr:
+
+```go
+stdout := runOK(t, "mail", "labels", "create", "--name", name, "--color", "#8080FF")
+id := strings.TrimSpace(stdout)
+// id is a bare 88-char Proton ID; stderr carried the human message.
+```
+
+This makes shell capture work: `ID=$(proton-cli ... create ...)`.
+
+### Exit codes
+
+| Code | Meaning |
+|---|---|
+| 0 | success |
+| 1 | user error (bad flag, missing arg, invalid input) |
+| 2 | auth |
+| 3 | not-found (REF matched no resource) |
+| 4 | conflict / ambiguous (REF matched multiple resources) |
+| 5 | network / 5xx |
+| 130 | cancelled via Ctrl+C |
+
+### Output format
+
+`--output text|json|yaml` (default `text`). JSON output uses `snake_case` keys (json tags); YAML respects the same tags via `goccy/go-yaml`'s json-tag fallback.
+
+### REF arguments
+
+Every command that takes an ID also accepts a substring search term. Ambiguous matches return exit 4 with candidates listed on stderr.
+
+`drive trash restore` is the single exception — it requires explicit link IDs because trashed items have encrypted names.
+
+## Cobra and Positional IDs
+
+Proton IDs are Base64URL-encoded and can start with `-`. Cobra interprets any
+positional arg that starts with `-` as a flag, so **every** command that takes
+a Proton ID positionally needs `--` before the ID:
 
 ```go
 // Wrong — breaks if ID starts with -
-runOK(t, "mail", "mark", "--read", msgID)
+runOK(t, "mail", "labels", "delete", labelID)
 
 // Correct
-runOK(t, "mail", "mark", "--read", "--", msgID)
+runOK(t, "mail", "labels", "delete", "--", labelID)
 ```
 
-This applies to: `mail mark`, `mail trash`, `mail delete`, `mail move`.
+Applies to (non-exhaustive):
 
-## Extracting IDs from Create Responses
+- `mail messages {mark,star,unstar,trash,delete,move,read}`
+- `mail labels delete`
+- `mail filters {delete,enable,disable}`
+- `calendar calendars delete`
+- `calendar events {get,update,delete}` (both calendar ID + event ID)
+- `contacts {get,update,delete}`
+- `pass vaults delete`
+- `pass items {get,edit,trash,restore,delete}` (when passing SHARE_ID ITEM_ID)
+- `drive trash restore`
 
-When a test creates something, extract the ID from the JSON response for cleanup:
+The same rule applies to copy-pasteable commands in `cleanupRun` descriptions
+— those are shown to the user on cleanup failure, and the user will need `--`
+when they run them manually:
 
 ```go
-// Contacts: ID is nested in Responses[0].Response.Contact.ID
-stdout := runOK(t, "contacts", "create", "--name", name, "--email", email)
-var result map[string]interface{}
-json.Unmarshal([]byte(stdout), &result)
-responses := result["Responses"].([]interface{})
-resp := responses[0].(map[string]interface{})
-contactID := jsonField(resp["Response"].(map[string]interface{}), "Contact", "ID")
-
-// Labels: ID is in Label.ID
-stdout := runOK(t, "mail", "labels", "create", "--name", name, "--color", "#8080FF")
-var result map[string]interface{}
-json.Unmarshal([]byte(stdout), &result)
-labelID := jsonField(result, "Label", "ID")
+cleanupRun(t,
+    fmt.Sprintf("Delete label: proton-cli mail labels delete -- %s", id),
+    "mail", "labels", "delete", "--", id)
 ```
+
+String args that start with a letter or `/` are safe (names, paths, titles).
+Only raw Proton IDs (from create responses, list responses, etc.) need `--`
+protection.
+
+## Naming
+
+- Test artifacts use the `proton-cli-test-{ms}-{rand}-{purpose}` prefix (from `testID()`).
+- This makes them identifiable in the Proton UI if cleanup ever fails.
+- Never use short or common names that could collide with real data.
 
 ## Known Limitations
 
-- `calendar delete` requires `PROTON_PASSWORD` for scope unlock — this works in tests since the env var is set
-- `drive trash empty` may not clear items from all volume types (photos share)
-- Proton only allows specific hex colors for labels and calendars (e.g. `#8080FF`, `#3CBB3A`) — see `ACCENT_COLORS` in WebClients source
-- Tests run ~6 minutes total due to API latency and mail delivery waits
+- `calendar calendars delete` requires `PROTON_PASSWORD` for the password-scope unlock — works in tests because the env var is set.
+- `drive trash empty` may not clear items from non-default volumes (e.g. Photos share).
+- Proton only allows specific hex colors for labels and calendars (e.g. `#8080FF`, `#3CBB3A`) — see `ACCENT_COLORS` in the WebClients source.
+- Tests run ~8 minutes total due to API latency and mail-delivery waits.
