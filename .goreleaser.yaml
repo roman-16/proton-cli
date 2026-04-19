@@ -15,7 +15,7 @@ builds:
       - -s -w -X github.com/roman-16/proton-cli/cmd.version={{.Version}}
 
 archives:
-  - format: binary
+  - formats: [binary]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 
 checksum:
