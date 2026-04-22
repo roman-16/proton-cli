@@ -122,7 +122,7 @@ components:
   # DRAWER_NATIVE_APPS: quick-settings=QUICK_SETTINGS, contacts=CONTACTS, security-center=SECURITY_CENTER, vpn=VPN, referral=REFERRAL
   # DRAWER_VISIBILITY: 0=SHOW, 1=HIDE
   # DRIVE_PERMISSIONS: 4=READ, 2=WRITE, 16=ADMIN
-  # DRIVE_SIGNATURE_CONTEXT: drive.share-member.inviter=SHARE_MEMBER_INVITER, drive.share-member.member=SHARE_MEMBER_MEMBER, drive.share-member.external-invitation=SHARE_MEMBER_EXTERNAL_INVITATION
+  # DRIVE_SIGNATURE_CONTEXT: drive.share-member.inviter=SHARE_MEMBER_INVITER, drive.share-member.member=SHARE_MEMBER_MEMBER, drive.share-member.external-invitation=SHARE_MEMBER_EXTERNAL_INVITATION, drive.search.index=SEARCH_INDEX
   # DRIVE_UPSELL_PATHS: sidebar=SIDEBAR, one-dollar-initial-reminder=ONE_DOLLAR_INITIAL_REMINDER, one-dollar-second-reminder=ONE_DOLLAR_SECOND_REMINDER, one-dollar-last-reminder=ONE_DOLLAR_LAST_REMINDER, plus_monthly-subscriber-nudge-variant-money=PLUS_MONTHLY_SUBSCRIBER_NUDGE_VARIANT_MONEY
   # DriveDocsPublicShareMessageType: CUSTOM_PASSWORD=CUSTOM_PASSWORD, READY_TO_RECEIVE_CUSTOM_PASSWORD=READY_TO_RECEIVE_CUSTOM_PASSWORD
   # EDM_VALUE: 0=ENABLED, 1=DISABLED
@@ -222,8 +222,8 @@ components:
   # MONTHLY_TYPE: 0=ON_MONTH_DAY, 1=ON_NTH_DAY, -1=ON_MINUS_NTH_DAY
   # MotionModeSetting: 0=No_preference, 1=Reduce
   # MX_STATE: 0=MX_STATE_DEFAULT, 1=MX_STATE_NO_US, 2=MX_STATE_INC_US, 3=MX_STATE_GOOD, 4=MX_STATE_BACKUP
-  # NEWSLETTER_SUBSCRIPTIONS: Announcements=ANNOUNCEMENTS, Features=FEATURES, Newsletter=NEWSLETTER, Beta=BETA, Business=BUSINESS, Offers=OFFERS, NewEmailNotif=NEW_EMAIL_NOTIF, Onboarding=ONBOARDING, UserSurveys=USER_SURVEY, InboxNews=INBOX_NEWS, VpnNews=VPN_NEWS, DriveNews=DRIVE_NEWS, PassNews=PASS_NEWS, WalletNews=WALLET_NEWS, LumoNews=LUMO_NEWS, InAppNotifications=IN_APP_NOTIFICATIONS
-  # NEWSLETTER_SUBSCRIPTIONS_BITS: 1=ANNOUNCEMENTS, 2=FEATURES, 4=NEWSLETTER, 8=BETA, 16=BUSINESS, 32=OFFERS, 64=NEW_EMAIL_NOTIF, 128=ONBOARDING, 256=USER_SURVEY, 512=INBOX_NEWS, 1024=VPN_NEWS, 2048=DRIVE_NEWS, 4096=PASS_NEWS, 8192=WALLET_NEWS, 16384=IN_APP_NOTIFICATIONS, 32768=LUMO_NEWS
+  # NEWSLETTER_SUBSCRIPTIONS: Announcements=ANNOUNCEMENTS, Features=FEATURES, Newsletter=NEWSLETTER, Beta=BETA, Business=BUSINESS, Offers=OFFERS, NewEmailNotif=NEW_EMAIL_NOTIF, Onboarding=ONBOARDING, UserSurveys=USER_SURVEY, InboxNews=INBOX_NEWS, VpnNews=VPN_NEWS, DriveNews=DRIVE_NEWS, PassNews=PASS_NEWS, WalletNews=WALLET_NEWS, LumoNews=LUMO_NEWS, MeetNews=MEET_NEWS, InAppNotifications=IN_APP_NOTIFICATIONS
+  # NEWSLETTER_SUBSCRIPTIONS_BITS: 1=ANNOUNCEMENTS, 2=FEATURES, 4=NEWSLETTER, 8=BETA, 16=BUSINESS, 32=OFFERS, 64=NEW_EMAIL_NOTIF, 128=ONBOARDING, 256=USER_SURVEY, 512=INBOX_NEWS, 1024=VPN_NEWS, 2048=DRIVE_NEWS, 4096=PASS_NEWS, 8192=WALLET_NEWS, 16384=IN_APP_NOTIFICATIONS, 32768=LUMO_NEWS, 65536=MEET_NEWS
   # NEXT_MESSAGE_ON_MOVE: 0=DISABLED, 1=DEFAULT, 2=ENABLED
   # NOTIFICATION_TYPE_API: 0=EMAIL, 1=DEVICE
   # NOTIFICATION_UNITS: 1=WEEK, 2=DAY, 3=HOUR, 4=MINUTE
@@ -266,6 +266,7 @@ components:
   # RetentionRuleAction: 0=RetainPurgeDeleted, 1=RetainPurgeAll, 2=RetainAll
   # RetentionRuleProduct: 1=Mail
   # RetentionRuleScopeType: 1=User, 2=Group
+  # ROLE_SOURCE: user=USER, group=GROUP
   # SAVE_CONFIRMATION_TYPES: 1=SINGLE, 2=RECURRING
   # SEND_MESSAGE_DIRECT_ACTION: 0=REPLY, 1=REPLY_ALL, 2=FORWARD, 3=AUTO_RESPONSE, 4=READ_RECEIPT
   # SentryCalendarInitiatives: rsvp-note=RSVP_NOTE, bookings=BOOKINGS
@@ -11907,6 +11908,9 @@ It's just not needed at this point"
                 LumoNews:
                   type: string
                   nullable: true
+                MeetNews:
+                  type: string
+                  nullable: true
                 InAppNotifications:
                   type: string
                   nullable: true
@@ -11988,6 +11992,9 @@ It's just not needed at this point"
                   type: string
                   nullable: true
                 LumoNews:
+                  type: string
+                  nullable: true
+                MeetNews:
                   type: string
                   nullable: true
                 InAppNotifications:
@@ -26740,6 +26747,27 @@ See the file uploader in the Drive app.
       responses:
         "200":
           description: Get User Permissions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  Code:
+                    type: integer
+  /permissions/v1/members/{memberID}/roles:
+    get:
+      tags: [Permissions]
+      summary: Get Member Organization Roles
+      operationId: getMemberOrganizationRoles
+      parameters:
+        - name: memberID
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Get Member Organization Roles
           content:
             application/json:
               schema:
