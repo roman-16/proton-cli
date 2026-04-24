@@ -192,15 +192,15 @@ func eventsCmd() *cobra.Command {
 			if a.R.Format != render.FormatText {
 				return a.R.Object(ev)
 			}
-			fmt.Fprintf(a.R.Stdout, "Event:    %s\n", ev.Title)
-			fmt.Fprintf(a.R.Stdout, "Start:    %s\n", ev.Start.Local().Format("2006-01-02 15:04"))
-			fmt.Fprintf(a.R.Stdout, "End:      %s\n", ev.End.Local().Format("2006-01-02 15:04"))
-			fmt.Fprintf(a.R.Stdout, "Duration: %s\n", render.Duration(ev.End.Sub(ev.Start)))
+			_, _ = fmt.Fprintf(a.R.Stdout, "Event:    %s\n", ev.Title)
+			_, _ = fmt.Fprintf(a.R.Stdout, "Start:    %s\n", ev.Start.Local().Format("2006-01-02 15:04"))
+			_, _ = fmt.Fprintf(a.R.Stdout, "End:      %s\n", ev.End.Local().Format("2006-01-02 15:04"))
+			_, _ = fmt.Fprintf(a.R.Stdout, "Duration: %s\n", render.Duration(ev.End.Sub(ev.Start)))
 			if ev.Location != "" {
-				fmt.Fprintf(a.R.Stdout, "Location: %s\n", ev.Location)
+				_, _ = fmt.Fprintf(a.R.Stdout, "Location: %s\n", ev.Location)
 			}
-			fmt.Fprintf(a.R.Stdout, "ID:       %s\n", ev.ID)
-			fmt.Fprintf(a.R.Stdout, "Calendar: %s\n", ev.CalendarID)
+			_, _ = fmt.Fprintf(a.R.Stdout, "ID:       %s\n", ev.ID)
+			_, _ = fmt.Fprintf(a.R.Stdout, "Calendar: %s\n", ev.CalendarID)
 			return nil
 		},
 	})

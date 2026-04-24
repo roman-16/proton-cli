@@ -58,8 +58,8 @@ func Table(w io.Writer, headers []string, rows [][]string) {
 		head.WriteString(padRight(h, widths[i]))
 		sep.WriteString(strings.Repeat("─", widths[i]))
 	}
-	fmt.Fprintln(w, head.String())
-	fmt.Fprintln(w, sep.String())
+	_, _ = fmt.Fprintln(w, head.String())
+	_, _ = fmt.Fprintln(w, sep.String())
 
 	for _, row := range rows {
 		var line strings.Builder
@@ -73,7 +73,7 @@ func Table(w io.Writer, headers []string, rows [][]string) {
 			}
 			line.WriteString(padRight(truncate(cell, widths[i]), widths[i]))
 		}
-		fmt.Fprintln(w, line.String())
+		_, _ = fmt.Fprintln(w, line.String())
 	}
 }
 

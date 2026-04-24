@@ -155,10 +155,10 @@ func (r *Renderer) TableOrObject(headers []string, rows [][]string, v any) error
 // success message on stderr. Use after a creating/mutating call.
 func (r *Renderer) ID(id, msg string) {
 	if id != "" {
-		fmt.Fprintln(r.Stdout, id)
+		_, _ = fmt.Fprintln(r.Stdout, id)
 	}
 	if !r.Quiet && msg != "" {
-		fmt.Fprintln(r.Stderr, "✓ "+msg)
+		_, _ = fmt.Fprintln(r.Stderr, "✓ "+msg)
 	}
 }
 
@@ -167,7 +167,7 @@ func (r *Renderer) Success(msg string) {
 	if r.Quiet || msg == "" {
 		return
 	}
-	fmt.Fprintln(r.Stderr, "✓ "+msg)
+	_, _ = fmt.Fprintln(r.Stderr, "✓ "+msg)
 }
 
 // Info prints a neutral progress notice to stderr.
@@ -175,7 +175,7 @@ func (r *Renderer) Info(msg string) {
 	if r.Quiet || msg == "" {
 		return
 	}
-	fmt.Fprintln(r.Stderr, msg)
+	_, _ = fmt.Fprintln(r.Stderr, msg)
 }
 
 // IsTTY reports whether stderr is a terminal.

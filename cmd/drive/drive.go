@@ -408,7 +408,7 @@ func itemsDeleteCmd() *cobra.Command {
 				}
 				a.R.Info(fmt.Sprintf("%s %d item(s):", label, len(targets)))
 				for _, t := range targets {
-					fmt.Fprintln(a.R.Stderr, "  "+t)
+					_, _ = fmt.Fprintln(a.R.Stderr, "  "+t)
 				}
 				return nil
 			}

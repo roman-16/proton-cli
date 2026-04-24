@@ -51,7 +51,7 @@ go build .
 
 ```bash
 export PROTON_USER=alice@proton.me
-export PROTON_PASSWORD='your-password'
+export PROTON_PASSWORD=your-password
 # export PROTON_TOTP=123456   # if 2FA is enabled
 ```
 

@@ -49,7 +49,7 @@ func TestAPIPostDeleteRoundTrip(t *testing.T) {
 	if id == "" {
 		t.Fatal("no Label.ID in response")
 	}
-	cleanupRun(t, fmt.Sprintf("Delete label: proton-cli api DELETE /core/v4/labels --body ..."),
+	cleanupRun(t, "Delete label: proton-cli api DELETE /core/v4/labels --body ...",
 		"api", "DELETE", "/core/v4/labels",
 		"--body", fmt.Sprintf(`{"LabelIDs":[%q]}`, id))
 

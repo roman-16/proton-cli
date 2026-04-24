@@ -54,7 +54,7 @@ func itemsCmd() *cobra.Command {
 				rows = append(rows, []string{it.Type, it.Name, uname, it.ShareID, it.ItemID})
 			}
 			render.Table(a.R.Stdout, headers, rows)
-			fmt.Fprintf(a.R.Stderr, "\n%d item(s)\n", len(items))
+			_, _ = fmt.Fprintf(a.R.Stderr, "\n%d item(s)\n", len(items))
 			return nil
 		},
 	}
@@ -84,46 +84,46 @@ func itemsCmd() *cobra.Command {
 			if a.R.Format != render.FormatText {
 				return a.R.Object(it)
 			}
-			fmt.Fprintf(a.R.Stdout, "Type:     %s\n", it.Type)
-			fmt.Fprintf(a.R.Stdout, "Name:     %s\n", it.Name)
+			_, _ = fmt.Fprintf(a.R.Stdout, "Type:     %s\n", it.Type)
+			_, _ = fmt.Fprintf(a.R.Stdout, "Name:     %s\n", it.Name)
 			if it.Username != "" {
-				fmt.Fprintf(a.R.Stdout, "Username: %s\n", it.Username)
+				_, _ = fmt.Fprintf(a.R.Stdout, "Username: %s\n", it.Username)
 			}
 			if it.Email != "" {
-				fmt.Fprintf(a.R.Stdout, "Email:    %s\n", it.Email)
+				_, _ = fmt.Fprintf(a.R.Stdout, "Email:    %s\n", it.Email)
 			}
 			if it.Password != "" {
-				fmt.Fprintf(a.R.Stdout, "Password: %s\n", it.Password)
+				_, _ = fmt.Fprintf(a.R.Stdout, "Password: %s\n", it.Password)
 			}
 			if it.TOTP != "" {
-				fmt.Fprintf(a.R.Stdout, "TOTP:     %s\n", it.TOTP)
+				_, _ = fmt.Fprintf(a.R.Stdout, "TOTP:     %s\n", it.TOTP)
 			}
 			for _, u := range it.URLs {
-				fmt.Fprintf(a.R.Stdout, "URL:      %s\n", u)
+				_, _ = fmt.Fprintf(a.R.Stdout, "URL:      %s\n", u)
 			}
 			if it.Holder != "" {
-				fmt.Fprintf(a.R.Stdout, "Holder:   %s\n", it.Holder)
+				_, _ = fmt.Fprintf(a.R.Stdout, "Holder:   %s\n", it.Holder)
 			}
 			if it.Number != "" {
-				fmt.Fprintf(a.R.Stdout, "Number:   %s\n", it.Number)
+				_, _ = fmt.Fprintf(a.R.Stdout, "Number:   %s\n", it.Number)
 			}
 			if it.Expiry != "" {
-				fmt.Fprintf(a.R.Stdout, "Expiry:   %s\n", it.Expiry)
+				_, _ = fmt.Fprintf(a.R.Stdout, "Expiry:   %s\n", it.Expiry)
 			}
 			if it.CVV != "" {
-				fmt.Fprintf(a.R.Stdout, "CVV:      %s\n", it.CVV)
+				_, _ = fmt.Fprintf(a.R.Stdout, "CVV:      %s\n", it.CVV)
 			}
 			if it.PIN != "" {
-				fmt.Fprintf(a.R.Stdout, "PIN:      %s\n", it.PIN)
+				_, _ = fmt.Fprintf(a.R.Stdout, "PIN:      %s\n", it.PIN)
 			}
 			if it.SSID != "" {
-				fmt.Fprintf(a.R.Stdout, "SSID:     %s\n", it.SSID)
+				_, _ = fmt.Fprintf(a.R.Stdout, "SSID:     %s\n", it.SSID)
 			}
 			if it.Note != "" {
-				fmt.Fprintf(a.R.Stdout, "Note:     %s\n", it.Note)
+				_, _ = fmt.Fprintf(a.R.Stdout, "Note:     %s\n", it.Note)
 			}
-			fmt.Fprintf(a.R.Stdout, "ID:       %s\n", it.ItemID)
-			fmt.Fprintf(a.R.Stdout, "Share:    %s\n", it.ShareID)
+			_, _ = fmt.Fprintf(a.R.Stdout, "ID:       %s\n", it.ItemID)
+			_, _ = fmt.Fprintf(a.R.Stdout, "Share:    %s\n", it.ShareID)
 			return nil
 		},
 	})
@@ -361,7 +361,7 @@ func bulkItemCmd(use, short string, fn func(a *app.App, cmd *cobra.Command, shar
 			if a.DryRun {
 				a.R.Info(fmt.Sprintf("dry-run: would %s %d item(s)", use, len(pairs)))
 				for _, p := range pairs {
-					fmt.Fprintf(a.R.Stderr, "  %s/%s\n", p[0], p[1])
+					_, _ = fmt.Fprintf(a.R.Stderr, "  %s/%s\n", p[0], p[1])
 				}
 				return nil
 			}
@@ -500,13 +500,13 @@ func aliasCmd() *cobra.Command {
 			if a.R.Format != render.FormatText {
 				return a.R.Object(map[string]any{"Suffixes": sx, "Mailboxes": mx})
 			}
-			fmt.Fprintln(a.R.Stdout, "Suffixes:")
+			_, _ = fmt.Fprintln(a.R.Stdout, "Suffixes:")
 			for _, s := range sx {
-				fmt.Fprintf(a.R.Stdout, "  %s\n", s.Suffix)
+				_, _ = fmt.Fprintf(a.R.Stdout, "  %s\n", s.Suffix)
 			}
-			fmt.Fprintln(a.R.Stdout, "\nMailboxes:")
+			_, _ = fmt.Fprintln(a.R.Stdout, "\nMailboxes:")
 			for _, m := range mx {
-				fmt.Fprintf(a.R.Stdout, "  %s (ID: %d)\n", m.Email, m.ID)
+				_, _ = fmt.Fprintf(a.R.Stdout, "  %s (ID: %d)\n", m.Email, m.ID)
 			}
 			return nil
 		},

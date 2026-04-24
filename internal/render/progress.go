@@ -50,7 +50,7 @@ func (p *Progress) Finish() {
 	if !p.active {
 		return
 	}
-	fmt.Fprintln(p.Writer)
+	_, _ = fmt.Fprintln(p.Writer)
 	p.active = false
 }
 
@@ -78,6 +78,6 @@ func (p *Progress) draw() {
 			bar += " "
 		}
 	}
-	fmt.Fprintf(p.Writer, "\r%s [%s] %s / %s (%.0f%%)",
+	_, _ = fmt.Fprintf(p.Writer, "\r%s [%s] %s / %s (%.0f%%)",
 		p.Label, bar, Size(p.current), Size(p.Total), pct*100)
 }

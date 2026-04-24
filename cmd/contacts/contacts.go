@@ -72,21 +72,21 @@ func getCmd() *cobra.Command {
 			if a.R.Format != render.FormatText {
 				return a.R.Object(c)
 			}
-			fmt.Fprintf(a.R.Stdout, "ID:    %s\n", c.ID)
+			_, _ = fmt.Fprintf(a.R.Stdout, "ID:    %s\n", c.ID)
 			if c.Name != "" {
-				fmt.Fprintf(a.R.Stdout, "Name:  %s\n", c.Name)
+				_, _ = fmt.Fprintf(a.R.Stdout, "Name:  %s\n", c.Name)
 			}
 			if c.Email != "" {
-				fmt.Fprintf(a.R.Stdout, "Email: %s\n", c.Email)
+				_, _ = fmt.Fprintf(a.R.Stdout, "Email: %s\n", c.Email)
 			}
 			if c.Phone != "" {
-				fmt.Fprintf(a.R.Stdout, "Phone: %s\n", c.Phone)
+				_, _ = fmt.Fprintf(a.R.Stdout, "Phone: %s\n", c.Phone)
 			}
 			if c.Org != "" {
-				fmt.Fprintf(a.R.Stdout, "Org:   %s\n", c.Org)
+				_, _ = fmt.Fprintf(a.R.Stdout, "Org:   %s\n", c.Org)
 			}
 			if c.Note != "" {
-				fmt.Fprintf(a.R.Stdout, "Note:  %s\n", c.Note)
+				_, _ = fmt.Fprintf(a.R.Stdout, "Note:  %s\n", c.Note)
 			}
 			return nil
 		},

@@ -107,16 +107,16 @@ func msgReadCmd() *cobra.Command {
 			if a.R.Format != render.FormatText {
 				return a.R.Object(msg)
 			}
-			fmt.Fprintf(a.R.Stdout, "Subject: %s\n", msg.Subject)
+			_, _ = fmt.Fprintf(a.R.Stdout, "Subject: %s\n", msg.Subject)
 			if s, ok := msg.Sender["Address"].(string); ok {
-				fmt.Fprintf(a.R.Stdout, "From:    %s\n", s)
+				_, _ = fmt.Fprintf(a.R.Stdout, "From:    %s\n", s)
 			}
 			for _, t := range msg.ToList {
 				if s, ok := t["Address"].(string); ok {
-					fmt.Fprintf(a.R.Stdout, "To:      %s\n", s)
+					_, _ = fmt.Fprintf(a.R.Stdout, "To:      %s\n", s)
 				}
 			}
-			fmt.Fprintf(a.R.Stdout, "ID:      %s\n\n", msg.ID)
+			_, _ = fmt.Fprintf(a.R.Stdout, "ID:      %s\n\n", msg.ID)
 			body := msg.Body
 			switch format {
 			case "text":
@@ -128,7 +128,7 @@ func msgReadCmd() *cobra.Command {
 			default:
 				return fmt.Errorf("unknown --format %q (use text, html, raw)", format)
 			}
-			fmt.Fprintln(a.R.Stdout, body)
+			_, _ = fmt.Fprintln(a.R.Stdout, body)
 			return nil
 		},
 	}
@@ -411,7 +411,7 @@ func bulkMessageAction(f *msgFilter, successFmt string, do func(cmd *cobra.Comma
 		if a.DryRun {
 			a.R.Info(fmt.Sprintf("dry-run: would affect %d message(s)", len(ids)))
 			for _, id := range ids {
-				fmt.Fprintln(a.R.Stderr, "  "+id)
+				_, _ = fmt.Fprintln(a.R.Stderr, "  "+id)
 			}
 			return nil
 		}
@@ -447,7 +447,7 @@ func renderMessages(a *app.App, msgs []mailsvc.Message, total, page int) error {
 		rows = append(rows, []string{m.ID, from, m.Subject, time.Unix(m.Time, 0).Local().Format("2006-01-02 15:04"), flags})
 	}
 	render.Table(a.R.Stdout, headers, rows)
-	fmt.Fprintf(a.R.Stderr, "\n%d messages total (page %d)\n", total, page)
+	_, _ = fmt.Fprintf(a.R.Stderr, "\n%d messages total (page %d)\n", total, page)
 	return nil
 }
 

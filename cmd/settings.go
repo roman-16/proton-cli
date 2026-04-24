@@ -68,7 +68,7 @@ func renderAccountSettings(a *app.App, m map[string]any) {
 		_ = a.R.Object(m)
 		return
 	}
-	print := func(k, v string) { fmt.Fprintf(a.R.Stdout, "%-16s %s\n", k+":", v) }
+	print := func(k, v string) { _, _ = fmt.Fprintf(a.R.Stdout, "%-16s %s\n", k+":", v) }
 	print("Locale", str(u["Locale"]))
 	if e, ok := u["Email"].(map[string]any); ok {
 		print("Recovery Email", str(e["Value"]))
@@ -94,7 +94,7 @@ func renderMailSettings(a *app.App, m map[string]any) {
 		_ = a.R.Object(m)
 		return
 	}
-	print := func(k, v string) { fmt.Fprintf(a.R.Stdout, "%-20s %s\n", k+":", v) }
+	print := func(k, v string) { _, _ = fmt.Fprintf(a.R.Stdout, "%-20s %s\n", k+":", v) }
 	print("Display Name", str(ms["DisplayName"]))
 	print("Page Size", intStr(ms["PageSize"]))
 	print("View Mode", viewMode(intOf(ms["ViewMode"])))

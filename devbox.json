@@ -4,8 +4,13 @@
     "go@latest",
     "gopls@latest",
     "golangci-lint@latest",
-    "nodejs@latest",
+    "nodejs@24",
     "just@latest",
     "protobuf@latest"
-  ]
+  ],
+  "shell": {
+    "init_hook": [
+      "if [ -f .env ]; then set -a; . ./.env; set +a; fi"
+    ]
+  }
 }
