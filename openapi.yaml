@@ -92,7 +92,7 @@ components:
   # CONTACT_CARD_TYPE: 3=ENCRYPTED_AND_SIGNED, 2=SIGNED, 1=ENCRYPTED, 0=CLEAR_TEXT
   # CookieSameSiteAttribute: lax=Lax, strict=Strict, none=None
   # CREATE_DRAFT_MESSAGE_ACTION: 0=REPLY, 1=REPLY_ALL, 2=FORWARD
-  # CreateMemberMode: 0=Password, 1=Invitation
+  # CreateMemberMode: 0=Password, 1=Invitation, 2=LoginLink
   # CRYPTO_PROCESSING_TYPES: 0=SUCCESS, 1=SIGNATURE_NOT_VERIFIED, 2=FAIL_TO_READ, 3=FAIL_TO_LOAD, 4=FAIL_TO_DECRYPT
   # CUSTOM_FETCH_ERROR_STATUS_CODE: 0=NO_NETWORK_CONNECTION, -1=TIMEOUT
   # CUSTOM_VIEWS_LABELS: views/newsletters=NEWSLETTER_SUBSCRIPTIONS
@@ -7528,6 +7528,8 @@ It's just not needed at this point"
                   type: integer
                 MaxAI:
                   type: integer
+                TemporaryPassword:
+                  type: boolean
       responses:
         "200":
           description: Create Member
