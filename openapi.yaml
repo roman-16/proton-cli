@@ -145,7 +145,7 @@ components:
   # FILTER_STATUS: 1=ENABLED, 0=DISABLED
   # FlagAction: 0=MARK_OBSOLETE, 1=MARK_NOT_OBSOLETE, 2=MARK_COMPROMISED, 3=MARK_NOT_COMPROMISED, 4=DISABLE_ENCRYPTION, 5=ENABLE_ENCRYPTION, 6=DISABLE_EXPECT_SIGNED, 7=ENABLE_EXPECT_SIGNED
   # FOLDER_COLOR: 0=DISABLED, 1=ENABLED
-  # ForkSearchParameters: app=App, state=State, sk=Base64Key, v=Version, u=LocalID, t=ForkType, p=Persistent, tr=Trusted, prompt=Prompt, independent=Independent, pt=PayloadType, source=Source, selector=Selector, pv=PayloadVersion, promptType=PromptType, promptBypass=PromptBypass, plan=Plan, partnerId=PartnerId, uru=UnauthenticatedReturnUrl
+  # ForkSearchParameters: app=App, state=State, sk=Base64Key, v=Version, u=LocalID, t=ForkType, p=Persistent, tr=Trusted, prompt=Prompt, independent=Independent, pt=PayloadType, source=Source, selector=Selector, pv=PayloadVersion, promptType=PromptType, promptBypass=PromptBypass, plan=Plan, partnerId=PartnerId, uru=UnauthenticatedReturnUrl, token=Token
   # ForkType: 1=SWITCH, 2=SIGNUP, 3=LOGIN
   # ForwardingState: 0=Pending, 1=Active, 2=Outdated, 3=Paused, 4=Rejected
   # ForwardingType: 0=InternalUnencrypted, 1=InternalEncrypted, 2=ExternalUnencrypted, 3=ExternalEncrypted
@@ -222,8 +222,8 @@ components:
   # MONTHLY_TYPE: 0=ON_MONTH_DAY, 1=ON_NTH_DAY, -1=ON_MINUS_NTH_DAY
   # MotionModeSetting: 0=No_preference, 1=Reduce
   # MX_STATE: 0=MX_STATE_DEFAULT, 1=MX_STATE_NO_US, 2=MX_STATE_INC_US, 3=MX_STATE_GOOD, 4=MX_STATE_BACKUP
-  # NEWSLETTER_SUBSCRIPTIONS: Announcements=ANNOUNCEMENTS, Features=FEATURES, Newsletter=NEWSLETTER, Beta=BETA, Business=BUSINESS, Offers=OFFERS, NewEmailNotif=NEW_EMAIL_NOTIF, Onboarding=ONBOARDING, UserSurveys=USER_SURVEY, InboxNews=INBOX_NEWS, VpnNews=VPN_NEWS, DriveNews=DRIVE_NEWS, PassNews=PASS_NEWS, WalletNews=WALLET_NEWS, LumoNews=LUMO_NEWS, MeetNews=MEET_NEWS, InAppNotifications=IN_APP_NOTIFICATIONS
-  # NEWSLETTER_SUBSCRIPTIONS_BITS: 1=ANNOUNCEMENTS, 2=FEATURES, 4=NEWSLETTER, 8=BETA, 16=BUSINESS, 32=OFFERS, 64=NEW_EMAIL_NOTIF, 128=ONBOARDING, 256=USER_SURVEY, 512=INBOX_NEWS, 1024=VPN_NEWS, 2048=DRIVE_NEWS, 4096=PASS_NEWS, 8192=WALLET_NEWS, 16384=IN_APP_NOTIFICATIONS, 32768=LUMO_NEWS, 65536=MEET_NEWS
+  # NEWSLETTER_SUBSCRIPTIONS: Announcements=ANNOUNCEMENTS, Features=FEATURES, Newsletter=NEWSLETTER, Beta=BETA, Business=BUSINESS, Offers=OFFERS, NewEmailNotif=NEW_EMAIL_NOTIF, Onboarding=ONBOARDING, UserSurveys=USER_SURVEY, InboxNews=INBOX_NEWS, VpnNews=VPN_NEWS, DriveNews=DRIVE_NEWS, PassNews=PASS_NEWS, WalletNews=WALLET_NEWS, LumoNews=LUMO_NEWS, MeetNews=MEET_NEWS, InAppNotifications=IN_APP_NOTIFICATIONS, AccountRecovery=ACCOUNT_RECOVERY
+  # NEWSLETTER_SUBSCRIPTIONS_BITS: 1=ANNOUNCEMENTS, 2=FEATURES, 4=NEWSLETTER, 8=BETA, 16=BUSINESS, 32=OFFERS, 64=NEW_EMAIL_NOTIF, 128=ONBOARDING, 256=USER_SURVEY, 512=INBOX_NEWS, 1024=VPN_NEWS, 2048=DRIVE_NEWS, 4096=PASS_NEWS, 8192=WALLET_NEWS, 16384=IN_APP_NOTIFICATIONS, 32768=LUMO_NEWS, 65536=MEET_NEWS, 131072=ACCOUNT_RECOVERY
   # NEXT_MESSAGE_ON_MOVE: 0=DISABLED, 1=DEFAULT, 2=ENABLED
   # NOTIFICATION_TYPE_API: 0=EMAIL, 1=DEVICE
   # NOTIFICATION_UNITS: 1=WEEK, 2=DAY, 3=HOUR, 4=MINUTE
@@ -249,7 +249,7 @@ components:
   # PhotoTag: -1=All, 0=Favorites, 1=Screenshots, 2=Videos, 3=LivePhotos, 4=MotionPhotos, 5=Selfies, 6=Portraits, 7=Bursts, 8=Panoramas, 9=Raw
   # PM_SIGNATURE: 0=DISABLED, 1=ENABLED, 2=LOCKED
   # PM_SIGNATURE_REFERRAL: 0=DISABLED, 1=ENABLED
-  # PREDEFINED_ROLE_NAME: Organization Admin=ORGANIZATION_ADMIN, User Admin=USER_ADMIN, Security Admin=SECURITY_ADMIN
+  # PREDEFINED_ROLE_NAME: Owner=OWNER, User Admin=USER_ADMIN, Security Admin=SECURITY_ADMIN
   # Product: Account=Account, Authenticator=Authenticator, Mail=Mail, Calendar=Calendar, Wallet=Wallet, Docs=Docs, Sheets=Sheets, Lumo=Lumo, Drive=Drive, VPN=VPN, VPN=Verify, Admin=Admin, Pass=Pass, Meet=Meet, Other=Other
   # PRODUCT: 1=MAIL, 2=VPN, 3=CALENDAR, 4=DRIVE, 5=PASS, 6=WALLET, 9=LUMO, 10=AUTHENTICATOR
   # PRODUCT_BIT: 1=MAIL, 2=DRIVE, 4=VPN, 8=PASS, 16=WALLET, 32=NEUTRON, 64=LUMO, 256=MEET
@@ -272,7 +272,7 @@ components:
   # SAVE_CONFIRMATION_TYPES: 1=SINGLE, 2=RECURRING
   # SEND_MESSAGE_DIRECT_ACTION: 0=REPLY, 1=REPLY_ALL, 2=FORWARD, 3=AUTO_RESPONSE, 4=READ_RECEIPT
   # SentryCalendarInitiatives: rsvp-note=RSVP_NOTE, bookings=BOOKINGS
-  # SentryCommonInitiatives: post-subscription=POST_SUBSCRIPTION, encrypted-search=ENCRYPTED_SEARCH
+  # SentryCommonInitiatives: post-subscription=POST_SUBSCRIPTION, encrypted-search=ENCRYPTED_SEARCH, contact-import=CONTACT_IMPORT
   # SentryMailInitiatives: assistant=ASSISTANT, attachment-encryption-error=ATTACHMENT_ENCRYPTION_ERROR, attachment-upload-error=ATTACHMENT_UPLOAD_ERROR, composer=COMPOSER, drawer-security-center=DRAWER_SECURITY_CENTER, drawer-vpn=DRAWER_VPN, list-actions-telemetry=LIST_ACTIONS_TELEMETRY, mail-onboarding=MAIL_ONBOARDING, mail-redux-errors=MAIL_REDUX_ERRORS, migration-tool=MIGRATION_TOOL, move-actions=MOVE_ACTIONS, lumo-in-mail=LUMO_IN_MAIL, remove-email-trackers=REMOVE_EMAIL_TRACKERS, upsell-modals=UPSELL_MODALS
   # SentryMailPerformanceInitiatives: apply-location-performance=APPLY_LOCATION_PERFORMANCE
   # SERVER_FEATURES: 1=SECURE_CORE, 2=TOR, 4=P2P, 8=XOR, 16=IPV6, 32=RESTRICTED, 64=PARTNER, 128=DOUBLE_RESTRICTION
@@ -1361,6 +1361,12 @@ paths:
                   type: string
                 SRPSession:
                   type: string
+                TwoFactorCode:
+                  type: string
+                  nullable: true
+                FIDO2:
+                  type: string
+                  nullable: true
       responses:
         "200":
           description: Auth Reminder
@@ -11609,6 +11615,9 @@ It's just not needed at this point"
                 PasswordReminderOptOut:
                   type: string
                   nullable: true
+                PersistPasswordScope:
+                  type: string
+                  nullable: true
       responses:
         "200":
           description: Update Flags
@@ -12214,6 +12223,9 @@ It's just not needed at this point"
                 InAppNotifications:
                   type: string
                   nullable: true
+                AccountRecovery:
+                  type: string
+                  nullable: true
       responses:
         "200":
           description: Patch News
@@ -12298,6 +12310,9 @@ It's just not needed at this point"
                   type: string
                   nullable: true
                 InAppNotifications:
+                  type: string
+                  nullable: true
+                AccountRecovery:
                   type: string
                   nullable: true
       responses:
@@ -12565,6 +12580,9 @@ It's just not needed at this point"
                   type: string
                 Signature:
                   type: string
+                PersistPasswordScope:
+                  type: string
+                  nullable: true
       responses:
         "200":
           description: Set New Recovery Secret
@@ -12602,6 +12620,9 @@ It's just not needed at this point"
               properties:
                 SessionAccountRecovery:
                   type: integer
+                PersistPasswordScope:
+                  type: string
+                  nullable: true
       responses:
         "200":
           description: Update Session Account Recovery

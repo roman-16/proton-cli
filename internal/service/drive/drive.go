@@ -105,8 +105,13 @@ type Link struct {
 	NodeKey                 string
 	NodePassphrase          string
 	NodePassphraseSignature string
+	SignatureEmail          string
 	CreateTime              int64
 	ModifyTime              int64
+	RealModifyTime          int64
+	XAttr                   string
+	ShareIDs                []string
+	ShareUrls               []struct{ ShareURLID string }
 	FolderProperties        *struct{ NodeHashKey string }
 	FileProperties          *struct {
 		ContentKeyPacket string

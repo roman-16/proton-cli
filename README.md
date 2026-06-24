@@ -173,6 +173,7 @@ proton-cli drive items rename /Documents/old.txt new.txt
 proton-cli drive items move /Documents/report.pdf /Archive
 proton-cli drive items delete /Documents/old-report.pdf
 proton-cli drive items delete --permanent /Documents/secret.txt
+proton-cli drive items info /Documents/report.pdf          # type, size, checksum, sharing
 
 # Batch filters
 proton-cli drive items delete --pattern "*.tmp" --recursive --scope /
@@ -182,6 +183,23 @@ proton-cli drive items delete --scope /OldStuff --all --recursive
 
 # Folders
 proton-cli drive folders create /Documents/NewFolder
+
+# Sharing — public links
+proton-cli drive share status /Documents/report.pdf        # who has access + public link
+proton-cli drive share link /Documents/report.pdf          # create/show the public link
+proton-cli drive share link /Documents/report.pdf --edit --expires 7d
+proton-cli drive share link /Documents/report.pdf --password hunter2
+proton-cli drive share unlink /Documents/report.pdf        # remove the public link
+
+# Sharing — members (invite Proton users)
+proton-cli drive share add /Documents/report.pdf bob@proton.me
+proton-cli drive share add /Documents/report.pdf bob@proton.me --edit
+proton-cli drive share remove /Documents/report.pdf bob@proton.me
+
+# Incoming share invitations
+proton-cli drive invitations list
+proton-cli drive invitations accept INVITATION_ID
+proton-cli drive invitations reject INVITATION_ID
 
 # Trash
 proton-cli drive trash list

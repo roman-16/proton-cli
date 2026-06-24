@@ -18,6 +18,13 @@ func Size(bytes int64) string {
 	}
 }
 
+func Time(unix int64) string {
+	if unix == 0 {
+		return "-"
+	}
+	return time.Unix(unix, 0).Local().Format("2006-01-02 15:04")
+}
+
 func Duration(d time.Duration) string {
 	if d < time.Minute {
 		return fmt.Sprintf("%ds", int(d.Seconds()))

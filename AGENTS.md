@@ -19,6 +19,7 @@ Tests are **integration tests** that run against the live Proton API. They requi
 
 - **Never run the full test suite** (`just test` / `go test ./...`) - only the user triggers that manually
 - **Single tests are allowed** (`just test-one TestName`) when verifying a specific change
+- **Unit test file naming**: name a unit test file after the source file it tests, with `_test.go` appended (e.g. `size.go` → `size_test.go`) - never after a symbol or after a file that doesn't exist. The integration tests under `tests/` are the exception: they are grouped by feature area.
 
 ## Reference Source
 

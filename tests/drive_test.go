@@ -36,6 +36,56 @@ func TestDriveItemsListJSONFieldNames(t *testing.T) {
 	}
 }
 
+// ── info ──
+
+func TestDriveItemsInfo(t *testing.T) {
+	skipIfNoCredentials(t)
+	folder := "/" + testID() + "-info"
+	tmp := t.TempDir()
+	src := filepath.Join(tmp, "doc.txt")
+	_ = os.WriteFile(src, []byte("info-payload-12345"), 0644)
+
+	runOK(t, "drive", "folders", "create", folder)
+	cleanupRun(t, fmt.Sprintf("Delete folder: proton-cli drive items delete --permanent %s", folder),
+		"drive", "items", "delete", "--permanent", folder)
+	runOK(t, "drive", "items", "upload", src, folder)
+
+	info := runJSON(t, "drive", "items", "info", folder+"/doc.txt")
+	if info["type"] != "file" {
+		t.Errorf("type = %v, want file", info["type"])
+	}
+	if sz, _ := info["size_bytes"].(float64); sz <= 0 {
+		t.Errorf("size_bytes = %v, want > 0", info["size_bytes"])
+	}
+	if _, ok := info["mime_type"]; !ok {
+		t.Errorf("expected mime_type, got keys %v", keysOf(info))
+	}
+	if info["shared"] != false {
+		t.Errorf("shared = %v, want false", info["shared"])
+	}
+	if info["signature"] != "verified" {
+		t.Errorf("signature = %v, want verified (we uploaded it)", info["signature"])
+	}
+
+	// Text mode renders the key/value block.
+	text := runOK(t, "drive", "items", "info", folder+"/doc.txt")
+	assertContains(t, text, "type:")
+	assertContains(t, text, "size:")
+}
+
+func TestDriveItemsInfoFolder(t *testing.T) {
+	skipIfNoCredentials(t)
+	folder := "/" + testID() + "-infodir"
+	runOK(t, "drive", "folders", "create", folder)
+	cleanupRun(t, fmt.Sprintf("Delete folder: proton-cli drive items delete --permanent %s", folder),
+		"drive", "items", "delete", "--permanent", folder)
+
+	info := runJSON(t, "drive", "items", "info", folder)
+	if info["type"] != "folder" {
+		t.Errorf("type = %v, want folder", info["type"])
+	}
+}
+
 // ── upload / download lifecycle ──
 
 func TestDriveItemsUploadDownload(t *testing.T) {

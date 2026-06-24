@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
@@ -189,6 +190,124 @@ func genNodeKeys(parentKR, addrKR *pgp.KeyRing) (nodeKey, passphrase, passSig st
 		return "", "", "", nil, err
 	}
 	return armKey, armPass, armSig, key, nil
+}
+
+// genShareKeys differs from genNodeKeys: it encrypts the passphrase to a
+// combined key ring (node key first, then address key) and returns the
+// passphrase session key, which the link and invite flows wrap for recipients.
+func genShareKeys(nodeKR, addrKR *pgp.KeyRing) (nodeKey, passphrase, passSig string, priv *pgp.Key, sessionKey *pgp.SessionKey, err error) {
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return "", "", "", nil, nil, err
+	}
+	phrase := base64.StdEncoding.EncodeToString(raw)
+	key, err := pgp.GenerateKey("Drive key", "", "x25519", 0)
+	if err != nil {
+		return "", "", "", nil, nil, err
+	}
+	locked, err := key.Lock([]byte(phrase))
+	if err != nil {
+		return "", "", "", nil, nil, err
+	}
+	armKey, err := locked.Armor()
+	if err != nil {
+		return "", "", "", nil, nil, err
+	}
+	combined, err := combinedKeyRing(nodeKR, addrKR)
+	if err != nil {
+		return "", "", "", nil, nil, err
+	}
+	msg := pgp.NewPlainMessageFromString(phrase)
+	enc, err := combined.Encrypt(msg, nil)
+	if err != nil {
+		return "", "", "", nil, nil, err
+	}
+	armPass, err := enc.GetArmored()
+	if err != nil {
+		return "", "", "", nil, nil, err
+	}
+	split, err := enc.SplitMessage()
+	if err != nil {
+		return "", "", "", nil, nil, err
+	}
+	sk, err := nodeKR.DecryptSessionKey(split.GetBinaryKeyPacket())
+	if err != nil {
+		return "", "", "", nil, nil, err
+	}
+	sig, err := addrKR.SignDetached(msg)
+	if err != nil {
+		return "", "", "", nil, nil, err
+	}
+	armSig, err := sig.GetArmored()
+	if err != nil {
+		return "", "", "", nil, nil, err
+	}
+	return armKey, armPass, armSig, key, sk, nil
+}
+
+// combinedKeyRing holds the node key followed by the address key; the order is
+// significant (node key must come first).
+func combinedKeyRing(nodeKR, addrKR *pgp.KeyRing) (*pgp.KeyRing, error) {
+	nk, err := nodeKR.GetKey(0)
+	if err != nil {
+		return nil, err
+	}
+	combined, err := pgp.NewKeyRing(nk)
+	if err != nil {
+		return nil, err
+	}
+	ak, err := addrKR.GetKey(0)
+	if err != nil {
+		return nil, err
+	}
+	if err := combined.AddKey(ak); err != nil {
+		return nil, err
+	}
+	return combined, nil
+}
+
+func reEncryptSessionKeyTo(armored string, oldKR, newKR *pgp.KeyRing) (string, error) {
+	msg, err := pgp.NewPGPMessageFromArmored(armored)
+	if err != nil {
+		return "", err
+	}
+	split, err := msg.SplitMessage()
+	if err != nil {
+		return "", err
+	}
+	sk, err := oldKR.DecryptSessionKey(split.GetBinaryKeyPacket())
+	if err != nil {
+		return "", err
+	}
+	kp, err := newKR.EncryptSessionKey(sk)
+	if err != nil {
+		return "", err
+	}
+	return base64.StdEncoding.EncodeToString(kp), nil
+}
+
+type xAttr struct {
+	Common struct {
+		ModificationTime string
+		Size             int64
+		Digests          struct{ SHA1 string }
+	}
+}
+
+func decryptXAttr(armored string, nodeKR *pgp.KeyRing) (*xAttr, error) {
+	msg, err := pgp.NewPGPMessageFromArmored(armored)
+	if err != nil {
+		return nil, err
+	}
+	dec, err := nodeKR.Decrypt(msg, nil, pgp.GetUnixTime())
+	if err != nil {
+		return nil, err
+	}
+	var x xAttr
+	if err := json.Unmarshal(dec.GetBinary(), &x); err != nil {
+		return nil, err
+	}
+	return &x, nil
 }
 
 func genNodeHashKey(nodeKR, signingKR *pgp.KeyRing) (string, error) {
