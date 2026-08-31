@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 )
@@ -18,6 +19,17 @@ func TestRunnerCapturesSeparatedOutput(t *testing.T) {
 	}
 	if got.Stdout != "answer\n" || got.Stderr != "progress\n" {
 		t.Fatalf("Run = %#v", got)
+	}
+}
+
+func TestRunnerCanAttachInputWithoutRelayingOutput(t *testing.T) {
+	r := fixture(t, "read -r answer; printf 'got:%s\\n' \"$answer\"")
+	got, err := r.RunWithInput(context.Background(), strings.NewReader("secret\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Stdout != "got:secret\n" {
+		t.Fatalf("RunWithInput = %#v", got)
 	}
 }
 

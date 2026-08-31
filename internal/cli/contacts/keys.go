@@ -121,7 +121,7 @@ func keysPinCmd() *cobra.Command {
 				encrypt = &off
 			}
 			return kit.Mutate(c, ui.ResultSpec{
-				Action: ui.Pinned, Kind: "keys", Count: 1,
+				Action: ui.Pinned.WithConsent(), Kind: "keys", Count: 1,
 				Detail: "for " + target,
 			}, func() error {
 				return c.App.Contacts.PinKey(c.Ctx, id, target, armored, encrypt, nil, pgpScheme)
@@ -151,7 +151,7 @@ func keysUnpinCmd() *cobra.Command {
 				return err
 			}
 			return kit.Mutate(c, ui.ResultSpec{
-				Action: ui.Unpinned, Kind: "keys", Count: 1,
+				Action: ui.Unpinned.WithConsent(), Kind: "keys", Count: 1,
 				Detail: "for " + target,
 			}, func() error {
 				return c.App.Contacts.UnpinKey(c.Ctx, id, target)

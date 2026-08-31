@@ -88,7 +88,7 @@ pg_dump mydb | gzip | proton drive items upload - /Backups/db.sql.gz
 proton mail messages trash --from newsletter@example.com --older-than 90d --dry-run
 ```
 
-Data goes to stdout and progress to stderr, so redirects stay clean. Exit codes tell user error, auth failure, not-found, ambiguity, and network trouble apart. Anything that removes permanently, or removes what a filter picked out rather than what you named, shows the rows and asks first - and off a terminal it refuses instead, so an unattended run fails safe until you add `--yes`. → [Scripting](docs/scripting.md)
+Data goes to stdout and progress to stderr, so redirects stay clean. Exit codes tell user error, auth failure, not-found, ambiguity, and network trouble apart. Permanent removals, filter-selected changes, external communication, sharing, and network or security-sensitive changes ask first - and off a terminal they refuse instead, so an unattended run fails safe until you add `--yes`. → [Scripting](docs/scripting.md)
 
 ## Encryption you can verify
 

@@ -113,18 +113,58 @@ func TestOutOfSightAsksOnlyForAComputedSelection(t *testing.T) {
 	}
 }
 
-// Everything else runs, filtered or not. The prompt exists for removals; a
-// question in front of a label or a move would only teach people to ignore it.
-func TestOrdinaryChangesNeverAsk(t *testing.T) {
+// An explicitly named ordinary change remains interruption-free; a computed
+// selection asks because the filter, not the command line, chose its targets.
+func TestOrdinaryChangesAskOnlyForComputedSelections(t *testing.T) {
 	for _, action := range []ui.Action{ui.Moved, ui.Labelled, ui.Updated, ui.Restored, ui.Copied} {
-		for _, computed := range []bool{false, true} {
-			spec := ui.ResultSpec{Action: action, Kind: "messages", Count: 40}
-			applied, err := mutation(t, signedIn(&app.App{}), noTerminal, spec, computed)
-			if !applied || err != nil {
-				t.Errorf("%s (computed=%v) should just run: applied=%v err=%v",
-					action.Key, computed, applied, err)
-			}
+		spec := ui.ResultSpec{Action: action, Kind: "messages", Count: 40}
+		applied, err := mutation(t, signedIn(&app.App{}), noTerminal, spec, false)
+		if !applied || err != nil {
+			t.Errorf("named %s should just run: applied=%v err=%v", action.Key, applied, err)
 		}
+		applied, err = mutation(t, signedIn(&app.App{}), noTerminal, spec, true)
+		if applied || err == nil {
+			t.Errorf("computed %s should ask: applied=%v err=%v", action.Key, applied, err)
+		}
+	}
+}
+
+func TestConsentActionsAlwaysAskWithoutClaimingIrreversibility(t *testing.T) {
+	for _, action := range []ui.Action{
+		ui.Sent, ui.Invited, ui.Revoked, ui.SignedOut, ui.Connected,
+		ui.Pinned.WithConsent(),
+	} {
+		spec := ui.ResultSpec{Action: action, Kind: "things", Count: 1}
+		applied, err := mutation(t, signedIn(&app.App{}), noTerminal, spec, false)
+		if applied || err == nil {
+			t.Errorf("%s ran without consent: applied=%v err=%v", action.Key, applied, err)
+		}
+		if strings.Contains(err.Error(), "cannot be undone") {
+			t.Errorf("%s is reversible and claimed otherwise: %v", action.Key, err)
+		}
+	}
+}
+
+func TestCreateHonorsConsentWithoutBurdeningOrdinaryDrafts(t *testing.T) {
+	var sent bool
+	a := signedIn(&app.App{})
+	a.UI = ui.New(ui.Options{In: strings.NewReader(""), NoInput: true})
+	c := &Invocation{Ctx: context.Background(), App: a}
+	err := Create(c, ui.ResultSpec{Action: ui.Sent, Kind: "messages"}, func() (string, error) {
+		sent = true
+		return "message-id", nil
+	})
+	if err == nil || sent {
+		t.Fatalf("send without consent: applied=%v err=%v", sent, err)
+	}
+
+	var drafted bool
+	err = Create(c, ui.ResultSpec{Action: ui.Created, Kind: "drafts"}, func() (string, error) {
+		drafted = true
+		return "draft-id", nil
+	})
+	if err != nil || !drafted {
+		t.Fatalf("ordinary draft creation: applied=%v err=%v", drafted, err)
 	}
 }
 

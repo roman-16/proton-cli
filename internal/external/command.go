@@ -65,6 +65,18 @@ func (e *TimeoutError) Error() string {
 // Run executes args without a shell and returns captured output. The caller's
 // cancellation always wins over the runner's own timeout.
 func (r Runner) Run(ctx context.Context, args ...string) (Result, error) {
+	return r.run(ctx, nil, args...)
+}
+
+// RunWithInput is Run with an attached input stream. It exists for external
+// programs that own an interactive credential exchange. Output remains captured
+// so it cannot contaminate this CLI's stdout; callers render only normalized
+// results and errors after the process finishes.
+func (r Runner) RunWithInput(ctx context.Context, input io.Reader, args ...string) (Result, error) {
+	return r.run(ctx, input, args...)
+}
+
+func (r Runner) run(ctx context.Context, input io.Reader, args ...string) (Result, error) {
 	lookPath := r.LookPath
 	if lookPath == nil {
 		lookPath = exec.LookPath
@@ -83,6 +95,7 @@ func (r Runner) Run(ctx context.Context, args ...string) (Result, error) {
 
 	var stdout, stderr bytes.Buffer
 	cmd := exec.CommandContext(runCtx, path, args...)
+	cmd.Stdin = input
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	configureProcess(cmd)
 	err = cmd.Run()

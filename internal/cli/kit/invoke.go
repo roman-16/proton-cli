@@ -174,8 +174,8 @@ func Mutate(c *Invocation, spec ui.ResultSpec, apply func() error) error {
 	return ui.Result(c.UI(), spec)
 }
 
-// confirm stops for a yes before a change that cannot be taken back, or that
-// would remove things the user never named.
+// confirm stops for a yes before a change that cannot be taken back, crosses an
+// external/network/security boundary, or acts on targets a filter selected.
 //
 // --yes is the answer given in advance, which is also the only way through in a
 // script: a prompt nobody can see is a hang, so an unattended run is told what
@@ -211,6 +211,9 @@ func Create(c *Invocation, spec ui.ResultSpec, apply func() (string, error)) err
 			return err
 		}
 		return ui.Result(c.UI(), spec)
+	}
+	if err := confirm(c, spec); err != nil {
+		return err
 	}
 	id, err := apply()
 	if err != nil {

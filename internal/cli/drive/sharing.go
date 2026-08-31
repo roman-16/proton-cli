@@ -213,7 +213,7 @@ func shareUpdateCmd() *cobra.Command {
 				return err
 			}
 			return kit.Mutate(c, ui.ResultSpec{
-				Action: ui.Updated, Count: 1, Name: c.Args[1],
+				Action: ui.Updated.WithConsent(), Count: 1, Name: c.Args[1],
 				Detail: "to " + access(edit) + " on " + c.Args[0],
 			}, func() error {
 				return c.App.Drive.SetMemberRole(c.Ctx, dc, c.Args[0], c.Args[1], edit)
@@ -257,7 +257,7 @@ func shareRemoveCmd() *cobra.Command {
 				return err
 			}
 			return kit.Mutate(c, ui.ResultSpec{
-				Action: ui.Removed, Count: 1, Name: c.Args[1],
+				Action: ui.Removed.WithConsent(), Count: 1, Name: c.Args[1],
 				Detail: "from " + c.Args[0],
 			}, func() error {
 				return c.App.Drive.RemoveMember(c.Ctx, dc, c.Args[0], c.Args[1])

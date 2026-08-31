@@ -14,9 +14,9 @@ A table measures its columns across every row it holds. A stream has no every ro
 
 For the same reason a machine-format stream has no envelope: an envelope has to be closed, and a watch ends when you stop it rather than when the data runs out. Each line is its own object instead, which is what `jq` reads without `--slurp`.
 
-## Why it asks before some removals and not others
+## Why it asks before some changes
 
-There are two ways a removal surprises you: the wrong verb, and the wrong filter. proton stops for exactly those two and nothing else.
+Some changes cross a boundary even when they can be reversed: sending something to another person, exposing or changing a share, changing network connectivity, and changing session or trust state. proton asks at those boundaries, before every permanent removal, and whenever a filter rather than a reference chose the targets.
 
 Only a permanent removal says *This cannot be undone*, because only a permanent removal cannot be. Trashing is recoverable, so it asks the shorter question and `restore` puts things back. A removal you named yourself, with a verb that can be undone, is not a surprise and does not interrupt you.
 

@@ -77,13 +77,14 @@ Try:   pass a REF, or a filter such as --unread, --starred, --from or --older-th
 
 ## When it asks first
 
-proton asks before it removes something it cannot put back, and before it removes things you did not name. Nothing else ever stops to ask.
+proton asks before it removes something it cannot put back, before any filter-selected change, and before a change communicates externally, changes network connectivity, or changes security-sensitive state.
 
 | | you named it | a filter found it |
 | --- | --- | --- |
 | `delete` · `empty` · `uninstall` | asks | asks |
 | `trash` | just does it | asks |
-| everything else | just does it | just does it |
+| send · share · session · network/security changes | asks | asks |
+| other reversible changes | just does it | asks |
 
 The question shows the things themselves, never a count:
 
@@ -100,9 +101,9 @@ zC7bX1yE  Example News  November round-up    2025-11-08 06:00
 This cannot be undone. Continue? [y/N]
 ```
 
-Anything but a plain `y` means no, including pressing enter. ([Why these two cases](design-notes.md#why-it-asks-before-some-removals-and-not-others).)
+Anything but a plain `y` means no, including pressing enter. ([Why these boundaries](design-notes.md#why-it-asks-before-some-changes).)
 
-**In a script** there is nobody to ask, so the question becomes an error and nothing is removed. `--yes` is the answer given in advance:
+**In a script** there is nobody to ask, so the question becomes an error and nothing changes. `--yes` is the answer given in advance:
 
 ```console
 $ proton mail messages delete --folder spam --older-than 30d

@@ -88,8 +88,11 @@ func autoreplySetCmd() *cobra.Command {
 				msg = mailtext.TextToHTML(msg)
 			}
 			ar.Message = msg
+			if err := mailsvc.ValidateAutoReply(ar); err != nil {
+				return err
+			}
 			return kit.Mutate(c, ui.ResultSpec{
-				Action: ui.Enabled, Kind: "settings", Count: 1, Name: "auto-reply",
+				Action: ui.Enabled.WithConsent(), Kind: "settings", Count: 1, Name: "auto-reply",
 				Detail: "on a " + mode + " schedule",
 			}, func() error {
 				// Nothing here arranges the elevation: the client does it when the
@@ -115,6 +118,9 @@ func autoreplyToggleCmd(use, short string, action ui.Action, enabled bool) *cobr
 		Short: short,
 		Args:  cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
+			if enabled {
+				action = action.WithConsent()
+			}
 			return kit.Mutate(c, ui.ResultSpec{
 				Action: action, Kind: "settings", Count: 1, Name: "auto-reply",
 			}, func() error { return c.App.Mail.AutoReplyToggle(c.Ctx, enabled) })

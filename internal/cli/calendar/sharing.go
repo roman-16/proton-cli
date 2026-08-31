@@ -109,7 +109,7 @@ func shareRemoveCmd() *cobra.Command {
 				return err
 			}
 			return kit.Mutate(c, ui.ResultSpec{
-				Action: ui.Removed, Kind: "members", Count: 1, Name: member.Email,
+				Action: ui.Removed.WithConsent(), Kind: "members", Count: 1, Name: member.Email,
 				Detail: "from " + cal.Name, IDs: []string{member.ID},
 			}, func() error {
 				return c.App.Calendar.CalendarUnshare(c.Ctx, cal.ID, member)

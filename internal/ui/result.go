@@ -7,11 +7,9 @@ import (
 
 // Consequence is how much a mutation is worth stopping for.
 //
-// The CLI prompts for exactly one reason: something is about to be removed. The
-// two hazards that makes real are different, so they are named separately - a
-// wrong verb (`delete` typed where `trash` was meant) is dangerous however few
-// things it touches, while a wrong filter is only dangerous because it selected
-// things the user never named.
+// The CLI prompts when the consequence deserves an explicit boundary: a change
+// cannot be undone, a filter selected its targets, or the change communicates,
+// alters connectivity, or changes security-sensitive state.
 type Consequence int
 
 const (
@@ -25,6 +23,9 @@ const (
 	// Forever cannot be undone by this CLI or by Proton's own clients, so it is
 	// always asked about and always says so.
 	Forever
+	// Consent is reversible but crosses an external, network or security
+	// boundary. It is always asked about without claiming it is irreversible.
+	Consent
 )
 
 // Action names a mutation in the three grammatical forms the CLI needs - the
@@ -58,19 +59,19 @@ var (
 	Exported     = Action{"Exported", "export", "exported", Ordinary}
 	Imported     = Action{"Imported", "import", "imported", Ordinary}
 	Merged       = Action{"Merged", "merge", "merged", Ordinary}
-	Resent       = Action{"Resent", "resend", "resent", Ordinary}
-	Verified     = Action{"Verified", "verify", "verified", Ordinary}
+	Resent       = Action{"Resent", "resend", "resent", Consent}
+	Verified     = Action{"Verified", "verify", "verified", Consent}
 	Blocked      = Action{"Blocked", "block", "blocked", Ordinary}
 	Allowed      = Action{"Allowed", "allow", "allowed", Ordinary}
 	Filed        = Action{"Filed", "file", "filed", Ordinary}
 	Forgot       = Action{"Forgot", "forget", "forgot", Ordinary}
-	Unsubscribed = Action{"Unsubscribed", "unsubscribe", "unsubscribed", Ordinary}
+	Unsubscribed = Action{"Unsubscribed", "unsubscribe", "unsubscribed", Consent}
 	Snoozed      = Action{"Snoozed", "snooze", "snoozed", Ordinary}
 	Unsnoozed    = Action{"Unsnoozed", "unsnooze", "unsnoozed", Ordinary}
 	Applied      = Action{"Applied", "apply", "applied", Ordinary}
 	Reordered    = Action{"Reordered", "reorder", "reordered", Ordinary}
-	Sent         = Action{"Sent", "send", "sent", Ordinary}
-	Scheduled    = Action{"Scheduled", "schedule", "scheduled", Ordinary}
+	Sent         = Action{"Sent", "send", "sent", Consent}
+	Scheduled    = Action{"Scheduled", "schedule", "scheduled", Consent}
 	Unscheduled  = Action{"Unscheduled", "unschedule", "unscheduled", Ordinary}
 	Saved        = Action{"Saved", "save", "saved", Ordinary}
 	Labelled     = Action{"Labelled", "label", "labelled", Ordinary}
@@ -81,31 +82,41 @@ var (
 	MarkedUnread = Action{"Marked", "mark", "marked_unread", Ordinary}
 	Enabled      = Action{"Enabled", "enable", "enabled", Ordinary}
 	Disabled     = Action{"Disabled", "disable", "disabled", Ordinary}
-	Linked       = Action{"Created", "create", "linked", Ordinary}
-	Unlinked     = Action{"Removed", "remove", "unlinked", Ordinary}
+	Linked       = Action{"Created", "create", "linked", Consent}
+	Unlinked     = Action{"Removed", "remove", "unlinked", Consent}
 	Added        = Action{"Added", "add", "added", Ordinary}
 	Removed      = Action{"Removed", "remove", "removed", Ordinary}
-	Accepted     = Action{"Accepted", "accept", "accepted", Ordinary}
-	Declined     = Action{"Declined", "decline", "declined", Ordinary}
+	Accepted     = Action{"Accepted", "accept", "accepted", Consent}
+	Declined     = Action{"Declined", "decline", "declined", Consent}
 	Favorited    = Action{"Favorited", "favorite", "favorited", Ordinary}
 	Unfavorited  = Action{"Unfavorited", "unfavorite", "unfavorited", Ordinary}
 	Pinned       = Action{"Pinned", "pin", "pinned", Ordinary}
 	Unpinned     = Action{"Unpinned", "unpin", "unpinned", Ordinary}
-	Responded    = Action{"Responded", "respond", "responded", Ordinary}
+	Responded    = Action{"Responded", "respond", "responded", Consent}
 	Set          = Action{"Set", "set", "set", Ordinary}
-	Invited      = Action{"Invited", "invite", "invited", Ordinary}
-	Revoked      = Action{"Revoked", "revoke", "revoked", Ordinary}
+	Invited      = Action{"Invited", "invite", "invited", Consent}
+	Revoked      = Action{"Revoked", "revoke", "revoked", Consent}
 	SignedIn     = Action{"Signed in as", "sign in as", "signed_in", Ordinary}
-	SignedOut    = Action{"Signed out", "sign out", "signed_out", Ordinary}
+	SignedOut    = Action{"Signed out", "sign out", "signed_out", Consent}
+	Connected    = Action{"Connected", "connect", "connected", Consent}
+	Disconnected = Action{"Disconnected", "disconnect", "disconnected", Consent}
+	SetSensitive = Action{"Configured", "set", "configured", Consent}
 )
 
 // Asks reports whether a change with this action stops for a yes.
 //
-// There are two reasons to stop, and no others: the change cannot be taken
-// back, or it removes things a filter chose rather than things the user named.
-// computed says which of those a selection was.
+// A computed target always stops: approving a filter is different from naming
+// one target. Forever and Consent actions stop however their target was chosen.
 func (a Action) Asks(computed bool) bool {
-	return a.Cost == Forever || (a.Cost == OutOfSight && computed)
+	return computed || a.Cost == Forever || a.Cost == Consent
+}
+
+// WithConsent keeps an action's public wording and machine key while marking a
+// security-sensitive use of an otherwise ordinary verb. For example, removing
+// a photo from an album is ordinary; removing somebody's access is not.
+func (a Action) WithConsent() Action {
+	a.Cost = Consent
+	return a
 }
 
 // Actions is the vocabulary, for the conformance test to check against.
@@ -115,7 +126,7 @@ var Actions = []Action{
 	Labelled, Unlabelled, Starred, Unstarred, MarkedRead, MarkedUnread,
 	Enabled, Disabled, Linked, Unlinked, Added, Removed, Accepted, Declined,
 	Favorited, Unfavorited, Pinned, Unpinned, Responded, Set, Invited, Revoked,
-	SignedIn, SignedOut,
+	SignedIn, SignedOut, Connected, Disconnected, SetSensitive,
 }
 
 // ResultSpec describes what a mutation did.

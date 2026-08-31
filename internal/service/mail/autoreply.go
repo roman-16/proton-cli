@@ -386,6 +386,15 @@ func (s *Service) AutoReplySet(ctx context.Context, ar AutoReply) error {
 	return s.putAutoResponder(ctx, body)
 }
 
+// ValidateAutoReply checks the complete schedule without sending a request.
+// Commands call it before asking for consent, so a malformed local value is
+// rejected before the user is asked to approve anything.
+func ValidateAutoReply(ar AutoReply) error {
+	ar.Enabled = true
+	_, err := ar.encode()
+	return err
+}
+
 // AutoReplyToggle flips IsEnabled while preserving the stored schedule.
 func (s *Service) AutoReplyToggle(ctx context.Context, enabled bool) error {
 	raw, err := s.fetchAutoResponder(ctx)
