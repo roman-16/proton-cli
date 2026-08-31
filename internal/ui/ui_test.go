@@ -2,6 +2,7 @@ package ui
 
 import (
 	"bytes"
+	"encoding/json"
 	"flag"
 	"log/slog"
 	"os"
@@ -146,6 +147,33 @@ func TestRawKeepsIntegers(t *testing.T) {
 		if !strings.Contains(got, "1.5") {
 			t.Errorf("%s: float not preserved: %s", format, got)
 		}
+	}
+}
+
+func TestRawJSONRequiresExactlyOneDocument(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		raw     string
+		wantErr bool
+	}{
+		{name: "valid", raw: "  {\"Code\":1000}\n\t"},
+		{name: "invalid", raw: `{"Code":`, wantErr: true},
+		{name: "trailing document", raw: `{"Code":1000} {"Code":1001}`, wantErr: true},
+		{name: "trailing garbage", raw: `{"Code":1000} garbage`, wantErr: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			u, out, _ := fixture(t, Options{Format: FormatJSON})
+			err := Raw(u, []byte(tc.raw))
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("Raw error = %v, want error %v", err, tc.wantErr)
+			}
+			if tc.wantErr && out.Len() != 0 {
+				t.Fatalf("invalid JSON reached stdout: %q", out.String())
+			}
+			if !tc.wantErr && !json.Valid(out.Bytes()) {
+				t.Fatalf("valid response is not JSON: %q", out.String())
+			}
+		})
 	}
 }
 

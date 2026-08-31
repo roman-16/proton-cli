@@ -284,8 +284,20 @@ func Raw(u *UI, raw []byte) error {
 	dec.UseNumber()
 	var v any
 	if err := dec.Decode(&v); err != nil {
+		if u.Format == FormatJSON {
+			return fmt.Errorf("API response is not valid JSON: %w", err)
+		}
 		_, err := u.Out.Write(raw)
 		return err
+	}
+	if u.Format == FormatJSON {
+		var trailing any
+		if err := dec.Decode(&trailing); err != io.EOF {
+			if err == nil {
+				return fmt.Errorf("API response contains more than one JSON document")
+			}
+			return fmt.Errorf("API response has trailing non-JSON data: %w", err)
+		}
 	}
 	return u.encode(plainNumbers(v))
 }

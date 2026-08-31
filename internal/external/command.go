@@ -10,9 +10,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
+
+	"golang.org/x/term"
 )
 
 const DefaultTimeout = 30 * time.Second
@@ -65,7 +69,7 @@ func (e *TimeoutError) Error() string {
 // Run executes args without a shell and returns captured output. The caller's
 // cancellation always wins over the runner's own timeout.
 func (r Runner) Run(ctx context.Context, args ...string) (Result, error) {
-	return r.run(ctx, nil, args...)
+	return r.run(ctx, nil, nil, args...)
 }
 
 // RunWithInput is Run with an attached input stream. It exists for external
@@ -73,10 +77,21 @@ func (r Runner) Run(ctx context.Context, args ...string) (Result, error) {
 // so it cannot contaminate this CLI's stdout; callers render only normalized
 // results and errors after the process finishes.
 func (r Runner) RunWithInput(ctx context.Context, input io.Reader, args ...string) (Result, error) {
-	return r.run(ctx, input, args...)
+	return r.run(ctx, input, nil, args...)
 }
 
-func (r Runner) run(ctx context.Context, input io.Reader, args ...string) (Result, error) {
+// RunInteractive is RunWithInput with the child process's output relayed to
+// terminal as it arrives. Both child streams go to that one writer: callers
+// pass their commentary/error stream so an upstream password or two-factor
+// prompt can never contaminate machine-readable stdout. A real terminal file
+// is attached directly so interactive children retain their TTY descriptors;
+// other writers are relayed and captured, primarily for tests. Exit failures
+// and timeouts remain typed in either case.
+func (r Runner) RunInteractive(ctx context.Context, input io.Reader, terminal io.Writer, args ...string) (Result, error) {
+	return r.run(ctx, input, terminal, args...)
+}
+
+func (r Runner) run(ctx context.Context, input io.Reader, terminal io.Writer, args ...string) (Result, error) {
 	lookPath := r.LookPath
 	if lookPath == nil {
 		lookPath = exec.LookPath
@@ -96,7 +111,18 @@ func (r Runner) run(ctx context.Context, input io.Reader, args ...string) (Resul
 	var stdout, stderr bytes.Buffer
 	cmd := exec.CommandContext(runCtx, path, args...)
 	cmd.Stdin = input
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	if terminal == nil {
+		cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	} else if terminalFile, ok := terminal.(*os.File); ok && term.IsTerminal(int(terminalFile.Fd())) {
+		// Giving os/exec the file itself avoids its intermediary pipes. Console
+		// programs such as Bridge use isatty/readline and may refuse or degrade
+		// their shell if handed a writer that merely forwards to a terminal.
+		cmd.Stdout, cmd.Stderr = terminalFile, terminalFile
+	} else {
+		relay := &lockedWriter{writer: terminal}
+		cmd.Stdout = captureAndRelay{capture: &stdout, relay: relay}
+		cmd.Stderr = captureAndRelay{capture: &stderr, relay: relay}
+	}
 	configureProcess(cmd)
 	err = cmd.Run()
 	result := Result{Stdout: stdout.String(), Stderr: stderr.String()}
@@ -116,6 +142,31 @@ func (r Runner) run(ctx context.Context, input io.Reader, args ...string) (Resul
 		}
 	}
 	return result, fmt.Errorf("run %s: %w", r.Name, err)
+}
+
+// lockedWriter keeps stdout and stderr relays from writing through a shared
+// terminal concurrently. A terminal is best-effort commentary: a closed relay
+// must not turn an otherwise valid child invocation into a broken-pipe failure.
+type lockedWriter struct {
+	mu     sync.Mutex
+	writer io.Writer
+}
+
+func (w *lockedWriter) write(p []byte) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	_, _ = w.writer.Write(p)
+}
+
+type captureAndRelay struct {
+	capture *bytes.Buffer
+	relay   *lockedWriter
+}
+
+func (w captureAndRelay) Write(p []byte) (int, error) {
+	_, _ = w.capture.Write(p)
+	w.relay.write(p)
+	return len(p), nil
 }
 
 // DecodeJSON parses a tool's machine-readable stdout into the integration's

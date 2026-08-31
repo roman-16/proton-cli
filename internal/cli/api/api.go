@@ -44,28 +44,31 @@ anything the commands do not cover.`,
 			}
 			req := proton.Request{Method: method, Path: c.Args[1], Query: q, Body: body}
 
-			// A request the CLI does not model is still a request that changes
-			// something, so it reports what it would have sent like every other
-			// mutation. The client refuses it as well; this is what makes the
-			// refusal readable rather than an error.
-			if c.App.DryRun && !readOnly(method) {
-				return kit.Mutate(c, ui.ResultSpec{
-					Action: ui.Updated, Kind: "API requests", Count: 1,
-					Name: method + " " + c.Args[1],
-				}, func() error { return nil })
+			send := func() error {
+				resp, err := c.App.API.Do(c.Ctx, req)
+				if err != nil {
+					// An API error carries a body that explains itself, and that body
+					// is what someone reaching for this command wants to read.
+					var apiErr *proton.APIError
+					if errors.As(err, &apiErr) && len(apiErr.RawBody) > 0 {
+						_ = ui.Raw(c.UI(), apiErr.RawBody)
+					}
+					return err
+				}
+				return ui.Raw(c.UI(), resp.Body)
 			}
 
-			resp, err := c.App.API.Do(c.Ctx, req)
-			if err != nil {
-				// An API error carries a body that explains itself, and that body
-				// is what someone reaching for this command wants to read.
-				var apiErr *proton.APIError
-				if errors.As(err, &apiErr) && len(apiErr.RawBody) > 0 {
-					_ = ui.Raw(c.UI(), apiErr.RawBody)
-				}
-				return err
+			if readOnly(method) {
+				return send()
 			}
-			return ui.Raw(c.UI(), resp.Body)
+
+			// An unmodelled write can communicate externally, change security
+			// settings, or be irreversible. Treat that uncertainty as a consent
+			// boundary, while keeping the API response as the command's one answer.
+			return kit.Mutate(c, ui.ResultSpec{
+				Action: ui.Updated.WithConsent(), Kind: "API requests", Count: 1,
+				Name: method + " " + c.Args[1], AnswerFollows: true,
+			}, send)
 		}),
 	}
 	c.Flags().StringArrayVar(&query, "query", nil, "Query parameter as key=value (repeatable)")

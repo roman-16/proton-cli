@@ -1,8 +1,10 @@
 package external
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -31,6 +33,108 @@ func TestRunnerCanAttachInputWithoutRelayingOutput(t *testing.T) {
 	if got.Stdout != "got:secret\n" {
 		t.Fatalf("RunWithInput = %#v", got)
 	}
+}
+
+func TestRunnerRelaysInteractivePromptsAsTheyArriveAndStillCapturesThem(t *testing.T) {
+	r := fixture(t, `
+printf 'Password: ' >&2
+read -r password
+printf 'Two-factor code: '
+read -r code
+[ "$password" = secret ] && [ "$code" = 123456 ]
+`)
+	inputReader, inputWriter := io.Pipe()
+	terminalReader, terminalWriter := io.Pipe()
+	t.Cleanup(func() {
+		_ = inputReader.Close()
+		_ = inputWriter.Close()
+		_ = terminalReader.Close()
+		_ = terminalWriter.Close()
+	})
+
+	type outcome struct {
+		result Result
+		err    error
+	}
+	done := make(chan outcome, 1)
+	go func() {
+		result, err := r.RunInteractive(context.Background(), inputReader, terminalWriter)
+		done <- outcome{result: result, err: err}
+	}()
+
+	readPrompt := func(want string) {
+		t.Helper()
+		got := make([]byte, len(want))
+		read := make(chan error, 1)
+		go func() {
+			_, err := io.ReadFull(terminalReader, got)
+			read <- err
+		}()
+		select {
+		case err := <-read:
+			if err != nil {
+				t.Fatalf("read relayed prompt: %v", err)
+			}
+			if string(got) != want {
+				t.Fatalf("relayed prompt = %q, want %q", got, want)
+			}
+		case <-time.After(time.Second):
+			t.Fatalf("prompt %q was not relayed before the child waited for input", want)
+		}
+	}
+
+	readPrompt("Password: ")
+	if _, err := io.WriteString(inputWriter, "secret\n"); err != nil {
+		t.Fatal(err)
+	}
+	readPrompt("Two-factor code: ")
+	if _, err := io.WriteString(inputWriter, "123456\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := inputWriter.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case got := <-done:
+		if got.err != nil {
+			t.Fatal(got.err)
+		}
+		if got.result.Stderr != "Password: " || got.result.Stdout != "Two-factor code: " {
+			t.Fatalf("RunInteractive = %#v", got.result)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("interactive child did not finish")
+	}
+}
+
+func TestRunnerInteractiveRetainsNormalizedFailuresAndTimeouts(t *testing.T) {
+	t.Run("exit", func(t *testing.T) {
+		r := fixture(t, "printf 'question' >&2; exit 17")
+		var terminal bytes.Buffer
+		result, err := r.RunInteractive(context.Background(), strings.NewReader(""), &terminal)
+		var failed *ExitError
+		if !errors.As(err, &failed) || failed.Code != 17 || failed.Stderr != "question" {
+			t.Fatalf("RunInteractive error = %#v", err)
+		}
+		if result.Stderr != "question" || terminal.String() != "question" {
+			t.Fatalf("RunInteractive output = (%#v, %q)", result, terminal.String())
+		}
+	})
+
+	t.Run("timeout", func(t *testing.T) {
+		r := fixture(t, "printf 'question' >&2; sleep 5")
+		r.Timeout = 20 * time.Millisecond
+		var terminal bytes.Buffer
+		result, err := r.RunInteractive(context.Background(), strings.NewReader(""), &terminal)
+		var timedOut *TimeoutError
+		if !errors.As(err, &timedOut) {
+			t.Fatalf("RunInteractive error = %T %v", err, err)
+		}
+		if result.Stderr != "question" || terminal.String() != "question" {
+			t.Fatalf("RunInteractive output = (%#v, %q)", result, terminal.String())
+		}
+	})
 }
 
 func TestRunnerReportsMissingExecutable(t *testing.T) {
