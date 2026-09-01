@@ -1,12 +1,22 @@
 {
-  "updated_at": "2026-09-01T15:37:50.129684451Z",
+  "updated_at": "2026-09-01T15:54:22.559584518Z",
   "totals": {
     "downloads": 1665,
     "stars": 57,
     "forks": 7,
     "latest": "2.10.0"
   },
-  "downloads": [],
+  "downloads": [
+    {
+      "date": "2026-09-01",
+      "hours": 0.2756749722408333,
+      "update": 0,
+      "script": 0,
+      "other": 0,
+      "platform": {},
+      "version": {}
+    }
+  ],
   "traffic": [
     {
       "date": "2026-08-18",
@@ -107,6 +117,12 @@
       "visitors": 8
     }
   ],
+  "traffic_window": {
+    "clones": 617,
+    "cloners": 130,
+    "views": 206,
+    "visitors": 71
+  },
   "stars": [
     {
       "date": "2026-04-16",
