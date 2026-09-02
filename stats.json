@@ -1,9 +1,9 @@
 {
-  "updated_at": "2026-09-01T15:54:22.559584518Z",
+  "updated_at": "2026-09-02T08:11:15.780085487Z",
   "totals": {
-    "downloads": 1665,
-    "stars": 57,
-    "forks": 7,
+    "downloads": 1699,
+    "stars": 58,
+    "forks": 8,
     "latest": "2.10.0"
   },
   "downloads": [
@@ -15,6 +15,30 @@
       "other": 0,
       "platform": {},
       "version": {}
+    },
+    {
+      "date": "2026-09-02",
+      "hours": 16.281450139158057,
+      "update": 3,
+      "script": 0,
+      "other": 31,
+      "platform": {
+        "darwin_amd64": 1,
+        "darwin_arm64": 2,
+        "linux_amd64": 9,
+        "linux_arm64": 3,
+        "windows_amd64": 8,
+        "windows_arm64": 11
+      },
+      "version": {
+        "1.9.12": 1,
+        "2.10.0": 23,
+        "2.5.0": 2,
+        "2.6.0": 2,
+        "2.7.0": 2,
+        "2.8.0": 2,
+        "2.9.0": 2
+      }
     }
   ],
   "traffic": [
@@ -115,13 +139,20 @@
       "cloners": 25,
       "views": 47,
       "visitors": 8
+    },
+    {
+      "date": "2026-09-01",
+      "clones": 106,
+      "cloners": 21,
+      "views": 63,
+      "visitors": 10
     }
   ],
   "traffic_window": {
-    "clones": 617,
-    "cloners": 130,
-    "views": 206,
-    "visitors": 71
+    "clones": 721,
+    "cloners": 144,
+    "views": 261,
+    "visitors": 78
   },
   "stars": [
     {
@@ -679,6 +710,10 @@
     {
       "date": "2026-09-01",
       "count": 57
+    },
+    {
+      "date": "2026-09-02",
+      "count": 58
     }
   ],
   "forks": [
@@ -981,6 +1016,10 @@
     {
       "date": "2026-09-01",
       "count": 7
+    },
+    {
+      "date": "2026-09-02",
+      "count": 8
     }
   ],
   "npm": [
@@ -1959,6 +1998,10 @@
     {
       "date": "2026-09-01",
       "count": 0
+    },
+    {
+      "date": "2026-09-02",
+      "count": 0
     }
   ],
   "npm_platforms": {
@@ -1972,23 +2015,23 @@
   "referrers": [
     {
       "name": "Google",
-      "count": 49,
-      "uniques": 24
+      "count": 55,
+      "uniques": 27
     },
     {
       "name": "search.brave.com",
-      "count": 30,
-      "uniques": 7
-    },
-    {
-      "name": "github.com",
-      "count": 17,
+      "count": 29,
       "uniques": 8
     },
     {
+      "name": "github.com",
+      "count": 19,
+      "uniques": 9
+    },
+    {
       "name": "search.nixos.org",
-      "count": 10,
-      "uniques": 3
+      "count": 12,
+      "uniques": 4
     },
     {
       "name": "kagi.com",
@@ -2001,18 +2044,18 @@
       "uniques": 2
     },
     {
+      "name": "DuckDuckGo",
+      "count": 3,
+      "uniques": 2
+    },
+    {
       "name": "ecosia.org",
       "count": 2,
       "uniques": 2
     },
     {
-      "name": "DuckDuckGo",
-      "count": 1,
-      "uniques": 1
-    },
-    {
       "name": "perplexity.ai",
-      "count": 1,
+      "count": 2,
       "uniques": 1
     },
     {
@@ -2024,12 +2067,12 @@
   "paths": [
     {
       "name": "/roman-16/proton-cli",
-      "count": 99,
-      "uniques": 63
+      "count": 116,
+      "uniques": 69
     },
     {
       "name": "/roman-16/proton-cli/issues",
-      "count": 15,
+      "count": 18,
       "uniques": 7
     },
     {
@@ -2038,17 +2081,27 @@
       "uniques": 4
     },
     {
-      "name": "/roman-16/proton-cli/blob/main/README.md",
-      "count": 4,
-      "uniques": 4
-    },
-    {
-      "name": "/roman-16/proton-cli/blob/main/docs/commands/drive.md",
-      "count": 4,
-      "uniques": 4
+      "name": "/roman-16/proton-cli/pulls",
+      "count": 8,
+      "uniques": 3
     },
     {
       "name": "/roman-16/proton-cli/tree/main",
+      "count": 6,
+      "uniques": 5
+    },
+    {
+      "name": "/roman-16/proton-cli/blob/main/README.md",
+      "count": 5,
+      "uniques": 5
+    },
+    {
+      "name": "/roman-16/proton-cli/pull/9",
+      "count": 5,
+      "uniques": 1
+    },
+    {
+      "name": "/roman-16/proton-cli/blob/main/docs/commands/drive.md",
       "count": 4,
       "uniques": 4
     },
@@ -2061,16 +2114,6 @@
       "name": "/roman-16/proton-cli/blob/main/docs/installation.md",
       "count": 3,
       "uniques": 3
-    },
-    {
-      "name": "/roman-16/proton-cli/blob/main/docs/how-it-works.md",
-      "count": 3,
-      "uniques": 2
-    },
-    {
-      "name": "/roman-16/proton-cli/blob/main/cmd/proton/main.go",
-      "count": 2,
-      "uniques": 2
     }
   ],
   "packaging": [
