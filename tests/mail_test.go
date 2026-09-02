@@ -1740,11 +1740,22 @@ func TestMailSendExpiringHasExpirationTime(t *testing.T) {
 	}
 }
 
+// eoPasswordFile is the password a recipient outside Proton types, delivered the
+// way every secret is: a file only its owner can read, never a flag value.
+func eoPasswordFile(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "eo-password")
+	if err := os.WriteFile(path, []byte("hunter2hunter2"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
 func TestMailSendEncryptedForOutsideDryRun(t *testing.T) {
 	t.Parallel()
 	_, stderr := runOKStderr(t, "--dry-run", "mail", "messages", "send",
 		"--to", externalRecipient(t), "--subject", testID()+"-eo-dry",
-		"--body", "secret", "--eo-password", "hunter2", "--eo-password-hint", "the usual")
+		"--body", "secret", "--eo-password-file", eoPasswordFile(t), "--eo-password-hint", "the usual")
 	assertContains(t, stderr, "Dry run")
 }
 
@@ -1759,7 +1770,7 @@ func TestMailSendEncryptedForOutside(t *testing.T) {
 
 	runOK(t, "mail", "messages", "send",
 		"--to", externalRecipient(t), "--subject", subject, "--body", "encrypted outside body",
-		"--eo-password", "hunter2", "--eo-password-hint", "the usual")
+		"--eo-password-file", eoPasswordFile(t), "--eo-password-hint", "the usual")
 
 	sentID := findMessage(t, "sent", subject)
 	if sentID == "" {

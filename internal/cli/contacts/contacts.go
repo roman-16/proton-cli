@@ -385,7 +385,7 @@ func importCmd() *cobra.Command {
 			if len(cards) == 0 {
 				return kit.Fail("%s holds no contacts.", c.Args[0])
 			}
-			return kit.Ingest(c, ui.ResultSpec{
+			return kit.Attempt(c, ui.ResultSpec{
 				Action: ui.Imported, Kind: "contacts", Count: len(cards),
 				Detail: "from " + c.Args[0],
 			}, func() ([]ctsvc.SkippedContact, error) {

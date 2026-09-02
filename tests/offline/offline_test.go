@@ -63,8 +63,16 @@ func TestMain(m *testing.M) {
 // that there is no account and no API.
 func run(t *testing.T, args ...string) (stdout, stderr string, exitCode int) {
 	t.Helper()
+	return runWithStdin(t, "", args...)
+}
+
+// runWithStdin is run with something on standard input, for the answers that are
+// about the stream itself.
+func runWithStdin(t *testing.T, stdin string, args ...string) (stdout, stderr string, exitCode int) {
+	t.Helper()
 	var outBuf, errBuf bytes.Buffer
 	cmd := exec.Command(binaryPath, args...)
+	cmd.Stdin = strings.NewReader(stdin)
 	cmd.Stdout = &outBuf
 	cmd.Stderr = &errBuf
 	cmd.Env = []string{

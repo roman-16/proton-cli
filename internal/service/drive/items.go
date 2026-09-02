@@ -251,17 +251,28 @@ func (s *Service) Rename(ctx context.Context, dc *Context, path, newName string)
 	}, nil)
 }
 
-func (s *Service) Move(ctx context.Context, dc *Context, sourcePath, destPath string) error {
+// ResolveFolder resolves a path that has to be a folder, which is what a
+// destination is.
+//
+// A destination is resolved once for the whole of a move or a copy rather than
+// per item: it is the same folder every time, and a preview that has not looked
+// for it would promise work into a folder that is not there.
+func (s *Service) ResolveFolder(ctx context.Context, dc *Context, path string) (*Resolved, error) {
+	res, err := s.ResolvePath(ctx, dc, path)
+	if err != nil {
+		return nil, err
+	}
+	if !res.IsFolder {
+		return nil, errs.Problemf("%s is not a folder.", path)
+	}
+	return res, nil
+}
+
+// Move puts an item into a folder that has already been resolved.
+func (s *Service) Move(ctx context.Context, dc *Context, sourcePath string, dst *Resolved) error {
 	src, err := s.ResolvePath(ctx, dc, sourcePath)
 	if err != nil {
-		return fmt.Errorf("source not found: %w", err)
-	}
-	dst, err := s.ResolvePath(ctx, dc, destPath)
-	if err != nil {
-		return fmt.Errorf("destination not found: %w", err)
-	}
-	if !dst.IsFolder {
-		return fmt.Errorf("%s is not a folder", destPath)
+		return err
 	}
 	hk, err := hashKeyOf(dst.Link, dst.NodeKR)
 	if err != nil {
@@ -288,20 +299,13 @@ func (s *Service) Move(ctx context.Context, dc *Context, sourcePath, destPath st
 	}, nil)
 }
 
-// Copy duplicates a file into destPath. The node passphrase and name are
-// re-encrypted to the destination folder's node key (the content is copied
+// Copy duplicates a file into an already-resolved folder. The node passphrase
+// and name are re-encrypted to that folder's node key (the content is copied
 // server-side); the source is left in place.
-func (s *Service) Copy(ctx context.Context, dc *Context, sourcePath, destPath string) error {
+func (s *Service) Copy(ctx context.Context, dc *Context, sourcePath string, dst *Resolved) error {
 	src, err := s.ResolvePath(ctx, dc, sourcePath)
 	if err != nil {
-		return fmt.Errorf("source not found: %w", err)
-	}
-	dst, err := s.ResolvePath(ctx, dc, destPath)
-	if err != nil {
-		return fmt.Errorf("destination not found: %w", err)
-	}
-	if !dst.IsFolder {
-		return fmt.Errorf("%s is not a folder", destPath)
+		return err
 	}
 	hk, err := hashKeyOf(dst.Link, dst.NodeKR)
 	if err != nil {
@@ -329,22 +333,50 @@ func (s *Service) Copy(ctx context.Context, dc *Context, sourcePath, destPath st
 	}, nil)
 }
 
-func (s *Service) Delete(ctx context.Context, dc *Context, path string, permanent bool) error {
-	res, err := s.ResolvePath(ctx, dc, path)
+// Trash moves items to the trash, from where they can be restored.
+//
+// It takes the IDs a selection already resolved rather than paths: acting on
+// what was chosen is what makes the count in a confirmation true, and resolving
+// a path a second time is a chance for it to mean something else by then.
+func (s *Service) Trash(ctx context.Context, dc *Context, linkIDs []string) ([]Refused, error) {
+	return s.linkBatches(ctx, linkIDs, func(batch []string) proton.Request {
+		return proton.Request{
+			Method: "POST", Path: "/drive/v2/volumes/" + dc.VolumeID + "/trash_multiple",
+			Body: map[string]any{"LinkIDs": batch},
+		}
+	})
+}
+
+// Delete removes items for good.
+//
+// Proton deletes out of the trash, so anything still in the tree is put there
+// first - which is why a permanent delete is two rounds of requests rather than
+// one. An item the first round refused is not offered to the second.
+func (s *Service) Delete(ctx context.Context, dc *Context, linkIDs []string) ([]Refused, error) {
+	refused, err := s.Trash(ctx, dc, linkIDs)
 	if err != nil {
-		return err
+		return refused, err
 	}
-	if err := s.C.Decode(ctx, proton.Request{
-		Method: "POST", Path: "/drive/v2/volumes/" + dc.VolumeID + "/trash_multiple",
-		Body: map[string]any{"LinkIDs": []string{res.LinkID}},
-	}, nil); err != nil {
-		return err
+	trashed := make([]string, 0, len(linkIDs))
+	for _, id := range linkIDs {
+		if !refusedIn(refused, id) {
+			trashed = append(trashed, id)
+		}
 	}
-	if permanent {
-		return s.C.Decode(ctx, proton.Request{
+	gone, err := s.linkBatches(ctx, trashed, func(batch []string) proton.Request {
+		return proton.Request{
 			Method: "POST", Path: "/drive/v2/volumes/" + dc.VolumeID + "/trash/delete_multiple",
-			Body: map[string]any{"LinkIDs": []string{res.LinkID}},
-		}, nil)
+			Body: map[string]any{"LinkIDs": batch},
+		}
+	})
+	return append(refused, gone...), err
+}
+
+func refusedIn(refused []Refused, linkID string) bool {
+	for _, r := range refused {
+		if r.LinkID == linkID {
+			return true
+		}
 	}
-	return nil
+	return false
 }

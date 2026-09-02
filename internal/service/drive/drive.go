@@ -38,6 +38,20 @@ type Context struct {
 	rootLink *Link
 }
 
+// RootKR is the key ring of the share's root folder.
+//
+// It is not the share key. The share key opens the root link's passphrase; the
+// root's own node key is what the names and passphrases of everything directly
+// inside it are sealed to, and reading one with the other yields nothing rather
+// than an error - so this is derived in one place instead of at each of them.
+func (dc *Context) RootKR() (*pgp.KeyRing, error) {
+	kr, err := unlockNode(dc.rootLink, dc.ShareKR, dc.AddrKR)
+	if err != nil {
+		return nil, fmt.Errorf("unlock the root of share %s: %w", dc.ShareID, err)
+	}
+	return kr, nil
+}
+
 func (s *Service) Resolve(ctx context.Context) (*Context, error) {
 	var r struct {
 		Volumes []struct {
@@ -175,12 +189,15 @@ type Link struct {
 	CreateTime              int64
 	ModifyTime              int64
 	RealModifyTime          int64
-	XAttr                   string
-	ShareIDs                []string
-	ShareUrls               []struct{ ShareURLID string }
-	FolderProperties        *struct{ NodeHashKey string }
-	AlbumProperties         *struct{ NodeHashKey string }
-	PhotoProperties         *struct {
+	// Trashed is when the item was moved to the trash, and is absent for one
+	// that is not in it.
+	Trashed          int64
+	XAttr            string
+	ShareIDs         []string
+	ShareUrls        []struct{ ShareURLID string }
+	FolderProperties *struct{ NodeHashKey string }
+	AlbumProperties  *struct{ NodeHashKey string }
+	PhotoProperties  *struct {
 		Albums []struct{ AlbumLinkID string }
 		Tags   []int
 	}
@@ -238,9 +255,9 @@ type stopped struct {
 // from a tree that is not there yet. Asking one ancestor at a time until one
 // answers would be the same walk, repeated.
 func (s *Service) resolveTo(ctx context.Context, dc *Context, path string) (*stopped, error) {
-	rootKR, err := unlockNode(dc.rootLink, dc.ShareKR, dc.AddrKR)
+	rootKR, err := dc.RootKR()
 	if err != nil {
-		return nil, fmt.Errorf("unlock root: %w", err)
+		return nil, err
 	}
 	st := &stopped{
 		at: &Resolved{
@@ -299,6 +316,61 @@ func components(path string) []string {
 		return nil
 	}
 	return strings.Split(trimmed, "/")
+}
+
+// linkBatch is how many links one request may name, matching BATCH_REQUEST_SIZE
+// in the web clients. Proton answers such a request with a code per link, so a
+// batch that succeeded as a whole can still have refused some of what it named.
+const linkBatch = 50
+
+// Refused is one item Proton would not act on, and why.
+//
+// A count is a promise, so a bulk verb that was refused part of what it asked
+// for names the part rather than reporting the number it hoped for.
+type Refused struct {
+	LinkID string `json:"link_id"`
+	Reason string `json:"reason"`
+}
+
+// String names what was refused. A trashed item has no path to name it by, so
+// the ID is what a reader has to go on.
+func (r Refused) String() string { return fmt.Sprintf("Refused %s: %s", r.LinkID, r.Reason) }
+
+// linkBatches acts on many links a batch at a time, collecting what Proton
+// refused. request builds the call for one batch, because the endpoints differ
+// in method and path but answer the same way.
+func (s *Service) linkBatches(ctx context.Context, linkIDs []string,
+	request func(batch []string) proton.Request) ([]Refused, error) {
+	var refused []Refused
+	for _, batch := range chunk(linkIDs, linkBatch) {
+		var r struct {
+			Responses []struct {
+				LinkID   string
+				Response struct {
+					Code  int
+					Error string
+				}
+			}
+		}
+		if err := s.C.Decode(ctx, request(batch), &r); err != nil {
+			return refused, err
+		}
+		for i, answer := range r.Responses {
+			if proton.Succeeded(answer.Response.Code) {
+				continue
+			}
+			id := answer.LinkID
+			if id == "" && i < len(batch) {
+				id = batch[i]
+			}
+			reason := answer.Response.Error
+			if reason == "" {
+				reason = "Proton did not accept it"
+			}
+			refused = append(refused, Refused{LinkID: id, Reason: reason})
+		}
+	}
+	return refused, nil
 }
 
 func (s *Service) getLink(ctx context.Context, shareID, linkID string) (*Link, error) {

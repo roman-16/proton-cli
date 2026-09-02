@@ -774,7 +774,7 @@ func eventsImportCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return kit.Ingest(c, ui.ResultSpec{
+			return kit.Attempt(c, ui.ResultSpec{
 				Action: ui.Imported, Kind: "events", Count: len(events),
 				Detail:  "from " + c.Args[0],
 				Preview: kit.Preview("events", importColumns(), events),

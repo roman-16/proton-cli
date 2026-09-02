@@ -97,12 +97,11 @@ func tagNames(ids []int) []string {
 // photosRoot unwraps the photos share root's node key ring, the parent for every
 // photo and album.
 func (s *Service) photosRoot(ctx context.Context, dc *Context) (*Link, *pgp.KeyRing, error) {
-	root := dc.rootLink
-	kr, err := unlockNode(root, dc.ShareKR, dc.AddrKR)
+	kr, err := dc.RootKR()
 	if err != nil {
-		return nil, nil, fmt.Errorf("unlock photos root: %w", err)
+		return nil, nil, err
 	}
-	return root, kr, nil
+	return dc.rootLink, kr, nil
 }
 
 // PhotosList returns all photos on the photos volume (paginated server-side).
@@ -397,22 +396,17 @@ func (s *Service) AlbumRemovePhotos(ctx context.Context, dc *Context, albumLinkI
 	}, nil)
 }
 
-// PhotosDelete moves photos to the trash (by volume). When permanent is set,
-// the photos are then purged from the trash.
-func (s *Service) PhotosDelete(ctx context.Context, dc *Context, linkIDs []string, permanent bool) error {
-	if err := s.C.Decode(ctx, proton.Request{
-		Method: "POST", Path: fmt.Sprintf("/drive/v2/volumes/%s/trash_multiple", dc.VolumeID),
-		Body: map[string]any{"LinkIDs": linkIDs},
-	}, nil); err != nil {
-		return err
+// PhotosDelete moves photos to the trash. When permanent is set, the photos are
+// then purged from it.
+//
+// A photo library is the largest collection an account has, so it goes through
+// the same batching every other bulk change does: the photo volume's trash is
+// the file tree's trash under another volume ID.
+func (s *Service) PhotosDelete(ctx context.Context, dc *Context, linkIDs []string, permanent bool) ([]Refused, error) {
+	if permanent {
+		return s.Delete(ctx, dc, linkIDs)
 	}
-	if !permanent {
-		return nil
-	}
-	return s.C.Decode(ctx, proton.Request{
-		Method: "POST", Path: fmt.Sprintf("/drive/v2/volumes/%s/trash/delete_multiple", dc.VolumeID),
-		Body: map[string]any{"LinkIDs": linkIDs},
-	}, nil)
+	return s.Trash(ctx, dc, linkIDs)
 }
 
 // AlbumDelete deletes an album. When deletePhotos is true the album's photos

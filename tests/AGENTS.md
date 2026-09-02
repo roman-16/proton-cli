@@ -423,7 +423,7 @@ Auto-reply is worth a note: Proton refuses it with 9100, the same code it uses f
 ## Known Limitations
 
 - `calendar settings calendars delete` hits an endpoint Proton guards behind an elevated session. Nothing in the command arranges that: the client elevates when the server asks, using the password `runAs` supplies through `--password-file`, and drops the scope again.
-- `drive trash empty` may not clear items from non-default volumes (e.g. Photos share).
+- `drive trash list` and `drive trash empty` cover every volume the account has, photos included, so a test that empties the trash empties the photo library's too. `driveTrash` is leased for exactly that reason.
 - Proton only allows specific hex colors for labels, folders, calendars and contact groups (e.g. `#8080FF`, `#3CBB3A`) - see `ACCENT_COLORS` in the WebClients source. The CLI refuses anything else locally, before a request.
 - `just test-report` says where the time went. The report ends with the request chains still worth flattening; `drive items upload` and `pass items delete` are genuinely deep and the rest is measured.
 - Mail-delivery latency is inherent: a self-mail's inbox copy lands a few seconds after send. Only the tests whose subject is the send pay it.

@@ -109,6 +109,7 @@ POST /drive/shares/{id}/files
 POST /drive/shares/{id}/files/{id}/revisions
 POST /drive/shares/{id}/files/{id}/revisions/{id}/restore
 POST /drive/shares/{id}/folders
+POST /drive/shares/{id}/links/fetch_metadata
 POST /drive/shares/{id}/links/{id}/checkAvailableHashes
 POST /drive/shares/{id}/urls
 POST /drive/v2/shares/invitations/{id}/accept

@@ -108,7 +108,55 @@ func selectItems(c *kit.Invocation, dc *drivesvc.Context, f *filters) (kit.Selec
 			return matchItems(ctx, c, dc, f)
 		}
 	}
-	return kit.Select(c, sel)
+	chosen, err := kit.Select(c, sel)
+	if err != nil {
+		return chosen, err
+	}
+	return withoutCoveredItems(chosen), nil
+}
+
+// withoutCoveredItems drops what a selected folder already covers.
+//
+// Every verb that takes this selection acts on a folder as a whole: trashing,
+// deleting, moving and copying one takes its contents with it. So a filter that
+// matched a folder and the files inside it named the same work twice - which
+// would be counted twice in the confirmation, and then asked for twice, the
+// second time about something that has already moved.
+func withoutCoveredItems(sel kit.Selection[drivesvc.Child]) kit.Selection[drivesvc.Child] {
+	var folders []string
+	for _, row := range sel.Rows {
+		if row.Type == drivesvc.TypeFolder {
+			folders = append(folders, normalise(row.Path))
+		}
+	}
+	if len(folders) == 0 {
+		return sel
+	}
+	rows := make([]drivesvc.Child, 0, len(sel.Rows))
+	ids := make([]string, 0, len(sel.IDs))
+	for _, row := range sel.Rows {
+		if covered(normalise(row.Path), folders) {
+			continue
+		}
+		rows = append(rows, row)
+		ids = append(ids, row.LinkID)
+	}
+	sel.Rows, sel.IDs = rows, ids
+	return sel
+}
+
+// covered reports whether a path is inside one of the folders.
+func covered(path string, folders []string) bool {
+	for _, folder := range folders {
+		prefix := folder + "/"
+		if folder == "/" {
+			prefix = "/"
+		}
+		if path != folder && strings.HasPrefix(path, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 // matchItems walks the scope and keeps what every given filter accepts.

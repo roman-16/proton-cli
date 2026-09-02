@@ -335,7 +335,7 @@ func uploadTree(c *kit.Invocation, dc *drivesvc.Context, src, dest string, on dr
 		return sayHowToGoAhead(err, on)
 	}
 	spec := ui.ResultSpec{
-		Action: ui.Uploaded, Kind: "items", Count: len(plan.Files),
+		Action: ui.Uploaded, Kind: "items", Count: landing(plan),
 		Detail: "to " + plan.Top,
 	}
 	if plan.Nothing {
@@ -356,6 +356,19 @@ func uploadTree(c *kit.Invocation, dc *drivesvc.Context, src, dest string, on dr
 		}
 		return nil
 	}), on)
+}
+
+// landing is how many things a tree upload puts inside its destination: the
+// files, and the folders it has to make to hold them. The tree's own folder is
+// the destination rather than something landing in it, so it is not among them.
+func landing(plan *drivesvc.TreePlan) int {
+	n := len(plan.Files)
+	for _, folder := range plan.Folders {
+		if folder != plan.Top {
+			n++
+		}
+	}
+	return n
 }
 
 // uploadInto writes one of a tree's files, reading it from where the tree came
@@ -482,14 +495,14 @@ func itemsUpdateCmd() *cobra.Command {
 
 func itemsMoveCmd() *cobra.Command {
 	return relocateCmd("move", "Move files or folders into another folder", ui.Moved,
-		func(c *kit.Invocation, dc *drivesvc.Context, src, into string) error {
+		func(c *kit.Invocation, dc *drivesvc.Context, src string, into *drivesvc.Resolved) error {
 			return c.App.Drive.Move(c.Ctx, dc, src, into)
 		})
 }
 
 func itemsCopyCmd() *cobra.Command {
 	return relocateCmd("copy", "Copy files into another folder", ui.Copied,
-		func(c *kit.Invocation, dc *drivesvc.Context, src, into string) error {
+		func(c *kit.Invocation, dc *drivesvc.Context, src string, into *drivesvc.Resolved) error {
 			return c.App.Drive.Copy(c.Ctx, dc, src, into)
 		})
 }
@@ -498,7 +511,7 @@ func itemsCopyCmd() *cobra.Command {
 // stays. Both take the selection model, so a filtered move is as available as a
 // filtered trash.
 func relocateCmd(use, short string, action ui.Action,
-	apply func(*kit.Invocation, *drivesvc.Context, string, string) error) *cobra.Command {
+	apply func(*kit.Invocation, *drivesvc.Context, string, *drivesvc.Resolved) error) *cobra.Command {
 	var f filters
 	var into string
 	c := &cobra.Command{
@@ -513,12 +526,18 @@ func relocateCmd(use, short string, action ui.Action,
 			if err != nil {
 				return err
 			}
+			// The destination is looked for before anything is promised about it, and
+			// once for the whole selection rather than once per item.
+			dest, err := c.App.Drive.ResolveFolder(c.Ctx, dc, into)
+			if err != nil {
+				return err
+			}
 			return kit.Mutate(c, ui.ResultSpec{
 				Action: action, Kind: "items", Count: sel.Len(), IDs: sel.IDs,
 				Detail: "into " + into, Preview: sel.Preview(),
 			}, func() error {
 				for _, row := range sel.Rows {
-					if err := apply(c, dc, row.Path, into); err != nil {
+					if err := apply(c, dc, row.Path, dest); err != nil {
 						return err
 					}
 				}
@@ -558,16 +577,14 @@ func removeCmd(use, short string, action ui.Action, permanent bool) *cobra.Comma
 			if !permanent {
 				detail = "to trash"
 			}
-			return kit.Mutate(c, ui.ResultSpec{
+			return kit.Attempt(c, ui.ResultSpec{
 				Action: action, Kind: "items", Count: sel.Len(), IDs: sel.IDs,
 				Detail: detail, Preview: sel.Preview(),
-			}, func() error {
-				for _, row := range sel.Rows {
-					if err := c.App.Drive.Delete(c.Ctx, dc, row.Path, permanent); err != nil {
-						return err
-					}
+			}, func() ([]drivesvc.Refused, error) {
+				if permanent {
+					return c.App.Drive.Delete(c.Ctx, dc, sel.IDs)
 				}
-				return nil
+				return c.App.Drive.Trash(c.Ctx, dc, sel.IDs)
 			})
 		}),
 	}

@@ -80,28 +80,36 @@ func expiry(at *int64) string {
 
 func shareLinkCmd() *cobra.Command {
 	var edit bool
-	var expires, password string
+	var expires string
+	password := kit.LinkPassword()
 	c := &cobra.Command{
 		Use:   "link PATH",
 		Short: "Create or update the public link for a file or folder",
 		Long: "Create or update the public link for a file or folder.\n\n" +
 			"Running it again with different options changes the existing link rather than\n" +
-			"making a second one, so the URL you have shared keeps working.",
+			"making a second one, so the URL you have shared keeps working.\n\n" +
+			"The password is read from a file or from stdin, never from a flag value, and\n" +
+			"may be at most 50 characters. --clear-link-password takes it off again, and\n" +
+			"--expires never makes an expiring link permanent.",
 		Args: cobra.ExactArgs(1),
-		RunE: kit.Run(nil, func(c *kit.Invocation) error {
+		RunE: kit.Run([]kit.Step{password.Supply}, func(c *kit.Invocation) error {
 			opts := drivesvc.LinkOptions{}
 			if c.Changed("edit") {
 				opts.SetEdit, opts.CanEdit = true, edit
 			}
 			if c.Changed("expires") {
-				d, err := units.ParseDuration(expires)
+				d, err := kit.Expires(expires)
 				if err != nil {
-					return kit.Fail("--expires: %v", err)
+					return err
 				}
 				opts.SetExpiry, opts.ExpireSeconds = true, int(d.Seconds())
 			}
-			if c.Changed("password") {
-				opts.SetPassword, opts.CustomPassword = true, password
+			if password.Wanted() {
+				custom, err := password.Value()
+				if err != nil {
+					return err
+				}
+				opts.SetPassword, opts.CustomPassword = true, custom
 			}
 			dc, err := context(c)
 			if err != nil {
@@ -135,8 +143,9 @@ func shareLinkCmd() *cobra.Command {
 		}),
 	}
 	c.Flags().BoolVar(&edit, "edit", false, "Allow editing rather than only viewing")
-	c.Flags().StringVar(&expires, "expires", "", "Stop working after DURATION (e.g. 7d, 2w, 6mo)")
-	c.Flags().StringVar(&password, "password", "", "Require this password to open the link")
+	c.Flags().StringVar(&expires, "expires", "",
+		"Stop working after DURATION (e.g. 7d, 2w, 6mo), or never")
+	password.Declare(c)
 	return c
 }
 
@@ -341,31 +350,67 @@ func trashColumns() []ui.Column[drivesvc.TrashEntry] {
 	return []ui.Column[drivesvc.TrashEntry]{
 		{Header: "ID", ID: true, Cell: func(e drivesvc.TrashEntry) string { return e.LinkID }},
 		{Header: "TYPE", Cell: func(e drivesvc.TrashEntry) string { return e.Type }},
-		{Header: "SIZE", Right: true, Cell: func(e drivesvc.TrashEntry) string { return units.Size(e.Size) }},
+		{Header: "SIZE", Right: true, Cell: func(e drivesvc.TrashEntry) string {
+			if e.Type == drivesvc.TypeFolder {
+				return ""
+			}
+			return units.Size(e.Size)
+		}},
 		{Header: "TRASHED", Cell: func(e drivesvc.TrashEntry) string { return units.Time(e.Trashed) }},
+		{Header: "NAME", Flex: true, Cell: func(e drivesvc.TrashEntry) string { return e.Name }},
+	}
+}
+
+// trashOrder is how the trash may be ordered. The whole of it is held here to be
+// counted before anything is shown, so ordering it is this process's to do, the
+// way it is for a folder's children.
+func trashOrder() kit.Comparators[drivesvc.TrashEntry] {
+	return kit.Comparators[drivesvc.TrashEntry]{
+		"name":    func(a, b drivesvc.TrashEntry) int { return kit.Fold(a.Name, b.Name) },
+		"size":    func(a, b drivesvc.TrashEntry) int { return kit.Ints(a.Size, b.Size) },
+		"trashed": func(a, b drivesvc.TrashEntry) int { return kit.Ints(a.Trashed, b.Trashed) },
 	}
 }
 
 func trashListCmd() *cobra.Command {
-	return &cobra.Command{
+	var page kit.Page
+	var order kit.Order
+	c := &cobra.Command{
 		Use:   "list",
 		Short: "List what is in the trash",
-		Args:  cobra.NoArgs,
+		Long: "List what is in the trash.\n\n" +
+			"Everything the account has trashed is here, photos included: they are kept\n" +
+			"on a volume of their own, and `trash empty` deletes both.\n\n" +
+			"A trashed item has no path any more, so it is addressed by the ID shown. An\n" +
+			"item whose name cannot be read is still listed, because knowing it is there\n" +
+			"is what lets you act on it.",
+		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			dc, err := context(c)
 			if err != nil {
 				return err
 			}
-			entries, err := c.App.Drive.TrashList(c.Ctx, dc)
+			refs, err := c.App.Drive.TrashRefs(c.Ctx, dc)
 			if err != nil {
 				return err
 			}
+			entries, err := c.App.Drive.TrashDescribe(c.Ctx, dc, refs)
+			if err != nil {
+				return err
+			}
+			if err := kit.Sort(order, entries, trashOrder()); err != nil {
+				return err
+			}
+			rows, total := kit.Slice(page, entries)
 			return kit.List(c, ui.TableSpec[drivesvc.TrashEntry]{
 				Noun: "items", Columns: trashColumns(),
-				Total: ui.Unknown, Page: ui.Unpaged,
-			}, entries, func(e drivesvc.TrashEntry) []string { return []string{e.LinkID} })
+				Total: total, Page: page.Number, PageSize: page.Size,
+			}, rows, func(e drivesvc.TrashEntry) []string { return []string{e.LinkID} })
 		}),
 	}
+	order.Register(c, "name", "size", "trashed")
+	page.Register(c, "items")
+	return c
 }
 
 func trashRestoreCmd() *cobra.Command {
@@ -381,9 +426,9 @@ func trashRestoreCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return kit.Mutate(c, ui.ResultSpec{
+			return kit.Attempt(c, ui.ResultSpec{
 				Action: ui.Restored, Kind: "items", Count: len(c.Args), IDs: c.Args,
-			}, func() error {
+			}, func() ([]drivesvc.Refused, error) {
 				return c.App.Drive.TrashRestore(c.Ctx, dc, c.Args)
 			})
 		}),
@@ -394,20 +439,25 @@ func trashEmptyCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "empty",
 		Short: "Delete everything in the trash, permanently",
-		Args:  cobra.NoArgs,
+		Long: "Delete everything in the trash, permanently.\n\n" +
+			"That is everything `trash list` shows, on every volume the account has:\n" +
+			"trashed photos go with it.",
+		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			dc, err := context(c)
 			if err != nil {
 				return err
 			}
-			entries, err := c.App.Drive.TrashList(c.Ctx, dc)
+			// Counting is the whole of what this needs to know, and identity is the
+			// cheap half of a listing: emptying is all or nothing, so a table of what
+			// is in there answers a question only `trash list` is asked.
+			refs, err := c.App.Drive.TrashRefs(c.Ctx, dc)
 			if err != nil {
 				return err
 			}
 			return kit.Mutate(c, ui.ResultSpec{
-				Action: ui.Emptied, Kind: "items", Count: len(entries),
-				Detail:  "from the trash",
-				Preview: kit.Preview("items", trashColumns(), entries),
+				Action: ui.Emptied, Kind: "items", Count: len(refs),
+				Detail: "from the trash",
 			}, func() error { return c.App.Drive.TrashEmpty(c.Ctx, dc) })
 		}),
 	}

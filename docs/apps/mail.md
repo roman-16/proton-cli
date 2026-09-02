@@ -54,8 +54,11 @@ Scheduling, self-destruction, and a password for recipients outside Proton:
 ```bash
 proton mail messages send … --send-at 2026-05-01T09:00     # local time; confirms the resolved time
 proton mail messages send … --expires 7d
-proton mail messages send … --eo-password hunter2 --eo-password-hint "our usual"
+proton mail messages send … --eo-password-file /run/secrets/jane --eo-password-hint "our usual"
+pass show mail/jane | proton mail messages send … --eo-password-stdin
 ```
+
+The password a recipient outside Proton types is a secret, so it comes from a file or from standard input rather than from a flag value, and Proton asks for at least eight characters. Such a message expires after 28 days whatever `--expires` says. `--eo-password-stdin` takes the stream for itself, so it cannot be combined with `--body -`.
 
 A scheduled send sits in the `scheduled` folder until it goes. `proton mail messages unschedule REF` pulls it back to Drafts.
 

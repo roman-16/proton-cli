@@ -436,10 +436,9 @@ func TestDriveItemsDeleteAndTrashRestore(t *testing.T) {
 	cleanupRun(t, fmt.Sprintf("Final delete: proton drive items delete --permanent %s", folder),
 		"drive", "items", "delete", folder)
 
-	// Noted before the trash: a trashed item has no path any more, and its name
-	// arrives encrypted, so its own ID is the only thing that still identifies
-	// it. Picking the first folder in the trash instead would restore whatever
-	// else happened to be in there.
+	// Noted before the trash: a trashed item has no path any more, so its own ID
+	// is what identifies it. Picking the first folder in the trash instead would
+	// restore whatever else happened to be in there.
 	linkID, _ := runJSON(t, "drive", "items", "get", folder)["link_id"].(string)
 	if linkID == "" {
 		t.Fatal("drive items get should report the folder's link ID")
@@ -448,18 +447,25 @@ func TestDriveItemsDeleteAndTrashRestore(t *testing.T) {
 	// Non-permanent → trash
 	runOK(t, "drive", "items", "trash", folder)
 
-	// Should appear in trash
-	found := false
+	// Should appear in trash, by name and with the moment it was trashed: the
+	// listing is what somebody decides from, so it says what each item is.
+	var entry map[string]interface{}
 	for _, e := range runJSONArray(t, "drive", "trash", "list") {
-		if e.(map[string]interface{})["link_id"] == linkID {
-			found = true
+		if row, ok := e.(map[string]interface{}); ok && row["link_id"] == linkID {
+			entry = row
 		}
 	}
-	if !found {
+	if entry == nil {
 		t.Fatal("the trashed folder should appear in the trash")
 	}
+	if name, _ := entry["name"].(string); name != strings.TrimPrefix(folder, "/") {
+		t.Errorf("trash list reports name %q, want %q", name, strings.TrimPrefix(folder, "/"))
+	}
+	if trashed, _ := entry["trashed"].(float64); trashed <= 0 {
+		t.Errorf("trash list reports trashed %v, want the moment it was trashed", entry["trashed"])
+	}
 
-	// Restore (IDs only - trashed names are encrypted)
+	// A trashed item has no path, so it is restored by the ID the listing showed.
 	runOK(t, "drive", "trash", "restore", "--", linkID)
 
 	// It should be back in root

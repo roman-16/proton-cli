@@ -121,9 +121,10 @@ proton mail conversations forward 'Quarterly numbers' --to jane@example.com
 | `--body string` | Your text, placed above the quoted original (- reads stdin) |
 | `--cc stringArray` | Carbon-copy recipient (repeatable) |
 | `--draft` | Save as a draft instead of sending |
-| `--eo-password string` | Password-protect the message for recipients outside Proton (expires after 28 days) |
+| `--eo-password-file string` | Read the password for recipients outside Proton from a file |
 | `--eo-password-hint string` | Hint shown to password-protected recipients |
-| `--expires string` | Self-destruct after DURATION (e.g. 7d, 24h) |
+| `--eo-password-stdin` | Read the password for recipients outside Proton from stdin |
+| `--expires string` | Self-destruct after DURATION (e.g. 7d, 24h), or never |
 | `--from string` | Address to send from, by email or ID (default: your primary) |
 | `--html` | Compose in HTML (default: match the original) |
 | `--no-attachments` | Leave the original's attachments behind |
@@ -330,10 +331,11 @@ proton mail conversations reply 'Quarterly numbers' --everyone --body Agreed.
 | `--body string` | Your text, placed above the quoted original (- reads stdin) |
 | `--cc stringArray` | Carbon-copy recipient (repeatable) |
 | `--draft` | Save as a draft instead of sending |
-| `--eo-password string` | Password-protect the message for recipients outside Proton (expires after 28 days) |
+| `--eo-password-file string` | Read the password for recipients outside Proton from a file |
 | `--eo-password-hint string` | Hint shown to password-protected recipients |
+| `--eo-password-stdin` | Read the password for recipients outside Proton from stdin |
 | `--everyone` | Reply to everyone who was on the message, not just the sender |
-| `--expires string` | Self-destruct after DURATION (e.g. 7d, 24h) |
+| `--expires string` | Self-destruct after DURATION (e.g. 7d, 24h), or never |
 | `--from string` | Address to send from, by email or ID (default: your primary) |
 | `--html` | Compose in HTML (default: match the original) |
 | `--no-quote` | Do not quote the original message |
@@ -594,9 +596,10 @@ proton mail drafts send 5bH2mQxK --send-at 2026-04-16T09:00
 
 | Flag | Description |
 | --- | --- |
-| `--eo-password string` | Password-protect the message for recipients outside Proton (expires after 28 days) |
+| `--eo-password-file string` | Read the password for recipients outside Proton from a file |
 | `--eo-password-hint string` | Hint shown to password-protected recipients |
-| `--expires string` | Self-destruct after DURATION (e.g. 7d, 24h) |
+| `--eo-password-stdin` | Read the password for recipients outside Proton from stdin |
+| `--expires string` | Self-destruct after DURATION (e.g. 7d, 24h), or never |
 | `--send-at string` | Schedule delivery (RFC 3339, or YYYY-MM-DDTHH:MM in the system timezone) |
 
 ### `drafts update`
@@ -827,9 +830,10 @@ proton mail messages forward 'Invoice #2291' --to jane@example.com --no-attachme
 | `--body string` | Your text, placed above the quoted original (- reads stdin) |
 | `--cc stringArray` | Carbon-copy recipient (repeatable) |
 | `--draft` | Save as a draft instead of sending |
-| `--eo-password string` | Password-protect the message for recipients outside Proton (expires after 28 days) |
+| `--eo-password-file string` | Read the password for recipients outside Proton from a file |
 | `--eo-password-hint string` | Hint shown to password-protected recipients |
-| `--expires string` | Self-destruct after DURATION (e.g. 7d, 24h) |
+| `--eo-password-stdin` | Read the password for recipients outside Proton from stdin |
+| `--expires string` | Self-destruct after DURATION (e.g. 7d, 24h), or never |
 | `--from string` | Address to send from, by email or ID (default: your primary) |
 | `--html` | Compose in HTML (default: match the original) |
 | `--no-attachments` | Leave the original's attachments behind |
@@ -1047,10 +1051,11 @@ proton mail messages reply 'Invoice #2291' --body 'Draft first.' --draft
 | `--body string` | Your text, placed above the quoted original (- reads stdin) |
 | `--cc stringArray` | Carbon-copy recipient (repeatable) |
 | `--draft` | Save as a draft instead of sending |
-| `--eo-password string` | Password-protect the message for recipients outside Proton (expires after 28 days) |
+| `--eo-password-file string` | Read the password for recipients outside Proton from a file |
 | `--eo-password-hint string` | Hint shown to password-protected recipients |
+| `--eo-password-stdin` | Read the password for recipients outside Proton from stdin |
 | `--everyone` | Reply to everyone who was on the message, not just the sender |
-| `--expires string` | Self-destruct after DURATION (e.g. 7d, 24h) |
+| `--expires string` | Self-destruct after DURATION (e.g. 7d, 24h), or never |
 | `--from string` | Address to send from, by email or ID (default: your primary) |
 | `--html` | Compose in HTML (default: match the original) |
 | `--no-quote` | Do not quote the original message |
@@ -1070,6 +1075,7 @@ proton mail messages send
 proton mail messages send --to jane@example.com --subject Report --body 'See attached.' --attach ./report.pdf
 proton mail messages send --to team@example.com --subject Standup --body -
 proton mail messages send --to jane@example.com --subject Reminder --send-at 2026-04-16T09:00
+proton mail messages send --to jane@example.com --subject Invoice --body 'See attached.' --eo-password-file /run/secrets/jane
 proton mail messages send --eml ./draft.eml
 ```
 
@@ -1081,9 +1087,10 @@ proton mail messages send --eml ./draft.eml
 | `--body string` | Message body (- reads stdin) |
 | `--cc stringArray` | Carbon-copy recipient (repeatable) |
 | `--eml string` | Build the message from an RFC 822 file; other flags override what it says |
-| `--eo-password string` | Password-protect the message for recipients outside Proton (expires after 28 days) |
+| `--eo-password-file string` | Read the password for recipients outside Proton from a file |
 | `--eo-password-hint string` | Hint shown to password-protected recipients |
-| `--expires string` | Self-destruct after DURATION (e.g. 7d, 24h) |
+| `--eo-password-stdin` | Read the password for recipients outside Proton from stdin |
+| `--expires string` | Self-destruct after DURATION (e.g. 7d, 24h), or never |
 | `--from string` | Address to send from, by email or ID (default: your primary) |
 | `--html` | Treat the body as HTML rather than plain text |
 | `--no-signature` | Leave out this address's signature and Proton's footer |

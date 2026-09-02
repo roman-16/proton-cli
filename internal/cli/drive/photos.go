@@ -233,10 +233,10 @@ func photosRemoveCmd(use, short string, action ui.Action, permanent bool) *cobra
 			if !permanent {
 				detail = "to trash"
 			}
-			return kit.Mutate(c, ui.ResultSpec{
+			return kit.Attempt(c, ui.ResultSpec{
 				Action: action, Kind: "photos", Count: sel.Len(), IDs: sel.IDs, Detail: detail,
 				Preview: sel.Preview(),
-			}, func() error {
+			}, func() ([]drivesvc.Refused, error) {
 				return c.App.Drive.PhotosDelete(c.Ctx, dc, sel.IDs, permanent)
 			})
 		}),

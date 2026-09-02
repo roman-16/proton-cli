@@ -204,7 +204,8 @@ var flagMeanings = map[string]string{
 	"email":                  "an email address",
 	"eml":                    "an RFC 822 file to build the message from",
 	"end":                    "the end of a range or event",
-	"eo-password":            "password-protect the message for recipients outside Proton",
+	"eo-password-file":       "where to read the password for recipients outside Proton from",
+	"eo-password-stdin":      "read the password for recipients outside Proton from stdin",
 	"eo-password-hint":       "hint shown to password-protected recipients",
 	"everyone":               "answer every address that was on the message, not only the sender",
 	"expires":                "how long before it stops working",
@@ -268,7 +269,6 @@ var flagMeanings = map[string]string{
 	"page-size":              "how many results per page",
 	"parent":                 "the containing folder",
 	"passport-number":        "a passport number",
-	"password":               "a password",
 	"passphrase-file":        "where to read the passphrase that locks a file",
 	"passphrase-stdin":       "read the passphrase that locks a file from stdin",
 	"password-file":          "where to read the account password from",
@@ -376,8 +376,13 @@ func TestSharedFlagNamesShareOneMeaning(t *testing.T) {
 // command that declares one of them itself.
 var kitOwnedFlags = map[string]string{
 	"all":                   "kit.All",
+	"clear-link-password":   "kit.LinkPassword",
+	"eo-password-file":      "kit.EOPassword",
+	"eo-password-stdin":     "kit.EOPassword",
 	"extra-password-file":   "kit.ExtraPassword",
 	"extra-password-stdin":  "kit.ExtraPassword",
+	"link-password-file":    "kit.LinkPassword",
+	"link-password-stdin":   "kit.LinkPassword",
 	"passphrase-file":       "kit.Passphrase",
 	"passphrase-stdin":      "kit.Passphrase",
 	"password-file":         "kit.Reauth",
@@ -391,8 +396,13 @@ var kitOwnedFlags = map[string]string{
 // below can tell kit's own registration from a command redeclaring the name.
 var kitFlagUsage = map[string]string{
 	"all":                   kit.AllUsage,
+	"clear-link-password":   kit.ClearLinkPasswordUsage,
+	"eo-password-file":      kit.EOPasswordFileUsage,
+	"eo-password-stdin":     kit.EOPasswordStdinUsage,
 	"extra-password-file":   kit.ExtraPasswordFileUsage,
 	"extra-password-stdin":  kit.ExtraPasswordStdinUsage,
+	"link-password-file":    kit.LinkPasswordFileUsage,
+	"link-password-stdin":   kit.LinkPasswordStdinUsage,
 	"passphrase-file":       kit.PassphraseFileUsage,
 	"passphrase-stdin":      kit.PassphraseStdinUsage,
 	"password-file":         kit.PasswordFileUsage,
@@ -458,6 +468,46 @@ func TestAFlagNameNamesOneSetOfValues(t *testing.T) {
 			fmt.Fprintf(&b, "\n  %s\n    %s", set, strings.Join(cmds, "\n    "))
 		}
 		t.Error(b.String())
+	}
+}
+
+// A flag that takes a value off names the flag that puts it on.
+//
+// There are three ways to say "none" in this CLI and each is the right one
+// somewhere. A value that can carry the word says it: `--expires never`, which
+// is what every screen prints for something that does not expire. A state
+// somebody can also choose when making the thing is `--no-x`: `--no-remind`
+// removes an event's reminders and gives a new event none, one word for one
+// idea. What is left is a single-valued field of something that already exists
+// whose flag cannot carry the word - a signature typed as text, a password read
+// from a file - and that is `--clear-x`.
+//
+// So a `--clear-x` sits beside the `x` it clears, and this fails on one that
+// does not: a `--clear-something` alone on a command is either a flag whose own
+// value could have said "never", or a name that no longer matches what it takes
+// off.
+func TestAClearFlagSitsBesideWhatItClears(t *testing.T) {
+	leaves, _ := partition(t)
+	for _, c := range leaves {
+		names := map[string]bool{}
+		c.LocalFlags().VisitAll(func(f *pflag.Flag) { names[f.Name] = true })
+		for name := range names {
+			cleared, isClear := strings.CutPrefix(name, "clear-")
+			if !isClear {
+				continue
+			}
+			sets := false
+			for other := range names {
+				if other != name && strings.HasPrefix(other, cleared) {
+					sets = true
+				}
+			}
+			if !sets {
+				t.Errorf("%s takes --%s but nothing on it sets %q; "+
+					"name it after the flag it clears, or let that flag's value say never",
+					cmdPath(c), name, cleared)
+			}
+		}
 	}
 }
 

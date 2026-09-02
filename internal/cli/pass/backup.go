@@ -112,7 +112,7 @@ func importCmd() *cobra.Command {
 			if plan.Count() == 0 && len(plan.Skipped) == 0 {
 				return kit.Fail("%s holds no items.", c.Args[0])
 			}
-			return kit.Ingest(c, ui.ResultSpec{
+			return kit.Attempt(c, ui.ResultSpec{
 				Action: ui.Imported, Kind: "items", Count: plan.Count(),
 				Detail:  "from " + c.Args[0] + newVaults(plan),
 				Preview: kit.Preview("items", importColumns(), plannedRows(plan)),

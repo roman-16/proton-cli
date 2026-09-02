@@ -128,7 +128,7 @@ printf '%s' "$PW" | proton calendar settings calendars delete Work --password-st
 ```console
 $ printf '%s' "$PW" | proton --password-stdin mail messages send --body - ...
 Error: --password-stdin and --body - both read standard input, which can only be read once.
-Try:   pass the password with --password-file instead
+Try:   pass it with --password-file instead
 ```
 
 ## Signing out

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -397,5 +398,82 @@ func TestRequestBlockLinksNonRetryable(t *testing.T) {
 	}
 	if d.calls != 1 {
 		t.Errorf("Decode calls = %d, want 1 (404 is not retried)", d.calls)
+	}
+}
+
+// A storage token authorises the block it was issued for on the host Proton
+// named, and net/http would carry a header it does not recognise as sensitive
+// to wherever a redirect pointed.
+func TestABlockTransferDoesNotCarryItsTokenToAnotherHost(t *testing.T) {
+	var elsewhere atomic.Int32
+	other := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		elsewhere.Add(1)
+		if r.Header.Get("pm-storage-token") != "" {
+			t.Error("the storage token followed a redirect to another host")
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer other.Close()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, other.URL, http.StatusFound)
+	}))
+	defer srv.Close()
+
+	shrinkBackoff(t)
+	link := uploadLink{Token: "t", BareURL: srv.URL, created: time.Now()}
+	if _, err := uploadBlock(context.Background(), 1, []byte("d"), link, failRefresh(t)); err == nil {
+		t.Error("a redirect off the origin should fail rather than be followed")
+	}
+	if got := elsewhere.Load(); got != 0 {
+		t.Errorf("the other host was reached %d times, want 0", got)
+	}
+}
+
+// A block is a known size, and the bytes are held whole while they are
+// decrypted, so an answer that keeps coming is refused rather than read.
+func TestABlockLargerThanABlockIsRefused(t *testing.T) {
+	shrinkBackoff(t)
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(make([]byte, storedBlockLimit+1))
+	}))
+	defer srv.Close()
+
+	_, err := downloadBlock(context.Background(), srv.URL, "t")
+	if !errors.Is(err, errBlockTooLarge) {
+		t.Fatalf("err = %v, want the oversize block refusal", err)
+	}
+	if got := hits.Load(); got != 1 {
+		t.Errorf("server hits = %d, want 1 (asking again would fetch the same thing)", got)
+	}
+}
+
+// What a block transfer failed with is said without quoting the signed URL it
+// was talking to, which is a credential for the block it names.
+func TestAStorageFailureQuotesNoUrlOrBody(t *testing.T) {
+	shrinkBackoff(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, `{"URL":"https://storage.proton.me/x?token=eyJhbGciOi"}`, http.StatusBadRequest)
+	}))
+	defer srv.Close()
+
+	link := uploadLink{Token: "sensitive-token", BareURL: srv.URL, created: time.Now()}
+	_, err := uploadBlock(context.Background(), 3, []byte("d"), link, failRefresh(t))
+	if err == nil {
+		t.Fatal("expected an error on HTTP 400")
+	}
+	said := err.Error()
+	for _, secret := range []string{srv.URL, "sensitive-token", "eyJhbGciOi"} {
+		if strings.Contains(said, secret) {
+			t.Errorf("the failure quotes %q: %s", secret, said)
+		}
+	}
+	for _, want := range []string{"upload block 3", "400"} {
+		if !strings.Contains(said, want) {
+			t.Errorf("the failure does not say %q: %s", want, said)
+		}
 	}
 }

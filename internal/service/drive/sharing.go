@@ -636,6 +636,15 @@ func (s *Service) SharedByMe(ctx context.Context) ([]SharedItem, error) {
 		}
 		item, err := s.describeShare(ctx, sh)
 		if err != nil {
+			// This listing answers "what have I left open", so a share that will not
+			// open is reported by its identity rather than dropped: leaving it out
+			// would understate what is shared, which is the one direction this
+			// question must not be wrong in.
+			slog.Debug("drive: could not read a share of mine", "share", sh.ShareID, "error", err)
+			out = append(out, SharedItem{
+				ShareID: sh.ShareID, LinkID: sh.LinkID, VolumeID: sh.VolumeID,
+				Created: sh.CreateTime,
+			})
 			continue
 		}
 		out = append(out, *item)

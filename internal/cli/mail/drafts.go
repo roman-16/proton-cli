@@ -156,7 +156,7 @@ func draftsSendCmd() *cobra.Command {
 			"Its body already contains whatever signature it was created with, so nothing\n" +
 			"is appended.",
 		Args: cobra.ExactArgs(1),
-		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
+		RunE: kit.Run([]kit.Step{d.supply, kit.StepExpand}, func(c *kit.Invocation) error {
 			del, at, err := d.delivery()
 			if err != nil {
 				return err

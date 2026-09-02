@@ -305,21 +305,26 @@ Create or update the public link for a file or folder.
 
 Running it again with different options changes the existing link rather than making a second one, so the URL you have shared keeps working.
 
+The password is read from a file or from stdin, never from a flag value, and may be at most 50 characters. --clear-link-password takes it off again, and --expires never makes an expiring link permanent.
+
 ```
 proton drive items share link PATH
 ```
 
 ```bash
 proton drive items share link /Documents/report.pdf
-proton drive items share link /Documents/report.pdf --expires 7d --password hunter2
+proton drive items share link /Documents/report.pdf --expires 7d --link-password-file /run/secrets/report-link
+proton drive items share link /Documents/report.pdf --clear-link-password --expires never
 proton drive items share link /Documents --edit
 ```
 
 | Flag | Description |
 | --- | --- |
+| `--clear-link-password` | Remove the public link's password |
 | `--edit` | Allow editing rather than only viewing |
-| `--expires string` | Stop working after DURATION (e.g. 7d, 2w, 6mo) |
-| `--password string` | Require this password to open the link |
+| `--expires string` | Stop working after DURATION (e.g. 7d, 2w, 6mo), or never |
+| `--link-password-file string` | Read the public link's password from a file |
+| `--link-password-stdin` | Read the public link's password from stdin |
 
 ### `items share remove`
 
@@ -737,6 +742,8 @@ Holds `empty`, `list` and `restore`.
 
 Delete everything in the trash, permanently.
 
+That is everything `trash list` shows, on every volume the account has: trashed photos go with it.
+
 ```
 proton drive trash empty
 ```
@@ -749,13 +756,25 @@ proton drive trash empty
 
 List what is in the trash.
 
+Everything the account has trashed is here, photos included: they are kept on a volume of their own, and `trash empty` deletes both.
+
+A trashed item has no path any more, so it is addressed by the ID shown. An item whose name cannot be read is still listed, because knowing it is there is what lets you act on it.
+
 ```
 proton drive trash list
 ```
 
 ```bash
 proton drive trash list
+proton drive trash list --sort trashed --desc
 ```
+
+| Flag | Description |
+| --- | --- |
+| `--desc` | Reverse the order |
+| `--page int` | Which page of results, counting from zero |
+| `--page-size int` | How many items per page (default `50`) |
+| `--sort string` | Order by: name, size, trashed (default `name`) |
 
 ### `trash restore`
 

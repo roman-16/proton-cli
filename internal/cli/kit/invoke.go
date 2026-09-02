@@ -352,19 +352,19 @@ func Fail(format string, a ...any) *errs.Problem { return errs.Problemf(format, 
 // commands, which report on the binary rather than on an account.
 func Object(c *Invocation, v any) error { return ui.Record(c.UI(), ui.RecordSpec{Object: v}) }
 
-// ── ingesting ──
+// ── attempting ──
 
-// Ingest reads things out of a file and reports what landed.
+// Attempt makes a change to many things and reports what it managed.
 //
 // It is separate from Mutate because how many of them land is not known until
-// the work is done: a file offers cards or events, Proton takes the ones it can
-// identify, and the rest are named with the reason. Counting the offer would
-// report a number that is right only when nothing went wrong, which is the one
-// case nobody needs told about.
+// the work is done: a file offers cards or events, a bulk verb offers a list of
+// items, Proton takes the ones it can and the rest are named with the reason.
+// Counting the offer would report a number that is right only when nothing went
+// wrong, which is the one case nobody needs told about.
 //
 // Under --dry-run there is nothing to report but the offer, since no server has
 // yet had the chance to refuse anything.
-func Ingest[T any](c *Invocation, spec ui.ResultSpec, read func() ([]T, error)) error {
+func Attempt[T any](c *Invocation, spec ui.ResultSpec, apply func() ([]T, error)) error {
 	if c.App.DryRun {
 		if err := c.preview(&spec); err != nil {
 			return err
@@ -377,7 +377,7 @@ func Ingest[T any](c *Invocation, spec ui.ResultSpec, read func() ([]T, error)) 
 	if spec.Count == 0 {
 		return ui.Result(c.UI(), spec)
 	}
-	skipped, err := read()
+	skipped, err := apply()
 	if err != nil {
 		return err
 	}
@@ -385,8 +385,8 @@ func Ingest[T any](c *Invocation, spec ui.ResultSpec, read func() ([]T, error)) 
 	if err := ui.Result(c.UI(), spec); err != nil {
 		return err
 	}
-	// A partial import is the common failure, so what did not land is named
-	// rather than left to a count that does not add up.
+	// Landing part of what was asked for is the common failure, so what did not
+	// land is named rather than left to a count that does not add up.
 	for _, s := range skipped {
 		c.Warn("%v", s)
 	}

@@ -3,6 +3,7 @@ package drive
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -27,7 +28,12 @@ import (
 //     blockMaxRateLimit ~ MAX_TOO_MANY_REQUESTS_WAIT), and refreshes an
 //     expired storage token (blockTokenTTL ~ TOKEN_EXPIRATION_TIME).
 const (
-	driveBlockSize     = 4 * 1024 * 1024
+	driveBlockSize = 4 * 1024 * 1024
+	// storedBlockLimit is how much of a block storage may answer with. A block is
+	// 4 MiB plus its encryption overhead, and the bytes are held whole in memory
+	// while they are decrypted, so an answer that keeps coming is refused rather
+	// than read.
+	storedBlockLimit   = driveBlockSize + 1024*1024
 	uploadBufferBlocks = 15
 	uploadLinkBatch    = 10
 	uploadParallelJobs = 5
@@ -40,6 +46,58 @@ const (
 // blockRetryBaseDelay is the base backoff between block-transfer retries. It is
 // a package var so tests can shrink it; production keeps a real backoff.
 var blockRetryBaseDelay = 500 * time.Millisecond
+
+// blockClient carries the storage token, and carries it nowhere else.
+//
+// Block transfers do not go through the API client: they are signed URLs on
+// Proton's storage hosts, authorised by a pm-storage-token header. net/http
+// strips a header it recognises as sensitive when a redirect crosses origins,
+// and its list is Authorization and Cookie - not this one - so the rule is
+// stated here: a redirect off the host Proton named is not followed with the
+// token in hand.
+var blockClient = &http.Client{
+	CheckRedirect: func(req *http.Request, via []*http.Request) error {
+		if len(via) == 0 {
+			return nil
+		}
+		origin := via[0].URL
+		if !strings.EqualFold(origin.Scheme, req.URL.Scheme) || !strings.EqualFold(origin.Host, req.URL.Host) {
+			return http.ErrUseLastResponse
+		}
+		return nil
+	},
+}
+
+// storageError is what a block transfer failed with, said without quoting what
+// failed.
+//
+// A signed storage URL is a credential for the block it names, and it appears in
+// every transport error net/http produces and in some of what an endpoint
+// answers with. An error is read in logs, pasted into issues and printed by
+// whatever ran the command, so what it carries is the operation and the status
+// and nothing else. The cause is kept for errors.Is, which is how a cancelled
+// context stays recognisable as one.
+type storageError struct {
+	operation string
+	status    int
+	cause     error
+}
+
+func (e *storageError) Error() string {
+	if e.status != 0 {
+		return fmt.Sprintf("%s: storage service returned HTTP %d", e.operation, e.status)
+	}
+	return e.operation + ": storage request failed"
+}
+
+func (e *storageError) Unwrap() error { return e.cause }
+
+// storageFailed wraps a block-transfer failure as a network error, which is what
+// decides the exit code: the request left this machine and did not come back
+// with an answer, whoever is at fault.
+func storageFailed(operation string, status int, cause error) error {
+	return &proton.NetworkError{Err: &storageError{operation: operation, status: status, cause: cause}}
+}
 
 // uploadLink is a block storage upload target plus the time its token was
 // issued, so a long-running upload can proactively refresh a stale token.
@@ -101,8 +159,9 @@ func tokenRejected(status int) bool {
 }
 
 // putBlock uploads one encrypted block's bytes to its storage URL and returns
-// the HTTP status, the Retry-After header, and a bounded response body.
-func putBlock(ctx context.Context, link uploadLink, data []byte) (status int, retryAfterHdr, body string, err error) {
+// the HTTP status and the Retry-After header. The response body is discarded:
+// storage can reflect the signed URL back, and no caller needs its text.
+func putBlock(ctx context.Context, link uploadLink, data []byte) (status int, retryAfterHdr string, err error) {
 	const boundary = "proton-cli-boundary"
 	var buf bytes.Buffer
 	buf.WriteString("--" + boundary + "\r\n")
@@ -113,17 +172,17 @@ func putBlock(ctx context.Context, link uploadLink, data []byte) (status int, re
 
 	req, err := http.NewRequestWithContext(ctx, "POST", link.BareURL, bytes.NewReader(buf.Bytes()))
 	if err != nil {
-		return 0, "", "", err
+		return 0, "", storageFailed("upload", 0, err)
 	}
 	req.Header.Set("pm-storage-token", link.Token)
 	req.Header.Set("Content-Type", "multipart/form-data; boundary="+boundary)
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := blockClient.Do(req)
 	if err != nil {
-		return 0, "", "", err
+		return 0, "", storageFailed("upload", 0, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
-	b, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-	return resp.StatusCode, resp.Header.Get("Retry-After"), string(b), nil
+	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
+	return resp.StatusCode, resp.Header.Get("Retry-After"), nil
 }
 
 // uploadBlock uploads one block, retrying transient failures with backoff,
@@ -141,7 +200,7 @@ func uploadBlock(ctx context.Context, index int, data []byte, link uploadLink, r
 		}
 
 		attemptCtx, cancel := context.WithTimeout(ctx, blockTransferQuery)
-		status, ra, body, err := putBlock(attemptCtx, link, data)
+		status, ra, err := putBlock(attemptCtx, link, data)
 		cancel()
 
 		if err == nil && status >= 200 && status < 300 {
@@ -151,7 +210,7 @@ func uploadBlock(ctx context.Context, index int, data []byte, link uploadLink, r
 			if err != nil {
 				return "", fmt.Errorf("upload block %d: %w", index, err)
 			}
-			return "", fmt.Errorf("upload block %d: HTTP %d: %s", index, status, body)
+			return "", storageFailed(fmt.Sprintf("upload block %d", index), status, nil)
 		}
 
 		switch {
@@ -174,7 +233,7 @@ func uploadBlock(ctx context.Context, index int, data []byte, link uploadLink, r
 				return "", werr
 			}
 		default: // other 4xx: not recoverable
-			return "", fmt.Errorf("upload block %d: HTTP %d: %s", index, status, body)
+			return "", storageFailed(fmt.Sprintf("upload block %d", index), status, nil)
 		}
 	}
 }
@@ -184,24 +243,31 @@ func uploadBlock(ctx context.Context, index int, data []byte, link uploadLink, r
 func getBlock(ctx context.Context, url, token string) (data []byte, status int, retryAfterHdr string, err error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
-		return nil, 0, "", err
+		return nil, 0, "", storageFailed("download", 0, err)
 	}
 	req.Header.Set("pm-storage-token", token)
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := blockClient.Do(req)
 	if err != nil {
-		return nil, 0, "", err
+		return nil, 0, "", storageFailed("download", 0, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
 		return nil, resp.StatusCode, resp.Header.Get("Retry-After"), nil
 	}
-	b, err := io.ReadAll(resp.Body)
+	b, err := io.ReadAll(io.LimitReader(resp.Body, storedBlockLimit+1))
 	if err != nil {
-		return nil, resp.StatusCode, "", err
+		return nil, resp.StatusCode, "", storageFailed("download", 0, err)
+	}
+	if len(b) > storedBlockLimit {
+		return nil, resp.StatusCode, "", errBlockTooLarge
 	}
 	return b, resp.StatusCode, "", nil
 }
+
+// errBlockTooLarge is a block that did not stop arriving. Retrying would ask for
+// the same thing again, so it is not one of the failures that is retried.
+var errBlockTooLarge = storageFailed("download block", 0, errors.New("the block exceeds the size a block can be"))
 
 // downloadBlock fetches one block's bytes, retrying transient failures with
 // backoff and honouring 429 Retry-After.
@@ -214,11 +280,14 @@ func downloadBlock(ctx context.Context, url, token string) ([]byte, error) {
 		if err == nil && status >= 200 && status < 300 {
 			return data, nil
 		}
+		if errors.Is(err, errBlockTooLarge) {
+			return nil, err
+		}
 		if attempt >= blockMaxRetries {
 			if err != nil {
 				return nil, err
 			}
-			return nil, fmt.Errorf("HTTP %d", status)
+			return nil, storageFailed("download block", status, nil)
 		}
 
 		switch {
@@ -235,7 +304,7 @@ func downloadBlock(ctx context.Context, url, token string) ([]byte, error) {
 				return nil, werr
 			}
 		default: // 4xx that isn't rate limiting: not recoverable
-			return nil, fmt.Errorf("HTTP %d", status)
+			return nil, storageFailed("download block", status, nil)
 		}
 	}
 }

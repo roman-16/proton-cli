@@ -253,7 +253,8 @@ var examples = map[string][]string{
 	"proton drive items share get": {"proton drive items share get /Documents/report.pdf"},
 	"proton drive items share link": {
 		"proton drive items share link /Documents/report.pdf",
-		"proton drive items share link /Documents/report.pdf --expires 7d --password hunter2",
+		"proton drive items share link /Documents/report.pdf --expires 7d --link-password-file /run/secrets/report-link",
+		"proton drive items share link /Documents/report.pdf --clear-link-password --expires never",
 		"proton drive items share link /Documents --edit",
 	},
 	"proton drive items share unlink": {"proton drive items share unlink /Documents/report.pdf"},
@@ -274,9 +275,12 @@ var examples = map[string][]string{
 	"proton drive items share resend": {
 		"proton drive items share resend /Reports jane@proton.me",
 	},
-	"proton drive shared list":   {"proton drive shared list"},
-	"proton drive sharing list":  {"proton drive sharing list"},
-	"proton drive trash list":    {"proton drive trash list"},
+	"proton drive shared list":  {"proton drive shared list"},
+	"proton drive sharing list": {"proton drive sharing list"},
+	"proton drive trash list": {
+		"proton drive trash list",
+		"proton drive trash list --sort trashed --desc",
+	},
 	"proton drive trash restore": {"proton drive trash restore 5bH2mQxK"},
 	"proton drive trash empty":   {"proton drive trash empty"},
 	"proton drive photos list": {
@@ -331,6 +335,7 @@ var examples = map[string][]string{
 		"proton mail messages send --to jane@example.com --subject Report --body 'See attached.' --attach ./report.pdf",
 		"proton mail messages send --to team@example.com --subject Standup --body -",
 		"proton mail messages send --to jane@example.com --subject Reminder --send-at 2026-04-16T09:00",
+		"proton mail messages send --to jane@example.com --subject Invoice --body 'See attached.' --eo-password-file /run/secrets/jane",
 		"proton mail messages send --eml ./draft.eml",
 	},
 	"proton mail messages reply": {

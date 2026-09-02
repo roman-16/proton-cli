@@ -52,6 +52,59 @@ func TestASecretIsNotAFlagValue(t *testing.T) {
 			t.Errorf("%s: stderr says %q", flag, truncate(stderr))
 		}
 	}
+	refuses(t, 1, []string{"drive", "items", "share", "link", "/Documents", "--password", "hunter2"},
+		"Unknown flag: --password")
+	refuses(t, 1, []string{"mail", "messages", "send", "--to", "jane@example.com",
+		"--subject", "Hi", "--body", "text", "--eo-password", "hunter2"},
+		"Unknown flag: --eo-password")
+}
+
+// The password a stranger types is judged where every other value is: against
+// the bounds Proton's own clients hold it to, before a request goes anywhere.
+func TestAPasswordSetOnSomethingIsJudgedBeforeTheNetwork(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name, contents string) string {
+		path := filepath.Join(dir, name)
+		if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+	empty := write("empty", "\n")
+	tooLong := write("long", strings.Repeat("x", 51))
+	tooShort := write("short", "secret7")
+
+	link := []string{"drive", "items", "share", "link", "/Documents"}
+	refuses(t, 1, append(link, "--link-password-file", filepath.Join(dir, "nope")), "Could not read")
+	refuses(t, 1, append(link, "--link-password-file", empty), "is empty")
+	refuses(t, 1, append(link, "--link-password-file", tooLong), "at most 50 characters")
+	refuses(t, 1, append(link, "--clear-link-password", "--link-password-file", tooLong),
+		"none of the others")
+	// A duration of nothing is what an arithmetic mistake produces, so it is
+	// refused rather than read as the word for no expiry.
+	refuses(t, 1, append(link, "--expires", "0s"), "longer than nothing", "--expires never")
+	refuses(t, 1, append(link, "--expires", "soon"), "--expires", "--expires never")
+
+	send := []string{"mail", "messages", "send", "--to", "jane@example.com", "--subject", "Hi",
+		"--body", "text"}
+	refuses(t, 1, append(send, "--eo-password-file", tooShort), "at least 8 characters")
+	refuses(t, 1, append(send, "--eo-password-file", empty), "is empty")
+}
+
+// Standard input has one reader, and the way out of a collision is the file the
+// same secret can be read from - which is a different flag for each of them.
+func TestAStdinCollisionNamesTheFlagThatMovesOffTheStream(t *testing.T) {
+	_, stderr, code := runWithStdin(t, "long enough to be a password",
+		"mail", "messages", "send", "--to", "jane@example.com",
+		"--subject", "Hi", "--body", "-", "--eo-password-stdin")
+	if code != 1 {
+		t.Errorf("exit %d, want 1\nstderr: %s", code, truncate(stderr))
+	}
+	for _, phrase := range []string{"both read standard input", "--eo-password-file"} {
+		if !strings.Contains(stderr, phrase) {
+			t.Errorf("stderr does not say %q: %s", phrase, truncate(stderr))
+		}
+	}
 }
 
 // A password made here never has to travel, and the flags that shape it are the

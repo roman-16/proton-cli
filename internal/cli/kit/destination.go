@@ -39,10 +39,17 @@ func (d *Destination) Register(c *cobra.Command) {
 
 // Validate rejects combinations that cannot mean anything, before any bytes are
 // fetched. single says whether exactly one item is being written.
+//
+// A named path that is already taken is one of them: whether the file is there
+// is a local fact, so finding out after the download would mean spending the
+// whole transfer to learn something that was true before it started.
 func (d *Destination) Validate(single bool) error {
 	if d.dest != "" && d.destDir != "" {
 		return Fail("--dest and --dest-dir cannot both be given.").
 			Hint("--dest names one file; --dest-dir names a directory to fill.")
+	}
+	if err := d.free(d.dest); err != nil {
+		return err
 	}
 	if !single && d.dest != "" {
 		// Several separate files down one stream arrive as one unusable run of
@@ -55,6 +62,17 @@ func (d *Destination) Validate(single bool) error {
 			Hint("use --dest-dir to write them all into a directory.")
 	}
 	return nil
+}
+
+// free reports that a named path may be written, which --force is the way to say
+// about one that is taken. It is asked twice: once before the work, so a
+// collision costs nothing, and again as the bytes are published, because the
+// answer can change while a large payload is arriving.
+func (d *Destination) free(path string) error {
+	if path == "" || path == "-" || d.force || !exists(path) {
+		return nil
+	}
+	return Fail("%s already exists.", path).Hint("--force to overwrite it.")
 }
 
 // Stdout reports whether the payload streams to standard output.
@@ -264,8 +282,8 @@ func ReadTextArg(c *Invocation, value, flag string) (string, error) {
 // policy as everything else instead of inventing their own.
 func (d *Destination) Reserve(name string) (string, error) {
 	if d.dest != "" {
-		if !d.force && exists(d.dest) {
-			return "", Fail("%s already exists.", d.dest).Hint("--force to overwrite it.")
+		if err := d.free(d.dest); err != nil {
+			return "", err
 		}
 		return d.dest, nil
 	}

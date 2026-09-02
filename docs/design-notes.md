@@ -53,9 +53,33 @@ Five flags have a single-letter form, and they are the five typed most: `-p`, `-
 
 `--password-file` is usually the one to reach for, since systemd's `LoadCredential=`, Kubernetes secrets and Docker secrets all hand you a path already.
 
+A password you choose *for somebody else* follows the same rule and gets a name of its own, because it is not the account's: `--link-password-file` for what opens a Drive public link, `--eo-password-file` for what a recipient outside Proton types. Each is held to the bounds Proton's own clients hold it to - at most 50 characters for a link, at least 8 for a message - and refused here rather than by the server.
+
+## Why there are three ways to say none
+
+Removing an optional value is one idea with three spellings in this CLI, and which one is right follows from what the value can carry.
+
+**The value says it.** `--expires never` is the answer to the question `--expires` asks, and it is the word every screen already prints for something that does not expire: `Expires: never`. A separate flag would be a second way to say the same thing, and then the two would have to be kept from being given at once.
+
+**`--no-x` is a state.** `calendar events update --no-remind` removes an event's reminders and `calendar settings calendars update --no-remind` gives new events in that calendar none. One word covers both because it names the state of having none rather than the act of removing, and one flag name means one thing.
+
+**`--clear-x` is an act, on something that already exists.** It is what is left when the flag's own value cannot carry the word: a signature is text, and "" is not something a shell shows you typing; a link's password is read from a file, and a path cannot say "none". So `--clear-signature` and `--clear-link-password`, each sitting beside the flag it clears - which `TestAClearFlagSitsBesideWhatItClears` is what keeps true.
+
+A verb whose entire subject is the field answers in its own words instead: `mail messages expire REF --never` is the same idea as `--in 7d`, not a flag clearing something.
+
 The rule holds for what Pass stores, too, which is where it matters most. The parts of an item that are secret - a password, a TOTP URI, a card's number, CVV and PIN, a private key, a hidden field - arrive through `--secret-file NAME=FILE` or `--secret-stdin NAME`. They name their field rather than having a flag each because an item has several, a card three at once, and standard input can be read only once. `--password-file` itself is not available to them: it means the account password everywhere in this CLI, and one flag name means one thing.
 
 A new password needs no file at all. `proton pass items create --generate-password` makes one here, stores it, and prints it beside the item's ID - so the only copy that ever existed is the one in the vault.
+
+## Why a count is a promise
+
+A confirmation and a dry run are read as a statement of what is about to happen, so the number in them has to be the number of things that happen.
+
+That is why the trash is one list across every volume the account has. Photos are kept on a volume of their own; a listing that read only the default one would say three while `trash empty` destroyed eight hundred. Both now walk the same set, fully paged, and `empty` counts what it will delete rather than what one page held.
+
+It is why a filter that matches a folder and the files inside it selects the folder alone. Every verb it feeds - `trash`, `delete`, `move`, `copy` - acts on a folder whole, so the files under it were never separate work: counting them would inflate the number and then ask Proton twice, the second time about something that has already moved.
+
+And it is why a bulk verb acts on the IDs its selection resolved, in batches of fifty, reading the answer Proton gives per item. A path resolved a second time can mean something else by then; a batch that half-succeeded and reported the number it hoped for would be the count lying at the last moment. What was refused is named instead, and the count says what landed.
 
 ## Why a listing carries no secret
 

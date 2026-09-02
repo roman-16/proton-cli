@@ -165,7 +165,7 @@ func New(opts Options) (*App, error) {
 
 // Stdin hands out the process's standard input, which only one reader may have.
 //
-// Two things want it: --password-stdin for the account password, and `-` for a
+// Two things want it: a --*-stdin flag for one of the secrets, and `-` for a
 // body, a key, or a file to upload. Whichever asked second would find an empty
 // stream and fail somewhere further along with a puzzle, so it is told here
 // instead, in terms of the two flags that collided.
@@ -175,10 +175,23 @@ func (a *App) Stdin(claim string) (io.Reader, error) {
 	if a.stdinClaim != "" {
 		return nil, errs.Problemf("%s and %s both read standard input, which can only be read once.",
 			a.stdinClaim, claim).
-			Hint("pass the password with --password-file instead")
+			Hint(elsewhere(a.stdinClaim, claim))
 	}
 	a.stdinClaim = claim
 	return a.UI.In, nil
+}
+
+// elsewhere is the way out of a collision: whichever claim is a secret's
+// --*-stdin flag has a --*-file twin that reads the same value from somewhere
+// else, and that is the one thing to change. A `-` argument has no twin, so when
+// neither claim is a flag the reader is left to pick which one moves.
+func elsewhere(claims ...string) string {
+	for _, claim := range claims {
+		if flag, ok := strings.CutSuffix(claim, "-stdin"); ok && strings.HasPrefix(flag, "--") {
+			return "pass it with " + flag + "-file instead"
+		}
+	}
+	return "read one of them from a path rather than -"
 }
 
 // saveSession writes the current client state to the profile's session file,

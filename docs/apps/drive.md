@@ -53,9 +53,12 @@ A path names every folder along it, so the ones above the last are made too: `Cr
 proton drive items trash /Documents/old.pdf     # reversible
 proton drive items delete /Documents/old.pdf    # permanent
 proton drive trash list
+proton drive trash list --sort trashed --desc --page 1
 proton drive trash restore 7Kd91mQx
-proton drive trash empty                        # permanent, across all volumes
+proton drive trash empty                        # permanent, and everything below
 ```
+
+The trash is one list however many volumes it is spread over: photos are kept on their own, and both `trash list` and `trash empty` cover them. `trash list` pages and sorts like any other listing, and says how many there are in total, which is the number `trash empty` deletes.
 
 `trash`, `delete`, `move` and `copy` all take filters instead of paths - `--pattern`, `--larger-than`, `--smaller-than`, `--older-than`, `--newer-than`, `--scope`, `--recursive`, `--all`. Try them with `list` or `--dry-run` first:
 
@@ -64,6 +67,8 @@ proton drive items list /Build --pattern "*.tmp" --recursive          # see what
 proton drive items trash --scope /Build --pattern "*.tmp" --recursive
 proton drive items delete --larger-than 100MB --scope /Downloads --recursive --dry-run
 ```
+
+A filter that matched a folder and the files inside it names one piece of work, not several: a folder is trashed, deleted, moved and copied whole, so what it already covers is left out of the count and out of the request.
 
 A trashed item has no place in the tree, so it has no path and is addressed by the ID its listing showed.
 
@@ -86,7 +91,8 @@ Neither command touches the version the file is at now. Restoring it would do no
 ## Share it
 
 ```bash
-proton drive items share link /Documents/report.pdf --expires 7d --password hunter2
+proton drive items share link /Documents/report.pdf --expires 7d \
+  --link-password-file /run/secrets/report-link
 proton drive items share get /Documents/report.pdf     # who has access, plus the link
 proton drive items share unlink /Documents/report.pdf
 
@@ -94,6 +100,8 @@ proton drive items share add /Documents/project bob@proton.me --edit --message "
 proton drive items share update /Reports jane@proton.me --edit=false
 proton drive items share remove /Documents/report.pdf bob@proton.me
 ```
+
+The password that opens a public link is a secret, so it comes from a file or from standard input rather than from a flag value, and Proton allows at most 50 characters. `--expires never` makes an expiring link permanent, which is the word every screen prints for one that does not expire; the password needs `--clear-link-password`, because a value read from a file has no way of saying "none".
 
 `share update` applies whether they have accepted yet or not. Nothing is re-encrypted - the key they hold still opens the share, and only what they may do with it changes. `share resend` sends an unanswered invitation again rather than cancelling and inviting afresh.
 

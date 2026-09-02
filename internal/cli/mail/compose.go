@@ -8,7 +8,6 @@ import (
 	"github.com/roman-16/proton-cli/internal/ical"
 	mailsvc "github.com/roman-16/proton-cli/internal/service/mail"
 	"github.com/roman-16/proton-cli/internal/ui"
-	"github.com/roman-16/proton-cli/internal/units"
 	"github.com/spf13/cobra"
 )
 
@@ -232,7 +231,7 @@ func (f *composeFlags) mergeEML(out *mailsvc.Content, parsed *mailsvc.ParsedEML,
 type deliveryFlags struct {
 	sendAt         string
 	expires        string
-	eoPassword     string
+	eoPassword     *kit.Password
 	eoPasswordHint string
 }
 
@@ -240,12 +239,16 @@ func (f *deliveryFlags) register(c *cobra.Command) {
 	fl := c.Flags()
 	fl.StringVar(&f.sendAt, "send-at", "",
 		"Schedule delivery (RFC 3339, or YYYY-MM-DDTHH:MM in the system timezone)")
-	fl.StringVar(&f.expires, "expires", "", "Self-destruct after DURATION (e.g. 7d, 24h)")
-	fl.StringVar(&f.eoPassword, "eo-password", "",
-		"Password-protect the message for recipients outside Proton (expires after 28 days)")
+	fl.StringVar(&f.expires, "expires", "", "Self-destruct after DURATION (e.g. 7d, 24h), or never")
+	f.eoPassword = kit.EOPassword()
+	f.eoPassword.Declare(c)
 	fl.StringVar(&f.eoPasswordHint, "eo-password-hint", "",
 		"Hint shown to password-protected recipients")
 }
+
+// supply is a step, so the stream is claimed before a body or an attachment can
+// read it.
+func (f *deliveryFlags) supply(c *kit.Invocation) error { return f.eoPassword.Supply(c) }
 
 // delivery parses the flags, also returning the resolved schedule so a caller can
 // echo the time back.
@@ -260,13 +263,20 @@ func (f *deliveryFlags) delivery() (mailsvc.Delivery, time.Time, error) {
 		at, del.At = t, t.Unix()
 	}
 	if f.expires != "" {
-		d, err := units.ParseDuration(f.expires)
+		d, err := kit.Expires(f.expires)
 		if err != nil {
-			return del, at, kit.Fail("--expires: %v", err)
+			return del, at, err
 		}
 		del.ExpiresInSeconds = int(d.Seconds())
 	}
-	del.EOPassword, del.EOPasswordHint = f.eoPassword, f.eoPasswordHint
+	if f.eoPassword.Wanted() {
+		password, err := f.eoPassword.Value()
+		if err != nil {
+			return del, at, err
+		}
+		del.EOPassword = password
+	}
+	del.EOPasswordHint = f.eoPasswordHint
 	return del, at, nil
 }
 
@@ -338,7 +348,7 @@ func sendCmd() *cobra.Command {
 		Use:   "send",
 		Short: "Compose and send a message",
 		Args:  cobra.NoArgs,
-		RunE: kit.Run(nil, func(c *kit.Invocation) error {
+		RunE: kit.Run([]kit.Step{d.supply}, func(c *kit.Invocation) error {
 			if f.eml == "" && f.subject == "" {
 				return kit.Fail("A subject is required.").Hint("--subject \"Quarterly numbers\"")
 			}
@@ -401,7 +411,7 @@ func answerCmd(use, short, long string, forward bool) *cobra.Command {
 		Short: short,
 		Long:  long,
 		Args:  cobra.ExactArgs(1),
-		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
+		RunE: kit.Run([]kit.Step{d.supply, kit.StepExpand}, func(c *kit.Invocation) error {
 			del, at, err := d.delivery()
 			if err != nil {
 				return err

@@ -107,6 +107,11 @@ func TestDriveShareLinkExpires(t *testing.T) {
 	if link["expire_time"] == nil {
 		t.Errorf("expected expire_time to be set, got %v", link["expire_time"])
 	}
+
+	permanent := runJSON(t, "drive", "items", "share", "link", folder, "--expires", "never")
+	if permanent["expire_time"] != nil {
+		t.Errorf("--expires never left expire_time %v", permanent["expire_time"])
+	}
 }
 
 func TestDriveShareLinkPassword(t *testing.T) {
@@ -118,12 +123,29 @@ func TestDriveShareLinkPassword(t *testing.T) {
 
 	// The record is the answer, so the custom password is reported there rather
 	// than in the confirmation on stderr.
-	stdout := runOK(t, "drive", "items", "share", "link", folder, "--password", "hunter2")
+	stdout := runOK(t, "drive", "items", "share", "link", folder,
+		"--link-password-file", passwordFile(t, "hunter2"))
 	if !strings.Contains(stdout, "#") {
 		t.Errorf("link should still carry a generated fragment: %q", stdout)
 	}
 	assertField(t, stdout, "Password:", "hunter2")
 	assertField(t, runOK(t, "drive", "items", "share", "get", folder), "Link Password:", "hunter2")
+
+	// A password read from a file has no way of saying "none", so taking one off
+	// is its own word.
+	runOK(t, "drive", "items", "share", "link", folder, "--clear-link-password")
+	assertNotContains(t, runOK(t, "drive", "items", "share", "get", folder), "Link Password:")
+}
+
+// passwordFile is how a secret reaches the CLI: a file only its owner can read,
+// never a flag value.
+func passwordFile(t *testing.T, password string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "password")
+	if err := os.WriteFile(path, []byte(password), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
 }
 
 func TestDriveShareLinkDryRun(t *testing.T) {
@@ -150,7 +172,8 @@ func TestDriveShareLinkUpdatesTheLinkItAlreadyHas(t *testing.T) {
 		"drive", "items", "delete", folder)
 
 	first := strings.TrimSpace(runOK(t, "drive", "items", "share", "link", folder))
-	updated := runOK(t, "drive", "items", "share", "link", folder, "--password", "hunter2")
+	updated := runOK(t, "drive", "items", "share", "link", folder,
+		"--link-password-file", passwordFile(t, "hunter2"))
 
 	assertField(t, updated, "Password:", "hunter2")
 	if !strings.Contains(updated, tokenOf(t, first)) {

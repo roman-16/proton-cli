@@ -53,9 +53,13 @@ const (
 // for both (PASSWORD_WRONG_ERROR, packages/shared/lib/api/auth.ts).
 const invalidLoginCode = 8002
 
-// succeeded reports whether a Proton code is one of the ways of saying it worked:
+// Succeeded reports whether a Proton code is one of the ways of saying it worked:
 // done, one answer per item, or accepted and being carried out in the background.
-func succeeded(code int) bool {
+//
+// It is exported because the per-item codes inside a batch answer are read by
+// the service that sent the batch, and which codes mean success is this
+// package's to know rather than each caller's to remember.
+func Succeeded(code int) bool {
 	switch code {
 	case okCode, multiCode, acceptedCode:
 		return true
@@ -201,7 +205,7 @@ func classifyErrorBody(status int, body []byte) (*HumanVerificationError, *APIEr
 func responseError(resp *Response) error {
 	if resp.Status >= 200 && resp.Status < 300 {
 		var env struct{ Code int }
-		if json.Unmarshal(resp.Body, &env) != nil || env.Code == 0 || succeeded(env.Code) {
+		if json.Unmarshal(resp.Body, &env) != nil || env.Code == 0 || Succeeded(env.Code) {
 			return nil
 		}
 	}
