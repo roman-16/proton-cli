@@ -238,7 +238,7 @@ type deliveryFlags struct {
 func (f *deliveryFlags) register(c *cobra.Command) {
 	fl := c.Flags()
 	fl.StringVar(&f.sendAt, "send-at", "",
-		"Schedule delivery (RFC 3339, or YYYY-MM-DDTHH:MM in the system timezone)")
+		"Schedule delivery (RFC 3339, or YYYY-MM-DDTHH:MM in the zone you are working in)")
 	fl.StringVar(&f.expires, "expires", "", "Self-destruct after DURATION (e.g. 7d, 24h), or never")
 	f.eoPassword = kit.EOPassword()
 	f.eoPassword.Declare(c)

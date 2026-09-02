@@ -25,7 +25,7 @@ Flags:
   -h, --help                        help for send
       --html                        Treat the body as HTML rather than plain text
       --no-signature                Leave out this address's signature and Proton's footer
-      --send-at string              Schedule delivery (RFC 3339, or YYYY-MM-DDTHH:MM in the system timezone)
+      --send-at string              Schedule delivery (RFC 3339, or YYYY-MM-DDTHH:MM in the zone you are working in)
       --subject string              Subject line
       --to stringArray              Recipient (repeatable; accepts "Name <addr>")
 

@@ -2,13 +2,21 @@ package ui
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"flag"
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"io/fs"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"reflect"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/roman-16/proton-cli/internal/errs"
 )
@@ -278,4 +286,173 @@ func TestAnInstructionSurvivesQuiet(t *testing.T) {
 	if out.Len() != 0 {
 		t.Errorf("an instruction reached the answer stream: %q", out.String())
 	}
+}
+
+// Dropping omitempty is half the promise. A nil slice in Go marshals to null
+// just as surely as a missing key breaks a consumer, so the machine format
+// writes every empty collection out as one.
+func TestMachineOutputSpellsEmptyCollectionsOut(t *testing.T) {
+	type inner struct {
+		Tags []string `json:"tags"`
+	}
+	type row struct {
+		Names   []string          `json:"names"`
+		Labels  map[string]string `json:"labels"`
+		Nested  []inner           `json:"nested"`
+		Blob    []byte            `json:"blob"`
+		At      time.Time         `json:"at"`
+		Pointed *inner            `json:"pointed"`
+	}
+
+	out, errb := &bytes.Buffer{}, &bytes.Buffer{}
+	u := New(Options{Format: FormatJSON})
+	u.Out, u.Err = out, errb
+	if err := u.encode(row{Nested: []inner{{}}}); err != nil {
+		t.Fatal(err)
+	}
+
+	var got map[string]any
+	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"names", "nested"} {
+		if _, ok := got[key].([]any); !ok {
+			t.Errorf("%s = %#v, want a list", key, got[key])
+		}
+	}
+	if _, ok := got["labels"].(map[string]any); !ok {
+		t.Errorf("labels = %#v, want an object", got["labels"])
+	}
+	// Every depth, not only the top level.
+	nested, _ := got["nested"].([]any)
+	if len(nested) != 1 {
+		t.Fatalf("nested = %#v", got["nested"])
+	}
+	if first, _ := nested[0].(map[string]any); first["tags"] == nil {
+		t.Errorf("a list inside a list stayed null: %#v", nested[0])
+	}
+	// A byte slice is a string in JSON, and a time writes itself: neither is a
+	// collection to spell out, and rebuilding a time field by field would hand
+	// back the zero instant.
+	if got["blob"] != nil {
+		t.Errorf("blob = %#v, want null", got["blob"])
+	}
+	if got["at"] != "0001-01-01T00:00:00Z" {
+		t.Errorf("at = %#v, want the zero instant it was given", got["at"])
+	}
+	if got["pointed"] != nil {
+		t.Errorf("pointed = %#v, want null", got["pointed"])
+	}
+}
+
+// A list is always a list, even when it is empty.
+//
+// `--output json` is read by programs, and a program indexes what it is given.
+// `omitempty` on a slice or a map drops the key when the collection is empty, so
+// the consumer gets null where it asked for something to iterate - which is not
+// an empty answer but a hard error:
+//
+//	$ proton calendar events get Dentist --output json | jq -r '.attendees[]'
+//	jq: error (at <stdin>:0): Cannot iterate over null (null)
+//
+// Absence still says something in this CLI, and deliberately: `total` and `page`
+// appear only when a request was paginated, so a consumer can tell page 0 from
+// no paging at all. That is why the rule is about containers rather than about
+// every field - a container is the one thing a consumer iterates, and null is
+// the one value that stops it.
+//
+// The check is on the tags rather than on the values because there is no list of
+// the types that reach encode: they are every view struct in every service. A
+// rule the compiler cannot see needs something that walks all of them, or it
+// holds only for the ones somebody remembered.
+func TestAContainerIsAlwaysAContainerInMachineOutput(t *testing.T) {
+	root := filepath.Join("..", "..", "internal")
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		switch {
+		case err != nil:
+			return err
+		case d.IsDir():
+			return nil
+		case !strings.HasSuffix(path, ".go"), strings.HasSuffix(path, "_test.go"):
+			return nil
+		case isForeignShape(path):
+			return nil
+		}
+		file, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
+		if err != nil {
+			return err
+		}
+		ast.Inspect(file, func(n ast.Node) bool {
+			field, ok := n.(*ast.Field)
+			if !ok || field.Tag == nil {
+				return true
+			}
+			name, omitEmpty := jsonTag(field.Tag.Value)
+			if !omitEmpty || !isContainer(field.Type) {
+				return true
+			}
+			t.Errorf("%s: %q is a list or a map and may not be omitted when empty:\n"+
+				"  a consumer that iterates it gets null instead, which is an error rather than nothing",
+				path, name)
+			return true
+		})
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// isForeignShape reports a file whose json tags belong to somebody else, and so
+// are not this CLI's to decide.
+//
+// Two of them: the Pass protobuf bindings, which are generated from Proton's
+// schema, and the Pass export file, which is the document Proton's own clients
+// write and other tools read.
+func isForeignShape(path string) bool {
+	path = filepath.ToSlash(path)
+	return strings.Contains(path, "internal/service/pass/proto/") ||
+		strings.HasSuffix(path, "internal/service/pass/export.go")
+}
+
+// jsonTag reads a field's json name, and whether it disappears when empty. A tag
+// naming no json field, or naming one in Proton's own PascalCase, is a wire
+// shape rather than this CLI's answer.
+func jsonTag(quoted string) (name string, omitEmpty bool) {
+	tag, err := strconv.Unquote(quoted)
+	if err != nil {
+		return "", false
+	}
+	value, ok := reflect.StructTag(tag).Lookup("json")
+	if !ok {
+		return "", false
+	}
+	parts := strings.Split(value, ",")
+	name = parts[0]
+	if name == "" || name == "-" || name != strings.ToLower(name) {
+		return "", false
+	}
+	for _, opt := range parts[1:] {
+		if opt == "omitempty" {
+			return name, true
+		}
+	}
+	return name, false
+}
+
+func isContainer(t ast.Expr) bool {
+	switch t := t.(type) {
+	case *ast.ArrayType:
+		// A fixed-size array is not a collection that can be empty, and a byte
+		// slice is a string in json rather than something to iterate.
+		return t.Len == nil && !isByte(t.Elt)
+	case *ast.MapType:
+		return true
+	}
+	return false
+}
+
+func isByte(t ast.Expr) bool {
+	ident, ok := t.(*ast.Ident)
+	return ok && ident.Name == "byte"
 }

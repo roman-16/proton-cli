@@ -20,6 +20,14 @@ import (
 // long as it is asked to.
 const maxExpansion = 10_000
 
+// ErrTooManyOccurrences is what a walk that ran out of room reports.
+//
+// Reaching the cap silently was the same mistake in three places: a walk that
+// stops early and returns nothing has told its caller the series ended, and
+// every count taken from it went on to be printed as though it were the whole
+// truth.
+var ErrTooManyOccurrences = fmt.Errorf("a rule generating more than %d occurrences", maxExpansion)
+
 // Occurrence is one instance of an event.
 type Occurrence struct {
 	// Number is the 1-based position among the instances the rule generates.
@@ -69,15 +77,40 @@ func (v VEvent) Walk(visit func(Occurrence) bool) error {
 	return v.walk(skipExcluded, func(o Occurrence) (bool, error) { return visit(o), nil })
 }
 
-// CountOccurrences returns how many instances the event has, stopping at limit so
-// an unbounded series answers "at least limit" rather than never answering.
-func (v VEvent) CountOccurrences(limit int) (int, error) {
+// Endless reports a series that never stops.
+//
+// A rule saying neither how many times it repeats nor when it stops repeats for
+// ever, and says so in its own text - so this is read rather than counted, and
+// is the one honest answer to "how many occurrences" for such a series.
+func (v VEvent) Endless() bool {
+	return v.Recurring() && RuleValue(v.RRule, "COUNT") == "" && RuleValue(v.RRule, "UNTIL") == ""
+}
+
+// CountOccurrences is how many instances the event has, or nil when it has no
+// last one.
+//
+// A count is either the whole truth or not a count. Where the rule states how
+// many times it repeats, that is the answer without walking anything; where it
+// states when it stops, the instances are counted; and where it states neither,
+// there is no number to give and saying so is the only thing that is true.
+func (v VEvent) CountOccurrences() (*int, error) {
+	if v.Endless() {
+		return nil, nil
+	}
+	// COUNT counts the instances the rule generates, cancellations included, so it
+	// answers for a series nobody has cancelled anything out of and the rest are
+	// counted properly.
+	if n := ruleCount(v.RRule); n > 0 && len(v.ExDates) == 0 {
+		return &n, nil
+	}
 	n := 0
-	err := v.walk(skipExcluded, func(Occurrence) (bool, error) {
+	if err := v.walk(skipExcluded, func(Occurrence) (bool, error) {
 		n++
-		return n < limit, nil
-	})
-	return n, err
+		return true, nil
+	}); err != nil {
+		return nil, err
+	}
+	return &n, nil
 }
 
 // ParseOccurrence reads the occurrence half of a reference.
@@ -94,7 +127,7 @@ func (v VEvent) ParseOccurrence(s string) (DateTime, error) {
 		}
 		return Day(t), nil
 	}
-	t, err := ParseTime(s, time.Local)
+	t, err := ParseWallTime(s, time.Local)
 	if err != nil {
 		return DateTime{}, fmt.Errorf("%q is not a time (expected YYYY-MM-DDTHH:MM)", s)
 	}
@@ -127,7 +160,10 @@ func (v VEvent) walk(skip bool, visit func(Occurrence) (bool, error)) error {
 	if err != nil {
 		return err
 	}
-	for n := 1; n <= maxExpansion; n++ {
+	for n := 1; ; n++ {
+		if n > maxExpansion {
+			return ErrTooManyOccurrences
+		}
 		t, ok := next()
 		if !ok {
 			return nil
@@ -145,7 +181,6 @@ func (v VEvent) walk(skip bool, visit func(Occurrence) (bool, error)) error {
 			return err
 		}
 	}
-	return nil
 }
 
 // iterator builds the rule's instance generator, anchored so that the rule

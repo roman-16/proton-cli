@@ -218,7 +218,7 @@ func shareGetCmd(t target) *cobra.Command {
 					Name    string               `json:"name"`
 					Members []passsvc.Member     `json:"members"`
 					Invited []passsvc.Invite     `json:"invited"`
-					Links   []passsvc.SecureLink `json:"links,omitempty"`
+					Links   []passsvc.SecureLink `json:"links"`
 				}{name, members, invited, links},
 				Fields: fields,
 			})

@@ -48,6 +48,7 @@ type globalFlags struct {
 	noColor    bool
 	noInput    bool
 	verified   string
+	zone       string
 }
 
 // settings is what the command line said, with a boolean left alone told apart
@@ -69,6 +70,7 @@ func (g *globalFlags) settings(pf *pflag.FlagSet) config.Flags {
 		Output:   g.output,
 		LogLevel: g.logLevel,
 		Confirm:  g.confirm,
+		Zone:     g.zone,
 		Quiet:    said("quiet", g.quiet),
 		FullIDs:  said("full-ids", g.fullIDs),
 		NoColor:  said("no-color", g.noColor),
@@ -121,6 +123,8 @@ func newRoot() *cobra.Command {
 	pf.BoolVar(&g.noInput, "no-input", false, "Never prompt; a missing credential becomes an error (env: PROTON_NO_INPUT)")
 	pf.StringVar(&g.verified, "verified", "",
 		"A human verification already solved, as the refusal printed it (env: PROTON_VERIFIED)")
+	pf.StringVar(&g.zone, "zone", "",
+		"IANA time zone to work in (env: "+config.ZoneVar+"; default: your system zone)")
 
 	// Pointing the CLI at something other than Proton is a thing to do while
 	// developing this tool and never while using it, so it is hidden rather than

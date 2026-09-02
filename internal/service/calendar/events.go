@@ -46,14 +46,16 @@ type Event struct {
 	// Number is this instance's position in the series.
 	Number int `json:"occurrence_number,omitempty"`
 	// Count is how many occurrences a series has, set only when the series itself
-	// is being reported rather than one of its instances.
-	Count int `json:"occurrence_count,omitempty"`
+	// is being reported rather than one of its instances. It is null for a series
+	// that never ends, because such a series has no number of occurrences to
+	// report rather than a very large one.
+	Count *int `json:"occurrence_count,omitempty"`
 	// Reminders are the triggers before the start, e.g. "-PT15M". Absent means the
 	// event takes the calendar's defaults.
-	Reminders []string `json:"reminders,omitempty"`
+	Reminders []string `json:"reminders"`
 	// Attendees are the participants, spelled the way --attendee accepts them, so
 	// an event that has been read can be described back.
-	Attendees []string `json:"attendees,omitempty"`
+	Attendees []string `json:"attendees"`
 	// Status is whether the event is going ahead. It is always reported, since
 	// an event nobody said anything about is confirmed and that is worth stating.
 	Status string `json:"status"`
@@ -487,9 +489,7 @@ func (s *Service) EventGet(ctx context.Context, calendarID, eventID, occurrence 
 	if occurrence == "" {
 		ev := e.row()
 		if e.readErr == nil && e.model.Recurring() {
-			if n, err := e.model.CountOccurrences(maxSeriesReport); err == nil {
-				ev.Count = n
-			}
+			ev.Count, _ = e.model.CountOccurrences()
 		}
 		return &ev, nil
 	}
@@ -504,15 +504,23 @@ func (s *Service) EventGet(ctx context.Context, calendarID, eventID, occurrence 
 	return &ev, nil
 }
 
-// maxSeriesReport caps the occurrence count reported for an unbounded series, so
-// `get` on "every weekday forever" answers rather than counting forever.
-const maxSeriesReport = 1000
-
-// EventOccurrences lists a series' occurrences from its start, up to limit.
+// Reach is what a change to a stored event actually touches.
 //
-// It is what a confirmation shows before removing a whole series: a count is not
-// enough to check, and the occurrences are the things that would go.
-func (s *Service) EventOccurrences(ctx context.Context, calendarID, eventID string, limit int) ([]Event, error) {
+// A series is one event to address and many meetings to lose, so the two counts
+// are kept apart: Rows is the sample a person reads to recognise what they are
+// about to change, and Total is how many there are - nil when the series never
+// ends, which is a thing to be told rather than a number to be given.
+type Reach struct {
+	Rows  []Event
+	Total *int
+}
+
+// Series reports what a stored event reaches, drawing at most sample of its
+// occurrences.
+//
+// It is what a preview and a confirmation both rest on: a count alone cannot be
+// checked, and the occurrences are the things that would change.
+func (s *Service) Series(ctx context.Context, calendarID, eventID string, sample int) (*Reach, error) {
 	ck, err := s.unlockCalendar(ctx, calendarID)
 	if err != nil {
 		return nil, err
@@ -522,9 +530,14 @@ func (s *Service) EventOccurrences(ctx context.Context, calendarID, eventID stri
 		return nil, err
 	}
 	if !master.model.Recurring() {
-		return []Event{master.row()}, nil
+		one := 1
+		return &Reach{Rows: []Event{master.row()}, Total: &one}, nil
 	}
 	chain, err := s.loadSeries(ctx, ck, calendarID, master)
+	if err != nil {
+		return nil, err
+	}
+	total, err := master.model.CountOccurrences()
 	if err != nil {
 		return nil, err
 	}
@@ -541,11 +554,11 @@ func (s *Service) EventOccurrences(ctx context.Context, calendarID, eventID stri
 		} else {
 			out = append(out, master.occurrenceRow(occ))
 		}
-		return len(out) < limit
+		return len(out) < sample
 	}); err != nil {
 		return nil, err
 	}
-	return out, nil
+	return &Reach{Rows: out, Total: total}, nil
 }
 
 func (s *Service) rawEvent(ctx context.Context, calendarID, eventID string) (rawEvent, error) {
@@ -1043,7 +1056,7 @@ func alarmsOf(raw rawEvent) []ical.Alarm {
 // which events landed rather than one number that hides the rest.
 type ImportResult struct {
 	Imported []string       `json:"imported"`
-	Skipped  []SkippedEvent `json:"skipped,omitempty"`
+	Skipped  []SkippedEvent `json:"skipped"`
 }
 
 // SkippedEvent is one event an import could not take, and why.

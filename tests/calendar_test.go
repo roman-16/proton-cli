@@ -801,16 +801,16 @@ func TestCalendarSeriesUpdateKeepsItsExclusions(t *testing.T) {
 
 // Ending a series at one occurrence keeps everything before it and removes
 // everything from it on.
-func TestCalendarFutureEndsTheSeriesAtAnOccurrence(t *testing.T) {
+func TestCalendarOnwardsEndsTheSeriesAtAnOccurrence(t *testing.T) {
 	t.Parallel()
-	title := testID() + "-future"
+	title := testID() + "-onwards"
 	createSeries(t, title, seriesAnchor+"T09:00", "FREQ=WEEKLY;COUNT=5")
 
 	refs := occurrenceRefs(t, title, seriesAnchor, "2027-04-05")
 	if len(refs) != 5 {
 		t.Fatalf("the series listed %d occurrences, want 5", len(refs))
 	}
-	runOK(t, "calendar", "events", "delete", "--future", "--yes", "--", refs[2])
+	runOK(t, "calendar", "events", "delete", "--onwards", "--yes", "--", refs[2])
 
 	after := occurrenceRefs(t, title, seriesAnchor, "2027-04-05")
 	if len(after) != 2 {
@@ -825,7 +825,7 @@ func TestCalendarFutureEndsTheSeriesAtAnOccurrence(t *testing.T) {
 
 // Changing one occurrence and every later one keeps the earlier ones as they were
 // and starts a second series from the split.
-func TestCalendarFutureUpdateSplitsTheSeries(t *testing.T) {
+func TestCalendarOnwardsUpdateSplitsTheSeries(t *testing.T) {
 	t.Parallel()
 	title := testID() + "-split"
 	createSeries(t, title, seriesAnchor+"T09:00", "FREQ=WEEKLY;COUNT=5")
@@ -834,7 +834,7 @@ func TestCalendarFutureUpdateSplitsTheSeries(t *testing.T) {
 	if len(refs) != 5 {
 		t.Fatalf("the series listed %d occurrences, want 5", len(refs))
 	}
-	runOK(t, "calendar", "events", "update", "--future",
+	runOK(t, "calendar", "events", "update", "--onwards",
 		"--title", title+"-later", "--start", "2027-03-15T11:00", "--duration", "30m", "--", refs[2])
 
 	after := occurrencesOf(t, title, seriesAnchor, "2027-04-05")
@@ -878,7 +878,7 @@ func TestCalendarFutureUpdateSplitsTheSeries(t *testing.T) {
 
 // Ending a series at its own first occurrence would leave nothing, so it is
 // refused rather than quietly removing everything.
-func TestCalendarFutureRefusesTheFirstOccurrence(t *testing.T) {
+func TestCalendarOnwardsRefusesTheFirstOccurrence(t *testing.T) {
 	t.Parallel()
 	title := testID() + "-firstocc"
 	createSeries(t, title, seriesAnchor+"T09:00", "FREQ=WEEKLY;COUNT=3")
@@ -887,7 +887,7 @@ func TestCalendarFutureRefusesTheFirstOccurrence(t *testing.T) {
 	if len(refs) == 0 {
 		t.Fatal("the series listed no occurrences")
 	}
-	_, stderr, code := run(t, "calendar", "events", "delete", "--future", "--yes", "--", refs[0])
+	_, stderr, code := run(t, "calendar", "events", "delete", "--onwards", "--yes", "--", refs[0])
 	if code == 0 {
 		t.Error("ending a series at its first occurrence was accepted")
 	}
@@ -901,7 +901,7 @@ func TestCalendarDeletingASeriesRemovesEveryOccurrence(t *testing.T) {
 	ref := createSeries(t, title, seriesAnchor+"T09:00", "FREQ=WEEKLY;COUNT=4")
 
 	_, stderr := runOKStderr(t, "calendar", "events", "delete", "--dry-run", "--", ref)
-	assertContains(t, stderr, "4 events")
+	assertContains(t, stderr, "all 4 occurrences of it")
 
 	runOK(t, "calendar", "events", "delete", "--yes", "--", ref)
 	if after := occurrenceRefs(t, title, seriesAnchor, "2027-03-29"); len(after) != 0 {

@@ -23,7 +23,7 @@ import (
 // ImportResult is what a read-back did and what it could not.
 type ImportResult struct {
 	Imported []string       `json:"imported"`
-	Skipped  []SkippedEntry `json:"skipped,omitempty"`
+	Skipped  []SkippedEntry `json:"skipped"`
 }
 
 // SkippedEntry is one item a read-back could not take, and why.

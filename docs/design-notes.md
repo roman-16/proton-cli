@@ -81,6 +81,30 @@ It is why a filter that matches a folder and the files inside it selects the fol
 
 And it is why a bulk verb acts on the IDs its selection resolved, in batches of fifty, reading the answer Proton gives per item. A path resolved a second time can mean something else by then; a batch that half-succeeded and reported the number it hoped for would be the count lying at the last moment. What was refused is named instead, and the count says what landed.
 
+## Why the zone is settled once
+
+Every wall-clock reading in this CLI is read against a named zone: `--start` on an event, `--send-at` on a message, `--until` on a snooze, the whole days `--start` and `--end` cut a listing into. It is the same zone for all of them - the one the person running the command is in - so it is settled once per invocation, in the same place every other setting is.
+
+The zone is a **name**, not an offset, because Proton anchors an event to one. A weekly 09:00 meeting anchored to `Europe/Vienna` stays at 09:00 when the clocks change; the same meeting stored as a UTC instant slides to 08:00. An offset pins the instant and says nothing about the anchor, so requiring one on every input would leave the load-bearing half of the answer to be guessed in silence.
+
+`TZ` is where it is read from when no flag or file names one, rather than a variable of this CLI's own. A machine that has already been told which zone it is in should not have to be told again, and a second name for the setting every other tool reads would leave the two free to disagree.
+
+Naming it once also keeps printing and parsing in step. An occurrence reference is a wall-clock reading the CLI prints and a person types back; printed in one zone and read in another it is a reference nobody can use.
+
+## Why an ambiguous time is refused rather than resolved
+
+For two hours a year a wall-clock reading names no instant, because the clocks went forward over it, and for two hours a year it names two, because they went back. Go answers both without complaint - it moves a time out of the gap and picks a side of the overlap - so `--start 2026-03-29T02:30` used to store an event at 03:30, and `--start 2026-10-25T02:30` used to pick one of two instants by a rule nobody wrote down.
+
+Neither can be settled from a zone name, and both are decidable from the command line alone, before anything reaches the network. So they are refused, and the message names the offset form that settles it. That is what an offset is for here: the four hours where a clock reading cannot name an instant, rather than every input in the year.
+
+## Why an occurrence count is a number or nothing
+
+A recurring rule that says neither how many times it repeats nor when it stops repeats for ever. Such a series has no number of occurrences - not a very large one - and it says so in its own text, which is why it is read rather than counted.
+
+Three places used to answer it with a cap instead. `events get` reported a thousand occurrences for "every weekday forever", a series delete reported two hundred, and the walk underneath both stopped at ten thousand and returned as though the rule had ended. Each cap was true of the walk and false of the series, and printed as though it were the whole truth.
+
+So a count is either exact or not given. `occurrence_count` on an event is a number when the rule ends and absent when it does not; a change that reached a series reports `occurrences`, a number or `null`, because there the question is always about a series and `null` can only mean one thing. In words, the sentence says it outright - "and all 500 occurrences of it", or "and every occurrence of it, a series with no end" - and the table under it is a sample, enough to recognise what is about to change and few enough that the question underneath is still on screen.
+
 ## Why a listing carries no secret
 
 `items get` says in its own help that it prints passwords in full, because that is the command for reading one. That sentence only means something if the commands beside it do not.

@@ -15,11 +15,13 @@ package ui
 
 import (
 	"bytes"
+	"encoding"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
 	"os"
+	"reflect"
 	"strings"
 
 	"github.com/goccy/go-yaml"
@@ -269,6 +271,7 @@ func (u *UI) Warnf(format string, a ...any) { u.Warn(fmt.Sprintf(format, a...)) 
 // path, so JSON and YAML can never disagree about field names: goccy/go-yaml
 // falls back to `json:"..."` tags when no `yaml:"..."` tag is present.
 func (u *UI) encode(v any) error {
+	v = spelledOut(v)
 	if u.Format == FormatYAML {
 		b, err := yaml.Marshal(v)
 		if err != nil {
@@ -280,6 +283,83 @@ func (u *UI) encode(v any) error {
 	enc := json.NewEncoder(u.Out)
 	enc.SetIndent("", "  ")
 	return enc.Encode(v)
+}
+
+// spelledOut is v with every empty list and map written out as one.
+//
+// A machine format promises that a list is always a list, and a nil slice in Go
+// marshals to null - which is not an empty answer to a consumer but an error, so
+// `jq '.attendees[]'` stops rather than yielding nothing. Keeping the promise
+// here, at the boundary that owns the machine format, is what makes it true of
+// every view struct in the CLI instead of true of the ones somebody remembered
+// to build an empty slice in.
+func spelledOut(v any) any {
+	if v == nil {
+		return nil
+	}
+	return spellOut(reflect.ValueOf(v)).Interface()
+}
+
+var (
+	jsonMarshaler = reflect.TypeOf((*json.Marshaler)(nil)).Elem()
+	textMarshaler = reflect.TypeOf((*encoding.TextMarshaler)(nil)).Elem()
+)
+
+func spellOut(v reflect.Value) reflect.Value {
+	// A type that writes itself is not a shape to walk into. time.Time is the one
+	// that matters: it carries nothing exported, so rebuilding it field by field
+	// would hand back the zero instant.
+	if t := v.Type(); t.Implements(jsonMarshaler) || t.Implements(textMarshaler) {
+		return v
+	}
+	switch v.Kind() {
+	case reflect.Slice:
+		// A byte slice is a string in JSON rather than something to iterate, so an
+		// absent one stays absent instead of becoming an empty string.
+		if v.Type().Elem().Kind() == reflect.Uint8 {
+			return v
+		}
+		out := reflect.MakeSlice(v.Type(), v.Len(), v.Len())
+		for i := range v.Len() {
+			out.Index(i).Set(spellOut(v.Index(i)))
+		}
+		return out
+	case reflect.Map:
+		out := reflect.MakeMapWithSize(v.Type(), v.Len())
+		iter := v.MapRange()
+		for iter.Next() {
+			out.SetMapIndex(iter.Key(), spellOut(iter.Value()))
+		}
+		return out
+	case reflect.Pointer:
+		if v.IsNil() {
+			return v
+		}
+		out := reflect.New(v.Type().Elem())
+		out.Elem().Set(spellOut(v.Elem()))
+		return out
+	case reflect.Interface:
+		if v.IsNil() {
+			return v
+		}
+		inner := spellOut(v.Elem())
+		if !inner.Type().AssignableTo(v.Type()) {
+			return v
+		}
+		out := reflect.New(v.Type()).Elem()
+		out.Set(inner)
+		return out
+	case reflect.Struct:
+		out := reflect.New(v.Type()).Elem()
+		for i := range v.NumField() {
+			if !out.Field(i).CanSet() {
+				continue
+			}
+			out.Field(i).Set(spellOut(v.Field(i)))
+		}
+		return out
+	}
+	return v
 }
 
 // Raw writes pre-formatted JSON bytes through, re-encoding for YAML. It exists

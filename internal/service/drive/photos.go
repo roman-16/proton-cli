@@ -21,7 +21,7 @@ type Photo struct {
 	CaptureTime int64    `json:"capture_time"`
 	Hash        string   `json:"hash,omitempty"`
 	ContentHash string   `json:"content_hash,omitempty"`
-	Tags        []string `json:"tags,omitempty"`
+	Tags        []string `json:"tags"`
 }
 
 type Album struct {

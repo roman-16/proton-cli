@@ -129,9 +129,11 @@ proton mail messages list --output yaml
 
 `count` is always there. `total`, `page`, `page_size` and `has_more` appear when the request involved them, so a consumer can tell "page 0" from "not paginated".
 
+**A list is always a list.** An empty collection is `[]` and an empty map is `{}`, never a missing key - so `jq '.attendees[]'` iterates nothing rather than failing on `null`. Scalars are the other way round: a field that does not apply is absent. That is how `occurrence_count` answers only when there is a number to give - an event that does not recur has none, and neither does a series with no end, which `rrule` tells you apart.
+
 **Names, not numbers**, matching the text output and `set`: `{ "type": "file", "state": "active", "unread": true }`. Keys are `snake_case`, timestamps are `<verb>_time` in Unix seconds, sizes are `size` in bytes, and IDs are always complete.
 
-**Times come back in your own zone.** An event's `start` and `end` are RFC 3339 with your offset, and what it is anchored to is its own field:
+**Times come back in the zone you are working in** - `--zone`, or `TZ`, or `zone:` in your [config](configuration.md), or your system's. An event's `start` and `end` are RFC 3339 with that offset, and what the event itself is anchored to is its own field:
 
 ```json
 { "start": "2026-04-16T16:00:00+02:00", "end": "2026-04-16T17:00:00+02:00", "zone": "Europe/Vienna" }

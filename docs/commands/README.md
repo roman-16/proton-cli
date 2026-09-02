@@ -43,5 +43,6 @@ These are declared on the root, so they can be given to any command and mean the
 | `-q, --quiet` | Suppress non-essential stderr output |
 | `--verified string` | A human verification already solved, as the refusal printed it (env: PROTON_VERIFIED) |
 | `-y, --yes` | Answer confirmation prompts with yes |
+| `--zone string` | IANA time zone to work in (env: TZ; default: your system zone) |
 
 See [Configuration](../configuration.md) for what each one changes, and [Output](../output.md) for the exit codes.

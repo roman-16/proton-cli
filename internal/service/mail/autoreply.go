@@ -86,7 +86,7 @@ type AutoReply struct {
 	Repeat  string   `json:"repeat"`
 	Start   string   `json:"start,omitempty"`
 	End     string   `json:"end,omitempty"`
-	Days    []string `json:"days,omitempty"`
+	Days    []string `json:"days"`
 	Zone    string   `json:"zone,omitempty"`
 	Message string   `json:"message"`
 	Subject string   `json:"subject"`
@@ -121,17 +121,21 @@ func (a AutoReply) ScheduleSummary() string {
 	}
 }
 
-// zoneOrLocal resolves the auto-reply's zone, falling back to the host zone.
-func (a AutoReply) zoneOrLocal() (*time.Location, string, error) {
-	name := a.Zone
-	if name == "" {
-		name = time.Now().Location().String()
+// location is the zone the schedule's times are read in.
+//
+// A schedule is stored against a named zone, and naming one is the caller's
+// business rather than this package's: an hour written here means nothing until
+// somebody says where, and guessing would put the auto-reply on at the wrong
+// time in silence.
+func (a AutoReply) location() (*time.Location, error) {
+	if a.Zone == "" {
+		return nil, fmt.Errorf("a schedule needs the time zone it is read in")
 	}
-	loc, err := time.LoadLocation(name)
+	loc, err := time.LoadLocation(a.Zone)
 	if err != nil {
-		return nil, "", fmt.Errorf("unknown time zone %q", name)
+		return nil, fmt.Errorf("unknown time zone %q", a.Zone)
 	}
-	return loc, name, nil
+	return loc, nil
 }
 
 // encode packs an AutoReply into the wire shape, validating that Start, End and
@@ -141,7 +145,7 @@ func (a AutoReply) encode() (*apiAutoResponder, error) {
 	if err != nil {
 		return nil, err
 	}
-	loc, zone, err := a.zoneOrLocal()
+	loc, err := a.location()
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +154,7 @@ func (a AutoReply) encode() (*apiAutoResponder, error) {
 	}
 	out := &apiAutoResponder{
 		IsEnabled: a.Enabled, Message: a.Message, Repeat: repeat,
-		DaysSelected: []int{}, Zone: zone, Subject: autoReplySubject,
+		DaysSelected: []int{}, Zone: a.Zone, Subject: autoReplySubject,
 	}
 	if repeat == repeatPermanent {
 		if a.Start != "" || a.End != "" {

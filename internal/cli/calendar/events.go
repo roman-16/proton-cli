@@ -182,16 +182,18 @@ func eventsGetCmd() *cobra.Command {
 	}
 }
 
-// occurrenceLabel says where an instance sits in its series, or how long a series
+// occurrenceLabel says where an instance sits in its series, or how far a series
 // runs when the series itself is being shown.
 func occurrenceLabel(e calsvc.Event) string {
 	switch {
-	case e.Number > 0 && e.Count > 0:
-		return fmt.Sprintf("%d of %d", e.Number, e.Count)
+	case e.Number > 0 && e.Count != nil:
+		return fmt.Sprintf("%d of %d", e.Number, *e.Count)
 	case e.Number > 0:
 		return fmt.Sprintf("%d of a recurring series", e.Number)
-	case e.Count > 1:
-		return fmt.Sprintf("the whole series, %s", ui.Quantity(e.Count, "occurrences"))
+	case e.Count == nil && e.RRule != "":
+		return "the whole series, which has no end"
+	case e.Count != nil && *e.Count > 1:
+		return fmt.Sprintf("the whole series, %s", ui.Quantity(*e.Count, "occurrences"))
 	}
 	return ""
 }
@@ -209,7 +211,7 @@ func seriesLabel(e calsvc.Event) string {
 // two commands cannot disagree about what an event is.
 type details struct {
 	title, location, description string
-	start, duration, zone, rrule string
+	start, duration, rrule       string
 	end                          string
 	status                       *kit.Enum
 	allDay                       bool
@@ -231,7 +233,6 @@ func (d *details) register(c *cobra.Command, verb string) {
 	f.StringVar(&d.location, "location", "", verb+" where it is")
 	f.StringVar(&d.description, "description", "", verb+" the description")
 	f.StringVar(&d.rrule, "rrule", "", verb+" the recurrence rule, e.g. FREQ=WEEKLY;COUNT=10")
-	f.StringVar(&d.zone, "zone", "", "IANA time zone the event is anchored to (default: your system zone)")
 	f.StringArrayVar(&d.reminders, "remind", nil,
 		"Remind this long before the start, as DURATION or DURATION:email (repeatable)")
 }
@@ -253,13 +254,9 @@ func eventsCreateCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			zone, err := c.App.Calendar.Anchor(c.Ctx, d.zone)
+			zone, loc, err := workingZone(c)
 			if err != nil {
-				return kit.Fail("--zone: %v", err)
-			}
-			loc, err := time.LoadLocation(zone)
-			if err != nil {
-				loc = time.Local
+				return err
 			}
 			start, err := ical.ParseTime(d.start, loc)
 			if err != nil {
@@ -276,6 +273,7 @@ func eventsCreateCmd() *cobra.Command {
 			var res *calsvc.EventResult
 			if err := kit.Create(c, ui.ResultSpec{
 				Action: ui.Created, Kind: "events", Name: d.title,
+				Detail: "for " + timeLabel(start, d.allDay, zone),
 			}, func() (string, error) {
 				var err error
 				res, err = c.App.Calendar.EventCreate(c.Ctx, calID, calsvc.EventInput{
@@ -305,7 +303,7 @@ func eventsCreateCmd() *cobra.Command {
 
 func eventsUpdateCmd() *cobra.Command {
 	var d details
-	var future bool
+	var onwards bool
 	c := &cobra.Command{
 		Use:   "update REF",
 		Short: "Change an event's title, time, location, description or recurrence",
@@ -313,32 +311,38 @@ func eventsUpdateCmd() *cobra.Command {
 			"Anything you do not mention is left alone, including the reminders and the\n" +
 			"recurrence.\n\n" +
 			"A reference that names one occurrence of a recurring event changes only that\n" +
-			"occurrence. Add --future to change it and every later one, or drop the @ part\n" +
-			"of the reference to change the whole series.",
+			"occurrence. Add --onwards to change it and every later one, or drop the @ part\n" +
+			"of the reference to change the whole series, which --dry-run will show you\n" +
+			"before you do.",
 		Args: cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{d.check(false), kit.StepExpand}, func(c *kit.Invocation) error {
 			calID, eventID, occurrence, err := resolveEvent(c, c.Args[0])
 			if err != nil {
 				return err
 			}
-			if future && occurrence == "" {
-				return kit.Fail("--future needs a reference that names an occurrence.").
+			if onwards && occurrence == "" {
+				return kit.Fail("--onwards needs a reference that names an occurrence.").
 					Hint("`events list` prints one, as CALENDAR/EVENT@2026-04-16T09:00")
 			}
-			patch, err := d.patch(c)
+			reached, err := reachOf(c, calID, eventID, occurrence)
+			if err != nil {
+				return err
+			}
+			patch, err := d.patch(c, reached)
 			if err != nil {
 				return err
 			}
 			var res *calsvc.EventResult
 			if err := kit.Mutate(c, ui.ResultSpec{
-				Action: ui.Updated, Kind: "events", Count: 1, Name: d.title,
-				IDs: []string{c.Args[0]}, Detail: updateScope(occurrence, future),
+				Action: ui.Updated, Kind: "events", Count: 1, Name: reached.name(d.title),
+				IDs: []string{c.Args[0]}, Preview: reached.preview(), Extra: reached.extra(),
+				Detail: clauses(reached.clause(occurrence, onwards), reached.moved(patch)),
 			}, func() error {
 				var err error
 				switch {
 				case occurrence == "":
 					res, err = c.App.Calendar.EventUpdate(c.Ctx, calID, eventID, patch)
-				case future:
+				case onwards:
 					res, err = c.App.Calendar.SeriesSplit(c.Ctx, calID, eventID, occurrence, patch)
 				default:
 					res, err = c.App.Calendar.OccurrenceUpdate(c.Ctx, calID, eventID, occurrence, patch)
@@ -353,26 +357,14 @@ func eventsUpdateCmd() *cobra.Command {
 	d.register(c, "Replace")
 	c.Flags().BoolVar(&d.allDay, "all-day", false, "Turn it into an event with no time of day")
 	c.Flags().BoolVar(&d.noReminders, "no-remind", false, "Remove the reminders")
-	c.Flags().BoolVar(&future, "future", false, "Also change every later occurrence of the series")
+	c.Flags().BoolVar(&onwards, "onwards", false, "Also change every later occurrence of the series")
 	return c
-}
-
-// updateScope says which occurrences a change reaches, so the confirmation and the
-// dry run describe the same thing the reference and the flag asked for.
-func updateScope(occurrence string, future bool) string {
-	switch {
-	case occurrence == "":
-		return ""
-	case future:
-		return "from " + occurrence + " onwards"
-	}
-	return "on " + occurrence
 }
 
 // patch turns the flags the user actually set into the change to make. A flag left
 // alone is absent rather than empty, which is what lets --description "" clear a
 // description instead of meaning "leave it".
-func (d *details) patch(c *kit.Invocation) (calsvc.EventPatch, error) {
+func (d *details) patch(c *kit.Invocation, reached *reach) (calsvc.EventPatch, error) {
 	var p calsvc.EventPatch
 	if c.Changed("title") {
 		p.Title = &d.title
@@ -385,9 +377,6 @@ func (d *details) patch(c *kit.Invocation) (calsvc.EventPatch, error) {
 	}
 	if c.Changed("rrule") {
 		p.RRule = &d.rrule
-	}
-	if c.Changed("zone") {
-		p.Zone = &d.zone
 	}
 	if c.Changed("all-day") {
 		p.AllDay = &d.allDay
@@ -414,19 +403,19 @@ func (d *details) patch(c *kit.Invocation) (calsvc.EventPatch, error) {
 	if !c.Changed("start") {
 		return p, nil
 	}
-	loc := time.Local
-	if d.zone != "" {
-		l, err := time.LoadLocation(d.zone)
-		if err != nil {
-			return p, kit.Fail("--zone: unknown time zone %q", d.zone)
-		}
-		loc = l
+	// A time is written against the zone the invocation works in, so re-timing an
+	// event re-anchors it. That is only true when a time is being written: an
+	// event whose location changed keeps the zone it was made in, wherever the
+	// person changing it happens to be.
+	zone, loc, err := workingZone(c)
+	if err != nil {
+		return p, err
 	}
 	start, err := ical.ParseTime(d.start, loc)
 	if err != nil {
 		return p, kit.Fail("--start: %v", err)
 	}
-	p.Start = &start
+	p.Start, p.Zone = &start, &zone
 	if c.Changed("duration") || c.Changed("end") {
 		dur, err := d.span(start, loc)
 		if err != nil {
@@ -436,6 +425,148 @@ func (d *details) patch(c *kit.Invocation) (calsvc.EventPatch, error) {
 		p.End = &end
 	}
 	return p, nil
+}
+
+// ── the zone, and what a change reaches ──
+
+// workingZone is the zone this invocation writes against, and the frame a
+// wall-clock time given on the command line is read in.
+func workingZone(c *kit.Invocation) (string, *time.Location, error) {
+	zone, err := c.App.Zone(c.Ctx)
+	if err != nil {
+		return "", nil, err
+	}
+	loc, err := c.App.Location(c.Ctx)
+	if err != nil {
+		return "", nil, err
+	}
+	return zone, loc, nil
+}
+
+// timeLabel is when an event sits, said in the zone it is anchored to.
+//
+// The zone is on screen because it is the one part of a written time that the
+// command line does not state and that nothing else would reveal until the event
+// turned up an hour out in somebody else's calendar.
+func timeLabel(t time.Time, allDay bool, zone string) string {
+	if allDay {
+		return t.Format("2006-01-02") + " (all day)"
+	}
+	return t.Format("2006-01-02 15:04") + " " + zone
+}
+
+// previewSample is how many of a series' occurrences a preview draws.
+//
+// Enough to recognise the pattern and see where it starts, few enough that the
+// question underneath is still on the screen. How many there are in all is in
+// the sentence above the table, which is where a preview keeps its count.
+const previewSample = 20
+
+// reach is what a reference reaches: the event it names, and, when it names a
+// series rather than one instance, the occurrences that come with it.
+//
+// It is read before the change is made, because a preview has to describe the
+// same thing the change will do, and a series addressed by its bare reference is
+// where those two are furthest apart - one reference, and every meeting it ever
+// generates.
+type reach struct {
+	title  string
+	allDay bool
+	rows   []calsvc.Event
+	// total is how many occurrences there are, or nil for a series with no end.
+	total *int
+	// series records that the reference named the whole of something recurring.
+	series bool
+}
+
+func reachOf(c *kit.Invocation, calID, eventID, occurrence string) (*reach, error) {
+	if occurrence != "" {
+		ev, err := c.App.Calendar.EventGet(c.Ctx, calID, eventID, occurrence)
+		if err != nil {
+			return nil, err
+		}
+		one := 1
+		return &reach{title: ev.Title, allDay: ev.AllDay, rows: []calsvc.Event{*ev}, total: &one}, nil
+	}
+	got, err := c.App.Calendar.Series(c.Ctx, calID, eventID, previewSample)
+	if err != nil {
+		return nil, err
+	}
+	r := &reach{rows: got.Rows, total: got.Total}
+	if len(got.Rows) > 0 {
+		first := got.Rows[0]
+		r.title, r.allDay, r.series = first.Title, first.AllDay, first.RRule != ""
+	}
+	return r, nil
+}
+
+// name is what the sentence calls the event: what it is being renamed to, or
+// what it is called now.
+func (r *reach) name(renamed string) string {
+	if renamed != "" {
+		return renamed
+	}
+	return r.title
+}
+
+// clause says which occurrences the change reaches, so the preview, the
+// confirmation and the result all describe the scope the reference asked for.
+func (r *reach) clause(occurrence string, onwards bool) string {
+	switch {
+	case occurrence != "" && onwards:
+		return "from " + occurrence + " onwards"
+	case occurrence != "":
+		return "on " + occurrence
+	case !r.series:
+		return ""
+	case r.total == nil:
+		return "and every occurrence of it, a series with no end"
+	case *r.total > 1:
+		return "and all " + ui.Quantity(*r.total, "occurrences") + " of it"
+	}
+	return ""
+}
+
+// moved says where a change puts the event, when it moves it at all.
+func (r *reach) moved(p calsvc.EventPatch) string {
+	if p.Start == nil {
+		return ""
+	}
+	allDay := r.allDay
+	if p.AllDay != nil {
+		allDay = *p.AllDay
+	}
+	zone := ""
+	if p.Zone != nil {
+		zone = *p.Zone
+	}
+	return "now " + timeLabel(*p.Start, allDay, zone)
+}
+
+func (r *reach) preview() func(*ui.UI) error {
+	if !r.series {
+		return nil
+	}
+	return kit.Preview("events", eventColumns(), r.rows)
+}
+
+func (r *reach) extra() map[string]any {
+	if !r.series {
+		return nil
+	}
+	return map[string]any{"occurrences": r.total}
+}
+
+// clauses joins the things a result has to say into one trailing sentence,
+// leaving out whatever does not apply.
+func clauses(parts ...string) string {
+	kept := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if part != "" {
+			kept = append(kept, part)
+		}
+	}
+	return strings.Join(kept, ", ")
 }
 
 // check judges what the command line alone decides, before anything is asked of
@@ -549,13 +680,13 @@ func eventsRespondCmd() *cobra.Command {
 }
 
 func eventsDeleteCmd() *cobra.Command {
-	var future bool
+	var onwards bool
 	c := &cobra.Command{
 		Use:   "delete REF...",
 		Short: "Delete events",
 		Long: "Delete events.\n\n" +
 			"A reference that names one occurrence of a recurring event deletes only that\n" +
-			"occurrence. Add --future to delete it and every later one, or drop the @ part\n" +
+			"occurrence. Add --onwards to delete it and every later one, or drop the @ part\n" +
 			"of the reference to delete the whole series.",
 		Args: cobra.MinimumNArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
@@ -565,49 +696,57 @@ func eventsDeleteCmd() *cobra.Command {
 			}
 			targets := make([]target, 0, len(c.Args))
 			var rows []calsvc.Event
+			var reached *reach
+			counted, endless := 0, false
 			for _, ref := range c.Args {
 				calID, eventID, occurrence, err := resolveEvent(c, ref)
 				if err != nil {
 					return err
 				}
-				if future && occurrence == "" {
-					return kit.Fail("--future needs a reference that names an occurrence.").
+				if onwards && occurrence == "" {
+					return kit.Fail("--onwards needs a reference that names an occurrence.").
 						Hint("`events list` prints one, as CALENDAR/EVENT@2026-04-16T09:00")
 				}
-				ev, err := c.App.Calendar.EventGet(c.Ctx, calID, eventID, occurrence)
+				reached, err = reachOf(c, calID, eventID, occurrence)
 				if err != nil {
 					return err
 				}
 				targets = append(targets, target{ref: ref, calID: calID, eventID: eventID, occurrence: occurrence})
-				// Removing a series removes every occurrence of it, so that is what
-				// the confirmation and the dry run have to show.
-				if occurrence == "" && ev.RRule != "" && !future {
-					occs, err := c.App.Calendar.EventOccurrences(c.Ctx, calID, eventID, previewLimit)
-					if err != nil {
-						return err
-					}
-					rows = append(rows, occs...)
+				rows = append(rows, reached.rows...)
+				if reached.total == nil {
+					endless = true
 					continue
 				}
-				rows = append(rows, *ev)
+				counted += *reached.total
 			}
 
 			refs := make([]string, 0, len(targets))
 			for _, t := range targets {
 				refs = append(refs, t.ref)
 			}
+			// One reference names one stored event however many meetings it holds,
+			// so the count says how many were addressed and the clause beside it
+			// says how far each one goes. Several references have nothing that
+			// could be said of all of them at once, so they say nothing.
+			whole := &reach{rows: rows, total: &counted, series: reached.series}
+			if endless {
+				whole.total = nil
+			}
+			detail, name := "", ""
+			if len(targets) == 1 {
+				detail = reached.clause(targets[0].occurrence, onwards)
+				name = reached.title
+			}
 			return kit.Mutate(c, ui.ResultSpec{
-				Action: ui.Deleted, Kind: "events", Count: len(rows), IDs: refs,
-				Name:    kit.Sole(rows, func(e calsvc.Event) string { return e.Title }),
-				Detail:  deleteScope(future),
-				Preview: kit.Preview("events", eventColumns(), rows),
+				Action: ui.Deleted, Kind: "events", Count: len(targets), IDs: refs,
+				Name: name, Detail: detail, Preview: whole.preview(), Extra: whole.extra(),
 			}, func() error {
 				for _, t := range targets {
 					var err error
 					switch {
 					case t.occurrence == "":
 						err = c.App.Calendar.EventDelete(c.Ctx, t.calID, t.eventID)
-					case future:
+					case onwards:
 						err = c.App.Calendar.SeriesTruncate(c.Ctx, t.calID, t.eventID, t.occurrence)
 					default:
 						err = c.App.Calendar.OccurrenceDelete(c.Ctx, t.calID, t.eventID, t.occurrence)
@@ -620,19 +759,8 @@ func eventsDeleteCmd() *cobra.Command {
 			})
 		}),
 	}
-	c.Flags().BoolVar(&future, "future", false, "Also delete every later occurrence of the series")
+	c.Flags().BoolVar(&onwards, "onwards", false, "Also delete every later occurrence of the series")
 	return c
-}
-
-// previewLimit caps how many occurrences of a series a confirmation draws. Past
-// this many, the count in the sentence is what carries the warning.
-const previewLimit = 200
-
-func deleteScope(future bool) string {
-	if future {
-		return "and every later occurrence"
-	}
-	return ""
 }
 
 // ── helpers ──

@@ -43,7 +43,6 @@ How long an event lasts is said **once**, with either `--end` or `--duration`. B
 | `--duration` | `15m`, `90m`, `1h`, `2h30m` - or `3d` for an all-day event |
 | `--remind` | `15m`, `1h`, `1d`, repeatable; add `:email` for an emailed one |
 | `--start` / `--end` on `list` | `YYYY-MM-DD`, both days included |
-| `--zone` | an IANA zone name, e.g. `Europe/Vienna` |
 
 `--all-day` makes an event with no time of day, measured in days. It ends at the midnight after its last day, which is how every other calendar client writes it.
 
@@ -51,11 +50,25 @@ How long an event lasts is said **once**, with either `--end` or `--duration`. B
 
 **Attendees.** Proton users are added directly; external addresses get an emailed invitation. A bare address is required; `--attendee jane@example.com:optional` is not.
 
-**Recurrence.** `--rrule` takes an iCal recurrence rule. Pair it with `--zone`: a series anchored to `Europe/Vienna` stays at 09:00 when the clocks change, where one stored as a plain UTC instant would slide to 08:00.
+**Recurrence.** `--rrule` takes an iCal recurrence rule. The series is anchored to the zone you are working in, so a 09:00 standup stays at 09:00 when the clocks change, where one stored as a plain UTC instant would slide to 08:00.
 
 ```bash
 proton calendar events create --title Standup --start 2026-04-16T09:00 --duration 15m \
-  --rrule "FREQ=WEEKLY;COUNT=10" --remind 15m --zone Europe/Vienna
+  --rrule "FREQ=WEEKLY;COUNT=10" --remind 15m
+```
+
+**Times.** Every event carries the zone it is anchored to, and the result says which:
+
+```console
+$ proton calendar events create --title Dentist --start 2026-04-16T14:00
+✓ Created event "Dentist" for 2026-04-16 14:00 Europe/Vienna.
+```
+
+The zone comes from `--zone`, `TZ`, `zone:` in your [config](../configuration.md), your system, or your Proton calendar's primary zone, in that order. The four hours a year where a clock reading means two instants or none are refused rather than guessed - add an offset to say which you meant:
+
+```console
+$ proton calendar events create --title 'Night shift' --start 2026-10-25T02:30
+Error: 02:30 happens twice on 2026-10-25 in Europe/Vienna, when the clocks go back; say which one, as 2026-10-25T02:30:00+02:00 or 2026-10-25T02:30:00+01:00
 ```
 
 ## Change or answer one
@@ -70,7 +83,7 @@ Anything you do not mention is left alone, including the reminders, the recurren
 
 ## Recurring events, occurrence by occurrence
 
-**The reference decides how far a change reaches.** Keep the `@occurrence` part and you act on that occurrence; drop it and you act on the series. `--future` widens one occurrence to it and everything after.
+**The reference decides how far a change reaches.** Keep the `@occurrence` part and you act on that occurrence; drop it and you act on the series. `--onwards` widens one occurrence to it and everything after.
 
 ```bash
 # move one standup, leaving the series alone
@@ -80,16 +93,28 @@ proton calendar events update 4f2a1b9c@2026-04-22T09:00 --start 2026-04-22T10:30
 proton calendar events delete 4f2a1b9c@2026-04-22T09:00
 
 # from May the 4th on, it moves half an hour later
-proton calendar events update 4f2a1b9c@2026-05-04T09:00 --start 2026-05-04T09:30 --future
+proton calendar events update 4f2a1b9c@2026-05-04T09:00 --start 2026-05-04T09:30 --onwards
 
 # end the series there
-proton calendar events delete 4f2a1b9c@2026-05-04T09:00 --future
+proton calendar events delete 4f2a1b9c@2026-05-04T09:00 --onwards
 
 # the whole series
 proton calendar events delete 4f2a1b9c
 ```
 
-Deleting a series removes every occurrence, so it says how many and shows them first. `--future` on the *first* occurrence is refused, because nothing would be left - delete the series instead.
+A bare reference reaches every occurrence a series holds, so both `update` and `delete` say how many and show the first of them. A series with no end says that instead of a number, because there is no number to give:
+
+```console
+$ proton calendar events update Standup --start 2026-04-16T10:00 --dry-run
+Dry run - would update event "Standup" and all 500 occurrences of it, now 2026-04-16 10:00 Europe/Vienna:
+
+ID                                DATE        TIME   DURATION  TITLE    LOCATION
+────────────────────────────────  ──────────  ─────  ────────  ───────  ────────
+Fh3jAe…/9xL4pQ…@2026-04-16T09:00  2026-04-16  09:00  15m       Standup  Room 2
+…
+```
+
+`--onwards` on the *first* occurrence is refused, because nothing would be left - delete the series instead.
 
 ## Reminders
 

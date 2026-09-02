@@ -42,7 +42,7 @@ type FilterRule struct {
 	Conditions []FilterCondition `json:"conditions"`
 	MatchAny   bool              `json:"match_any,omitempty"`
 	MoveTo     string            `json:"move_to,omitempty"`
-	Labels     []string          `json:"labels,omitempty"`
+	Labels     []string          `json:"labels"`
 	MarkRead   bool              `json:"mark_read,omitempty"`
 	Star       bool              `json:"star,omitempty"`
 }
@@ -299,7 +299,7 @@ func RuleOf(tree []any) (FilterRule, bool) {
 }
 
 func readRule(tree []any) (FilterRule, bool) {
-	var rule FilterRule
+	rule := FilterRule{Labels: []string{}}
 	body, ok := lastIf(tree)
 	if !ok {
 		return rule, false

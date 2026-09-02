@@ -36,7 +36,7 @@ type Item struct {
 	Name       string   `json:"name,omitempty"`
 	Username   string   `json:"username,omitempty"`
 	Email      string   `json:"email,omitempty"`
-	URLs       []string `json:"urls,omitempty"`
+	URLs       []string `json:"urls"`
 
 	// Shares is how many people hold this item on its own, which is what makes it
 	// one of the things you have shared.
@@ -69,17 +69,17 @@ type FullItem struct {
 	// Identity is what an identity item holds, keyed by the flag that sets it.
 	// It is a map rather than thirty fields because Pass stores thirty and the
 	// set is IdentityFields' to declare, not this struct's to repeat.
-	Identity map[string]string `json:"identity,omitempty"`
+	Identity map[string]string `json:"identity"`
 
 	// the route behind an alias: where its mail arrives, what it sends as, and
 	// what it has carried.
-	AliasMailboxes   []string       `json:"alias_mailboxes,omitempty"`
+	AliasMailboxes   []string       `json:"alias_mailboxes"`
 	AliasDisplayName string         `json:"alias_display_name,omitempty"`
 	AliasNote        string         `json:"alias_note,omitempty"`
 	AliasActivity    *AliasActivity `json:"alias_activity,omitempty"`
 
 	// extra custom fields (any item type)
-	Fields []ItemField `json:"fields,omitempty"`
+	Fields []ItemField `json:"fields"`
 
 	raw *pb.Item
 }

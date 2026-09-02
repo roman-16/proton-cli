@@ -37,6 +37,7 @@ Flags:
   -q, --quiet              Suppress non-essential stderr output
       --verified string    A human verification already solved, as the refusal printed it (env: PROTON_VERIFIED)
   -y, --yes                Answer confirmation prompts with yes
+      --zone string        IANA time zone to work in (env: TZ; default: your system zone)
 
 Per-command help:  proton <command> --help
 Full reference:    https://proton-cli.lerchster.dev/commands/

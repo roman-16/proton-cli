@@ -52,9 +52,11 @@ func TestOccurrenceLabelSaysWhereAnInstanceSits(t *testing.T) {
 		in   calsvc.Event
 		want string
 	}{
-		{"an instance of a bounded series", calsvc.Event{Number: 3, Count: 10}, "3 of 10"},
+		{"an instance of a bounded series", calsvc.Event{Number: 3, Count: count(10)}, "3 of 10"},
 		{"an instance of an unbounded series", calsvc.Event{Number: 3}, "3 of a recurring series"},
-		{"the series itself", calsvc.Event{Count: 12}, "the whole series, 12 occurrences"},
+		{"the series itself", calsvc.Event{RRule: "FREQ=WEEKLY;COUNT=12", Count: count(12)},
+			"the whole series, 12 occurrences"},
+		{"a series with no end", calsvc.Event{RRule: "FREQ=WEEKLY"}, "the whole series, which has no end"},
 		{"a one-off event", calsvc.Event{}, ""},
 	} {
 		if got := occurrenceLabel(tc.in); got != tc.want {
@@ -73,17 +75,54 @@ func TestSeriesLabelOnlyNamesASeriesFromOneOfItsOccurrences(t *testing.T) {
 	}
 }
 
-func TestUpdateScopeDescribesWhatTheReferenceAndTheFlagAskedFor(t *testing.T) {
-	if got := updateScope("", false); got != "" {
-		t.Errorf("a whole-event update reads %q", got)
-	}
-	if got := updateScope("2026-04-16T09:00", false); got != "on 2026-04-16T09:00" {
-		t.Errorf("a single occurrence reads %q", got)
-	}
-	if got := updateScope("2026-04-16T09:00", true); got != "from 2026-04-16T09:00 onwards" {
-		t.Errorf("an occurrence and its successors read %q", got)
+// The clause is what a preview, a confirmation and a result all describe the
+// scope with, so it has to say the same thing the reference and the flag asked
+// for - including the case the reference says nothing about, where one word
+// reaches every meeting a series will ever hold.
+func TestTheReachClauseDescribesWhatTheReferenceAndTheFlagAskedFor(t *testing.T) {
+	series := func(total *int) *reach { return &reach{series: true, total: total} }
+	for _, tc := range []struct {
+		name       string
+		in         *reach
+		occurrence string
+		onwards    bool
+		want       string
+	}{
+		{"a one-off event", &reach{total: count(1)}, "", false, ""},
+		{"a single occurrence", series(count(10)), "2026-04-16T09:00", false, "on 2026-04-16T09:00"},
+		{"an occurrence and its successors", series(count(10)), "2026-04-16T09:00", true,
+			"from 2026-04-16T09:00 onwards"},
+		{"a whole series", series(count(500)), "", false, "and all 500 occurrences of it"},
+		{"a series with no end", series(nil), "", false, "and every occurrence of it, a series with no end"},
+	} {
+		if got := tc.in.clause(tc.occurrence, tc.onwards); got != tc.want {
+			t.Errorf("%s: clause = %q, want %q", tc.name, got, tc.want)
+		}
 	}
 }
+
+// A result says where a change put an event, in the zone it is anchored to,
+// because the zone is the one part of a written time the command line does not
+// state and nothing else would reveal in time.
+func TestAMovedEventSaysWhenAndWhere(t *testing.T) {
+	at := time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC)
+	r := &reach{}
+	if got := r.moved(calsvc.EventPatch{}); got != "" {
+		t.Errorf("an event that did not move reads %q", got)
+	}
+	zone := "Europe/Vienna"
+	got := r.moved(calsvc.EventPatch{Start: &at, Zone: &zone})
+	if want := "now 2026-04-16 10:00 Europe/Vienna"; got != want {
+		t.Errorf("moved = %q, want %q", got, want)
+	}
+	allDay := true
+	got = r.moved(calsvc.EventPatch{Start: &at, Zone: &zone, AllDay: &allDay})
+	if want := "now 2026-04-16 (all day)"; got != want {
+		t.Errorf("an all-day event reads %q, want %q", got, want)
+	}
+}
+
+func count(n int) *int { return &n }
 
 // A whole-day row has no time of day, and it lasts a day rather than the hours a day
 // happens to have. It is also printed on the date it carries: the service hands out
@@ -92,7 +131,7 @@ func TestUpdateScopeDescribesWhatTheReferenceAndTheFlagAskedFor(t *testing.T) {
 func TestEventColumnsRenderAnAllDayRow(t *testing.T) {
 	loc, err := time.LoadLocation("America/New_York")
 	if err != nil {
-		t.Skipf("America/New_York is not available: %v", err)
+		t.Fatalf("America/New_York: %v", err)
 	}
 	saved := time.Local
 	time.Local = loc

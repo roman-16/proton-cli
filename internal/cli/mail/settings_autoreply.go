@@ -59,7 +59,7 @@ func autoreplySetCmd() *cobra.Command {
 		Short: "Configure the auto-reply and turn it on",
 		Long: "Configure the auto-reply and turn it on.\n\n" +
 			"--start and --end are written in the grammar the repeat mode dictates:\n" +
-			"  fixed      2026-07-01T09:00   a date and time in --zone\n" +
+			"  fixed      2026-07-01T09:00   a date and time in your zone\n" +
 			"  daily      09:00              a time of day, with --days\n" +
 			"  weekly     mon:09:00          a weekday and time\n" +
 			"  monthly    1:09:00            a day of the month and time\n" +
@@ -76,6 +76,9 @@ func autoreplySetCmd() *cobra.Command {
 				return err
 			}
 			ar.Repeat = mode
+			if ar.Zone, err = c.App.Zone(c.Ctx); err != nil {
+				return err
+			}
 			msg, err := kit.ReadTextArg(c, ar.Message, "--message")
 			if err != nil {
 				return err
@@ -106,7 +109,6 @@ func autoreplySetCmd() *cobra.Command {
 	c.Flags().StringVar(&ar.Start, "start", "", "Start of the window (grammar depends on --repeat)")
 	c.Flags().StringVar(&ar.End, "end", "", "End of the window (grammar depends on --repeat)")
 	c.Flags().StringSliceVar(&ar.Days, "days", nil, "Days it is active, for a daily schedule, e.g. mon,tue,wed")
-	c.Flags().StringVar(&ar.Zone, "zone", "", "IANA time zone the schedule is read in (default: the system zone)")
 	c.Flags().StringVar(&ar.Message, "message", "", "Reply body (- reads stdin)")
 	c.Flags().BoolVar(&html, "html", false, "Treat the message as HTML rather than escaping it")
 	reauth.Declare(c)

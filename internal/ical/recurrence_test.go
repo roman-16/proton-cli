@@ -1,6 +1,7 @@
 package ical
 
 import (
+	"errors"
 	"testing"
 	"time"
 )
@@ -9,7 +10,7 @@ func vienna(t *testing.T) *time.Location {
 	t.Helper()
 	loc, err := time.LoadLocation("Europe/Vienna")
 	if err != nil {
-		t.Skipf("Europe/Vienna is not available: %v", err)
+		t.Fatalf("Europe/Vienna: %v", err)
 	}
 	return loc
 }
@@ -405,16 +406,60 @@ func TestOccurrencesOfANonRecurringEventIsItself(t *testing.T) {
 	}
 }
 
-func TestCountOccurrencesStopsAtTheLimit(t *testing.T) {
-	v := weekly(t, "FREQ=DAILY", 12)
-	n, err := v.CountOccurrences(50)
+// A count is either the whole truth or not a count. A rule that ends has one; a
+// rule that does not has none, and reporting a cap in its place is how "every
+// weekday forever" came to be printed as a thousand occurrences.
+func TestCountOccurrencesCountsWhatEnds(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		rule string
+		want *int
+	}{
+		{"a rule saying how many times", "FREQ=DAILY;COUNT=12", ptr(12)},
+		{"a rule saying when it stops", "FREQ=DAILY;UNTIL=20261231T225959Z", ptr(81)},
+		{"a rule saying neither", "FREQ=DAILY", nil},
+	} {
+		v := weekly(t, tc.rule, 12)
+		got, err := v.CountOccurrences()
+		if err != nil {
+			t.Fatalf("%s: %v", tc.name, err)
+		}
+		switch {
+		case tc.want == nil && got != nil:
+			t.Errorf("%s: counted %d, want no count at all", tc.name, *got)
+		case tc.want != nil && got == nil:
+			t.Errorf("%s: no count, want %d", tc.name, *tc.want)
+		case tc.want != nil && *got != *tc.want:
+			t.Errorf("%s: counted %d, want %d", tc.name, *got, *tc.want)
+		}
+	}
+}
+
+// COUNT counts the instances a rule generates, cancelled ones included, so a
+// series somebody has cancelled an instance out of cannot be answered from the
+// rule text and has to be walked.
+func TestCountOccurrencesLeavesOutTheCancelledOnes(t *testing.T) {
+	v := weekly(t, "FREQ=WEEKLY;COUNT=10", 12)
+	v.ExDates = []DateTime{v.Start.At(v.Start.Wall().AddDate(0, 0, 7))}
+	got, err := v.CountOccurrences()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n != 50 {
-		t.Errorf("CountOccurrences = %d, want the limit", n)
+	if got == nil || *got != 9 {
+		t.Errorf("CountOccurrences = %v, want 9", got)
 	}
 }
+
+// A walk that runs out of room says so. Returning as though the rule had ended
+// is what let three separate counts be printed as exact.
+func TestAWalkThatRunsOutOfRoomSaysSo(t *testing.T) {
+	v := weekly(t, "FREQ=MINUTELY", 12)
+	if err := v.Walk(func(Occurrence) bool { return true }); !errors.Is(err, ErrTooManyOccurrences) {
+		t.Errorf("Walk err = %v, want ErrTooManyOccurrences", err)
+	}
+}
+
+func ptr(n int) *int { return &n }
 
 // A reference keeps naming the same instance after it is cancelled. Without that,
 // cancelling one twice complains that it is not there instead of doing nothing.

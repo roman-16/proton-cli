@@ -36,6 +36,7 @@ The top level applies whichever profile you are acting as. `per-profile:` narrow
 | `output` | `-o`, `--output` |
 | `quiet` | `-q`, `--quiet` |
 | `log-level` | `--log-level`; `PROTON_LOG_LEVEL` |
+| `zone` | `--zone`; `TZ` |
 | `full-ids` | `--full-ids` |
 | `no-color` | `--no-color`; `NO_COLOR` |
 | `no-input` | `--no-input`; `PROTON_NO_INPUT` |
@@ -103,8 +104,6 @@ $ proton --quiet=false mail messages list
 
 ## Environment variables
 
-Nine, and none of them can name an account.
-
 | Variable | Description |
 | --- | --- |
 | `PROTON_CONFIG` | A config file somewhere other than the default path |
@@ -115,6 +114,7 @@ Nine, and none of them can name an account.
 | `COLORTERM` | `truecolor` or `24bit` if your terminal takes 24-bit color and does not advertise it; only affects how exactly a color swatch is drawn ([why](design-notes.md#why-colour-is-asked-for-by-name)) |
 | `PROTON_NO_INPUT` | Set to any value, even empty, to never prompt; a missing credential becomes an error |
 | `PROTON_LOG_LEVEL` | `debug`, `info`, `warn` or `error` |
+| `TZ` | The IANA zone to work in, e.g. `Europe/Vienna`; POSIX's own variable, read when no flag or file names one |
 | `PROTON_NO_UPDATE_CHECK` | Set to any value, even empty, to never look for a new release ([what that is](installation.md#updating)) |
 | `PROTON_VERIFIED` | A human verification already solved, as the refusal printed it ([when you need it](troubleshooting.md#nothing-here-can-be-asked)) |
 
@@ -143,6 +143,7 @@ Those paths are the Linux ones. macOS uses `~/Library/Application Support/proton
 | `--full-ids` | Don't shorten IDs in interactive output |
 | `--no-color` | Turn colored output off (env: `NO_COLOR`) |
 | `--log-level debug\|info\|warn\|error` | Logging verbosity (env: `PROTON_LOG_LEVEL`) |
+| `--zone NAME` | IANA time zone to work in (env: `TZ`) |
 | `--no-input` | Never prompt; a missing credential becomes an error (env: `PROTON_NO_INPUT`) |
 | `--verified TOKEN` | A human verification already solved, as the refusal printed it (env: `PROTON_VERIFIED`) |
 

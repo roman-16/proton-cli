@@ -27,10 +27,10 @@ type Contact struct {
 	Phone string `json:"phone,omitempty"`
 	// The repeatable fields carry their kind where one was stated, spelled the
 	// way --phone and --address accept it.
-	Emails    []string `json:"emails,omitempty"`
-	Phones    []string `json:"phones,omitempty"`
-	Addresses []string `json:"addresses,omitempty"`
-	URLs      []string `json:"urls,omitempty"`
+	Emails    []string `json:"emails"`
+	Phones    []string `json:"phones"`
+	Addresses []string `json:"addresses"`
+	URLs      []string `json:"urls"`
 
 	FirstName   string `json:"first_name,omitempty"`
 	LastName    string `json:"last_name,omitempty"`
@@ -45,7 +45,7 @@ type Contact struct {
 	Language    string `json:"language,omitempty"`
 	Timezone    string `json:"timezone,omitempty"`
 
-	Cards []string `json:"cards,omitempty"`
+	Cards []string `json:"cards"`
 
 	Signature pgp.VerifyResult `json:"signature,omitempty"`
 }
@@ -459,7 +459,7 @@ func pickSlice(a, b []string) []string {
 // what did not land rather than reporting one number that hides it.
 type ImportResult struct {
 	Imported []string         `json:"imported"`
-	Skipped  []SkippedContact `json:"skipped,omitempty"`
+	Skipped  []SkippedContact `json:"skipped"`
 }
 
 // SkippedContact is one card an import could not take, and why.

@@ -38,7 +38,7 @@ type state struct {
 	Profile  string   `json:"profile"`
 	Session  string   `json:"session"`
 	Unlocked bool     `json:"unlocked"`
-	Scopes   []string `json:"scopes,omitempty"`
+	Scopes   []string `json:"scopes"`
 }
 
 func getCmd() *cobra.Command {

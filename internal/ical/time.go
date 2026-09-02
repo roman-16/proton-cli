@@ -5,6 +5,13 @@ import (
 	"strings"
 	"time"
 
+	// A value read here is anchored to an IANA zone name, and resolving one is
+	// what tells a wall-clock reading that names two instants from one that names
+	// none. The database travels with the package rather than with the binary, so
+	// the checks are exercised wherever this code is built and not only where the
+	// host happens to ship a zoneinfo directory.
+	_ "time/tzdata"
+
 	"github.com/roman-16/proton-cli/internal/contentline"
 )
 
@@ -16,6 +23,7 @@ const (
 	stampLayout     = "20060102T150405Z"
 	refTimeLayout   = "2006-01-02T15:04"
 	refDateLayout   = "2006-01-02"
+	clockLayout     = "15:04"
 	untilDayEndHour = 23
 )
 
@@ -189,24 +197,132 @@ func parseValue(raw, tzid string, allDay bool) (DateTime, error) {
 	return DateTime{Time: t, TZID: tzid}, nil
 }
 
-// ParseTime accepts the date and time formats a person types, reading bare
-// dates and times in loc.
+// ParseTime reads a time somebody wrote, in the zone they are working in.
+//
+// A wall-clock reading is not always one instant. For two hours a year it is
+// none, because the clocks went forward over it, and for two hours a year it is
+// two, because they went back. Go answers both without complaint - it moves a
+// time out of the gap and picks one side of the overlap - so a value the writer
+// believed was exact silently becomes a different one.
+//
+// Neither can be settled from a zone name, which is why an offset is accepted
+// alongside: it is the only form that names one instant in the four hours where
+// the wall clock cannot.
 func ParseTime(s string, loc *time.Location) (time.Time, error) {
+	t, form, err := parseTime(s, loc)
+	if err != nil {
+		return time.Time{}, err
+	}
+	// An offset names an instant outright, and a bare date names a day, which has
+	// no reading of a clock to be uncertain about. Only a wall-clock time read in
+	// a zone can be two instants or none.
+	if form.offset || !strings.Contains(form.layout, "15") {
+		return t, nil
+	}
+	return t, checkWallClock(s, t, form.layout, loc)
+}
+
+// ParseWallTime reads a time the CLI itself printed, without judging whether the
+// wall clock it names is unique.
+//
+// A reference is resolved against the series that generated it, which knows
+// which instant a repeated 02:30 is; refusing to parse a string this CLI wrote
+// would make the occurrence behind it unaddressable.
+func ParseWallTime(s string, loc *time.Location) (time.Time, error) {
+	t, _, err := parseTime(s, loc)
+	return t, err
+}
+
+// timeForm is one way of writing a time, and whether it names an instant on its
+// own or a reading of a clock that a zone has to interpret.
+type timeForm struct {
+	layout string
+	offset bool
+}
+
+// timeFormats are the forms a person writes, and the ones the CLI prints.
+// The two carrying an offset name an instant outright; the rest name a reading
+// of a clock, which has to be interpreted in a zone.
+var timeFormats = []timeForm{
+	{time.RFC3339, true},
+	{"2006-01-02T15:04Z07:00", true},
+	{"2006-01-02T15:04", false},
+	{"2006-01-02T15:04:05", false},
+	{"2006-01-02 15:04", false},
+	{"2006-01-02 15:04:05", false},
+	{refDateLayout, false},
+}
+
+func parseTime(s string, loc *time.Location) (time.Time, timeForm, error) {
 	if loc == nil {
 		loc = time.Local
 	}
-	for _, f := range []string{
-		time.RFC3339,
-		"2006-01-02T15:04",
-		"2006-01-02T15:04:05",
-		"2006-01-02 15:04",
-		"2006-01-02",
-	} {
-		if t, err := time.ParseInLocation(f, s, loc); err == nil {
-			return t, nil
+	for _, f := range timeFormats {
+		if t, err := time.ParseInLocation(f.layout, s, loc); err == nil {
+			return t, f, nil
 		}
 	}
-	return time.Time{}, fmt.Errorf("unrecognized time format: %s", s)
+	return time.Time{}, timeForm{}, fmt.Errorf("unrecognized time format: %s", s)
+}
+
+// checkWallClock reports a wall-clock reading that names no instant in loc, or
+// two.
+//
+// A gap shows up as a reading that will not write itself back: asking for 02:30
+// where that hour was skipped yields 03:30, so writing the result out in the
+// layout it was read in returns a different string than the one that was given.
+//
+// An overlap shows up as a twin. The clocks going back repeat the last stretch
+// before the change, so the same reading names two instants exactly that shift
+// apart, and neither of them is the one that was meant.
+func checkWallClock(s string, t time.Time, layout string, loc *time.Location) error {
+	if landed := t.Format(layout); landed != s {
+		return fmt.Errorf("%s does not exist on %s in %s, where the clocks go forward; "+
+			"%s is the same instant, as %s",
+			clockOf(s), t.Format(refDateLayout), loc,
+			t.Format(clockLayout), t.Format(time.RFC3339))
+	}
+	if twin, ok := wallClockTwin(t); ok {
+		first, second := t, twin
+		if twin.Before(t) {
+			first, second = twin, t
+		}
+		return fmt.Errorf("%s happens twice on %s in %s, when the clocks go back; "+
+			"say which one, as %s or %s",
+			t.Format(clockLayout), t.Format(refDateLayout), loc,
+			first.Format(time.RFC3339), second.Format(time.RFC3339))
+	}
+	return nil
+}
+
+// wallClockTwin is the other instant sharing this one's reading of the clock.
+//
+// The shift is read off the zone either side of the day rather than assumed to
+// be an hour, because it is not everywhere: Lord Howe Island moves its clocks
+// by thirty minutes, and an overlap only half as long as the search for it is
+// one the search would miss.
+func wallClockTwin(t time.Time) (time.Time, bool) {
+	_, before := t.Add(-24 * time.Hour).Zone()
+	_, after := t.Add(24 * time.Hour).Zone()
+	shift := time.Duration(before-after) * time.Second
+	if shift <= 0 {
+		return time.Time{}, false
+	}
+	for _, twin := range []time.Time{t.Add(-shift), t.Add(shift)} {
+		if twin.Format(clockLayout) == t.Format(clockLayout) {
+			return twin, true
+		}
+	}
+	return time.Time{}, false
+}
+
+// clockOf is the time-of-day half of what was written, for a message about it.
+func clockOf(s string) string {
+	_, clock, found := strings.Cut(strings.ReplaceAll(s, " ", "T"), "T")
+	if !found {
+		return s
+	}
+	return clock
 }
 
 // UntilValue is the UNTIL that ends a series just before the given occurrence.

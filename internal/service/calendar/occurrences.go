@@ -107,13 +107,13 @@ func withTimes(v ical.VEvent, start, end time.Time, allDay bool, tzid string) ic
 	return v
 }
 
-// anchorFor resolves the zone a patched event is written against: the one asked
-// for, or the one the event already has.
-func (s *Service) anchorFor(ctx context.Context, v ical.VEvent, p EventPatch) (string, error) {
+// anchorFor is the zone a patched event is written against: the one the change
+// names, or the one the event already has.
+func anchorFor(v ical.VEvent, p EventPatch) string {
 	if p.Zone == nil {
-		return v.Start.TZID, nil
+		return v.Start.TZID
 	}
-	return s.Anchor(ctx, *p.Zone)
+	return *p.Zone
 }
 
 // reminders resolves the notification list a write sends: the patched one, or the
@@ -283,11 +283,7 @@ func (s *Service) EventUpdate(ctx context.Context, calendarID, eventID string, p
 	if old.readErr != nil {
 		return nil, fmt.Errorf("read the event before updating it: %w", old.readErr)
 	}
-	anchor, err := s.anchorFor(ctx, old.model, p)
-	if err != nil {
-		return nil, err
-	}
-	updated := p.apply(old.model, anchor)
+	updated := p.apply(old.model, anchorFor(old.model, p))
 
 	var ops []syncOp
 	if old.model.Recurring() && p.breaks() {
@@ -346,11 +342,7 @@ func (s *Service) OccurrenceUpdate(ctx context.Context, calendarID, eventID, occ
 	}
 
 	current := target.currentVEvent()
-	anchor, err := s.anchorFor(ctx, current, p)
-	if err != nil {
-		return nil, err
-	}
-	updated := p.apply(current, anchor).AsOverride(master.model, target.at)
+	updated := p.apply(current, anchorFor(current, p)).AsOverride(master.model, target.at)
 	// A replacement may never claim to be older than the series it belongs to, and
 	// Proton refuses a sequence that goes backwards.
 	updated.Sequence = max(ical.NextSequence(current, updated), master.model.Sequence)
@@ -434,11 +426,7 @@ func (s *Service) SeriesSplit(ctx context.Context, calendarID, eventID, occurren
 	truncated.Sequence = master.model.Sequence + 1
 
 	current := target.currentVEvent()
-	anchor, err := s.anchorFor(ctx, current, p)
-	if err != nil {
-		return nil, err
-	}
-	remainder := p.apply(current, anchor)
+	remainder := p.apply(current, anchorFor(current, p))
 	remainder.RRule = master.model.RRule
 	if p.RRule != nil {
 		remainder.RRule = *p.RRule

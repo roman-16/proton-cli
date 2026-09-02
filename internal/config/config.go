@@ -19,6 +19,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/goccy/go-yaml"
 	"github.com/roman-16/proton-cli/internal/confirm"
@@ -51,6 +52,7 @@ func Dir() (string, error) {
 type Settings struct {
 	Output        string           `yaml:"output"`
 	LogLevel      string           `yaml:"log-level"`
+	Zone          string           `yaml:"zone"`
 	Quiet         *bool            `yaml:"quiet"`
 	FullIDs       *bool            `yaml:"full-ids"`
 	NoColor       *bool            `yaml:"no-color"`
@@ -119,6 +121,7 @@ type Flags struct {
 	Output   string
 	LogLevel string
 	Confirm  string
+	Zone     string
 	Quiet    *bool
 	FullIDs  *bool
 	NoColor  *bool
@@ -127,8 +130,11 @@ type Flags struct {
 
 // Resolved is the settled answer for one invocation.
 type Resolved struct {
-	Profile       profile.Name
-	Output        ui.Format
+	Profile profile.Name
+	Output  ui.Format
+	// Zone is the IANA zone this invocation works in, or "" when nothing on this
+	// machine names one.
+	Zone          string
 	LogLevel      slog.Level
 	Quiet         bool
 	FullIDs       bool
@@ -170,10 +176,15 @@ func Resolve(f *File, flags Flags) (Resolved, error) {
 	if err != nil {
 		return Resolved{}, err
 	}
+	zone, err := resolveZone(global, scoped, flags.Zone)
+	if err != nil {
+		return Resolved{}, err
+	}
 
 	return Resolved{
 		Profile:       profileName,
 		Output:        format,
+		Zone:          zone,
 		LogLevel:      level,
 		Quiet:         firstSet(flags.Quiet, nil, scoped.Quiet, global.Quiet),
 		FullIDs:       firstSet(flags.FullIDs, nil, scoped.FullIDs, global.FullIDs),
@@ -182,6 +193,30 @@ func Resolve(f *File, flags Flags) (Resolved, error) {
 		NoUpdateCheck: firstSet(nil, present("PROTON_NO_UPDATE_CHECK"), scoped.NoUpdateCheck, global.NoUpdateCheck),
 		Confirm:       policy,
 	}, nil
+}
+
+// resolveZone settles the zone this invocation works in.
+//
+// A zone written for this CLI has to be a real one, so a flag or a file naming
+// an unknown zone stops the command rather than being passed over - a silent
+// fallback there would anchor an event to a zone nobody asked for. The host's
+// own answer sits below the file, so `zone:` overrides the machine.
+//
+// An empty answer is not a failure here. Whether a zone is required depends on
+// what the command does, and the account's own calendar setting is a further
+// fallback that needs a client to ask; see app.App.Zone.
+func resolveZone(global, scoped Settings, flag string) (string, error) {
+	for _, named := range [][2]string{{"--zone", flag}, {"zone", scoped.Zone}, {"zone", global.Zone}} {
+		source, value := named[0], named[1]
+		if value == "" {
+			continue
+		}
+		if _, err := time.LoadLocation(value); err != nil {
+			return "", errs.Problemf("%s: %q is not an IANA time zone.", source, value).
+				Hint("zones are named like `Europe/Vienna` or `UTC`")
+		}
+	}
+	return firstNonEmpty(flag, envZone(), scoped.Zone, global.Zone, hostZone()), nil
 }
 
 // ConfirmVar carries the one-line form of the policy.

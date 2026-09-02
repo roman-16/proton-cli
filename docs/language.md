@@ -82,7 +82,7 @@ proton calendar events get 4f2a1b9c@2026-04-16T09:00   # one occurrence
 proton calendar events get 4f2a1b9c                    # the whole series
 ```
 
-Keep the `@` part and you act on that occurrence; drop it and you act on the series. `--future` widens one occurrence to it and every later one.
+Keep the `@` part and you act on that occurrence; drop it and you act on the series. `--onwards` widens one occurrence to it and every later one.
 
 ### Drive is addressed by path
 

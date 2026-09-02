@@ -11,7 +11,7 @@ func newYork(t *testing.T) *time.Location {
 	t.Helper()
 	loc, err := time.LoadLocation("America/New_York")
 	if err != nil {
-		t.Skipf("America/New_York is not available: %v", err)
+		t.Fatalf("America/New_York: %v", err)
 	}
 	return loc
 }

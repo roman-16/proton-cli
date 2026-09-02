@@ -188,12 +188,19 @@ func TestDecodeAutoReplyReadsTheSettingsObject(t *testing.T) {
 	}
 }
 
-func TestAutoReplyZoneDefaultsToTheHost(t *testing.T) {
-	got, err := AutoReply{Repeat: "permanent"}.encode()
+// A schedule is stored against a named zone, and an hour written with no zone
+// means nothing. Guessing one would put the auto-reply on at the wrong time and
+// say nothing about it, so an unnamed zone is refused here and named by whoever
+// resolved it.
+func TestAutoReplyNeedsTheZoneItIsReadIn(t *testing.T) {
+	if _, err := (AutoReply{Repeat: "permanent"}).encode(); err == nil {
+		t.Error("a schedule with no zone was encoded")
+	}
+	got, err := AutoReply{Repeat: "permanent", Zone: "Europe/Vienna"}.encode()
 	if err != nil {
 		t.Fatalf("encode: %v", err)
 	}
-	if got.Zone == "" {
-		t.Error("an omitted zone should default to the system zone, not empty")
+	if got.Zone != "Europe/Vienna" {
+		t.Errorf("Zone = %q, want the one it was given", got.Zone)
 	}
 }

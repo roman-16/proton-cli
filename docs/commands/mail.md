@@ -130,7 +130,7 @@ proton mail conversations forward 'Quarterly numbers' --to jane@example.com
 | `--no-attachments` | Leave the original's attachments behind |
 | `--no-quote` | Do not quote the original message |
 | `--no-signature` | Leave out this address's signature and Proton's footer |
-| `--send-at string` | Schedule delivery (RFC 3339, or YYYY-MM-DDTHH:MM in the system timezone) |
+| `--send-at string` | Schedule delivery (RFC 3339, or YYYY-MM-DDTHH:MM in the zone you are working in) |
 | `--to stringArray` | Recipient (repeatable; accepts "Name <addr>") |
 
 ### `conversations get`
@@ -340,7 +340,7 @@ proton mail conversations reply 'Quarterly numbers' --everyone --body Agreed.
 | `--html` | Compose in HTML (default: match the original) |
 | `--no-quote` | Do not quote the original message |
 | `--no-signature` | Leave out this address's signature and Proton's footer |
-| `--send-at string` | Schedule delivery (RFC 3339, or YYYY-MM-DDTHH:MM in the system timezone) |
+| `--send-at string` | Schedule delivery (RFC 3339, or YYYY-MM-DDTHH:MM in the zone you are working in) |
 | `--to stringArray` | Recipient (repeatable; accepts "Name <addr>") |
 
 ### `conversations snooze`
@@ -600,7 +600,7 @@ proton mail drafts send 5bH2mQxK --send-at 2026-04-16T09:00
 | `--eo-password-hint string` | Hint shown to password-protected recipients |
 | `--eo-password-stdin` | Read the password for recipients outside Proton from stdin |
 | `--expires string` | Self-destruct after DURATION (e.g. 7d, 24h), or never |
-| `--send-at string` | Schedule delivery (RFC 3339, or YYYY-MM-DDTHH:MM in the system timezone) |
+| `--send-at string` | Schedule delivery (RFC 3339, or YYYY-MM-DDTHH:MM in the zone you are working in) |
 
 ### `drafts update`
 
@@ -839,7 +839,7 @@ proton mail messages forward 'Invoice #2291' --to jane@example.com --no-attachme
 | `--no-attachments` | Leave the original's attachments behind |
 | `--no-quote` | Do not quote the original message |
 | `--no-signature` | Leave out this address's signature and Proton's footer |
-| `--send-at string` | Schedule delivery (RFC 3339, or YYYY-MM-DDTHH:MM in the system timezone) |
+| `--send-at string` | Schedule delivery (RFC 3339, or YYYY-MM-DDTHH:MM in the zone you are working in) |
 | `--to stringArray` | Recipient (repeatable; accepts "Name <addr>") |
 
 ### `messages get`
@@ -1060,7 +1060,7 @@ proton mail messages reply 'Invoice #2291' --body 'Draft first.' --draft
 | `--html` | Compose in HTML (default: match the original) |
 | `--no-quote` | Do not quote the original message |
 | `--no-signature` | Leave out this address's signature and Proton's footer |
-| `--send-at string` | Schedule delivery (RFC 3339, or YYYY-MM-DDTHH:MM in the system timezone) |
+| `--send-at string` | Schedule delivery (RFC 3339, or YYYY-MM-DDTHH:MM in the zone you are working in) |
 | `--to stringArray` | Recipient (repeatable; accepts "Name <addr>") |
 
 ### `messages send`
@@ -1094,7 +1094,7 @@ proton mail messages send --eml ./draft.eml
 | `--from string` | Address to send from, by email or ID (default: your primary) |
 | `--html` | Treat the body as HTML rather than plain text |
 | `--no-signature` | Leave out this address's signature and Proton's footer |
-| `--send-at string` | Schedule delivery (RFC 3339, or YYYY-MM-DDTHH:MM in the system timezone) |
+| `--send-at string` | Schedule delivery (RFC 3339, or YYYY-MM-DDTHH:MM in the zone you are working in) |
 | `--subject string` | Subject line |
 | `--to stringArray` | Recipient (repeatable; accepts "Name <addr>") |
 
@@ -1376,7 +1376,7 @@ proton mail settings autoreply get
 
 Configure the auto-reply and turn it on.
 
---start and --end are written in the grammar the repeat mode dictates: fixed      2026-07-01T09:00   a date and time in --zone daily      09:00              a time of day, with --days weekly     mon:09:00          a weekday and time monthly    1:09:00            a day of the month and time permanent  -                  no bounds
+--start and --end are written in the grammar the repeat mode dictates: fixed      2026-07-01T09:00   a date and time in your zone daily      09:00              a time of day, with --days weekly     mon:09:00          a weekday and time monthly    1:09:00            a day of the month and time permanent  -                  no bounds
 
 Proton sends every auto-reply with the subject "Auto" and offers no way to change it. Auto-reply is a paid feature.
 
@@ -1400,7 +1400,6 @@ proton mail settings autoreply set --message 'On holiday.' --start 2026-07-01T09
 | `--repeat string` | How the schedule repeats: fixed, daily, weekly, monthly, permanent (default `fixed`) |
 | `--start string` | Start of the window (grammar depends on --repeat) |
 | `--totp string` | Two-factor code |
-| `--zone string` | IANA time zone the schedule is read in (default: the system zone) |
 
 ### `settings filters`
 

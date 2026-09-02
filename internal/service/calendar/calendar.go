@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
@@ -26,6 +27,36 @@ func zoneOf(name string) (*time.Location, error) {
 		return nil, fmt.Errorf("unknown time zone %q", name)
 	}
 	return loc, nil
+}
+
+// PrimaryZone is the zone the account's calendar is drawn in, which is the zone
+// Proton's own clients write new events against.
+//
+// It is the last resort behind everything this machine can say about its own
+// zone, so it is asked for at most once and only when the rest of the chain came
+// up empty - a Windows or container install still gets a real anchor rather than
+// a bare UTC instant.
+func (s *Service) PrimaryZone(ctx context.Context) string {
+	s.zoneOnce.Do(func() {
+		var r struct {
+			CalendarUserSettings struct{ PrimaryTimezone string }
+		}
+		if err := s.C.Decode(ctx, proton.Request{Method: "GET", Path: "/settings/calendar"}, &r); err != nil {
+			return
+		}
+		if name := r.CalendarUserSettings.PrimaryTimezone; name != "" {
+			if _, err := time.LoadLocation(name); err == nil {
+				s.zone = name
+			}
+		}
+	})
+	return s.zone
+}
+
+// zoneCache is embedded in Service.
+type zoneCache struct {
+	zoneOnce sync.Once
+	zone     string
 }
 
 type Service struct {

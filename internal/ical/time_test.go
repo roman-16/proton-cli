@@ -1,6 +1,7 @@
 package ical
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -47,7 +48,7 @@ func TestStringIsTheLocalReadingOfTheInstant(t *testing.T) {
 func TestInReadsAnAllDayDateAsTheReadersOwnDay(t *testing.T) {
 	newYork, err := time.LoadLocation("America/New_York")
 	if err != nil {
-		t.Skipf("America/New_York is not available: %v", err)
+		t.Fatalf("America/New_York: %v", err)
 	}
 	day := Day(time.Date(2026, 8, 14, 0, 0, 0, 0, time.UTC))
 	if got := day.In(newYork); got.Format("2006-01-02 15:04") != "2026-08-14 00:00" {
@@ -127,5 +128,95 @@ func TestOccurrenceReferencesRoundTripAcrossAnchors(t *testing.T) {
 		if !back.Equal(v.Start) {
 			t.Errorf("a reference did not name the instant it was printed from: %v vs %v", back.Time, v.Start.Time)
 		}
+	}
+}
+
+// The clocks going forward leave an hour that no wall clock ever reads. Asking
+// for a time inside it used to yield the hour after, so an event written for
+// 02:30 was stored at 03:30 and nothing said so.
+func TestATimeInsideASkippedHourIsRefused(t *testing.T) {
+	loc := vienna(t)
+	_, err := ParseTime("2026-03-29T02:30", loc)
+	if err == nil {
+		t.Fatal("02:30 does not exist that day, and was accepted")
+	}
+	for _, want := range []string{"does not exist", "2026-03-29", "Europe/Vienna", "03:30"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not mention %q", err, want)
+		}
+	}
+}
+
+// The clocks going back read the same hour twice, and only an offset can say
+// which of the two was meant - so the message offers both, spelled the way the
+// answer has to be written.
+func TestATimeInsideARepeatedHourIsRefused(t *testing.T) {
+	loc := vienna(t)
+	_, err := ParseTime("2026-10-25T02:30", loc)
+	if err == nil {
+		t.Fatal("02:30 happens twice that day, and was accepted")
+	}
+	for _, want := range []string{"happens twice", "2026-10-25T02:30:00+02:00", "2026-10-25T02:30:00+01:00"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not mention %q", err, want)
+		}
+	}
+}
+
+// An offset names one instant outright, which is what makes it the answer to
+// both refusals above rather than a second way of saying the same thing.
+func TestAnOffsetSettlesAnAmbiguousReading(t *testing.T) {
+	loc := vienna(t)
+	for _, tc := range []struct{ in, want string }{
+		{"2026-10-25T02:30:00+02:00", "2026-10-25T00:30:00Z"},
+		{"2026-10-25T02:30:00+01:00", "2026-10-25T01:30:00Z"},
+		{"2026-03-29T02:30:00+01:00", "2026-03-29T01:30:00Z"},
+	} {
+		got, err := ParseTime(tc.in, loc)
+		if err != nil {
+			t.Fatalf("%s: %v", tc.in, err)
+		}
+		if utc := got.UTC().Format(time.RFC3339); utc != tc.want {
+			t.Errorf("%s = %s, want %s", tc.in, utc, tc.want)
+		}
+	}
+}
+
+// Every ordinary reading still parses, in each form somebody writes one.
+func TestAnUnambiguousReadingIsAccepted(t *testing.T) {
+	loc := vienna(t)
+	for _, in := range []string{
+		"2026-04-16T14:00", "2026-04-16T14:00:30", "2026-04-16 14:00", "2026-04-16",
+		"2026-04-16T14:00:00+02:00",
+	} {
+		if _, err := ParseTime(in, loc); err != nil {
+			t.Errorf("%s: %v", in, err)
+		}
+	}
+}
+
+// A reference this CLI printed has to keep resolving. The occurrence behind a
+// repeated 02:30 is settled by the series that generated it, which knows which
+// instant it meant, so refusing to read the string back would leave that
+// occurrence with no way to address it.
+func TestAPrintedReferenceIsReadBackWithoutJudgement(t *testing.T) {
+	loc := vienna(t)
+	for _, in := range []string{"2026-10-25T02:30", "2026-03-29T02:30"} {
+		if _, err := ParseWallTime(in, loc); err != nil {
+			t.Errorf("%s: %v", in, err)
+		}
+	}
+}
+
+// Where the clocks move by less than an hour, an overlap is shorter than an
+// hour too. Looking exactly an hour away for the twin would step straight over
+// Lord Howe Island's.
+func TestAHalfHourOverlapIsFound(t *testing.T) {
+	loc, err := time.LoadLocation("Australia/Lord_Howe")
+	if err != nil {
+		t.Fatalf("Australia/Lord_Howe: %v", err)
+	}
+	if _, err := ParseTime("2026-04-05T01:45", loc); err == nil {
+		t.Error("01:45 happens twice that day on Lord Howe Island, and was accepted")
 	}
 }

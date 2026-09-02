@@ -64,6 +64,7 @@ type App struct {
 	// cannot be asked a question get past a CAPTCHA at all.
 	Verified string
 
+	zone  zoneCache
 	mu    sync.Mutex
 	cache *keys.Unlocked
 
@@ -130,6 +131,12 @@ func New(opts Options) (*App, error) {
 		userID:        userID,
 		email:         email,
 	}
+	// Adopted before anything runs, so a listing prints in the same zone a write
+	// would be anchored to. Only a machine that cannot name its own zone leaves
+	// this empty, and that one asks the account the first time a command needs a
+	// name for it.
+	a.zone.name = opts.Zone
+	adoptZone(opts.Zone)
 	// A service that decrypts holds the keys it decrypts with, the way it holds the
 	// client it fetches with. Unlock is memoised, so the hierarchy is fetched at
 	// most once per invocation and only if something actually asks for it.

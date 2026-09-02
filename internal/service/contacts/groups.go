@@ -136,7 +136,7 @@ type ContactEmail struct {
 	// Groups are the groups this address is in. Membership lives here rather
 	// than on the group, which is why asking what a group holds means reading
 	// the addresses.
-	Groups []string `json:"groups,omitempty"`
+	Groups []string `json:"groups"`
 }
 
 // ContactEmails lists a contact's addresses with the IDs a group is applied to.

@@ -42,13 +42,12 @@ proton calendar events create --title Renewal --start 2026-09-01T09:00 --remind 
 | `--start string` | Set the start (RFC 3339, or YYYY-MM-DDTHH:MM) |
 | `--status string` | Set whether it is going ahead: confirmed, tentative, cancelled |
 | `--title string` | Set the title |
-| `--zone string` | IANA time zone the event is anchored to (default: your system zone) |
 
 ### `events delete`
 
 Delete events.
 
-A reference that names one occurrence of a recurring event deletes only that occurrence. Add --future to delete it and every later one, or drop the @ part of the reference to delete the whole series.
+A reference that names one occurrence of a recurring event deletes only that occurrence. Add --onwards to delete it and every later one, or drop the @ part of the reference to delete the whole series.
 
 ```
 proton calendar events delete REF...
@@ -56,12 +55,12 @@ proton calendar events delete REF...
 
 ```bash
 proton calendar events delete Dentist
-proton calendar events delete 4f2a1b9c@2026-05-04T09:00 --future
+proton calendar events delete 4f2a1b9c@2026-05-04T09:00 --onwards
 ```
 
 | Flag | Description |
 | --- | --- |
-| `--future` | Also delete every later occurrence of the series |
+| `--onwards` | Also delete every later occurrence of the series |
 
 ### `events export`
 
@@ -167,7 +166,7 @@ Change an event.
 
 Anything you do not mention is left alone, including the reminders and the recurrence.
 
-A reference that names one occurrence of a recurring event changes only that occurrence. Add --future to change it and every later one, or drop the @ part of the reference to change the whole series.
+A reference that names one occurrence of a recurring event changes only that occurrence. Add --onwards to change it and every later one, or drop the @ part of the reference to change the whole series, which --dry-run will show you before you do.
 
 ```
 proton calendar events update REF
@@ -176,7 +175,7 @@ proton calendar events update REF
 ```bash
 proton calendar events update Dentist --start 2026-04-16T15:30
 proton calendar events update 4f2a1b9c@2026-04-22T09:00 --location 'Room 3'
-proton calendar events update 4f2a1b9c@2026-04-22T09:00 --title Standup --future
+proton calendar events update 4f2a1b9c@2026-04-22T09:00 --title Standup --onwards
 ```
 
 | Flag | Description |
@@ -185,15 +184,14 @@ proton calendar events update 4f2a1b9c@2026-04-22T09:00 --title Standup --future
 | `--description string` | Replace the description |
 | `--duration string` | Replace how long it lasts (e.g. 15m, 1h, 2h30m, 3d) |
 | `--end string` | Replace the end (RFC 3339, or YYYY-MM-DDTHH:MM) |
-| `--future` | Also change every later occurrence of the series |
 | `--location string` | Replace where it is |
 | `--no-remind` | Remove the reminders |
+| `--onwards` | Also change every later occurrence of the series |
 | `--remind stringArray` | Remind this long before the start, as DURATION or DURATION:email (repeatable) |
 | `--rrule string` | Replace the recurrence rule, e.g. FREQ=WEEKLY;COUNT=10 |
 | `--start string` | Replace the start (RFC 3339, or YYYY-MM-DDTHH:MM) |
 | `--status string` | Replace whether it is going ahead: confirmed, tentative, cancelled |
 | `--title string` | Replace the title |
-| `--zone string` | IANA time zone the event is anchored to (default: your system zone) |
 
 ## `invitations`
 

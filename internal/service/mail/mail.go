@@ -86,7 +86,7 @@ type Message struct {
 	Time           int64    `json:"time"`
 	Unread         int      `json:"unread"`
 	NumAttachments int      `json:"num_attachments"`
-	Labels         []string `json:"labels,omitempty"`
+	Labels         []string `json:"labels"`
 }
 
 // Starred reports whether the message carries the Starred label. A star is a
@@ -99,14 +99,14 @@ type Full struct {
 	ConversationID string                 `json:"conversation_id,omitempty"`
 	Subject        string                 `json:"subject"`
 	Sender         map[string]any         `json:"from"`
-	ToList         []map[string]any       `json:"to,omitempty"`
-	CCList         []map[string]any       `json:"cc,omitempty"`
-	BCCList        []map[string]any       `json:"bcc,omitempty"`
+	ToList         []map[string]any       `json:"to"`
+	CCList         []map[string]any       `json:"cc"`
+	BCCList        []map[string]any       `json:"bcc"`
 	Time           int64                  `json:"time,omitempty"`
 	Body           string                 `json:"body"`
 	MIMEType       string                 `json:"mime_type"`
 	AddressID      string                 `json:"address_id"`
-	Attachments    []Attachment           `json:"attachments,omitempty"`
+	Attachments    []Attachment           `json:"attachments"`
 	Signature      pgphelper.VerifyResult `json:"signature,omitempty"`
 }
 
@@ -117,9 +117,9 @@ type Conversation struct {
 	NumUnread      int              `json:"num_unread"`
 	NumAttachments int              `json:"num_attachments"`
 	Time           int64            `json:"time"`
-	Senders        []map[string]any `json:"senders,omitempty"`
-	Recipients     []map[string]any `json:"recipients,omitempty"`
-	Labels         []string         `json:"labels,omitempty"`
+	Senders        []map[string]any `json:"senders"`
+	Recipients     []map[string]any `json:"recipients"`
+	Labels         []string         `json:"labels"`
 }
 
 // Starred reports whether the thread carries the Starred label.

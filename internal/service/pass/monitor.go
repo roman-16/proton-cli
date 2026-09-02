@@ -51,7 +51,7 @@ type Breach struct {
 	// time.
 	Published int64 `json:"published,omitempty"`
 	// Exposed is what was leaked - an address, a password, a date of birth.
-	Exposed []string `json:"exposed,omitempty"`
+	Exposed []string `json:"exposed"`
 	// Source is where it came from, when that is known.
 	Source string `json:"source,omitempty"`
 	// Size is roughly how many records the breach held.
