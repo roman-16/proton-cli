@@ -1,0 +1,62 @@
+---
+/*
+ * The theme's sidebar, plus the scroll position Starlight means it to keep.
+ *
+ * Starlight persists the sidebar across a navigation by reading and writing the
+ * scrollTop of `#starlight__sidebar`. The theme scrolls `.sidebar-content`
+ * inside it instead, so what Starlight measures is always zero and what it
+ * restores goes to an element that cannot scroll. With sixty entries in the
+ * sidebar, every click threw the reader back to the top of it.
+ *
+ * The scroll is kept under a key of its own rather than folded into Starlight's,
+ * so which groups are open stays Starlight's to answer and the two cannot
+ * corrupt each other.
+ */
+import ThemeSidebar from "starlight-theme-black/overrides/Sidebar.astro";
+---
+
+<ThemeSidebar />
+
+{
+  /*
+   * Inline and here rather than a bundled module, so it runs while the document
+   * is still parsing: a restore that waits for the page to load is a jump the
+   * reader watches happen.
+   */
+}
+<script is:inline>
+  (() => {
+    const key = "proton-cli-sidebar-scroll";
+    const scroller = document.querySelector("#starlight__sidebar .sidebar-content");
+    if (!scroller) return;
+
+    try {
+      scroller.scrollTop = Number(sessionStorage.getItem(key)) || 0;
+    } catch {}
+
+    /*
+     * Arriving from search or from a link in the body lands on a page the
+     * restored position may not cover, and a sidebar that does not show where
+     * you are is worse than one scrolled to the top.
+     */
+    const current = scroller.querySelector('[aria-current="page"]');
+    if (current) {
+      const pane = scroller.getBoundingClientRect();
+      const entry = current.getBoundingClientRect();
+      if (entry.top < pane.top || entry.bottom > pane.bottom) {
+        current.scrollIntoView({ block: "center" });
+      }
+    }
+
+    const save = () => {
+      try {
+        sessionStorage.setItem(key, String(scroller.scrollTop));
+      } catch {}
+    };
+
+    // Written as it happens, so the position is already stored by the time a
+    // click on one of these links begins a navigation.
+    scroller.addEventListener("scroll", save, { passive: true });
+    addEventListener("pagehide", save);
+  })();
+</script>

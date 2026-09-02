@@ -7,6 +7,26 @@ import starlightThemeBlack from "starlight-theme-black";
 
 import { description, origin, repo, social } from "./site.ts";
 
+/*
+ * The sidebar keeps its scroll position across a navigation.
+ *
+ * It is registered from a plugin rather than from `components`, because the
+ * theme warns about any override it finds in the configuration - and this one is
+ * the very thing that warning recommends, since it renders the theme's own
+ * sidebar. Declared after the theme, it updates the same setting without being
+ * seen.
+ */
+const sidebarScroll = {
+  hooks: {
+    "config:setup"({ config, updateConfig }) {
+      updateConfig({
+        components: { ...config.components, Sidebar: "./src/components/Sidebar.astro" },
+      });
+    },
+  },
+  name: "proton-cli-sidebar-scroll",
+};
+
 export default defineConfig({
   fonts: [
     {
@@ -78,6 +98,7 @@ export default defineConfig({
           promote: ["index", "first-commands", "commands", "using/output", "about/faq"],
         }),
         starlightLinksValidator(),
+        sidebarScroll,
       ],
       /*
        * One section per app, holding its guide and the reference pages for its

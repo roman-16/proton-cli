@@ -21,7 +21,12 @@ import Footer from "../components/Footer.astro";
         tag: "meta",
       },
     ],
-    template: "splash",
+    /*
+     * The reference brings a contents list of its own, seven hundred entries
+     * deep, and a second one beside it listing the two paragraphs above would
+     * only compete with it.
+     */
+    tableOfContents: false,
     title: "Proton API reference",
   }}
 >
@@ -45,9 +50,9 @@ import Footer from "../components/Footer.astro";
 
 <style is:global>
   /*
-   * The reference brings a two-column layout of its own, and the splash template
-   * sizes its column for prose. Scoped to the page by the element it renders
-   * into, so nothing else on the site widens with it.
+   * The reference brings a two-column layout of its own, and a content column
+   * sized for prose leaves it nowhere to put the second one. Scoped to the page
+   * by the element it renders into, so nothing else on the site widens with it.
    */
   html:has(#api-reference) {
     --sl-content-width: 100%;
