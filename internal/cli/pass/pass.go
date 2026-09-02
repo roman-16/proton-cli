@@ -98,17 +98,18 @@ func (g *generator) make() (string, error) {
 // and may never leave it. That is also the point - a generator you already have
 // beats reaching for whatever is on the path.
 //
-// The alphabet and the wordlist are Proton's own, so what comes out is what Pass
-// itself would have made.
+// The wordlist and the separators are Proton's own, so a passphrase made here is
+// one Pass could have made. A password of characters is drawn from a wider set of
+// symbols than Pass draws from.
 func generateCmd() *cobra.Command {
 	var g generator
 	c := &cobra.Command{
 		Use:   "generate",
 		Short: "Make a password",
 		Long: "Make a password, without storing it anywhere.\n\n" +
-			"It reaches no account and needs no session. The alphabet is Proton's own,\n" +
-			"which leaves out i, o, l and their capitals - the characters people misread -\n" +
-			"unless letters are all the password has.\n\n" +
+			"It reaches no account and needs no session. The alphabet leaves out i, o, l\n" +
+			"and their capitals - the characters people misread - unless letters are all\n" +
+			"the password has.\n\n" +
 			"Every kind asked for is guaranteed to appear, so a password that has to\n" +
 			"contain a digit does.\n\n" +
 			"--words makes a passphrase instead, from Proton's own wordlist: that many\n" +

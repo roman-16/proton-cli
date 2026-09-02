@@ -26,7 +26,9 @@ func TestPasswordIncludesEveryClassAskedFor(t *testing.T) {
 	}
 }
 
-// What was not asked for does not appear.
+// What was not asked for does not appear - capitals included, which the
+// misread-prone characters would smuggle in if they were not kept in their own
+// case.
 func TestPasswordLeavesOutWhatWasNotAskedFor(t *testing.T) {
 	for i := 0; i < 200; i++ {
 		got, err := Password(Options{Length: 16})
@@ -39,16 +41,14 @@ func TestPasswordLeavesOutWhatWasNotAskedFor(t *testing.T) {
 		if strings.ContainsAny(got, symbols) {
 			t.Fatalf("%q has a symbol and none was asked for", got)
 		}
-		if strings.ContainsAny(got, upper) {
+		if strings.ContainsAny(got, upper+misreadUpper) {
 			t.Fatalf("%q has a capital and none was asked for", got)
 		}
 	}
 }
 
-// The misread-prone characters are left out of a mixed password and allowed back
-// when letters are the only alphabet there is.
-
-func TestPasswordAmbiguousCharacters(t *testing.T) {
+// The misread-prone characters are left out of a mixed password.
+func TestPasswordLeavesOutTheMisreadCharacters(t *testing.T) {
 	mixed := ""
 	for i := 0; i < 200; i++ {
 		got, err := Password(Options{Length: 20, Digits: true, Symbols: true, Upper: true})
@@ -57,8 +57,26 @@ func TestPasswordAmbiguousCharacters(t *testing.T) {
 		}
 		mixed += got
 	}
-	if strings.ContainsAny(mixed, ambiguous) {
+	if strings.ContainsAny(mixed, misreadLower+misreadUpper) {
 		t.Error("a mixed password should leave out the characters people misread")
+	}
+}
+
+// They come back when letters are the only alphabet there is, in whichever cases
+// the password was allowed.
+func TestPasswordAllowsTheMisreadCharactersBackWhenLettersAreAll(t *testing.T) {
+	letters := ""
+	for i := 0; i < 200; i++ {
+		got, err := Password(Options{Length: 20, Upper: true})
+		if err != nil {
+			t.Fatalf("password: %v", err)
+		}
+		letters += got
+	}
+	for _, want := range []string{misreadLower, misreadUpper} {
+		if !strings.ContainsAny(letters, want) {
+			t.Errorf("a password of letters alone should be able to contain %q", want)
+		}
 	}
 }
 

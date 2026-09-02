@@ -224,7 +224,7 @@ proton pass export --dest pass-backup.zip
 
 Make a password, without storing it anywhere.
 
-It reaches no account and needs no session. The alphabet is Proton's own, which leaves out i, o, l and their capitals - the characters people misread - unless letters are all the password has.
+It reaches no account and needs no session. The alphabet leaves out i, o, l and their capitals - the characters people misread - unless letters are all the password has.
 
 Every kind asked for is guaranteed to appear, so a password that has to contain a digit does.
 

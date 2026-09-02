@@ -1,5 +1,5 @@
-// Package secret makes passwords, using the same alphabet and defaults as Proton
-// Pass.
+// Package secret makes passwords, with the lengths, wordlist and separators
+// Proton Pass uses.
 //
 // It is here rather than in the Pass service because nothing about it involves
 // Proton: a password is made on this machine and may never be stored anywhere.
@@ -14,18 +14,19 @@ import (
 	"strings"
 )
 
-// The alphabets Proton's own generator uses.
+// The alphabet a password is drawn from.
 //
 // i, o, l and their capitals are left out of the default set because they are
 // the characters people misread; they come back when letters are the only thing
 // asked for, since a password of 20 characters drawn from 46 would be weaker for
 // no reason. The symbols are the ones that survive a double-click selection.
 const (
-	upper     = "ABCDEFGHJKMNPQRSTUVWXYZ"
-	lower     = "abcdefghjkmnpqrstuvwxyz"
-	ambiguous = "iolIOL"
-	digits    = "0123456789"
-	symbols   = "!#$%&()*+.:;<=>?@[]^"
+	digits       = "0123456789"
+	lower        = "abcdefghjkmnpqrstuvwxyz"
+	misreadLower = "iol"
+	misreadUpper = "IOL"
+	symbols      = "!#$%&()*+.:;<=>?@[]^"
+	upper        = "ABCDEFGHJKMNPQRSTUVWXYZ"
 )
 
 // DefaultLength is Proton's, and long enough that the alphabet hardly matters.
@@ -65,20 +66,22 @@ func Password(o Options) (string, error) {
 	if o.Length <= 0 {
 		o.Length = DefaultLength
 	}
-	classes := []string{lower}
+	// Letters alone is a narrow enough alphabet that the misread-prone ones are
+	// worth having back, each in the case it belongs to so that a password of
+	// lowercase stays lowercase.
+	lowercase, uppercase := lower, upper
+	if !o.Digits && !o.Symbols {
+		lowercase, uppercase = lower+misreadLower, upper+misreadUpper
+	}
+	classes := []string{lowercase}
 	if o.Upper {
-		classes = append(classes, upper)
+		classes = append(classes, uppercase)
 	}
 	if o.Digits {
 		classes = append(classes, digits)
 	}
 	if o.Symbols {
 		classes = append(classes, symbols)
-	}
-	// Letters alone is a narrow enough alphabet that the misread-prone ones are
-	// worth having back.
-	if !o.Digits && !o.Symbols {
-		classes[0] = lower + ambiguous
 	}
 	if o.Length < len(classes) {
 		return "", fmt.Errorf("a password of %d characters cannot hold one of each of %d kinds",
