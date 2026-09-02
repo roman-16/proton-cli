@@ -8,7 +8,7 @@
 
 _One binary, end-to-end encrypted. A community project, not affiliated with Proton AG._
 
-[![Release](https://img.shields.io/github/v/release/roman-16/proton-cli?sort=semver&style=flat-square&color=6D4AFF)](https://github.com/roman-16/proton-cli/releases/latest) [![Downloads](https://img.shields.io/github/downloads/roman-16/proton-cli/total?style=flat-square&color=6D4AFF)](https://github.com/roman-16/proton-cli/releases) [![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-6D4AFF?style=flat-square)](docs/installation.md) [![License](https://img.shields.io/github/license/roman-16/proton-cli?style=flat-square&color=6D4AFF)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/roman-16/proton-cli?sort=semver&style=flat-square&color=6D4AFF)](https://github.com/roman-16/proton-cli/releases/latest) [![Downloads](https://img.shields.io/github/downloads/roman-16/proton-cli/total?style=flat-square&color=6D4AFF)](https://github.com/roman-16/proton-cli/releases) [![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-6D4AFF?style=flat-square)](docs/install.md) [![License](https://img.shields.io/github/license/roman-16/proton-cli?style=flat-square&color=6D4AFF)](LICENSE)
 
 **[proton-cli.lerchster.dev](https://proton-cli.lerchster.dev)** - the documentation, searchable.
 
@@ -24,7 +24,7 @@ Read your mail, move files in and out of Drive, manage calendars, passwords and 
 
 - **Real end-to-end encryption.** SRP login and the full PGP key hierarchy, handled locally with Proton's own [go-srp](https://github.com/ProtonMail/go-srp) and [gopenpgp](https://github.com/ProtonMail/gopenpgp). No bridge, no proxy, no browser in the middle.
 - **Five apps, one binary.** Mail, Drive, Calendar, Pass and Contacts, in a single static executable on Linux, macOS and Windows.
-- **Built for pipes and cron.** JSON and YAML with one envelope shape for every list, streaming stdin and stdout, exit codes that mean something, and `--dry-run` on everything that changes state, showing the rows it would touch.
+- **Built for pipes and cron.** JSON and YAML with one envelope shape for every list, streaming stdin and stdout, exit codes that mean something, and `--dry-run` on everything that changes state.
 
 ## Install
 
@@ -36,9 +36,11 @@ curl -fsSL https://raw.githubusercontent.com/roman-16/proton-cli/main/scripts/in
 irm https://raw.githubusercontent.com/roman-16/proton-cli/main/scripts/install.ps1 | iex
 ```
 
-Also on Homebrew, winget, APT, AUR, Nix, npm, and as plain signed binaries - see [Install](docs/installation.md). The command is `proton`, and `proton-cli` works too.
+Also on Homebrew, winget, APT, AUR, Nix, npm, and as plain signed binaries. See [Install](docs/install.md).
 
-## Sixty seconds
+The command is `proton`, and `proton-cli` works too.
+
+## Sign in
 
 ```console
 $ proton account login
@@ -49,7 +51,9 @@ Two-factor code:  123456
 ✓ Signed in as you@proton.me.
 ```
 
-That's the whole setup - signing in saves the session **and** unlocks your keys, so your password is needed once on this machine and not again.
+That is the whole setup. Signing in saves the session **and** unlocks your keys, so your password is needed once on this machine and not again.
+
+## Try it
 
 ```bash
 proton mail messages list --unread
@@ -59,61 +63,25 @@ proton calendar events list
 proton pass items totp github.com
 ```
 
-Every command reads the same way - `proton <app> <collection> <verb>` - and anywhere one wants an ID, a subject, name, path, or address works too. → [Quickstart](docs/quickstart.md) · [How commands read](docs/language.md)
+Every command reads the same way, `proton <app> <collection> <verb>`, and anywhere one wants an ID, a subject, name, path or address works too.
 
-## What you can do
-
-- **[Mail](docs/apps/mail.md)** - read, send, search and organize. Threads, attachments, filters, snoozing, block and allow lists, auto-reply.
-- **[Drive](docs/apps/drive.md)** - files and folders as paths. Revisions, public links, sharing with people, trash, photo albums.
-- **[Calendar](docs/apps/calendar.md)** - events and reminders. Recurrence occurrence by occurrence, attendees, invitations, .ics in and out.
-- **[Pass](docs/apps/pass.md)** - logins and secrets. Notes, cards, SSH keys, identities, aliases, two-factor codes, item history, sharing a vault or one item.
-- **[Contacts](docs/apps/contacts.md)** - your address book. Typed addresses and phones, the full vCard field set, duplicate merging.
-- **[Account](docs/apps/account.md)** - signing in, sessions, and more than one account side by side.
-
-[`proton api`](docs/apps/api.md) reaches any endpoint the commands don't. The [command reference](docs/commands/README.md) has every command, argument and flag.
-
-## How it compares
-
-Proton ships a CLI for Drive and one for Pass, and Bridge for mail in a desktop client. This is one binary across all five apps, with one grammar and one output shape.
-
-| | Mail | Drive | Calendar | Pass | Contacts |
-| --- | --- | --- | --- | --- | --- |
-| **proton-cli** | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Proton Drive CLI | | ✓ | | | |
-| Proton Pass CLI | | | | ✓ | |
-| Proton Mail Bridge | IMAP/SMTP only | | | | |
-
-Bridge is a background service your mail client talks to, and needs a paid plan. proton-cli is a command you run, on any plan. → [FAQ](docs/faq.md)
-
-## Automate it
-
-```bash
-# creating something prints its new ID to stdout
-ID=$(proton mail settings labels create --name Work --color purple)
-
-# every list is an envelope keyed by its plural name, always with a count
-proton mail messages list --unread --output json | jq -r '.messages[].subject'
-
-# stream through, no temporary files
-pg_dump mydb | gzip | proton drive items upload - /Backups/db.sql.gz
-
-# check what a bulk change would touch before it happens
-proton mail messages trash --from newsletter@example.com --older-than 90d --dry-run
-```
-
-Data goes to stdout and progress to stderr, so redirects stay clean. Exit codes tell user error, auth failure, not-found, ambiguity, and network trouble apart. Anything that removes permanently, or removes what a filter picked out rather than what you named, shows the rows and asks first - and off a terminal it refuses instead, so an unattended run fails safe until you add `--yes`. → [Scripting](docs/scripting.md)
-
-## Encryption you can verify
-
-Your password never reaches Proton: login is SRP, and the key password it derives stays local and unlocks your PGP keys in memory. Mail, files, events, contacts, and Pass items are decrypted after they arrive and encrypted before they leave, with the same key hierarchy the web clients use.
-
-The saved session keeps your key password encrypted with a key held server-side, so revoking the session from any Proton app makes a leaked copy of the file useless. proton-cli is unaudited; the whole model is written down in [Security and encryption](docs/how-it-works.md).
+→ [First commands](docs/first-commands.md) · [How a command is built](docs/commands.md)
 
 ## Documentation
 
-Everything is at **[proton-cli.lerchster.dev](https://proton-cli.lerchster.dev)** and in [`docs/`](docs/README.md) beside the code. Start with [Quickstart](docs/quickstart.md), reach for the [FAQ](docs/faq.md) when you wonder whether this is the right tool, and [Troubleshooting](docs/troubleshooting.md) when a command surprises you.
+Everything is at **[proton-cli.lerchster.dev](https://proton-cli.lerchster.dev)** and in [`docs/`](docs/README.md) beside the code.
 
-[`CHANGELOG.md`](CHANGELOG.md) records what each version changed, and `proton changelog` prints it. Already installed? `proton update`. An install no package manager owns says so itself, once a day.
+| If you want to | Read |
+| --- | --- |
+| Get going | [Install](docs/install.md) · [First commands](docs/first-commands.md) |
+| Do something in one app | [Mail](docs/mail/README.md) · [Drive](docs/drive/README.md) · [Calendar](docs/calendar/README.md) · [Pass](docs/pass/README.md) · [Contacts](docs/contacts/README.md) |
+| Script it | [Scripting](docs/using/scripting.md) · [Output and exit codes](docs/using/output.md) |
+| Look up a command | [All commands](docs/about/commands.md) |
+| Know whether this is the right tool | [FAQ](docs/about/faq.md) - including how it compares to Proton's own CLIs and to Bridge |
+| Understand the encryption | [Security and encryption](docs/about/security.md) |
+| Fix a failing command | [Troubleshooting](docs/help/troubleshooting.md) |
+
+[`CHANGELOG.md`](CHANGELOG.md) records what each version changed, and `proton changelog` prints it. Already installed? `proton update`.
 
 ## Contributing
 

@@ -23,10 +23,10 @@ func sharedCmd() *cobra.Command {
 		Use:   "list",
 		Short: "List the items other people have shared with you",
 		Long: "List the items other people have shared with you.\n\n" +
-			"These are in no vault of yours, so they are not in `items list`: they are\n" +
-			"addressed by the ID this shows, or by their name like anything else.\n\n" +
-			"An item whose content will not open is still listed, because knowing it is\n" +
-			"there is what lets you act on it.",
+			"These are in no vault of yours, so `items list` does not show them. Address\n" +
+			"them by the ID shown here, or by name.\n\n" +
+			"An item whose content cannot be decrypted is still listed, so you can still\n" +
+			"act on it.",
 		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			rows, err := c.App.Pass.SharedWithMe(c.Ctx)
@@ -58,10 +58,9 @@ func sharingCmd() *cobra.Command {
 		Use:   "list",
 		Short: "List the items you have shared",
 		Long: "List the items you have shared with somebody on their own.\n\n" +
-			"`items share get REF` answers the question for one item; this answers the\n" +
-			"one you actually have, which is what have I left open. A vault you share\n" +
-			"is in `vaults list`, with the number of people in it, and a link you made\n" +
-			"is in `links list`.",
+			"To check a single item instead, run `items share get REF`. Shared vaults\n" +
+			"are in `vaults list` with the number of people in each, and secure links\n" +
+			"are in `links list`.",
 		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			rows, err := c.App.Pass.SharedByMe(c.Ctx)

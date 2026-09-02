@@ -86,8 +86,8 @@ func shareLinkCmd() *cobra.Command {
 		Use:   "link PATH",
 		Short: "Create or update the public link for a file or folder",
 		Long: "Create or update the public link for a file or folder.\n\n" +
-			"Running it again with different options changes the existing link rather than\n" +
-			"making a second one, so the URL you have shared keeps working.\n\n" +
+			"Running it again changes the existing link rather than making a second one,\n" +
+			"so a URL you have already shared keeps working.\n\n" +
 			"The password is read from a file or from stdin, never from a flag value, and\n" +
 			"may be at most 50 characters. --clear-link-password takes it off again, and\n" +
 			"--expires never makes an expiring link permanent.",
@@ -208,9 +208,8 @@ func shareUpdateCmd() *cobra.Command {
 		Use:   "update PATH EMAIL",
 		Short: "Change what somebody may do with a file or folder",
 		Long: "Change what somebody may do with a file or folder.\n\n" +
-			"It applies to whoever holds the address, whether they have accepted yet or\n" +
-			"not: Proton keeps members and invitations apart, but the question is the\n" +
-			"same one either way.",
+			"Name them by address. It works whether they have accepted the share or\n" +
+			"still have it pending.",
 		Args: cobra.ExactArgs(2),
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			if !c.Changed("edit") {
@@ -379,11 +378,10 @@ func trashListCmd() *cobra.Command {
 		Use:   "list",
 		Short: "List what is in the trash",
 		Long: "List what is in the trash.\n\n" +
-			"Everything the account has trashed is here, photos included: they are kept\n" +
-			"on a volume of their own, and `trash empty` deletes both.\n\n" +
-			"A trashed item has no path any more, so it is addressed by the ID shown. An\n" +
-			"item whose name cannot be read is still listed, because knowing it is there\n" +
-			"is what lets you act on it.",
+			"This covers everything the account has trashed, photos included. `trash\n" +
+			"empty` deletes all of it.\n\n" +
+			"A trashed item has no path, so address it by the ID shown here. An item\n" +
+			"whose name cannot be decrypted is still listed, so you can still act on it.",
 		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			dc, err := context(c)
@@ -418,8 +416,7 @@ func trashRestoreCmd() *cobra.Command {
 		Use:   "restore REF...",
 		Short: "Put items back where they came from",
 		Long: "Put items back where they came from.\n\n" +
-			"A trashed item has no path any more, so it is named by the ID that\n" +
-			"`trash list` shows.",
+			"A trashed item has no path. Name it by the ID that `trash list` shows.",
 		Args: cobra.MinimumNArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			dc, err := context(c)
@@ -440,8 +437,7 @@ func trashEmptyCmd() *cobra.Command {
 		Use:   "empty",
 		Short: "Delete everything in the trash, permanently",
 		Long: "Delete everything in the trash, permanently.\n\n" +
-			"That is everything `trash list` shows, on every volume the account has:\n" +
-			"trashed photos go with it.",
+			"That is everything `trash list` shows, trashed photos included.",
 		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			dc, err := context(c)
@@ -490,10 +486,10 @@ func sharedCmd() *cobra.Command {
 		Use:   "list",
 		Short: "List what other people have shared with you",
 		Long: "List what other people have shared with you.\n\n" +
-			"These do not live in your tree, so they have no path: they are addressed by\n" +
-			"the ID this listing shows, the way trashed items and photos are.\n\n" +
-			"An item whose name cannot be read is still listed, because knowing it is\n" +
-			"there is what lets you act on it.",
+			"These are not in your tree and have no path. Address them by the ID shown\n" +
+			"here, as you would a trashed item or a photo.\n\n" +
+			"An item whose name cannot be decrypted is still listed, so you can still\n" +
+			"act on it.",
 		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			items, err := c.App.Drive.SharedWithMe(c.Ctx)
@@ -518,9 +514,8 @@ func sharingCmd() *cobra.Command {
 	c.AddCommand(&cobra.Command{
 		Use:   "list",
 		Short: "List what you have shared",
-		Long: "List what you have shared, by link or with named people.\n\n" +
-			"`items share get PATH` answers the question for one item; this answers the\n" +
-			"one you actually have, which is what have I left open.",
+		Long: "List everything you have shared, by public link or with named people.\n\n" +
+			"To check a single item instead, run `items share get PATH`.",
 		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			items, err := c.App.Drive.SharedByMe(c.Ctx)

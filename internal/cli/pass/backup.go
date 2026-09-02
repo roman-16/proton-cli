@@ -24,12 +24,12 @@ func exportCmd() *cobra.Command {
 		Use:   "export",
 		Short: "Write the vaults you own out as a Proton Pass archive",
 		Long: "Write the vaults you own out as a Proton Pass archive, or to stdout with --dest -.\n\n" +
-			"The file is the one Proton Pass itself writes, so it can be read back by\n" +
-			"the app as well as by this tool. Give a passphrase and the contents are\n" +
-			"encrypted to it; without one the archive holds every password in the clear.\n\n" +
-			"A vault somebody shared with you is theirs to back up, so it is not in the\n" +
-			"file - restoring this one cannot turn their vault into a second copy under\n" +
-			"your name.",
+			"This writes the same archive format Proton Pass writes, so the app can read\n" +
+			"it back.\n\n" +
+			"Give a passphrase and the contents are encrypted to it. Without one, the\n" +
+			"archive holds every password in the clear.\n\n" +
+			"Only vaults you own are included. A vault somebody shared with you is\n" +
+			"theirs to back up.",
 		Args: cobra.NoArgs,
 		RunE: kit.Run([]kit.Step{passphrase.Supply}, func(c *kit.Invocation) error {
 			if err := dest.Validate(true); err != nil {
@@ -89,10 +89,10 @@ func importCmd() *cobra.Command {
 		Use:   "import PATH",
 		Short: "Read a Proton Pass archive back in",
 		Long: "Read a Proton Pass archive back in, or one on stdin with -.\n\n" +
-			"A vault in the file lands in the vault of that name, and one that is not\n" +
-			"there yet is made. Items are added rather than matched: nothing in a file\n" +
-			"says which existing item it was, so reading the same file twice puts the\n" +
-			"items in twice.",
+			"A vault in the file lands in the vault of that name, which is created if it\n" +
+			"does not exist.\n\n" +
+			"Items are always added, never matched against what is already there, so\n" +
+			"reading the same file twice creates duplicates.",
 		Args: cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{passphrase.Supply}, func(c *kit.Invocation) error {
 			raw, err := kit.ReadBytesArg(c, c.Args[0], "PATH")

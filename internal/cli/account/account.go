@@ -123,25 +123,23 @@ func loginCmd() *cobra.Command {
 		Short: "Sign in and save the session for this profile",
 		Long: "Sign in and save the session for this profile.\n\n" +
 			"Signing in also unlocks your keys, so your password is needed once per\n" +
-			"machine and not again. Anything a flag has not set is asked for, as long\n" +
-			"as this is a terminal.\n\n" +
-			"An account with a security key is asked to touch it. With an authenticator\n" +
-			"app enabled as well, an empty answer to the code prompt reaches for the key\n" +
-			"instead - so --totp is what an unattended job uses, a key being something\n" +
-			"only a person can answer.\n\n" +
-			"An account in two-password mode is asked for its second password once it has\n" +
-			"signed in, because that is the secret its keys are locked with rather than\n" +
-			"the one that proves who it is. A one-password account is never asked for it.\n\n" +
-			"Pass can be protected with an extra password of its own. It is not asked for\n" +
-			"here - the first `pass` command asks, and Proton then lets the session reach\n" +
-			"Pass for as long as it lives. --extra-password-file hands it over now instead,\n" +
-			"which is what a run with nobody to ask needs.\n\n" +
-			"Proton may ask you to prove you are human. The page it wants is printed, and\n" +
-			"can be solved on any device - so a machine with no display signs in like any\n" +
-			"other. A run that cannot be asked anything says which page to solve and which\n" +
-			"token to repeat the command with.\n\n" +
+			"machine and not again. Anything a flag has not set is asked for, as long as\n" +
+			"this is a terminal.\n\n" +
+			"Security key: you are asked to touch it. If the account also has an\n" +
+			"authenticator app, pressing Enter at the code prompt reaches for the key\n" +
+			"instead. A key needs a person present, so unattended jobs want --totp.\n\n" +
+			"Two-password mode: the second password is asked for after signing in. That\n" +
+			"is the password your keys are locked with. A one-password account is never\n" +
+			"asked for it.\n\n" +
+			"Pass extra password: not asked for here. The first `pass` command asks, and\n" +
+			"the session can then reach Pass for as long as it lives. Pass it now with\n" +
+			"--extra-password-file when there is nobody to ask.\n\n" +
+			"Human verification: Proton may ask you to prove you are human. The page is\n" +
+			"printed and can be solved on any device, so a machine with no display signs\n" +
+			"in like any other. A run that cannot ask prints the page and the token to\n" +
+			"repeat the command with.\n\n" +
 			"Signing in again as the same account changes nothing, so an unattended job\n" +
-			"can run it first and recover from a session that expired.",
+			"can run it first to recover from an expired session.",
 		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			if err := reauth.Supply(c); err != nil {
@@ -185,9 +183,10 @@ func logoutCmd() *cobra.Command {
 		Use:   "logout",
 		Short: "Discard the saved session for this profile",
 		Long: "Discard the saved session for this profile.\n\n" +
-			"The sealed key password on disk is useless without the session, so removing\n" +
-			"the file is enough to make it unreadable. --revoke additionally invalidates\n" +
-			"the session at Proton, which is what signing out in a Proton app does.",
+			"The key password on disk is sealed with a key held by Proton, so deleting\n" +
+			"the session file is enough to make it unreadable.\n\n" +
+			"--revoke also invalidates the session at Proton, the same as signing out in\n" +
+			"a Proton app. Use it if the file may have been copied.",
 		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			targets := []profile.Name{c.App.Profile}

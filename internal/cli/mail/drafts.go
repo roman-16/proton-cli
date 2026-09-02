@@ -153,8 +153,8 @@ func draftsSendCmd() *cobra.Command {
 		Use:   "send REF",
 		Short: "Send a draft as it stands",
 		Long: "Send a draft as it stands.\n\n" +
-			"Its body already contains whatever signature it was created with, so nothing\n" +
-			"is appended.",
+			"No signature is appended: the draft already holds whatever signature it was\n" +
+			"created with.",
 		Args: cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{d.supply, kit.StepExpand}, func(c *kit.Invocation) error {
 			del, at, err := d.delivery()

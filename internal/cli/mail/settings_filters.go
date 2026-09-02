@@ -40,8 +40,8 @@ func filtersApplyCmd() *cobra.Command {
 		Use:   "apply [REF...]",
 		Short: "Run filters over mail that is already in the mailbox",
 		Long: "Run filters over mail that is already in the mailbox.\n\n" +
-			"A filter ordinarily acts once, as mail arrives, so a rule written today\n" +
-			"does nothing about what came yesterday.\n\n" +
+			"A filter normally runs once, as mail arrives, so a rule written today does\n" +
+			"nothing about yesterday's mail.\n\n" +
 			"With no filter named, every enabled filter runs.",
 		Args: cobra.ArbitraryArgs,
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
@@ -72,9 +72,8 @@ func filtersReorderCmd() *cobra.Command {
 		Short: "Set the order filters run in",
 		Long: "Set the order filters run in.\n\n" +
 			"The first rule to file a message wins, so the order decides where mail\n" +
-			"lands. Name every filter, in the order you want them: this replaces the\n" +
-			"whole order rather than nudging one entry, because a half-stated order is\n" +
-			"one nobody can predict.",
+			"lands. Name every filter, in the order you want them. This replaces the\n" +
+			"whole order; a partial one is refused.",
 		Args: cobra.MinimumNArgs(2),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			all, err := filterList(c).Rows(c.Ctx)
@@ -322,7 +321,8 @@ func filtersUpdateCmd() *cobra.Command {
 		Short: "Change what a filter is called, matches, or does",
 		Long: "Change what a filter is called, matches, or does.\n\n" +
 			"--if and the actions beside it replace the whole rule rather than adding to\n" +
-			"it. The filter keeps its place in the order and whether it is running.",
+			"it. The filter keeps its place in the order, and stays enabled or disabled\n" +
+			"as it was.",
 		Args: cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand, func(*kit.Invocation) error {
 			if len(conditions) == 0 && sieve == "" {

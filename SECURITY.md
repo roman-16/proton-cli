@@ -2,7 +2,7 @@
 
 > **Disclaimer:** This is an unofficial, community-built tool and is not endorsed by or affiliated with Proton AG. Use at your own risk.
 
-How credentials are stored, what is encrypted with what, and how to reduce your risk as a user are documented in [Security and encryption](docs/how-it-works.md). This file is the policy for reporting a problem with any of it.
+How credentials are stored, what is encrypted with what, and how to reduce your risk as a user are documented in [Security and encryption](docs/about/security.md). This file is the policy for reporting a problem with any of it.
 
 ## Reporting a vulnerability
 

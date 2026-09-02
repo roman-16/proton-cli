@@ -38,6 +38,9 @@ var docRoots = []string{
 	"../../web/src/content/landing",
 }
 
+// doc is a page this test names, from the root of the repository.
+func doc(path string) string { return filepath.Join("..", "..", path) }
+
 // ── the facts a page states as a whole list ──
 
 // enumeration is a fact a page states as a complete list, and the tree question
@@ -61,9 +64,9 @@ type enumeration struct {
 var enumerations = []enumeration{{
 	what: "the commands Proton makes you prove yourself for again",
 	pages: []string{
-		"../../docs/apps/account.md",
-		"../../docs/scripting.md",
-		"../../docs/troubleshooting.md",
+		doc("docs/account/README.md"),
+		doc("docs/using/scripting.md"),
+		doc("docs/help/troubleshooting.md"),
 	},
 	members: func(root *cobra.Command) []string {
 		var out []string
@@ -79,7 +82,7 @@ var enumerations = []enumeration{{
 	},
 }, {
 	what:  "the flags that work on every command",
-	pages: []string{"../../docs/configuration.md"},
+	pages: []string{doc("docs/using/settings.md")},
 	members: func(root *cobra.Command) []string {
 		var out []string
 		root.PersistentFlags().VisitAll(func(f *pflag.Flag) {
@@ -302,6 +305,11 @@ var (
 	// drawn, which is the renderer's business and not this checker's.
 	fencedBlock = regexp.MustCompile("(?s)```(?:bash|console|sh|shell)[^\n]*\n(.*?)```")
 	inlineSpan  = regexp.MustCompile("`([^`\n]+)`")
+	// headingLine is a title, not an instruction. The reference names a command
+	// on its own page by the part that page has not already said, so `contacts
+	// allow` heads an entry under `proton pass aliases` and means nothing on its
+	// own. The synopsis below it carries the whole command line.
+	headingLine = regexp.MustCompile(`(?m)^#+ .*$`)
 	// commandStart finds the program name wherever a line puts it: at the start,
 	// after a prompt, after a pipe, or after environment assignments.
 	commandStart = regexp.MustCompile(`(?:^|[|(]\s*|\$\s+|\s)(` + kit.Program + `|` + kit.Alias + `)\s+(.*)$`)
@@ -329,9 +337,10 @@ func invocations(root *cobra.Command, src string) []invocation {
 			collect(line)
 		}
 	}
-	// Fenced blocks are stripped before the inline pass so a line inside one is
-	// not also read as a span.
-	for _, span := range inlineSpan.FindAllStringSubmatch(fencedBlock.ReplaceAllString(src, ""), -1) {
+	// Fenced blocks and headings are stripped before the inline pass, so a line
+	// inside one is not also read as a span and a title is not read as a command.
+	prose := headingLine.ReplaceAllString(fencedBlock.ReplaceAllString(src, ""), "")
+	for _, span := range inlineSpan.FindAllStringSubmatch(prose, -1) {
 		collect(span[1])
 	}
 	return out

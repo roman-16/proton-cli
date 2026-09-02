@@ -32,7 +32,7 @@ proton-cli has one grammar, one verb per idea, and one shape per response. All o
 - Argument names come from `kit.Placeholders`. `REF` is a full ID, a short ID, or a human handle; Drive uses `PATH` for things that exist in the tree.
 - A flag name means exactly one thing CLI-wide. New shared flags go in `flagMeanings` in the conformance test, which fails if two commands disagree.
 - Output goes through `internal/ui`: `kit.List`, `kit.Show`, `kit.Read`, `kit.Mutate`, `kit.Create`. Nothing outside `internal/ui` touches a process stream, and only `internal/app/credentials.go` reads a credential from a human.
-- A command's `Short`, `Long`, flag usage and `examples.go` entry are its documentation: they are what `--help` shows and what `docs/commands/` is generated from. `internal/cli/help.go` renders every screen, and three of them are golden-tested. A `Long` says what would surprise the person running the command - a constraint, a default, a value list; the reasoning behind a design goes in `docs/design-notes.md`, which a reader can skip.
+- A command's `Short`, `Long`, flag usage and `examples.go` entry are its documentation: they are what `--help` shows and what the generated reference is built from. `internal/cli/help.go` renders every screen, and three of them are golden-tested. A `Long` says what would surprise the person running the command - a constraint, a default, a value list; the reasoning behind a design goes in `docs/about/why.md`, which a reader can skip.
 - Mutations go through `kit.Mutate` or `kit.Create`, which is what makes `--dry-run` structural rather than remembered.
 - Anything judgeable from the command line alone must be judged before the network: use `kit.Enum`, `kit.Color`, or cobra's `Args` and `MarkFlagRequired`.
 - Selection uses `kit.Select`. Never write a second bulk-filter implementation.
@@ -60,7 +60,7 @@ Tests are **integration tests** that run against the live Proton API. They run o
 - **What limits how often you can run it is the sending allowance, not the clock.** A run sends about seventeen messages and these are free accounts, which Proton caps at fifty an hour and a hundred and fifty a day. Two runs back to back are fine; four in an hour will start failing on the quota, and those failures look like bugs but are not. When in doubt, wait rather than debug.
 - **Single tests are cheaper** (`just test-one TestName`) when verifying one change
 - **`just test-report`** says where the time went and how deep each command's request graph was
-- **`just docs`** regenerates `docs/commands/` from the tree; `just lint` runs it too, and CI fails on the diff. Never edit a file in there - change the command's `Short`, `Long`, flag usage or `examples.go` entry
+- **`just docs`** regenerates the command reference from the tree; `just lint` runs it too, and CI fails on the diff. Inside an app's directory every markdown file except `README.md` is generated, one per collection - never edit one. Change the command's `Short`, `Long`, flag usage or `examples.go` entry
 - **Unit test file naming**: name a unit test file after the source file it tests, with `_test.go` appended (e.g. `size.go` → `size_test.go`) - never after a symbol or after a file that doesn't exist. The integration tests under `tests/` are the exception: they are grouped by feature area.
 
 ## Reference Source

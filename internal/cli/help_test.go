@@ -59,10 +59,10 @@ func TestEveryHelpScreenPointsAtSomethingThatWasWritten(t *testing.T) {
 			continue
 		}
 		if _, seen := pages[page]; !seen {
-			src, err := os.ReadFile(filepath.Join("..", "..", "docs", "commands", page+".md"))
+			file := pageFile(page)
+			src, err := os.ReadFile(filepath.Join("..", "..", file))
 			if err != nil {
-				t.Errorf("%s points at docs/commands/%s.md, which is not generated (run `just docs`)",
-					cmdPath(c), page)
+				t.Errorf("%s points at %s, which is not there (run `just docs`)", cmdPath(c), file)
 				pages[page] = ""
 				continue
 			}
@@ -76,10 +76,21 @@ func TestEveryHelpScreenPointsAtSomethingThatWasWritten(t *testing.T) {
 		// which is what both GitHub and the site derive.
 		if !strings.Contains(pages[page], "\n## `"+heading+"`\n") &&
 			!strings.Contains(pages[page], "\n### `"+heading+"`\n") {
-			t.Errorf("%s links to %s, but docs/commands/%s.md has no heading %q (run `just docs`)",
-				cmdPath(c), kit.Reference(c), page, heading)
+			t.Errorf("%s links to %s, but %s has no heading %q (run `just docs`)",
+				cmdPath(c), kit.Reference(c), pageFile(page), heading)
 		}
 	}
+}
+
+// pageFile is where a reference page slug lives in the repository. An app that
+// holds other commands is published at its guide, which is the README of the
+// app's own directory; everything else is a generated file named for the
+// command line it documents.
+func pageFile(page string) string {
+	if !strings.Contains(page, "/") && page != kit.SelfPage {
+		return filepath.Join("docs", page, "README.md")
+	}
+	return filepath.Join("docs", page+".md")
 }
 
 func checkGolden(t *testing.T, name, got string) {

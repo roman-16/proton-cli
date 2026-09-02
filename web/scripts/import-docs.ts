@@ -29,15 +29,10 @@ const store = join(root, "web/.astro/data-store.json");
 const skipped = new Set(["docs/README.md"]);
 
 /*
- * The pages whose slug is not where they sit. A section's index is the section
- * itself rather than a page inside it, and the changelog keeps the place at the
- * root of the repository that GitHub, `proton changelog` and the release
- * workflow all read it from.
+ * The changelog keeps the place at the root of the repository that GitHub,
+ * `proton changelog` and the release workflow all read it from.
  */
-const slugs = new Map([
-  ["CHANGELOG.md", "changelog"],
-  ["docs/commands/README.md", "commands"],
-]);
+const slugs = new Map([["CHANGELOG.md", "changelog"]]);
 
 const alerts = new Map([
   ["CAUTION", "danger"],
@@ -59,7 +54,19 @@ const sources = [...(await markdownFiles(docs)), "CHANGELOG.md"].filter((path) =
 
 const pages = new Set(sources);
 
-const slugOf = (path: string) => slugs.get(path) ?? path.replace(/^docs\//, "").replace(/\.md$/, "");
+/*
+ * An app's directory holds its guide as a README, the way a reader on GitHub
+ * expects, and the guide is the section itself rather than a page inside it. So
+ * docs/mail/README.md is published at /mail/, beside the generated
+ * docs/mail/messages.md at /mail/messages/.
+ */
+const slugOf = (path: string) =>
+  slugs.get(path) ??
+  path
+    .replace(/^docs\//, "")
+    .replace(/\.md$/, "")
+    .replace(/(^|\/)README$/, "")
+    .replace(/\/$/, "");
 
 const pageURL = (path: string) => `/${slugOf(path)}/`;
 

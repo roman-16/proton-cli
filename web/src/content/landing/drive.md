@@ -1,6 +1,6 @@
 ---
 gradient: var(--app-drive)
-href: /apps/drive/
+href: /drive/
 order: 2
 summary: Revisions, sharing with people, what others shared with you, and photo albums.
 title: Drive

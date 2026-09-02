@@ -91,8 +91,9 @@ func aliasesCreateCmd() *cobra.Command {
 		Use:   "create",
 		Short: "Create an alias",
 		Long: "Create an alias.\n\n" +
-			"The address is a prefix you choose plus a suffix Proton offers; mail sent to it\n" +
-			"arrives in the mailboxes you name. `aliases options` lists both.",
+			"The address is a prefix you choose plus a suffix Proton offers. Mail sent to\n" +
+			"it arrives in the mailboxes you name. Run `aliases options` to see the\n" +
+			"suffixes and mailboxes available.",
 		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			if prefix == "" {
@@ -150,9 +151,9 @@ func aliasesOptionsCmd() *cobra.Command {
 		Use:   "options",
 		Short: "List the suffixes and mailboxes an alias can use",
 		Long: "List the suffixes and mailboxes an alias can use.\n\n" +
-			"A suffix is the domain an address is made on, and what --suffix takes.\n" +
-			"Proton puts a word of its own in front of it and only settles on one when\n" +
-			"the alias is created.",
+			"A suffix is the domain an alias is made on, and is what --suffix takes.\n\n" +
+			"Proton adds a random word in front of the suffix, and only settles on it\n" +
+			"when the alias is created.",
 		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			shareID, err := resolveVault(c, "")

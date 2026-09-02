@@ -7,7 +7,7 @@ Everything the maintainer or CI runs, in whatever language suits it: shell insta
 | `install.sh`, `install.ps1` | The installers users curl; referenced from the README |
 | `gen-completions.sh` | Emits the shell completions shipped in releases (a goreleaser `before` hook) |
 | `changelog/` | Reads `CHANGELOG.md`: the version to release and the notes to publish (`just notes`) |
-| `gendocs/` | Generates `docs/commands/` from the command tree (`just docs`) |
+| `gendocs/` | Generates the command reference from the command tree (`just docs`) |
 | `openapi-generator/` | Generates `openapi.yaml` from the WebClients TypeScript source (`just openapi`) |
 | `stats/` | Records the public counters the Stats page charts (`just stats`) |
 | `terminal-demo/` | Records the README panel against the primary account (`just demo`) |
@@ -15,7 +15,9 @@ Everything the maintainer or CI runs, in whatever language suits it: shell insta
 
 ## Command Reference Generator
 
-Writes `docs/commands/` - an index and one page per app - by walking the assembled Cobra tree rather than by reading the source or the prose.
+Writes the command reference by walking the assembled Cobra tree rather than by reading the source or the prose.
+
+One page per collection, named for the command line it documents: `docs/mail/messages.md` for `proton mail messages`, plus `docs/about/commands.md` listing every command in one table. Inside an app's directory, `README.md` is the hand-written guide and every other markdown file belongs to this generator.
 
 ```bash
 just docs
@@ -23,7 +25,7 @@ just docs
 
 Every command gets its whole entry: what it does, how it is invoked, what it holds, the flags it takes and the examples it already carries. All of that is on the command already, checked by conformance, and the generator is what stops it living only in a terminal - a flag nobody can search for is a flag nobody finds.
 
-The guides in `docs/apps/` are hand-written and stay that way, in files of their own. A page that is half generated cannot be regenerated, so the split is by file rather than by section.
+The guides are hand-written and stay that way, in files of their own. A page that is half generated cannot be regenerated, so the split is by file rather than by section.
 
 Where a command is published is `kit.ReferencePage`'s answer, and a help screen prints the URL from the same function. A heading here and a link there cannot disagree, and `internal/cli/help_test.go` fails if a screen points at a page this does not write.
 

@@ -30,4 +30,4 @@ Flags:
       --to stringArray              Recipient (repeatable; accepts "Name <addr>")
 
 Global flags:    proton --help
-Full reference:  https://proton-cli.lerchster.dev/commands/mail/#messages-send
+Full reference:  https://proton-cli.lerchster.dev/mail/messages/#send

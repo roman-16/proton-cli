@@ -34,8 +34,8 @@ func mailboxesCreateCmd() *cobra.Command {
 		Use:   "create EMAIL",
 		Short: "Add an address for aliases to forward to",
 		Long: "Add an address for aliases to forward to.\n\n" +
-			"Proton emails the address a code, and it receives nothing until the code\n" +
-			"is handed back with `mailboxes verify`.",
+			"Proton emails the address a code. The mailbox receives nothing until you\n" +
+			"pass that code to `mailboxes verify`.",
 		Args: cobra.ExactArgs(1),
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			return kit.Create(c, ui.ResultSpec{
@@ -105,9 +105,8 @@ func mailboxesDeleteCmd() *cobra.Command {
 		Use:   "delete REF",
 		Short: "Remove an address aliases forward to",
 		Long: "Remove an address aliases forward to.\n\n" +
-			"Aliases arriving in it have to go somewhere: --transfer-to names the\n" +
-			"mailbox they move to. Without it they stop receiving, which is why it is\n" +
-			"asked for rather than assumed.",
+			"--transfer-to names the mailbox that its aliases move to. It is required:\n" +
+			"without a new mailbox, those aliases would stop receiving mail.",
 		Args: cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			box, err := c.App.Pass.MailboxByEmail(c.Ctx, c.Args[0])
@@ -173,9 +172,9 @@ func mailboxesListCmd() *cobra.Command {
 		Use:   "list",
 		Short: "List the addresses your aliases forward to",
 		Long: "List the addresses your aliases forward to.\n\n" +
-			"An alias is a route rather than a mailbox of its own: mail sent to it\n" +
-			"arrives in one of these. `proton pass items update REF --mailbox` is what\n" +
-			"points an alias at one.",
+			"An alias is a route, not a mailbox: mail sent to it arrives in one of\n" +
+			"these. To point an alias at one, run `proton pass items update REF\n" +
+			"--mailbox`.",
 		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			rows, err := c.App.Pass.Mailboxes(c.Ctx)
@@ -209,8 +208,8 @@ func domainsListCmd() *cobra.Command {
 		Use:   "list",
 		Short: "List the domains an alias can be made on",
 		Long: "List the domains an alias can be made on.\n\n" +
-			"These are the part after the @ that `proton pass aliases create --suffix`\n" +
-			"chooses between.",
+			"These are the values `proton pass aliases create --suffix` accepts: the\n" +
+			"part of an alias after the @.",
 		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			rows, err := c.App.Pass.Domains(c.Ctx)

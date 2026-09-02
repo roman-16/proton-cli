@@ -4,46 +4,50 @@ Rendered and searchable at **[proton-cli.lerchster.dev](https://proton-cli.lerch
 
 ## Start here
 
-| Page | What's in it |
+| Page | What it covers |
 | --- | --- |
-| [Install](installation.md) | Every platform, updating, uninstalling |
-| [Quickstart](quickstart.md) | Signing in, your first commands, completion |
-| [How commands read](language.md) | The grammar: verbs, naming a thing, filters, dry runs, what asks first |
+| [Install](install.md) | Every platform, updating, uninstalling |
+| [First commands](first-commands.md) | Signing in, your first commands, completion |
+| [How a command is built](commands.md) | The grammar and the verbs |
 
 ## The apps
 
-One page each, task by task, with the commands in use.
+One guide each, task by task, with the reference for that app beside it.
 
-| Page | What's in it |
+| App | What it covers |
 | --- | --- |
-| [Mail](apps/mail.md) | Reading, sending, searching, organizing, filters, auto-reply |
-| [Drive](apps/drive.md) | Upload and download, revisions, sharing, trash, photos |
-| [Calendar](apps/calendar.md) | Events, recurrence, reminders, invitations, .ics |
-| [Pass](apps/pass.md) | Items, vaults, aliases, secure links, two-factor codes |
-| [Contacts](apps/contacts.md) | Contacts, groups, pinned keys, vCard import and export |
-| [Account](apps/account.md) | Signing in, sessions, several accounts side by side, settings |
-| [Raw API](apps/api.md) | Reaching an endpoint the commands don't cover |
+| [Mail](mail/README.md) | Reading, sending, searching, organizing, filters, auto-reply |
+| [Drive](drive/README.md) | Upload and download, revisions, sharing, trash, photos |
+| [Calendar](calendar/README.md) | Events, recurrence, reminders, invitations, `.ics` |
+| [Pass](pass/README.md) | Items, vaults, aliases, secure links, two-factor codes |
+| [Contacts](contacts/README.md) | Contacts, groups, pinned keys, vCard import and export |
+| [Account](account/README.md) | Signing in, sessions, several accounts side by side, settings |
+| [Raw API](api/README.md) | Reaching an endpoint the commands do not cover |
 
-## Automating it
+## Everyday use
 
-| Page | What's in it |
+| Page | What it covers |
 | --- | --- |
-| [Scripting](scripting.md) | Pipelines, `jq`, cron and systemd |
-| [Configuration](configuration.md) | Environment variables, files on disk, global flags |
+| [Naming what to act on](using/naming.md) | IDs, short IDs, names, paths |
+| [Filters and bulk changes](using/filters.md) | Acting on many things at once |
+| [Dry runs and confirmations](using/confirmations.md) | Previewing a change, and what asks first |
+| [Output and exit codes](using/output.md) | The five response shapes, JSON, colour, exit codes |
+| [Scripting](using/scripting.md) | Pipelines, `jq`, cron and systemd |
+| [Settings, files and environment](using/settings.md) | The config file, variables, global flags |
 
-## Reference
+## When something goes wrong
 
-| Page | What's in it |
+| Page | What it covers |
 | --- | --- |
-| [Command reference](commands/README.md) | Every command, argument and flag (generated from the tree) |
-| [Output](output.md) | The five response shapes, JSON, colour, exit codes |
-| [Limits](limitations.md) | What it can't do, and why |
+| [Troubleshooting](help/troubleshooting.md) | CAPTCHAs, expired sessions, rate limits |
+| [What it can't do](help/limits.md) | Known gaps, and why |
 
-## Answers
+## About
 
-| Page | What's in it |
+| Page | What it covers |
 | --- | --- |
-| [FAQ](faq.md) | Is this official? How does it differ from Bridge? Is my password safe? |
-| [Troubleshooting](troubleshooting.md) | CAPTCHAs, expired sessions, rate limits |
-| [Security and encryption](how-it-works.md) | Sign-in, keys, what is encrypted with what, what is on disk |
-| [Design notes](design-notes.md) | The choices behind the interface |
+| [FAQ](about/faq.md) | Is this official? How does it differ from Bridge? Is my password safe? |
+| [Security and encryption](about/security.md) | Sign-in, keys, what is encrypted with what, what is on disk |
+| [Why it works this way](about/why.md) | The reasoning behind the interface |
+| [All commands](about/commands.md) | Every command in one table |
+| [`proton` itself](proton.md) | Updating, uninstalling, completions, changelog |

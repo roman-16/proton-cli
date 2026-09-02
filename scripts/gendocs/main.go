@@ -9,7 +9,13 @@
 //
 // Where a command is published is kit's answer, not this file's: the same
 // function tells a help screen which URL to print, so a heading and a link
-// cannot disagree.
+// cannot disagree. A page is one command line's worth of commands, so
+// `proton mail messages send` is documented at docs/mail/messages.md under the
+// heading `send`, and the URL a reader lands on reads like what they typed.
+//
+// Inside an app's directory, README.md is the hand-written guide and every other
+// markdown file is generated. That invariant is what lets this rewrite the
+// reference without touching the prose beside it.
 //
 // Prose here is written as whole paragraphs on one line, as the hand-written
 // pages are: a hard wrap is a decision about somebody else's window.
@@ -29,27 +35,21 @@ import (
 	"github.com/spf13/pflag"
 )
 
-const dir = "docs/commands"
+// indexPage is the flat list of every command, which is the one place a reader
+// who knows a word but not which app it belongs to can start.
+const indexPage = "about/commands"
 
 func main() {
 	root := cli.Root()
 	pages := collect(root)
 
-	// Emptied first, so a page for an app that no longer exists goes with it.
-	// The directory is generated whole or not at all.
-	out := filepath.Join(moduleRoot(), dir)
-	if err := os.RemoveAll(out); err != nil {
-		fail(err)
-	}
-	if err := os.MkdirAll(out, 0o755); err != nil {
-		fail(err)
-	}
+	clean(root)
 	for slug, commands := range pages {
-		if err := write(slug+".md", page(root, slug, commands)); err != nil {
+		if err := write(slug, page(root, slug, commands)); err != nil {
 			fail(err)
 		}
 	}
-	if err := write("README.md", index(root, pages)); err != nil {
+	if err := write(indexPage, index(root, pages)); err != nil {
 		fail(err)
 	}
 }
@@ -62,8 +62,11 @@ func collect(root *cobra.Command) map[string][]*cobra.Command {
 		if c.Hidden || c.Name() == "help" {
 			return
 		}
-		if c != root {
-			pages[kit.ReferencePage(c)] = append(pages[kit.ReferencePage(c)], c)
+		// An app that holds other commands has its guide for a page, and that is
+		// written by hand.
+		if c != root && !isGuide(root, c) {
+			slug := kit.ReferencePage(c)
+			pages[slug] = append(pages[slug], c)
 		}
 		for _, sub := range c.Commands() {
 			walk(sub)
@@ -78,39 +81,59 @@ func collect(root *cobra.Command) map[string][]*cobra.Command {
 	return pages
 }
 
-// index is the way in: the grammar, the flags that work everywhere, and what
-// each page holds.
-func index(root *cobra.Command, pages map[string][]*cobra.Command) string {
-	var b strings.Builder
-	b.WriteString("# Command reference\n\n")
-	b.WriteString("Every command, every argument and every flag, generated from the command tree.\n\n")
-	b.WriteString("```\n" + kit.Program + " <app> <collection> <verb> [TARGET...] [--flags]\n```\n\n")
-	b.WriteString("Anywhere a command shows `REF`, you can pass a full ID, the eight-character short ID a list printed, or something human: a subject, a name, a path, an email address. See [Naming the thing you want](../language.md#naming-the-thing-you-want).\n")
-
-	for _, group := range root.Groups() {
-		fmt.Fprintf(&b, "\n## %s\n\n", strings.TrimSuffix(group.Title, ":"))
-		for _, top := range sorted(root.Commands()) {
-			if top.GroupID != group.ID || top.Hidden {
-				continue
-			}
-			slug := kit.ReferencePage(top)
-			if group.ID == kit.GroupSelf {
-				continue
-			}
-			fmt.Fprintf(&b, "- **[`%s %s`](%s.md)** - %s. %s.\n",
-				kit.Program, top.Name(), slug, lower(top.Short), tally(pages[slug]))
+// clean removes what a previous run wrote, so a page for a command that no
+// longer exists goes with it. Only generated files are in scope: an app's guide
+// is its README, and nothing else under an app's directory is written by hand.
+func clean(root *cobra.Command) {
+	docs := filepath.Join(moduleRoot(), "docs")
+	for _, app := range visible(root) {
+		if app.GroupID == kit.GroupSelf {
+			continue
 		}
-		if group.ID == kit.GroupSelf {
-			fmt.Fprintf(&b, "- **[`%s` itself](%s.md)** - updating, uninstalling, completions and what a release changed. %s.\n",
-				kit.Program, kit.GroupSelf, tally(pages[kit.GroupSelf]))
+		entries, err := os.ReadDir(filepath.Join(docs, app.Name()))
+		if err != nil {
+			continue
+		}
+		for _, entry := range entries {
+			if entry.IsDir() || entry.Name() == "README.md" || !strings.HasSuffix(entry.Name(), ".md") {
+				continue
+			}
+			if err := os.Remove(filepath.Join(docs, app.Name(), entry.Name())); err != nil {
+				fail(err)
+			}
 		}
 	}
-	b.WriteString("\n")
+	for _, slug := range []string{kit.SelfPage, indexPage} {
+		if err := os.Remove(filepath.Join(docs, slug+".md")); err != nil && !os.IsNotExist(err) {
+			fail(err)
+		}
+	}
+}
 
-	b.WriteString("## Flags that work on every command\n\n")
-	b.WriteString("These are declared on the root, so they can be given to any command and mean the same thing on all of them.\n\n")
+// index is one row per command, for the reader who knows the word but not which
+// app owns it, plus the flags that work everywhere.
+func index(root *cobra.Command, pages map[string][]*cobra.Command) string {
+	var b strings.Builder
+	b.WriteString("# All commands\n\n")
+	b.WriteString("Every command in one table, generated from the command tree. Search this page for a word, then follow the link for the arguments, flags and examples.\n\n")
+	b.WriteString("```\n" + kit.Program + " <app> <collection> <verb> [TARGET...] [--flags]\n```\n\n")
+	b.WriteString("Where a command shows `REF`, pass a full ID, the eight-character short ID a list printed, or something you already know: a subject, a name, a path, an email address. See [Naming what to act on](../using/naming.md).\n\n")
+
+	b.WriteString("| Command | What it does |\n| --- | --- |\n")
+	for _, slug := range sortedKeys(pages) {
+		for _, c := range pages[slug] {
+			if !c.Runnable() {
+				continue
+			}
+			fmt.Fprintf(&b, "| [`%s`](%s) | %s |\n",
+				kit.Program+" "+commandPath(c), link(indexPage, c), escape(c.Short))
+		}
+	}
+
+	b.WriteString("\n## Flags that work on every command\n\n")
+	b.WriteString("These are declared on the root, so any command takes them and they mean the same thing everywhere.\n\n")
 	writeFlags(&b, root.LocalFlags())
-	b.WriteString("\nSee [Configuration](../configuration.md) for what each one changes, and [Output](../output.md) for the exit codes.\n")
+	b.WriteString("\nSee [Settings, files and environment](../using/settings.md) for what each one changes, and [Output and exit codes](../using/output.md) for what a command answers with.\n")
 	return b.String()
 }
 
@@ -124,45 +147,49 @@ func index(root *cobra.Command, pages map[string][]*cobra.Command) string {
 func page(root *cobra.Command, slug string, commands []*cobra.Command) string {
 	var b strings.Builder
 
-	if slug == kit.GroupSelf {
+	if slug == kit.SelfPage {
 		fmt.Fprintf(&b, "# %s itself\n\n", kit.Program)
 		b.WriteString("Updating, uninstalling, shell completions, and what a release changed.\n\n")
 		b.WriteString("These act on this installation rather than on your account, so none of them needs you to be signed in.\n")
 		for _, c := range commands {
 			writeCommand(&b, c)
 		}
-		b.WriteString(footer)
+		b.WriteString(footer(slug))
 		return b.String()
 	}
 
 	// The title carries no backticks: it becomes frontmatter, which is read as a
 	// string rather than as markdown, so a backtick there is a backtick on screen.
-	top := child(root, slug)
-	fmt.Fprintf(&b, "# %s %s\n\n%s\n\n", kit.Program, slug, lead(top))
-	fmt.Fprintf(&b, "Every command under `%s %s`, with the arguments and flags it takes. For these commands in use, see [the guide](../apps/%s.md).\n",
-		kit.Program, slug, slug)
-	writeBody(&b, top)
+	scope := kit.ReferenceScope(commands[0])
+	fmt.Fprintf(&b, "# %s %s\n\n%s\n\n", kit.Program, commandPath(scope), lead(scope))
+	fmt.Fprintf(&b, "Every command under `%s %s`, with the arguments and flags it takes. For these commands in use, see [the %s guide](README.md).\n",
+		kit.Program, commandPath(scope), app(root, scope).Name())
+	if scope.Runnable() || scope.HasSubCommands() {
+		writeBody(&b, scope)
+	}
 
 	for _, c := range commands {
-		if c == top {
+		if c == scope {
 			continue
 		}
 		writeCommand(&b, c)
 	}
 
-	b.WriteString(footer)
+	b.WriteString(footer(slug))
 	return b.String()
 }
 
-const footer = "\n---\n\nEvery command also takes the [flags that work everywhere](README.md#flags-that-work-on-every-command).\n"
+func footer(slug string) string {
+	return "\n---\n\nEvery command also takes the [flags that work everywhere](" +
+		relative(slug, indexPage) + "#flags-that-work-on-every-command).\n"
+}
 
 // writeCommand is one command's entry, and the shape never varies: what it is,
 // what it holds, how it is invoked, what it takes, and it being used.
 //
 // A collection is a heading and everything under it is a level down, so the
 // page's own contents list reads as the tree it documents rather than as one
-// flat run of seventy-seven lines. It stops at three, which is as deep as a
-// contents list is read.
+// flat run. It stops at three, which is as deep as a contents list is read.
 func writeCommand(b *strings.Builder, c *cobra.Command) {
 	heading := kit.ReferenceHeading(c)
 	level := "###"
@@ -252,8 +279,28 @@ func reflow(text string) string {
 	return strings.Join(paragraphs, "\n\n")
 }
 
-func write(name, body string) error {
-	return os.WriteFile(filepath.Join(moduleRoot(), dir, name), []byte(body), 0o644)
+// link is how one generated page points at a command documented on another.
+func link(from string, c *cobra.Command) string {
+	target := relative(from, kit.ReferencePage(c))
+	if anchor := kit.ReferenceAnchor(c); anchor != "" {
+		target += "#" + anchor
+	}
+	return target
+}
+
+// relative is the path from one page to another, as a reader on GitHub follows
+// it: every page is a file in docs/, so the walk is from one to the other.
+func relative(from, to string) string {
+	up := strings.Repeat("../", strings.Count(from, "/"))
+	return up + to + ".md"
+}
+
+func write(slug, body string) error {
+	out := filepath.Join(moduleRoot(), "docs", slug+".md")
+	if err := os.MkdirAll(filepath.Dir(out), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(out, []byte(body), 0o644)
 }
 
 // moduleRoot is where the repository is, worked out from this file rather than
@@ -265,6 +312,24 @@ func moduleRoot() string {
 		fail(fmt.Errorf("cannot locate the generator's own source"))
 	}
 	return filepath.Dir(filepath.Dir(filepath.Dir(self)))
+}
+
+// isGuide reports whether a command's page is the hand-written guide beside this
+// generated reference rather than a page of its own.
+func isGuide(root, c *cobra.Command) bool {
+	return c.Parent() == root && c.GroupID != kit.GroupSelf && c.HasSubCommands()
+}
+
+// app is the top-level command a scope belongs to.
+func app(root *cobra.Command, scope *cobra.Command) *cobra.Command {
+	for scope.Parent() != nil && scope.Parent() != root {
+		scope = scope.Parent()
+	}
+	return scope
+}
+
+func commandPath(c *cobra.Command) string {
+	return strings.TrimPrefix(c.CommandPath(), kit.Program+" ")
 }
 
 func visible(c *cobra.Command) []*cobra.Command {
@@ -283,14 +348,13 @@ func sorted(in []*cobra.Command) []*cobra.Command {
 	return out
 }
 
-func child(parent *cobra.Command, name string) *cobra.Command {
-	for _, sub := range parent.Commands() {
-		if sub.Name() == name {
-			return sub
-		}
+func sortedKeys(pages map[string][]*cobra.Command) []string {
+	out := make([]string, 0, len(pages))
+	for slug := range pages {
+		out = append(out, slug)
 	}
-	fail(fmt.Errorf("no command named %q", name))
-	return nil
+	sort.Strings(out)
+	return out
 }
 
 func hasOwnFlags(set *pflag.FlagSet) bool {
@@ -303,21 +367,6 @@ func hasOwnFlags(set *pflag.FlagSet) bool {
 	return found
 }
 
-// tally counts what a page holds, which is the commands that do work rather than
-// the groups holding them: a group is a heading, not something you can run.
-func tally(commands []*cobra.Command) string {
-	n := 0
-	for _, c := range commands {
-		if c.Runnable() {
-			n++
-		}
-	}
-	if n == 1 {
-		return "1 command"
-	}
-	return fmt.Sprintf("%d commands", n)
-}
-
 func list(items []string) string {
 	switch len(items) {
 	case 1:
@@ -327,26 +376,6 @@ func list(items []string) string {
 	default:
 		return strings.Join(items[:len(items)-1], ", ") + " and " + items[len(items)-1]
 	}
-}
-
-func lower(s string) string {
-	if s == "" {
-		return s
-	}
-	// Only the first word, and only when it is an ordinary one: "Proton" and
-	// "Vaults" are not the same case.
-	first, rest, _ := strings.Cut(s, " ")
-	if strings.ToUpper(first) == first {
-		return s
-	}
-	return strings.ToLower(first[:1]) + first[1:] + ifRest(rest)
-}
-
-func ifRest(rest string) string {
-	if rest == "" {
-		return ""
-	}
-	return " " + rest
 }
 
 func escape(s string) string { return strings.ReplaceAll(s, "|", `\|`) }

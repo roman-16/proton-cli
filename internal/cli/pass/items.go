@@ -43,9 +43,9 @@ func itemsMoveCmd() *cobra.Command {
 		Use:   "move REF",
 		Short: "Put an item in another vault",
 		Long: "Put an item in another vault.\n\n" +
-			"The item keeps its history and everything it holds, and is given a new ID:\n" +
-			"an item in Pass is only unique together with the vault it is in. The new ID\n" +
-			"is printed, so a script can go on addressing it.",
+			"The item keeps its history and everything it holds, but gets a new ID: an\n" +
+			"item in Pass is identified by its vault as well as itself. The new ID is\n" +
+			"printed on stdout.",
 		Args: cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand, func(*kit.Invocation) error {
 			if into == "" {
@@ -110,8 +110,8 @@ func itemsListCmd() *cobra.Command {
 		Use:   "list",
 		Short: "List items across your vaults",
 		Long: "List items across your vaults.\n\n" +
-			"The filters are the same ones trash and delete take, so a selection can be\n" +
-			"worked out here before it is handed to a verb that acts on it.",
+			"Takes the same filters as trash and delete, so you can preview a selection\n" +
+			"here before acting on it.",
 		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			items, err := matchItems(c.Ctx, c, &f)
@@ -140,8 +140,8 @@ func itemsGetCmd() *cobra.Command {
 		Use:   "get REF",
 		Short: "Show one item, decrypted",
 		Long: "Show one item, decrypted.\n\n" +
-			"Passwords, TOTP secrets and private keys are printed in full: this is the\n" +
-			"command for reading a secret, so it does not hide one.",
+			"Passwords, TOTP secrets and private keys are printed in full. This is the\n" +
+			"only command that prints them; the listings do not.",
 		Args: cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			shareID, itemID, err := resolveItem(c, c.Args[0])
@@ -766,8 +766,7 @@ func itemsRevisionsGetCmd() *cobra.Command {
 		Short: "Show one earlier version, decrypted",
 		Long: "Show one earlier version, decrypted.\n\n" +
 			"The password, TOTP secret and private key that revision held are printed in\n" +
-			"full, as `items get` prints the current ones: this is the command for\n" +
-			"reading a password an item used to have.\n\n" +
+			"full, as `items get` prints the current ones.\n\n" +
 			"REVISION_REF is the number `revisions list` shows.",
 		Args: cobra.ExactArgs(2),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
@@ -794,9 +793,10 @@ func itemsRevisionsListCmd() *cobra.Command {
 		Use:   "list REF",
 		Short: "Show what an item used to be",
 		Long: "Show what an item used to be.\n\n" +
-			"Pass keeps every edit, so a password changed by mistake can be found again.\n" +
-			"Newest first. This is what changed and when; `revisions get` reads one of\n" +
-			"them back in full.",
+			"Pass keeps every edit, so a password changed by mistake can be recovered.\n" +
+			"Newest first.\n\n" +
+			"This says what changed and when. To read one revision back in full, use\n" +
+			"`revisions get`.",
 		Args: cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			shareID, itemID, err := resolveItem(c, c.Args[0])
@@ -849,8 +849,8 @@ func itemsTOTPCmd() *cobra.Command {
 		Use:   "totp REF",
 		Short: "Print the current two-factor code for an item",
 		Long: "Print the current two-factor code for an item.\n\n" +
-			"How long the code has left is reported beside it, because a code about to\n" +
-			"expire is one worth waiting out.\n\n" +
+			"How long the code has left is reported beside it, so you can tell whether\n" +
+			"to wait for the next one.\n\n" +
 			"For a script: --output json, then read .code.",
 		Args: cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {

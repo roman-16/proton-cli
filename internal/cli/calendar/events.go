@@ -105,11 +105,10 @@ func eventsListCmd() *cobra.Command {
 		Use:   "list",
 		Short: "List events in a date range",
 		Long: "List what is on your calendars between two dates.\n\n" +
-			"--start and --end are whole days in your own zone, both included, and\n" +
-			"nothing outside them is reported. A recurring event is stored once and\n" +
-			"happens many times, so each occurrence is listed on its own day with a\n" +
-			"reference that names it. Every calendar is included unless --calendar\n" +
-			"narrows it to one.",
+			"--start and --end are whole days in your own zone, both included.\n\n" +
+			"Each occurrence of a recurring event is listed on its own day, with a\n" +
+			"reference that names that occurrence.\n\n" +
+			"Covers every calendar unless --calendar narrows it to one.",
 		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			calIDs, err := listedCalendars(c, calendar)
@@ -823,9 +822,9 @@ func eventsExportCmd() *cobra.Command {
 		Use:   "export",
 		Short: "Write events out as an .ics file",
 		Long: "Write events out as an .ics file.\n\n" +
-			"--start and --end are whole days in your own zone, both included. A\n" +
-			"recurring series is written once with its rule, so another client can\n" +
-			"read it back as the same series.",
+			"--start and --end are whole days in your own zone, both included.\n\n" +
+			"A recurring series is written once, with its rule, so another client reads\n" +
+			"it back as the same series.",
 		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			if err := dest.Validate(true); err != nil {
@@ -876,8 +875,8 @@ func eventsImportCmd() *cobra.Command {
 		Long: "Read events in from an .ics file, or from stdin with -.\n\n" +
 			"An event is addressed by its UID, so reading a file back changes that event\n" +
 			"rather than making a second one.\n\n" +
-			"Participants are left out: an imported event is a record, not an invitation\n" +
-			"being reissued.",
+			"Participants are left out. An imported event is a record; no invitations\n" +
+			"are sent.",
 		Args: cobra.ExactArgs(1),
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			text, err := kit.ReadTextArg(c, c.Args[0], "PATH")

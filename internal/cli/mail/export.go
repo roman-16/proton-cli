@@ -34,9 +34,9 @@ func exportCmd() *cobra.Command {
 			"client, grep, or anything else.\n\n" +
 			"eml writes one file per message; mbox concatenates everything into one stream.\n" +
 			"Skipping attachments with --no-attachments is much faster for a large archive.\n\n" +
-			"Exported files are not encrypted - that is what exporting means. The original\n" +
-			"DKIM signatures will not verify against the rebuilt body either, exactly as\n" +
-			"with the web client's own export.",
+			"Exported files are not encrypted. Their DKIM and ARC headers no longer\n" +
+			"verify either, since the body those headers signed was the encrypted one.\n" +
+			"Proton's own web export behaves the same way.",
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			shape, err := format.Value()
 			if err != nil {

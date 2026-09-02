@@ -107,14 +107,13 @@ func generateCmd() *cobra.Command {
 		Use:   "generate",
 		Short: "Make a password",
 		Long: "Make a password, without storing it anywhere.\n\n" +
-			"It reaches no account and needs no session. The alphabet leaves out i, o, l\n" +
-			"and their capitals - the characters people misread - unless letters are all\n" +
-			"the password has.\n\n" +
-			"Every kind asked for is guaranteed to appear, so a password that has to\n" +
-			"contain a digit does.\n\n" +
-			"--words makes a passphrase instead, from Proton's own wordlist: that many\n" +
-			"words, capitalised and each followed by a digit unless --no-uppercase or\n" +
-			"--no-digits says otherwise.",
+			"Runs locally. It reaches no account and needs no session.\n\n" +
+			"The alphabet leaves out i, o, l and their capitals, which are easily\n" +
+			"misread. They are used only when letters are all the password may contain.\n\n" +
+			"Every character kind you ask for is guaranteed to appear at least once.\n\n" +
+			"--words makes a passphrase instead, from Proton's own wordlist. Each word is\n" +
+			"capitalised and followed by a digit, unless --no-uppercase or --no-digits\n" +
+			"says otherwise.",
 		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			pw, err := g.make()

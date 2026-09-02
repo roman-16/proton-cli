@@ -1,6 +1,6 @@
 ---
 gradient: var(--app-calendar)
-href: /apps/calendar/
+href: /calendar/
 order: 3
 summary: Recurring events occurrence by occurrence, all-day events, attendees, and .ics in and out.
 title: Calendar

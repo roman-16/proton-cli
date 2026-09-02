@@ -56,8 +56,8 @@ func breachesListCmd() *cobra.Command {
 		Use:   "list",
 		Short: "List the addresses Proton watches, and how many breaches each is in",
 		Long: "List the addresses Proton watches, and how many breaches each is in.\n\n" +
-			"Worst first, because the reason to run this is to find what to deal with.\n" +
-			"`breaches get` on one of them says which breaches, and what they exposed.",
+			"Worst first. To see which breaches an address is in and what they exposed,\n" +
+			"run `breaches get` on it.",
 		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			rows, err := c.App.Pass.Monitored(c.Ctx)

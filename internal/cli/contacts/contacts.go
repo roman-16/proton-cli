@@ -288,9 +288,10 @@ func exportCmd() *cobra.Command {
 		Use:   "export [REF...]",
 		Short: "Write contacts out as vCards",
 		Long: "Write contacts out as .vcf files, or as one stream with --dest -.\n\n" +
-			"Named contacts are written; with none named, the whole address book is,\n" +
-			"narrowed by --keyword. Properties this tool has no flag for travel too,\n" +
-			"since the stored card goes out whole.",
+			"Naming contacts writes those; naming none writes the whole address book,\n" +
+			"narrowed by --keyword.\n\n" +
+			"The stored card goes out whole, so properties this tool has no flag for are\n" +
+			"exported too.",
 		Args: cobra.ArbitraryArgs,
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			all, err := c.App.Contacts.List(c.Ctx)
@@ -371,10 +372,10 @@ func importCmd() *cobra.Command {
 		Short: "Read contacts in from a .vcf file",
 		Long: "Read contacts in from a .vcf file, or from stdin with -.\n\n" +
 			"Each card goes in whole, so a property this tool has no flag for survives\n" +
-			"the trip. A card with no name and no address is skipped and named, since\n" +
-			"there would be nothing to file it under.\n\n" +
-			"Nothing is merged: importing the same file twice makes duplicates, because\n" +
-			"nothing here can tell a re-import from a file somebody edited.",
+			"the trip. A card with no name and no address is skipped and reported: there\n" +
+			"would be nothing to file it under.\n\n" +
+			"Nothing is merged. Importing the same file twice creates duplicates. Use\n" +
+			"`merge` afterwards to fold them together.",
 		Args: cobra.ExactArgs(1),
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			text, err := readWholeArg(c, c.Args[0])
@@ -420,10 +421,11 @@ func mergeCmd() *cobra.Command {
 		Use:   "merge",
 		Short: "Fold duplicate contacts into one",
 		Long: "Fold duplicate contacts into one.\n\n" +
-			"A shared address decides, compared case-insensitively; two entries merely\n" +
-			"sharing a name are not duplicates.\n\n" +
-			"The oldest of each set is kept, so a group or a pinned key referring to it\n" +
-			"still does. Everything the others had is added, and nothing is overwritten.",
+			"Contacts are duplicates when they share an email address, compared without\n" +
+			"regard to case. Sharing only a name is not enough.\n\n" +
+			"The oldest contact of each set is kept, so groups and pinned keys that refer\n" +
+			"to it keep working. Fields from the others are added; nothing is\n" +
+			"overwritten.",
 		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			all, err := c.App.Contacts.List(c.Ctx)

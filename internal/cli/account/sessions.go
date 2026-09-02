@@ -57,8 +57,8 @@ func sessionsRevokeCmd() *cobra.Command {
 		Use:   "revoke [REF...]",
 		Short: "Invalidate sessions at Proton",
 		Long: "Invalidate sessions at Proton.\n\n" +
-			"A revoked session cannot decrypt the key password sealed into its saved file,\n" +
-			"so revoking is what makes a leaked session file worthless.",
+			"A revoked session can no longer decrypt the key password sealed into its\n" +
+			"saved file, so revoking makes a leaked session file worthless.",
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			if others {
 				if len(c.Args) > 0 {

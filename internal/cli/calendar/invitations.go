@@ -70,8 +70,8 @@ func invitationsAcceptCmd() *cobra.Command {
 		Short: "Take a calendar somebody offered you",
 		Long: "Take a calendar somebody offered you.\n\n" +
 			"The invitation carries the calendar's key, encrypted to the address it was\n" +
-			"sent to. Accepting opens it and signs it back, and the calendar then reads\n" +
-			"like any other one of yours.",
+			"sent to. Accepting re-encrypts that key to your own, after which the\n" +
+			"calendar behaves like any other of yours.",
 		Args: cobra.MinimumNArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			return answerInvitations(c, ui.Accepted, c.App.Calendar.CalendarInvitationAccept)

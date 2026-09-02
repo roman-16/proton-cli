@@ -51,9 +51,9 @@ func itemsListCmd() *cobra.Command {
 		Use:   "list [PATH]",
 		Short: "List what is in a folder",
 		Long: "List what is in a folder.\n\n" +
-			"The filters are the same ones move, copy, trash and delete take, so a\n" +
-			"selection can be worked out here and then handed to the verb that acts on\n" +
-			"it. PATH is what those commands call --scope.",
+			"Takes the same filters as move, copy, trash and delete, so you can preview a\n" +
+			"selection here before acting on it. What PATH is here, those commands call\n" +
+			"--scope.",
 		Args: cobra.MaximumNArgs(1),
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			dc, err := context(c)
@@ -472,8 +472,8 @@ func itemsUpdateCmd() *cobra.Command {
 		Use:   "update PATH",
 		Short: "Rename a file or folder",
 		Long: "Rename a file or folder.\n\n" +
-			"A name is a field like any other, so changing it is `update --name` rather\n" +
-			"than a verb of its own. To put something somewhere else, use `move`.",
+			"Renaming is `update --name`; there is no `rename` verb. To put something\n" +
+			"somewhere else, use `move`.",
 		Args: cobra.ExactArgs(1),
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			dc, err := context(c)
@@ -600,8 +600,7 @@ func revisionsCmd() *cobra.Command {
 		Short: "Earlier versions of a file",
 		Long: "Earlier versions of a file.\n\n" +
 			"Uploading over a file with `--if-exists replace` keeps what was there as a\n" +
-			"revision. Any of them can be read back without disturbing the file, put back\n" +
-			"in place, or dropped from the history.",
+			"revision. You can read any revision back, restore it, or delete it.",
 	}
 	c.AddCommand(revisionsListCmd(), revisionsDownloadCmd(), revisionsRestoreCmd(), revisionsDeleteCmd())
 	return c
@@ -665,8 +664,8 @@ func revisionsDownloadCmd() *cobra.Command {
 		Use:   "download PATH REVISION_REF",
 		Short: "Download an earlier version of a file",
 		Long: "Download an earlier version of a file.\n\n" +
-			"The file keeps whatever it holds now: this reads an old version out, where\n" +
-			"`revisions restore` puts one back in place.",
+			"The file itself is not changed. To put an old version back in place, use\n" +
+			"`revisions restore`.",
 		Args: cobra.ExactArgs(2),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			if err := dest.Validate(true); err != nil {

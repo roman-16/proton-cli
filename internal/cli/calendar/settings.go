@@ -263,9 +263,8 @@ func calendarsUpdateCmd() *cobra.Command {
 		Use:   "update REF",
 		Short: "Rename or recolor a calendar, or change what it gives new events",
 		Long: "Rename or recolor a calendar, or change what it gives new events.\n\n" +
-			"The defaults are per-calendar because that is where Proton keeps them: a\n" +
-			"work calendar can open half-hour meetings with a reminder while a personal\n" +
-			"one does not.",
+			"Defaults are set per calendar, so a work calendar can open half-hour\n" +
+			"meetings with a reminder while a personal one does not.",
 		Args: cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			busyValue, err := busy.Value()

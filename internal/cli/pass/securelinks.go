@@ -29,10 +29,9 @@ func linksGetCmd() *cobra.Command {
 		Use:   "get REF",
 		Short: "Show one link, URL and all",
 		Long: "Show one link, URL and all.\n\n" +
-			"Proton stores the key sealed under the item's own, so a link you mislaid is\n" +
-			"read back here rather than revoked and made again. The URL is the secret,\n" +
-			"which is why it takes a command that says so rather than appearing in a\n" +
-			"listing.",
+			"Use this to recover a link you mislaid, rather than revoking it and making\n" +
+			"a new one.\n\n" +
+			"The URL is the secret, so it appears here and in no listing.",
 		Args: cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			found, err := secureLinkList(c).Find(c.Ctx, c.Args[0])
@@ -97,9 +96,9 @@ func linksListCmd() *cobra.Command {
 		Use:   "list",
 		Short: "List the links you have made",
 		Long: "List the links you have made.\n\n" +
-			"The URL is not among them: it carries the key that opens the item, and a\n" +
-			"listing is no place for a secret. `links get` reads one back whole, and\n" +
-			"`items share get` the ones an item has.",
+			"The URLs are not shown: each one carries the key that opens its item. To\n" +
+			"read a URL, use `links get`, or `items share get` for the links on one\n" +
+			"item.",
 		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			rows, err := c.App.Pass.SecureLinksList(c.Ctx)
@@ -120,9 +119,9 @@ func linksCreateCmd() *cobra.Command {
 		Use:   "create REF",
 		Short: "Make a link that shows one item",
 		Long: "Make a link that shows one item to somebody with no Proton account.\n\n" +
-			"The key that opens it travels in the URL after the '#', which a browser\n" +
-			"never sends to Proton. So the URL is the secret: anyone holding the whole\n" +
-			"of it can read the item until the link expires or is revoked.\n\n" +
+			"The URL is the secret. The key that opens the item travels in the part\n" +
+			"after the '#', which a browser never sends to Proton, so anyone holding the\n" +
+			"whole URL can read the item until the link expires or is revoked.\n\n" +
 			"--expires is required.",
 		Args: cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand, func(*kit.Invocation) error {
@@ -179,8 +178,8 @@ func linksRevokeCmd() *cobra.Command {
 		Use:   "revoke REF...",
 		Short: "Stop a link working",
 		Long: "Stop a link working.\n\n" +
-			"The item is untouched; only the link is withdrawn. Anyone who already\n" +
-			"read it has already read it.",
+			"The item is untouched; only the link stops working. This cannot take back\n" +
+			"what somebody already read.",
 		Args: cobra.MinimumNArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			sel, err := kit.SelectFrom(c, "links", linkColumns(), secureLinkList(c))

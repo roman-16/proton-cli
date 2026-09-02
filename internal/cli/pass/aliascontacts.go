@@ -67,9 +67,9 @@ func aliasContactsCreateCmd() *cobra.Command {
 		Use:   "create REF EMAIL",
 		Short: "Make an address that writes to somebody as the alias",
 		Long: "Make an address that writes to somebody as the alias.\n\n" +
-			"Proton answers with a second address standing for that one person. Mail\n" +
-			"you send there reaches them as though the alias had written it, so a\n" +
-			"reply never shows the address behind it.",
+			"Proton answers with a second address standing for that one person. Mail you\n" +
+			"send there reaches them as though the alias had written it, so your real\n" +
+			"address is never shown.",
 		Args: cobra.ExactArgs(2),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			shareID, itemID, err := aliasOf(c, c.Args[0])

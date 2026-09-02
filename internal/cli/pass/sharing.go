@@ -358,9 +358,9 @@ func vaultsTransferCmd() *cobra.Command {
 		Use:   "transfer REF EMAIL",
 		Short: "Make somebody else the owner of a vault",
 		Long: "Make somebody else the owner of a vault.\n\n" +
-			"They have to be a member already, and only the owner can hand a vault\n" +
-			"over. Afterwards you are a manager of it like anybody else, so this is\n" +
-			"the one change to a vault you cannot undo on your own.",
+			"They have to be a member already, and only the owner can hand a vault over.\n\n" +
+			"Afterwards you are a manager like anybody else. This is the one change to a\n" +
+			"vault you cannot undo on your own.",
 		Args: cobra.ExactArgs(2),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			vault, err := vaultList(c).Find(c.Ctx, c.Args[0])
@@ -426,10 +426,9 @@ func invitationsListCmd() *cobra.Command {
 		Use:   "list",
 		Short: "List what other people have offered you",
 		Long: "List what other people have offered you.\n\n" +
-			"A vault's name and how much is in it are readable before you take it:\n" +
-			"the invitation carries the key that opens them, encrypted to you. What is\n" +
-			"in the vault is not, until you accept. An item offered on its own carries\n" +
-			"no preview at all.",
+			"For a vault, you can read its name and how much is in it before accepting.\n" +
+			"Its contents stay sealed until you do.\n\n" +
+			"An item offered on its own shows no preview at all.",
 		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			rows, err := c.App.Pass.InvitesReceived(c.Ctx)
@@ -448,10 +447,10 @@ func invitationsAcceptCmd() *cobra.Command {
 		Use:   "accept REF...",
 		Short: "Take what somebody offered you",
 		Long: "Take what somebody offered you.\n\n" +
-			"The keys arrive encrypted to the address the offer was sent to and are\n" +
-			"moved onto your own key, which is what makes a vault open like any other\n" +
-			"of yours afterwards. An item taken this way is in no vault of yours, so\n" +
-			"it is `shared list` that has it.",
+			"The keys arrive encrypted to the address the offer was sent to, and are\n" +
+			"re-encrypted to your own. A vault then behaves like any other of yours.\n\n" +
+			"An item accepted on its own is in no vault of yours, so `shared list` is\n" +
+			"where it appears.",
 		Args: cobra.MinimumNArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			return answerInvites(c, ui.Accepted, c.App.Pass.InviteAccept)

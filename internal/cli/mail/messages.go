@@ -37,10 +37,11 @@ func listCmd() *cobra.Command {
 		Use:   "list",
 		Short: "List messages in a folder",
 		Long: "List messages in a folder.\n\n" +
-			"The filters are the ones every organising verb takes, so a selection can be\n" +
-			"read here and then handed to trash, move, label or export. Text predicates\n" +
-			"go through Proton's index, which lags a change by a few seconds.\n\n" +
-			"It looks in the inbox unless told otherwise; --folder all searches everything.",
+			"Takes the same filters as trash, move, label and export, so you can preview\n" +
+			"a selection here before acting on it. Text filters go through Proton's\n" +
+			"index, which lags a change by a few seconds.\n\n" +
+			"Looks in the inbox unless told otherwise. Use --folder all to search\n" +
+			"everything.",
 		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			opts, err := f.list()
@@ -175,8 +176,8 @@ func moveCmd() *cobra.Command {
 		Use:   "move [REF...]",
 		Short: "Move messages to a folder",
 		Long: "Move messages to a folder.\n\n" +
-			"A folder is somewhere a message lives, so moving takes it out of wherever it\n" +
-			"was. To add a tag while leaving it in place, use `label` instead.",
+			"A message is in exactly one folder, so this takes it out of the one it was\n" +
+			"in. To tag it while leaving it where it is, use `label` instead.",
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			dest, err := c.App.Mail.ResolveFolderTarget(c.Ctx, into)
 			if err != nil {
@@ -498,8 +499,8 @@ func emptyCmd() *cobra.Command {
 		Use:   "empty",
 		Short: "Delete everything in a folder, permanently",
 		Long: "Delete everything in a folder, permanently.\n\n" +
-			"Nothing is listed first: Proton clears the folder without naming what was\n" +
-			"in it, which is why this cannot be narrowed and why it always asks.",
+			"Proton clears the folder without reporting what was in it, so nothing is\n" +
+			"listed first. This takes no filters and always asks for confirmation.",
 		Args: cobra.NoArgs,
 		// Which folder to clear is on the command line or it is nowhere, so it is
 		// settled before the sign-in rather than after it.
@@ -597,9 +598,8 @@ func unsubscribeCmd() *cobra.Command {
 		Use:   "unsubscribe REF...",
 		Short: "Ask a mailing list to stop",
 		Long: "Ask a mailing list to stop.\n\n" +
-			"Proton does the asking, using whatever the message offered - a\n" +
-			"List-Unsubscribe header, or the one-click form behind it - because Proton\n" +
-			"is the party the list already knows.",
+			"Proton sends the request on your behalf, using whatever the message offered:\n" +
+			"a List-Unsubscribe header, or the one-click form behind it.",
 		Args: cobra.MinimumNArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			ids := make([]string, 0, len(c.Args))

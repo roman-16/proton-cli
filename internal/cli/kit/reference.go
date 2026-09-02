@@ -18,40 +18,84 @@ const (
 	GroupSelf    = "self"
 )
 
+// SelfPage is where the commands that act on this installation are published.
+// They share one page: five commands with a dozen flags between them are a
+// section rather than a chapter.
+const SelfPage = Program
+
+// ReferenceScope is the command whose page a command is published on.
+//
+// A collection earns a page, because `proton mail messages` is the unit a reader
+// looks things up by: the page is one command line's worth of commands. An app's
+// own verbs - `contacts create`, `account login` - have no collection above them,
+// so the app is their scope.
+//
+// It is nil for the root and for the commands that act on this installation,
+// which share SelfPage.
+func ReferenceScope(c *cobra.Command) *cobra.Command {
+	var chain []*cobra.Command
+	for n := c; n != nil && n.Parent() != nil; n = n.Parent() {
+		chain = append([]*cobra.Command{n}, chain...)
+	}
+	if len(chain) == 0 {
+		return nil
+	}
+	if app := chain[0]; app.GroupID == GroupSelf {
+		return nil
+	}
+	if len(chain) > 1 && chain[1].HasSubCommands() {
+		return chain[1]
+	}
+	return chain[0]
+}
+
 // ReferencePage is the slug of the page a command's full entry is published on.
 //
-// A top-level command that holds others earns a page, because a page is what a
-// collection's worth of commands needs. The handful that act on this machine
-// share one, because five commands with a dozen flags between them are a section
-// rather than a chapter.
+// The slug is the command line with the program dropped and the spaces turned
+// into slashes, so `proton mail messages send` is published at `mail/messages`
+// and a reader can guess a URL from a command. An app that holds other commands
+// is the exception: it is published at its guide, which is what somebody typing
+// `proton mail --help` is looking for.
 func ReferencePage(c *cobra.Command) string {
-	top := c
-	for top != nil && top.Parent() != nil && top.Parent().Parent() != nil {
-		top = top.Parent()
+	scope := ReferenceScope(c)
+	if scope == nil {
+		if c.Parent() == nil {
+			return ""
+		}
+		return SelfPage
 	}
-	if top == nil || top.Parent() == nil {
-		return ""
+	app := scope
+	for app.Parent() != nil && app.Parent().Parent() != nil {
+		app = app.Parent()
 	}
-	if top.GroupID == GroupSelf {
-		return GroupSelf
+	if c == app && app.HasSubCommands() {
+		return app.Name()
 	}
-	return top.Name()
+	return app.Name() + "/" + scope.Name()
 }
 
 // ReferenceHeading is what a command is called on its page: its path, with the
-// page's own name dropped.
+// page's own command line dropped.
 //
-// The page is already titled `proton mail`, so writing `mail` in front of all
-// seventy-seven of its headings is the repetition a reference exists to spare
-// somebody. It is empty when the command is the page, which has no heading of
-// its own because the page is it.
+// The page is already titled `proton mail messages`, so writing that in front of
+// every heading on it is the repetition a reference exists to spare somebody. It
+// is empty only when the command is the page, which has no heading of its own
+// because the page is it.
+//
+// SelfPage gathers top-level commands, so it covers no command line of its own
+// and nothing is dropped: `update` heads its own entry.
 func ReferenceHeading(c *cobra.Command) string {
-	path := commandPath(c)
-	page := ReferencePage(c)
-	if path == "" || path == page {
+	if c.Parent() == nil {
 		return ""
 	}
-	return strings.TrimPrefix(path, page+" ")
+	scope := ReferenceScope(c)
+	if scope == nil {
+		return commandPath(c)
+	}
+	if c == scope {
+		return ""
+	}
+	return strings.TrimPrefix(commandPath(c), commandPath(scope)+" ")
 }
 
 // ReferenceAnchor is where a command's heading is linked to.
@@ -63,13 +107,18 @@ func ReferenceAnchor(c *cobra.Command) string {
 	return strings.ReplaceAll(ReferenceHeading(c), " ", "-")
 }
 
+// Index is the page listing every command, which is where the root points: a
+// screen that has just shown the whole tree is answering "where is all of this
+// written down".
+const Index = "about/commands"
+
 // Reference is where a command is documented in full.
 func Reference(c *cobra.Command) string {
 	page := ReferencePage(c)
 	if page == "" {
-		return Docs + "/commands/"
+		return Docs + "/" + Index + "/"
 	}
-	url := Docs + "/commands/" + page + "/"
+	url := Docs + "/" + page + "/"
 	if anchor := ReferenceAnchor(c); anchor != "" {
 		url += "#" + anchor
 	}

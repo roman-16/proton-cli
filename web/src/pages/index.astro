@@ -4,7 +4,7 @@ import StarlightPage from "@astrojs/starlight/components/StarlightPage.astro";
 import Apps from "../components/Apps.astro";
 import Footer from "../components/Footer.astro";
 import Install from "../components/Install.astro";
-import { description, origin, repo, tagline } from "../../site.ts";
+import { description, origin, repo } from "../../site.ts";
 
 const demoAlt =
   "Listing unread mail, uploading a file to Drive, previewing which files a cleanup would remove, and listing Pass items";
@@ -25,18 +25,18 @@ const traits = [
 ];
 
 const questions = [
-  { href: "/faq/#is-proton-cli-made-by-proton", text: "Is this made by Proton?" },
+  { href: "/about/faq/#is-proton-cli-made-by-proton", text: "Is this made by Proton?" },
   {
-    href: "/faq/#proton-has-its-own-drive-cli-and-pass-cli-why-use-this-one",
+    href: "/about/faq/#how-does-it-compare-to-protons-own-tools",
     text: "How does it compare to Proton's own CLIs?",
   },
   {
-    href: "/faq/#how-is-it-different-from-proton-mail-bridge",
+    href: "/about/faq/#how-is-it-different-from-proton-mail-bridge",
     text: "How is it different from Bridge?",
   },
-  { href: "/faq/#is-it-safe-to-give-it-my-proton-password", text: "Is my password safe?" },
-  { href: "/faq/#do-i-need-a-paid-proton-plan", text: "Do I need a paid plan?" },
-  { href: "/faq/#does-it-work-on-a-headless-server", text: "Does it work on a server?" },
+  { href: "/about/faq/#is-it-safe-to-give-it-my-proton-password", text: "Is my password safe?" },
+  { href: "/about/faq/#do-i-need-a-paid-proton-plan", text: "Do I need a paid plan?" },
+  { href: "/about/faq/#does-it-work-on-a-headless-server", text: "Does it work on a server?" },
 ];
 
 const application = {
@@ -61,11 +61,11 @@ const application = {
     description,
     hero: {
       actions: [
-        { link: "/installation/", text: "Install", variant: "primary" },
-        { link: "/quickstart/", text: "Quickstart", variant: "secondary" },
+        { link: "/install/", text: "Install", variant: "primary" },
+        { link: "/first-commands/", text: "First commands", variant: "secondary" },
         { link: repo, text: "GitHub", variant: "minimal" },
       ],
-      tagline: `${tagline} One binary, end-to-end encrypted, and your keys never leave your machine.`,
+      tagline: description,
       title: "proton-cli",
     },
     template: "splash",

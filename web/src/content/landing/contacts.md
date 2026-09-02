@@ -1,6 +1,6 @@
 ---
 gradient: var(--app-contacts)
-href: /apps/contacts/
+href: /contacts/
 order: 5
 summary: Typed addresses and phones, the full vCard field set, duplicate merging, and vCard import and export.
 title: Contacts

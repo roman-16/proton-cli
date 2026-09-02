@@ -45,10 +45,10 @@ func shareAddCmd() *cobra.Command {
 		Use:   "add REF EMAIL",
 		Short: "Give somebody a calendar",
 		Long: "Give somebody a calendar.\n\n" +
-			"They are sent an invitation and see nothing until they accept. What travels\n" +
-			"is the key that opens the calendar, encrypted to their key - so it has to be\n" +
-			"another Proton account.\n\n" +
-			"They can read the calendar; --edit lets them change it too.",
+			"It has to be another Proton account: what travels is the key that opens the\n" +
+			"calendar, encrypted to their key.\n\n" +
+			"They are sent an invitation and see nothing until they accept. They can then\n" +
+			"read the calendar; --edit lets them change it too.",
 		Args: cobra.ExactArgs(2),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			cal, err := calendarList(c).Find(c.Ctx, c.Args[0])
@@ -72,8 +72,8 @@ func shareListCmd() *cobra.Command {
 		Use:   "list REF",
 		Short: "List who has a calendar",
 		Long: "List who has a calendar.\n\n" +
-			"Somebody who has not answered yet is listed as pending: they were sent an\n" +
-			"invitation and cannot see anything until they take it.",
+			"Somebody who has not answered yet is listed as pending. They can see nothing\n" +
+			"until they accept.",
 		Args: cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			cal, err := calendarList(c).Find(c.Ctx, c.Args[0])
@@ -96,8 +96,8 @@ func shareRemoveCmd() *cobra.Command {
 		Use:   "remove REF EMAIL",
 		Short: "Take somebody's access to a calendar away",
 		Long: "Take somebody's access to a calendar away.\n\n" +
-			"It works whether they accepted or not: an invitation nobody answered is\n" +
-			"withdrawn, and a membership somebody is using is ended.",
+			"Works whether they accepted or not. An unanswered invitation is withdrawn;\n" +
+			"an accepted membership is ended.",
 		Args: cobra.ExactArgs(2),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			cal, err := calendarList(c).Find(c.Ctx, c.Args[0])

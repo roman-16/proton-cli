@@ -36,10 +36,11 @@ func convListCmd() *cobra.Command {
 		Use:   "list",
 		Short: "List threads in a folder",
 		Long: "List threads in a folder.\n\n" +
-			"The filters are the ones every organising verb takes, so a selection can be\n" +
-			"read here and then handed to one of them. Text predicates go through Proton's\n" +
-			"index, which lags a change by a few seconds.\n\n" +
-			"It looks in the inbox unless told otherwise; --folder all searches everything.",
+			"Takes the same filters as the verbs that organise threads, so you can\n" +
+			"preview a selection here before acting on it. Text filters go through\n" +
+			"Proton's index, which lags a change by a few seconds.\n\n" +
+			"Looks in the inbox unless told otherwise. Use --folder all to search\n" +
+			"everything.",
 		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			opts, err := f.list()

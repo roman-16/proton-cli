@@ -96,9 +96,10 @@ func vaultsUpdateCmd() *cobra.Command {
 		Use:   "update REF",
 		Short: "Rename a vault, or change how it looks",
 		Long: "Rename a vault, or change how it looks.\n\n" +
-			"Pass shows its icons and colors as a grid with no names, so the numbers are\n" +
-			"what there is: --icon 7, --color 3. Anything not mentioned is left alone,\n" +
-			"including a description written in the Pass app.",
+			"Icons and colors are numbers, because Pass shows them as an unnamed grid:\n" +
+			"--icon 7, --color 3.\n\n" +
+			"Anything you do not mention is left alone, including a description written\n" +
+			"in the Pass app.",
 		Args: cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			iconValue, err := icon.Value()

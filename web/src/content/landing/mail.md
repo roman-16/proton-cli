@@ -1,6 +1,6 @@
 ---
 gradient: var(--app-mail)
-href: /apps/mail/
+href: /mail/
 order: 1
 summary: Threads, attachments, filters, snoozing, block and allow lists, and auto-reply.
 title: Mail
