@@ -6,6 +6,49 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 Adding a version section here is what publishes a release, so this file is the one place a version is decided: see [Releases](CONTRIBUTING.md#releases). Versions that shipped before this file existed are on the [releases page](https://github.com/roman-16/proton-cli/releases).
 
+## [3.0.0] - 2026-09-02
+
+### Added
+
+- A config file. `~/.config/proton-cli/config.yaml` holds what you would otherwise retype on every command or export as its own variable - `output`, `profile`, `zone`, `quiet`, `log-level` and the rest - with a `per-profile:` section for narrowing one to an account. It does not exist until you write it, and a key it does not recognise is an error rather than a line quietly ignored. `--config` and `PROTON_CONFIG` read a different one.
+- A confirmation policy says what `proton` must stop for and what it must not do at all: `--confirm`, `PROTON_CONFIRM`, or `confirm:` in the config file, scoped as narrowly as one command. A denied command exits `6` and nothing answers it - not `--yes`, not `--dry-run`, not a `--confirm` on the command line. Nothing you can write makes `proton` less careful than it is with no configuration at all.
+- Pass protected with an extra password can be reached at all: the first `pass` command asks for it, and Proton then lets the session reach Pass for as long as it lives. `account login --extra-password-file` or `--extra-password-stdin` hands it over for a run with nobody to ask.
+- `pass items share add|get|remove|update` shares one item and leaves the vault around it alone: what travels is the item's own key, so they can open that item and nothing else.
+- `pass vaults share update` changes what somebody may do with a vault, and `pass vaults transfer` makes a member the owner of it.
+- `pass shared list` shows the items other people share with you, `pass sharing list` the ones you share. An item shared with you is in no vault of yours, so `items list` never had it.
+- `pass items move REF --into VAULT` puts an item in another vault, keeping its history. It gets a new ID, which the command prints.
+- `pass items revisions get REF REVISION` reads an earlier version back in full, and `pass links get REF` prints a link's whole URL.
+- `pass generate --words N` makes a passphrase from Proton's own wordlist, and `--generate-password` on `pass items create|update` makes the password on your machine and prints it beside the new ID, so a new login needs no file to read from.
+- `--zone`, and `TZ` beside it, set the one zone a run works in: what a written time means, what a listing prints, what an event is anchored to. Every event created or re-timed says which zone that was.
+- `drive trash list` shows each item's name and when it was trashed, and sorts and pages like any other listing: `--sort name|size|trashed`, `--desc`, `--page`, `--page-size`.
+- `--expires never` removes an expiry, on a public link and on a message.
+- The changelog and a browsable [Proton API reference](https://proton-cli.lerchster.dev/api-reference/) are on the site. The reference is generated from the same `openapi.yaml` the repository holds, served at [proton-cli.lerchster.dev/openapi.yaml](https://proton-cli.lerchster.dev/openapi.yaml) for a code generator or an HTTP client to read.
+
+### Changed
+
+- **Breaking.** `--output` means the response format on every command. The commands that write bytes to disk take `--dest` and `--dest-dir` for where they go - every `download`, plus `mail messages export`, `contacts export`, `calendar events export` and `pass export`. A script passing a path to `--output` now fails, naming the three formats it accepts.
+- **Breaking.** A secret is never a flag value. `pass items create|update` no longer take `--password`, `--totp-uri`, `--totp-field`, `--hidden`, `--number`, `--cvv`, `--pin` or `--private-key`; use `--secret-file NAME=FILE`, `--secret-stdin NAME` or `--generate-password`. `drive items share link --password` is now `--link-password-file` / `--link-password-stdin`, with `--clear-link-password` to take one off. `--eo-password` on `mail messages send`, `reply`, `forward` and `drafts send` is now `--eo-password-file` / `--eo-password-stdin`.
+- **Breaking.** No Pass listing carries a secret, in any format. `items list`, `aliases list`, `trash list` and `shared list` used to print every password in the account under `--output json`; read one with `items get`, `items revisions get` or `links get`.
+- **Breaking.** `--future` is now `--onwards`, on `calendar events update` and `calendar events delete`.
+- **Breaking.** `pass vaults share list` is now `pass vaults share get`, and answers one record rather than a list.
+- **Breaking.** `pass export` holds the vaults you own, as Proton's own export does. A vault somebody shared with you is theirs to back up; the command says on stderr how much it left out.
+- **Breaking.** An empty list under `--output json` and `--output yaml` is `[]` rather than a missing key, so `jq '.attendees[]'` iterates nothing instead of failing on `null`.
+- **Breaking.** A timed event whose zone cannot be named is refused rather than stored without one, and a clock reading that names two instants or none - the four hours a year the clocks move - needs an explicit offset instead of being settled in silence. `02:30` on a spring morning used to be stored as `03:30`.
+- An occurrence count is exact or it is not given. "Every weekday forever" reported a thousand occurrences and deleting a series reported two hundred, both of them the cap the walk stopped at; `occurrence_count` is now absent where there is no number, and a change reaching a whole series shows what it would touch first.
+- A filtered `drive items trash|delete|move|copy` sends fifty items to a request rather than one, so a large selection finishes in a fraction of the round trips.
+
+### Fixed
+
+- `drive trash list` shows everything `drive trash empty` deletes. Trashed photos sit on a volume of their own and were missing from the listing while `empty` destroyed them anyway, so the number you confirmed was not the number that went.
+- A filtered Drive command counts a folder and the files inside it once rather than twice - a folder is trashed, deleted, moved and copied whole - and names what Proton refused rather than reporting the count it hoped for.
+- `proton api` keeps stdout for the response. A proxy's HTML error page standing in for the API's answer arrived on stdout with exit `0`, so a `jq` downstream broke while the pipeline looked like it had worked; it goes to stderr now and exits `5`.
+- `mail settings autoreply set` refuses a schedule its `--repeat` mode does not allow before it reports anything, so `--dry-run` no longer predicts a change the real run would be refused for.
+- `drive items download` refuses a path that already exists before the transfer rather than after it.
+
+### Security
+
+- A failed Drive block transfer no longer quotes the signed storage URL it was talking to. That URL is a credential for the block it names, and it was landing in error text that gets logged and pasted into issues. A redirect off the host Proton named is no longer followed with the storage token in hand.
+
 ## [2.10.0] - 2026-08-31
 
 ### Added

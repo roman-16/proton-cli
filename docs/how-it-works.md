@@ -101,4 +101,4 @@ Found a vulnerability? [`SECURITY.md`](../SECURITY.md) has the private reporting
 
 ## Where the API definitions come from
 
-The endpoint shapes are generated from Proton's own open-source [web client](https://github.com/ProtonMail/WebClients) into [`openapi.yaml`](../openapi.yaml), covering roughly 740 endpoints. A weekly workflow regenerates it, so the CLI tracks upstream changes rather than guessing.
+The endpoint shapes are generated from Proton's own open-source [web client](https://github.com/ProtonMail/WebClients) into an [API reference](https://proton-cli.lerchster.dev/api-reference/) covering roughly 740 endpoints. A weekly workflow regenerates it, so the CLI tracks upstream changes rather than guessing.

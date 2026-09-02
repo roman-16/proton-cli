@@ -4,6 +4,8 @@ export const repo = "https://github.com/roman-16/proton-cli";
 
 export const branch = `${repo}/blob/main/`;
 
+export const edit = `${repo}/edit/main/`;
+
 /*
  * The counters recorded by the Stats workflow, read in the browser rather than
  * at build time so the page is as current as the last recording instead of as

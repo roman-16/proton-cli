@@ -11,6 +11,7 @@
   "dependencies": {
     "@astrojs/check": "^0.9.5",
     "@astrojs/starlight": "^0.41.9",
+    "@scalar/api-reference": "^1.67.0",
     "astro": "^7.2.9",
     "starlight-links-validator": "^0.25.3",
     "starlight-llms-txt": "^0.11.0",

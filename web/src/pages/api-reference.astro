@@ -1,0 +1,115 @@
+---
+import StarlightPage from "@astrojs/starlight/components/StarlightPage.astro";
+
+import Footer from "../components/Footer.astro";
+---
+
+<StarlightPage
+  frontmatter={{
+    description:
+      "Every endpoint Proton's own web clients call, with its parameters and response shape - the API proton api sends requests to.",
+    /*
+     * This page runs somebody else's renderer, and the only thing it needs to
+     * fetch is the spec beside it. Saying so here is what makes that a property
+     * of the page rather than of the renderer's own defaults, which turn on
+     * telemetry and reach for a vendor registry when they believe they are
+     * being developed against.
+     */
+    head: [
+      {
+        attrs: { content: "connect-src 'self'", "http-equiv": "Content-Security-Policy" },
+        tag: "meta",
+      },
+    ],
+    template: "splash",
+    title: "Proton API reference",
+  }}
+>
+  <p class="lead">
+    Proton publishes no API documentation, so this is generated from the source of <a
+      href="https://github.com/ProtonMail/WebClients">their own web clients</a
+    > and regenerated weekly, which is what makes it follow the endpoints they actually call.
+    <a href="/apps/api/"><code>proton api</code></a> is what sends a request to any of it, with your
+    session and your headers already attached.
+  </p>
+  <p class="lead">
+    The file behind this page is served as it is at <a href="/openapi.yaml"><code>/openapi.yaml</code
+      ></a
+    >, for a code generator or an HTTP client to read.
+  </p>
+
+  <div class="reference" id="api-reference"></div>
+
+  <Footer />
+</StarlightPage>
+
+<style is:global>
+  /*
+   * The reference brings a two-column layout of its own, and the splash template
+   * sizes its column for prose. Scoped to the page by the element it renders
+   * into, so nothing else on the site widens with it.
+   */
+  html:has(#api-reference) {
+    --sl-content-width: 100%;
+  }
+</style>
+
+<style>
+  .reference {
+    margin-block: 2rem;
+    min-block-size: 100vh;
+  }
+</style>
+
+<script>
+  import { createApiReference } from "@scalar/api-reference";
+  import "@scalar/api-reference/style.css";
+
+  /*
+   * Reading is all this page offers. A request to Proton needs a bearer token, a
+   * session UID and an app version, and the API answers a browser with no CORS
+   * header at all - so a "send request" button here could never do anything but
+   * fail, and `proton api` is the thing that can.
+   *
+   * The renderer reports usage to its own vendor unless told not to, and offers
+   * an assistant and a developer toolbar that it happens to keep to localhost.
+   * A page of this project sends nothing about its reader anywhere, so all four
+   * are turned off here rather than left to a default: what the security page
+   * promises has to be true of the site as well as of the binary.
+   */
+  const configuration = {
+    documentDownloadType: "yaml",
+    hideClientButton: true,
+    // The site's own control is in the header, and two of them on one page
+    // disagree the moment either is used.
+    hideDarkModeToggle: true,
+    hideTestRequestButton: true,
+    mcp: { disabled: true },
+    showDeveloperTools: "never",
+    showToolbar: "never",
+    telemetry: false,
+    url: "/openapi.yaml",
+    // The site's own font is already loaded, and the reference reads as part of
+    // the site rather than as a panel embedded in it.
+    withDefaultFonts: false,
+  } as const;
+
+  const dark = () => document.documentElement.dataset.theme !== "light";
+
+  createApiReference("#api-reference", { ...configuration, darkMode: dark() });
+
+  /*
+   * Starlight's control in the header is the only one on the page, so it has to
+   * reach the reference too. The reference reads the mode once as it mounts and
+   * renders from a class on the body afterwards - which is the class its own
+   * toggle sets - so following the site means setting the same one.
+   */
+  const follow = () => {
+    document.body.classList.toggle("dark-mode", dark());
+    document.body.classList.toggle("light-mode", !dark());
+  };
+
+  new MutationObserver(follow).observe(document.documentElement, {
+    attributeFilter: ["data-theme"],
+  });
+</script>

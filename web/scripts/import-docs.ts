@@ -1,22 +1,22 @@
 /*
  * Turns the repository's documentation into the site's content collection.
  *
- * The pages in docs/ are written for someone reading them on GitHub, and they
- * stay that way: no frontmatter is added to them, so nothing gains the key/value
- * table GitHub prints above it, and every relative link between them keeps
- * working there. Starlight needs a title in frontmatter and absolute links, so
- * the two are derived here instead - from the heading the page already has and
- * from where the link already points.
+ * The pages are written for someone reading them on GitHub, and they stay that
+ * way: no frontmatter is added to them, so nothing gains the key/value table
+ * GitHub prints above it, and every relative link between them keeps working
+ * there. Starlight needs a title in frontmatter and absolute links, so the two
+ * are derived here instead - from the heading the page already has and from
+ * where the link already points.
  *
  * The output is generated, so it is rebuilt from empty on every run and is not
- * committed. docs/ is the source of truth; this file is the only thing that
- * knows how it becomes a page.
+ * committed. The markdown in the repository is the source of truth; this file is
+ * the only thing that knows how it becomes a page.
  */
 import { copyFile, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, posix, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { branch } from "../site.ts";
+import { branch, edit } from "../site.ts";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const docs = join(root, "docs");
@@ -26,11 +26,18 @@ const statics = join(root, "web/public");
 const store = join(root, "web/.astro/data-store.json");
 
 // docs/README.md is a table of contents, and the sidebar already is one.
-const skipped = new Set(["README.md"]);
+const skipped = new Set(["docs/README.md"]);
 
-// Each section's index is the section itself rather than a page inside it, so
-// what stays under a directory is only what the section is made of.
-const renamed = new Map([["commands/README.md", "commands.md"]]);
+/*
+ * The pages whose slug is not where they sit. A section's index is the section
+ * itself rather than a page inside it, and the changelog keeps the place at the
+ * root of the repository that GitHub, `proton changelog` and the release
+ * workflow all read it from.
+ */
+const slugs = new Map([
+  ["CHANGELOG.md", "changelog"],
+  ["docs/commands/README.md", "commands"],
+]);
 
 const alerts = new Map([
   ["CAUTION", "danger"],
@@ -44,12 +51,15 @@ const markdownFiles = async (dir: string): Promise<string[]> => {
   const entries = await readdir(dir, { recursive: true, withFileTypes: true });
   return entries
     .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
-    .map((entry) => posix.normalize(relative(docs, join(entry.parentPath, entry.name))))
-    .filter((path) => !skipped.has(path))
-    .sort();
+    .map((entry) => posix.normalize(relative(root, join(entry.parentPath, entry.name))));
 };
 
-const slugOf = (path: string) => renamed.get(path)?.replace(/\.md$/, "") ?? path.replace(/\.md$/, "");
+// Every page, as the path from the root of the repository that it was written at.
+const sources = [...(await markdownFiles(docs)), "CHANGELOG.md"].filter((path) => !skipped.has(path)).sort();
+
+const pages = new Set(sources);
+
+const slugOf = (path: string) => slugs.get(path) ?? path.replace(/^docs\//, "").replace(/\.md$/, "");
 
 const pageURL = (path: string) => `/${slugOf(path)}/`;
 
@@ -67,12 +77,9 @@ const rewriteTarget = (from: string, target: string) => {
   const resolved = posix.normalize(posix.join(posix.dirname(from), path));
   const suffix = fragment ? `#${fragment}` : "";
 
-  if (resolved.startsWith("../")) {
-    return `${branch}${resolved.replace(/^(?:\.\.\/)+/, "")}${suffix}`;
-  }
-  if (resolved === "README.md") return `/${suffix}`;
-  if (!resolved.endsWith(".md")) return `${branch}docs/${resolved}${suffix}`;
-  return `${pageURL(resolved)}${suffix}`;
+  if (resolved === "docs/README.md") return `/${suffix}`;
+  if (pages.has(resolved)) return `${pageURL(resolved)}${suffix}`;
+  return `${branch}${resolved}${suffix}`;
 };
 
 const rewriteLinks = (from: string, body: string) =>
@@ -121,7 +128,7 @@ const quote = (value: string) => `"${value.replace(/["\\]/g, "\\$&")}"`;
 
 const render = (path: string, source: string) => {
   const heading = source.match(/^#\s+(.+)$/m);
-  if (!heading?.[1]) throw new Error(`docs/${path} has no heading to take a title from`);
+  if (!heading?.[1]) throw new Error(`${path} has no heading to take a title from`);
 
   const withoutHeading = source.replace(/^#\s+.+\n+/m, "");
   const opening = lead(withoutHeading);
@@ -133,6 +140,9 @@ const render = (path: string, source: string) => {
     "---",
     `title: ${quote(heading[1].trim())}`,
     ...(opening ? [`description: ${quote(opening.description)}`] : []),
+    // Where the page was written, which Starlight would otherwise guess at from
+    // the path of the generated file it is reading here.
+    `editUrl: ${quote(edit + path)}`,
     "---",
     "",
   ].join("\n");
@@ -150,10 +160,10 @@ const render = (path: string, source: string) => {
 const importDocs = async () => {
   await rm(store, { force: true });
   await rm(content, { force: true, recursive: true });
-  for (const path of await markdownFiles(docs)) {
-    const out = join(content, renamed.get(path) ?? path);
+  for (const path of sources) {
+    const out = join(content, `${slugOf(path)}.md`);
     await mkdir(dirname(out), { recursive: true });
-    await writeFile(out, render(path, await readFile(join(docs, path), "utf8")));
+    await writeFile(out, render(path, await readFile(join(root, path), "utf8")));
   }
 };
 
@@ -163,12 +173,17 @@ const importDocs = async () => {
  * are meant to be shown at, and nothing an image pipeline does to an SVG of a
  * screenshot improves it. The social card is a PNG because that is the only
  * format the places a link gets pasted will draw.
+ *
+ * openapi.yaml is served byte for byte, at a URL a code generator or an HTTP
+ * client can be pointed at. It is the file the repository holds and the file the
+ * reference page reads, so there is one of it rather than three.
  */
 const importAssets = async () => {
   await mkdir(assets, { recursive: true });
   await mkdir(statics, { recursive: true });
   await copyFile(join(root, "assets/logo.svg"), join(assets, "logo.svg"));
   await copyFile(join(root, "assets/logo.svg"), join(statics, "favicon.svg"));
+  await copyFile(join(root, "openapi.yaml"), join(statics, "openapi.yaml"));
   for (const name of ["demo-dark.svg", "demo-light.svg", "og.png"]) {
     await copyFile(join(root, "assets", name), join(statics, name));
   }

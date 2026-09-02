@@ -19,7 +19,6 @@ export default defineConfig({
     starlight({
       customCss: ["./src/styles/proton.css"],
       description,
-      editLink: { baseUrl: `${repo}/edit/main/docs/` },
       /*
        * Half of what is shown here is terminal output, and a table that wraps
        * is a table destroyed: the columns a reader is matching up land under
@@ -132,6 +131,8 @@ export default defineConfig({
             "commands/self",
             { label: "Output", slug: "output" },
             { label: "Limits", slug: "limitations" },
+            { label: "Changelog", slug: "changelog" },
+            { label: "Proton API reference", link: "/api-reference/" },
           ],
           label: "Reference",
         },

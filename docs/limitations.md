@@ -19,7 +19,6 @@ Each has an equivalent in a web client, and each is unbuilt for a stated reason 
 | Drive computers and shared bookmarks | Neither exists until you use a desktop client or open somebody's link, so neither can be tested |
 | Mail forwarding to another Proton address | Needs an OpenPGP forwarding primitive the Go libraries don't implement |
 | Mail forwarding to a non-Proton address | Proton emails the address a link its owner must follow, so a command can start the flow but never finish it |
-| Moving a Pass item between vaults | Re-encrypting to another share loses access on failure rather than failing loudly |
 | Turning the Pass [extra password](apps/pass.md#an-extra-password) on or off | It is a credential, and proton changes none of them - the account password, two-factor and the recovery phrase are absent for the same reason. Setting one from a file cannot ask you to type it twice the way Proton's own clients do, and a typo would leave every item in Pass unreachable; removing one signs every device out of every app. Answering an extra password, so the commands work, is built |
 
 ## Out of scope

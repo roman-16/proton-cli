@@ -5,16 +5,19 @@ name: Web
 # APT repository. Keeping the two apart is what stops a documentation change from
 # ever reaching the tree `apt update` reads.
 #
-# The pages themselves stay in docs/, so a pull request that renames a command
-# regenerates the reference and republishes the site in the same merge.
+# The pages themselves stay where they are written, so a pull request that
+# renames a command regenerates the reference and republishes the site in the
+# same merge, and the release that adds a changelog section publishes it here.
 on:
   push:
     branches: [main]
     paths:
       - .github/workflows/web.yml
+      - CHANGELOG.md
       - README.md
       - assets/**
       - docs/**
+      - openapi.yaml
       - web/**
   workflow_dispatch:
 

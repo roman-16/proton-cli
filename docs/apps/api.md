@@ -18,4 +18,4 @@ Stdout carries that response and nothing else. A body that is not JSON - a proxy
 
 ## Finding an endpoint
 
-[`openapi.yaml`](https://github.com/roman-16/proton-cli/blob/main/openapi.yaml) documents roughly 740 endpoints - paths, methods, request and response schemas, and query parameters. It is generated from Proton's own web client source, and a weekly job keeps it in step with upstream.
+The [API reference](https://proton-cli.lerchster.dev/api-reference/) documents roughly 740 endpoints - paths, methods, request and response schemas, and query parameters. It is generated from Proton's own web client source, and a weekly job keeps it in step with upstream. The spec behind it is served as [`openapi.yaml`](https://proton-cli.lerchster.dev/openapi.yaml), for a code generator or an HTTP client to read.
