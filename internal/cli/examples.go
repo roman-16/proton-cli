@@ -550,12 +550,33 @@ var examples = map[string][]string{
 		"proton pass vaults share add Work jane@proton.me",
 		"proton pass vaults share add Work jane@proton.me --access editor",
 	},
-	"proton pass vaults share list": {
-		"proton pass vaults share list Work",
+	"proton pass vaults share get": {
+		"proton pass vaults share get Work",
+	},
+	"proton pass vaults share update": {
+		"proton pass vaults share update Work jane@proton.me --access manager",
 	},
 	"proton pass vaults share remove": {
 		"proton pass vaults share remove Work jane@proton.me",
 	},
+	"proton pass vaults transfer": {
+		"proton pass vaults transfer Work jane@proton.me",
+	},
+	"proton pass items share add": {
+		"proton pass items share add github.com jane@proton.me",
+		"proton pass items share add github.com jane@proton.me --access editor",
+	},
+	"proton pass items share get": {
+		"proton pass items share get github.com",
+	},
+	"proton pass items share update": {
+		"proton pass items share update github.com jane@proton.me --access viewer",
+	},
+	"proton pass items share remove": {
+		"proton pass items share remove github.com jane@proton.me",
+	},
+	"proton pass shared list":  {"proton pass shared list"},
+	"proton pass sharing list": {"proton pass sharing list"},
 	"proton pass invitations list": {
 		"proton pass invitations list",
 	},
@@ -605,6 +626,9 @@ var examples = map[string][]string{
 	"proton pass links list": {
 		"proton pass links list",
 	},
+	"proton pass links get": {
+		"proton pass links get 5bH2mQxK",
+	},
 	"proton pass links create": {
 		"proton pass links create github.com --expires 7d",
 		"proton pass links create github.com --expires 24h --views 1",
@@ -630,6 +654,8 @@ var examples = map[string][]string{
 		"proton pass generate",
 		"proton pass generate --length 32",
 		"proton pass generate --no-symbols --length 24",
+		"proton pass generate --words 4",
+		"proton pass generate --words 4 --separator space --no-digits",
 	},
 	"proton pass items list": {
 		"proton pass items list",
@@ -641,20 +667,27 @@ var examples = map[string][]string{
 		"proton pass items get GitHub --output json",
 	},
 	"proton pass items create": {
-		"proton pass items create --name GitHub --username roman --password hunter2 --url github.com",
+		"proton pass items create --name GitHub --username roman --url github.com --generate-password",
+		"proton pass items create --name Router --generate-password --words 5",
 		"proton pass items create --type note --name 'Door codes' --note 'Front: 1234'",
-		"proton pass items create --type credit-card --name 'Travel card' --holder 'Roman' --number 4111111111111111 --expiry 2030-04",
-		"proton pass items create --type custom --name Router --field 'Network/SSID=home' --hidden 'Network/Key=hunter2'",
+		"proton pass items create --type credit-card --name 'Travel card' --holder 'Roman' --expiry 2030-04 --secret-file number=/run/secrets/card",
+		"proton pass items create --type custom --name Router --field 'Network/SSID=home' --secret-file 'Network/Key=/run/secrets/wifi'",
 	},
 	"proton pass items update": {
-		"proton pass items update GitHub --password hunter3",
+		"proton pass items update GitHub --secret-file password=/run/secrets/github",
+		"proton pass items update GitHub --secret-stdin password",
 		"proton pass items update GitHub --username roman-16 --url github.com",
-		"proton pass items update Router --hidden 'Network/Key=hunter3'",
-		"proton pass items update GitHub --totp-field 'Backup=otpauth://totp/GitHub?secret=JBSWY3DPEHPK3PXP'",
+		"proton pass items update GitHub --generate-password",
+	},
+	"proton pass items move": {
+		"proton pass items move github.com --into Work",
 	},
 	"proton pass items revisions list": {
 		"proton pass items revisions list github.com",
 		"proton pass items revisions list github.com --output json",
+	},
+	"proton pass items revisions get": {
+		"proton pass items revisions get github.com 3",
 	},
 	"proton pass items totp": {
 		"proton pass items totp github.com",

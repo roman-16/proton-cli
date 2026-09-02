@@ -110,12 +110,14 @@ func Mailbox(work string) []Collection {
 			ID:     "GitHub",
 			Fields: map[string]string{"type": "login"},
 			Create: []string{"pass", "items", "create", "--vault", "Personal", "--name", "GitHub",
-				"--username", "roman", "--url", "github.com", "--password", "correct-horse-battery"},
+				"--username", "roman", "--url", "github.com"},
+			Secrets: map[string]string{"password": "correct-horse-battery"},
 		}, {
 			ID:     "Home Wi-Fi",
 			Fields: map[string]string{"type": "wifi"},
 			Create: []string{"pass", "items", "create", "--vault", "Personal", "--type", "wifi",
-				"--name", "Home Wi-Fi", "--ssid", "Fritzbox", "--security", "WPA2", "--password", "hunter2hunter2"},
+				"--name", "Home Wi-Fi", "--ssid", "Fritzbox", "--security", "WPA2"},
+			Secrets: map[string]string{"password": "hunter2hunter2"},
 		}, {
 			ID:     "Door codes",
 			Fields: map[string]string{"type": "note"},
@@ -125,8 +127,8 @@ func Mailbox(work string) []Collection {
 			ID:     "Travel card",
 			Fields: map[string]string{"type": "credit-card"},
 			Create: []string{"pass", "items", "create", "--vault", "Personal", "--type", "credit-card",
-				"--name", "Travel card", "--holder", "Anna Berger", "--number", "4111111111111111",
-				"--expiry", "2030-12", "--cvv", "123"},
+				"--name", "Travel card", "--holder", "Anna Berger", "--expiry", "2030-12"},
+			Secrets: map[string]string{"cvv": "123", "number": "4111111111111111"},
 		}, {
 			// An alias, because making one is what Proton meters hardest here -
 			// a handful an hour, against five tests that each want one. Only the

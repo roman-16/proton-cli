@@ -66,7 +66,7 @@ Every command reads the same way - `proton <app> <collection> <verb>` - and anyw
 - **[Mail](docs/apps/mail.md)** - read, send, search and organize. Threads, attachments, filters, snoozing, block and allow lists, auto-reply.
 - **[Drive](docs/apps/drive.md)** - files and folders as paths. Revisions, public links, sharing with people, trash, photo albums.
 - **[Calendar](docs/apps/calendar.md)** - events and reminders. Recurrence occurrence by occurrence, attendees, invitations, .ics in and out.
-- **[Pass](docs/apps/pass.md)** - logins and secrets. Notes, cards, SSH keys, identities, aliases, two-factor codes, item history.
+- **[Pass](docs/apps/pass.md)** - logins and secrets. Notes, cards, SSH keys, identities, aliases, two-factor codes, item history, sharing a vault or one item.
 - **[Contacts](docs/apps/contacts.md)** - your address book. Typed addresses and phones, the full vCard field set, duplicate merging.
 - **[Account](docs/apps/account.md)** - signing in, sessions, and more than one account side by side.
 

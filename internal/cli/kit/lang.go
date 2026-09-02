@@ -75,6 +75,7 @@ var Verbs = map[string]string{
 	"disable": "turn off",
 
 	// Sharing
+	"transfer":    "hand ownership to somebody else",
 	"link":        "create a public link",
 	"unlink":      "remove a public link",
 	"add":         "put a member into a container",
@@ -171,7 +172,7 @@ var Mutating = map[string]bool{
 	"spam": true, "forget": true, "expire": true, "unsubscribe": true,
 	"snooze": true, "unsnooze": true, "apply": true, "reorder": true, "favorite": true, "unfavorite": true, "pin": true,
 	"unpin": true, "respond": true, "login": true, "logout": true,
-	"revoke": true, "uninstall": true,
+	"revoke": true, "uninstall": true, "transfer": true,
 }
 
 // SettingsPages declares every collection that lives under a `settings` group,

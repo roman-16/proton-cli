@@ -94,23 +94,33 @@ type ExportedMetadata struct {
 // dropped.
 var exportJSON = protojson.MarshalOptions{EmitUnpopulated: true, UseProtoNames: false}
 
-// Export gathers every vault and its items into the document Proton Pass reads.
-func (s *Service) Export(ctx context.Context, userID string) (*ExportDocument, error) {
+// Export gathers the vaults this account owns, and their items, into the
+// document Proton Pass reads.
+//
+// What somebody else shared is theirs to back up: it stays out, as it does in
+// Proton's own export, so restoring this file cannot turn a vault you were let
+// into to a second copy of it under your name. Skipped says how many were left
+// out, because an archive quietly smaller than the account is worth a word.
+func (s *Service) Export(ctx context.Context, userID string) (doc *ExportDocument, skipped int, err error) {
 	vaults, err := s.VaultsList(ctx)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	items, err := s.ItemsList(ctx, "")
+	items, err := s.itemsFull(ctx, "")
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	doc := &ExportDocument{
+	doc = &ExportDocument{
 		UserID:  userID,
 		Vaults:  make(map[string]*ExportedVault, len(vaults)),
 		Version: exportVersion,
 	}
 	for _, v := range vaults {
+		if !v.Owner {
+			skipped++
+			continue
+		}
 		doc.Vaults[v.ShareID] = &ExportedVault{
 			Name: v.Name, Description: v.Description,
 			Display: ExportedDisplay{Color: v.Color, Icon: v.Icon},
@@ -124,15 +134,15 @@ func (s *Service) Export(ctx context.Context, userID string) (*ExportDocument, e
 		}
 		exported, err := exportItem(it)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		vault.Items = append(vault.Items, *exported)
 	}
-	return doc, nil
+	return doc, skipped, nil
 }
 
 // exportItem renders one item the way the app writes it.
-func exportItem(it Item) (*ExportedItem, error) {
+func exportItem(it FullItem) (*ExportedItem, error) {
 	content, kind, err := exportContent(it.raw)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", it.Name, err)

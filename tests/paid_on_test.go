@@ -128,18 +128,37 @@ var noticesProtonSends = []string{
 // It runs before the photograph below, so what it clears is not then reported as
 // something the run left behind. Anything it cannot clear stays, and the
 // photograph names it.
+//
+// Proton writes a moment after the other side answers rather than as it answers,
+// so this waits for as many notices as the run caused - runAs counts them - and
+// stops as soon as it has them. A run that caused none sweeps once and returns.
 func sweepNotices() {
+	want := int(noticesCaused.Load())
+	var swept int
+	waitFor(90*time.Second, 5*time.Second, func() bool {
+		swept += sweepOnce()
+		return swept >= want
+	})
+	if swept < want {
+		fmt.Fprintf(os.Stderr,
+			"Proton was told to write %d notices and %d arrived in time to be cleared\n", want, swept)
+	}
+}
+
+// sweepOnce trashes the notices that have arrived so far, and says how many.
+func sweepOnce() int {
 	body, _, code, err := runAs(paid, nil, asJSON([]string{
 		"mail", "messages", "list", "--folder", "all",
 		"--from", "no-reply@proton.me", "--page-size", "50",
 	})...)
 	if err != nil || code != 0 {
-		return
+		return 0
 	}
 	rows, ok := rowsOf(body)
 	if !ok {
-		return
+		return 0
 	}
+	var cleared int
 	for _, row := range rows {
 		m, _ := row.(map[string]interface{})
 		at, _ := m["time"].(float64)
@@ -162,8 +181,11 @@ func sweepNotices() {
 		}
 		if _, _, code, err := runAs(paid, nil, "--yes", "mail", "messages", "trash", "--", id); err != nil || code != 0 {
 			fmt.Fprintf(os.Stderr, "could not clear the notice %q Proton sent; it is in the inbox\n", subject)
+			continue
 		}
+		cleared++
 	}
+	return cleared
 }
 
 // snapshotPaid photographs the account before any test runs.
@@ -330,6 +352,36 @@ func requirePaid(t *testing.T) {
 	}
 }
 
+// runOKStderrSecondary is runOKStderr for the second account, for the answers
+// that are on the other stream.
+func runOKStderrSecondary(t *testing.T, args ...string) (stdout, stderr string) {
+	t.Helper()
+	stdout, stderr, code := runSecondary(t, consenting(args)...)
+	if code != 0 {
+		t.Fatalf("command %v failed as the secondary account (exit %d):\nstdout: %s\nstderr: %s",
+			args, code, truncateOutput(stdout), truncateOutput(stderr))
+	}
+	return stdout, stderr
+}
+
+// memberEmail is the address Proton reports for the owner of a share, or for
+// somebody who is not.
+//
+// It is read out of the listing rather than assumed, because an account is a
+// member under its primary Proton address whatever address it signs in as.
+func memberEmail(t *testing.T, members any, owner bool) string {
+	t.Helper()
+	rows, _ := members.([]any)
+	for _, row := range rows {
+		m, _ := row.(map[string]any)
+		if is, _ := m["owner"].(bool); is == owner {
+			email, _ := m["email"].(string)
+			return email
+		}
+	}
+	return ""
+}
+
 func runPaid(t *testing.T, args ...string) (stdout, stderr string, exitCode int) {
 	t.Helper()
 	out, errOut, code, err := runAs(paid, nil, args...)
@@ -401,6 +453,12 @@ var vaultSharing = gate{
 	feature: "vault sharing",
 	words:   []string{"upgrade", "paid", "subscription"},
 }
+
+// itemSharing is how Proton refuses an item offered to somebody on a free plan.
+// It is the invitee's plan being refused rather than this account's, and the
+// account the suite shares with is a free one - so the round trip needs a second
+// paid account, and there is one.
+var itemSharing = gate{feature: "item sharing", code: "2011"}
 
 // secureLinks is how Proton refuses a secure link to an account without the
 // plan for it.
@@ -620,7 +678,8 @@ func TestPaidPassSecureLink(t *testing.T) {
 
 	name := testID() + "-link"
 	out, stderr, code := runPaid(t, "--yes", "pass", "items", "create",
-		"--name", name, "--username", "jane", "--password", "hunter2")
+		"--name", name, "--username", "jane",
+		"--secret-file", secretFile(t, "password", "hunter2"))
 	if code != 0 {
 		t.Fatalf("could not make an item to link to: %s", truncateOutput(stderr))
 	}
@@ -639,24 +698,31 @@ func TestPaidPassSecureLink(t *testing.T) {
 	assertContains(t, stderr, "Anyone with this link")
 
 	rows := runJSONArrayPaid(t, "pass", "links", "list")
-	var linkID, url string
+	var linkID string
 	for _, row := range rows {
 		m, _ := row.(map[string]interface{})
 		if id, _ := m["item_id"].(string); !strings.Contains(ref, id) {
 			continue
 		}
 		linkID, _ = m["link_id"].(string)
-		url, _ = m["url"].(string)
+		// The URL carries the key that opens the item, so a listing does not.
+		if url, _ := m["url"].(string); url != "" {
+			t.Errorf("a link listing carries the URL that opens the item: %q", url)
+		}
 	}
 	if linkID == "" {
 		t.Fatal("the link this test made is not in the listing")
 	}
-	// Proton stores the link key sealed under the item's own, so a listing can
-	// put the whole URL back together - which is what makes a mislaid link
-	// recoverable rather than lost.
-	if !strings.Contains(url, "#") {
-		t.Errorf("the listing could not rebuild the link: %q", url)
+	// Proton stores the link key sealed under the item's own, so the whole URL
+	// can be put back together - which is what makes a mislaid link recoverable
+	// rather than lost. It takes a command that says so.
+	back, warned := runOKStderrPaid(t, "pass", "links", "get", linkID)
+	if !strings.Contains(back, "#") {
+		t.Errorf("`links get` could not rebuild the link: %q", back)
 	}
+	assertContains(t, warned, "Anyone with this link")
+	// The same URL is part of how that item is shared.
+	assertContains(t, runOKPaid(t, "pass", "items", "share", "get", ref), "#")
 	cleanupRunPaid(t, "Revoke link: proton pass links revoke "+linkID, "pass", "links", "revoke", linkID)
 }
 
@@ -891,7 +957,7 @@ func TestPaidPassVaultSharing(t *testing.T) {
 	// Something in it, so the other side has more to open than an empty vault.
 	secret := testID() + "-in-shared-vault"
 	runOKPaid(t, "pass", "items", "create", "--vault", vault, "--name", secret,
-		"--username", "jane", "--password", "hunter2")
+		"--username", "jane", "--secret-file", secretFile(t, "password", "hunter2"))
 
 	_, stderr, code = runPaid(t, "--yes", "pass", "vaults", "share", "add", vault, secondaryEmail())
 	skipIfPlanRefuses(t, vaultSharing, code, stderr)
@@ -930,6 +996,149 @@ func TestPaidPassVaultSharing(t *testing.T) {
 	if !found {
 		t.Error("the shared vault's item did not read on the account that took it")
 	}
+
+	// Somebody who accepted is a member, which is a different thing from an
+	// invitation and the only one whose access can be changed in place.
+	shared := runJSONPaid(t, "pass", "vaults", "share", "get", vault)
+	if !strings.Contains(fmt.Sprintf("%v", shared["members"]), secondaryEmail()) {
+		t.Fatalf("the second account accepted the vault and is not a member: %v", shared["members"])
+	}
+	if !strings.Contains(fmt.Sprintf("%v", shared["members"]), "owner") {
+		t.Errorf("the owner is not among the members: %v", shared["members"])
+	}
+
+	// A backup is of what you own. Somebody else's vault is theirs to back up,
+	// and an archive that leaves one out says how many.
+	_, note := runOKStderrSecondary(t, "pass", "export", "--dest", "-")
+	if !strings.Contains(note, "shared with you") {
+		t.Errorf("the second account's export says nothing about the vault it does not own: %s", truncateOutput(note))
+	}
+
+	runOKPaid(t, "pass", "vaults", "share", "update", vault, secondaryEmail(), "--access", "manager")
+	if !strings.Contains(fmt.Sprintf("%v", runJSONPaid(t, "pass", "vaults", "share", "get", vault)["members"]), "manager") {
+		t.Error("the member's access did not change")
+	}
+
+	// Handing it over, and taking it back. Only an owner may transfer, so the
+	// return trip is the other account's to make - and if it fails, the vault is
+	// theirs and the clean-up says so loudly rather than leaving it unsaid.
+	//
+	// The address to hand it back to is the one Proton reports, which is the
+	// account's primary Proton address and not necessarily the address it signs
+	// in as.
+	owner := memberEmail(t, shared["members"], true)
+	if owner == "" {
+		t.Fatalf("the vault has no owner among its members: %v", shared["members"])
+	}
+	runOKPaid(t, "pass", "vaults", "transfer", vault, secondaryEmail())
+	cleanupRunSecondary(t, "Give the vault back: proton pass vaults transfer "+name+" "+owner,
+		"pass", "vaults", "transfer", name, owner)
+	if was := fmt.Sprint(runJSONPaid(t, "pass", "vaults", "get", vault)["owner"]); was != "false" {
+		t.Errorf("after handing the vault over, owner = %s", was)
+	}
+	runOKSecondary(t, "pass", "vaults", "transfer", name, owner)
+	if was := fmt.Sprint(runJSONPaid(t, "pass", "vaults", "get", vault)["owner"]); was != "true" {
+		t.Errorf("after taking the vault back, owner = %s", was)
+	}
+
+	runOKPaid(t, "pass", "vaults", "share", "remove", vault, secondaryEmail())
+	if left := runJSONPaid(t, "pass", "vaults", "share", "get", vault); strings.Contains(
+		fmt.Sprintf("%v", left["members"]), secondaryEmail()) {
+		t.Errorf("the member is still there after being removed: %v", left["members"])
+	}
+}
+
+// One item, shared on its own: what travels is that item's key rather than the
+// vault's, so the other account can open it and nothing around it.
+//
+// Proton allows an item invitation only to somebody on a paid plan, and the
+// account the suite shares with is a free one, so this skips until there is a
+// second paid account to answer it.
+func TestPaidPassItemSharing(t *testing.T) {
+	t.Parallel()
+	requirePaid(t)
+
+	name := testID() + "-shared-item"
+	out, stderr, code := runPaid(t, "--yes", "pass", "items", "create", "--name", name,
+		"--username", "jane", "--generate-password")
+	if code != 0 {
+		t.Fatalf("could not make an item to share: %s", truncateOutput(stderr))
+	}
+	ref := strings.TrimSpace(out)
+	cleanupRunPaid(t, "Delete item: proton pass items delete "+ref, "pass", "items", "delete", ref)
+
+	_, stderr, code = runPaid(t, "--yes", "pass", "items", "share", "add", ref, secondaryEmail())
+	skipIfPlanRefuses(t, itemSharing, code, stderr)
+	cleanupRunPaid(t, "Unshare item: proton pass items share remove "+ref+" "+secondaryEmail(),
+		"pass", "items", "share", "remove", ref, secondaryEmail())
+
+	// Offered, and on the record as offered.
+	if !strings.Contains(fmt.Sprintf("%v", runJSONPaid(t, "pass", "items", "share", "get", ref)["invited"]),
+		secondaryEmail()) {
+		t.Fatal("the invitation is not in `items share get`")
+	}
+	var shared bool
+	for _, row := range runJSONArrayPaid(t, "pass", "sharing", "list") {
+		m, _ := row.(map[string]interface{})
+		if fmt.Sprint(m["name"]) == name {
+			shared = true
+		}
+	}
+	if !shared {
+		t.Error("an item this account has shared is not in its `sharing list`")
+	}
+
+	var token string
+	waitFor(60*time.Second, 3*time.Second, func() bool {
+		for _, row := range runJSONArraySecondary(t, "pass", "invitations", "list") {
+			m, _ := row.(map[string]interface{})
+			if fmt.Sprint(m["item_id"]) == "" || !strings.Contains(ref, fmt.Sprint(m["item_id"])) {
+				continue
+			}
+			token, _ = m["id"].(string)
+			return token != ""
+		}
+		return false
+	})
+	if token == "" {
+		t.Fatal("the offer of one item never reached the second account")
+	}
+	runOKSecondary(t, "pass", "invitations", "accept", "--", token)
+
+	// It is theirs to read, and in no vault of theirs - which is why it is listed
+	// apart from the ones that are.
+	var sharedRef string
+	waitFor(60*time.Second, 3*time.Second, func() bool {
+		for _, row := range runJSONArraySecondary(t, "pass", "shared", "list") {
+			m, _ := row.(map[string]interface{})
+			if fmt.Sprint(m["name"]) != name {
+				continue
+			}
+			sharedRef = fmt.Sprint(m["share_id"]) + "/" + fmt.Sprint(m["item_id"])
+			return true
+		}
+		return false
+	})
+	if sharedRef == "" {
+		t.Fatal("the item the second account accepted is not in its `shared list`")
+	}
+	assertContains(t, runOKSecondary(t, "pass", "items", "get", "--", sharedRef), "jane")
+	for _, row := range runJSONArraySecondary(t, "pass", "items", "list") {
+		if m, _ := row.(map[string]interface{}); fmt.Sprint(m["name"]) == name {
+			t.Error("an item shared with the second account turned up in its `items list`")
+		}
+	}
+
+	// A member now, whose access can change and be taken away.
+	runOKPaid(t, "pass", "items", "share", "update", ref, secondaryEmail(), "--access", "editor")
+	if !strings.Contains(fmt.Sprintf("%v", runJSONPaid(t, "pass", "items", "share", "get", ref)["members"]), "editor") {
+		t.Error("the member's access to the item did not change")
+	}
+	runOKPaid(t, "pass", "items", "share", "remove", ref, secondaryEmail())
+	if left := runJSONPaid(t, "pass", "items", "share", "get", ref); strings.Contains(
+		fmt.Sprintf("%v", left["members"]), secondaryEmail()) {
+		t.Errorf("the second account still holds the item: %v", left["members"])
+	}
 }
 
 // An offer can be withdrawn before it is taken.
@@ -949,13 +1158,14 @@ func TestPaidPassVaultShareWithdrawn(t *testing.T) {
 	_, stderr, code = runPaid(t, "--yes", "pass", "vaults", "share", "add", vault, secondaryEmail())
 	skipIfPlanRefuses(t, vaultSharing, code, stderr)
 
-	rows := runJSONArrayPaid(t, "pass", "vaults", "share", "list", vault)
-	if len(rows) == 0 {
-		t.Fatal("the offer is not listed on the vault it was made for")
+	shared := runJSONPaid(t, "pass", "vaults", "share", "get", vault)
+	if !strings.Contains(fmt.Sprintf("%v", shared["invited"]), secondaryEmail()) {
+		t.Fatalf("the offer is not on the vault it was made for: %v", shared["invited"])
 	}
 	runOKPaid(t, "pass", "vaults", "share", "remove", vault, secondaryEmail())
-	if left := runJSONArrayPaid(t, "pass", "vaults", "share", "list", vault); len(left) != 0 {
-		t.Errorf("the offer is still listed after being withdrawn: %v", left)
+	left := runJSONPaid(t, "pass", "vaults", "share", "get", vault)
+	if strings.Contains(fmt.Sprintf("%v", left["invited"]), secondaryEmail()) {
+		t.Errorf("the offer is still there after being withdrawn: %v", left["invited"])
 	}
 }
 

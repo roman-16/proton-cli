@@ -53,6 +53,18 @@ Five flags have a single-letter form, and they are the five typed most: `-p`, `-
 
 `--password-file` is usually the one to reach for, since systemd's `LoadCredential=`, Kubernetes secrets and Docker secrets all hand you a path already.
 
+The rule holds for what Pass stores, too, which is where it matters most. The parts of an item that are secret - a password, a TOTP URI, a card's number, CVV and PIN, a private key, a hidden field - arrive through `--secret-file NAME=FILE` or `--secret-stdin NAME`. They name their field rather than having a flag each because an item has several, a card three at once, and standard input can be read only once. `--password-file` itself is not available to them: it means the account password everywhere in this CLI, and one flag name means one thing.
+
+A new password needs no file at all. `proton pass items create --generate-password` makes one here, stores it, and prints it beside the item's ID - so the only copy that ever existed is the one in the vault.
+
+## Why a listing carries no secret
+
+`items get` says in its own help that it prints passwords in full, because that is the command for reading one. That sentence only means something if the commands beside it do not.
+
+So a Pass listing is a different type from a Pass item: `Item` is what a row knows - what the thing is, where it lives, what it is called - and `FullItem` is the decrypted whole. `items list`, `aliases list`, `trash list`, `shared list` and `sharing list` can only hold the first, in text and in JSON alike, and the compiler is what says so rather than a rule somebody has to remember. `revisions list` says what changed and when; `revisions get` reads one revision back whole. `links list` says which links exist; `links get` hands over the URL, which is the key that opens the item.
+
+One path still decrypts everything at once, and it is the one whose job that is: `pass export`, which warns as it writes.
+
 ## Why the reference is generated
 
 Prose drifts and a command tree does not. Everything in the [command reference](commands/README.md) - every argument, every flag, every example - is read out of the running program, so a command that exists is a command that is documented, under its current name and with its current flags. The examples are parsed against the real tree, so one cannot name a command that was renamed.

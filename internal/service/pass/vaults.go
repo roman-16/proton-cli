@@ -3,7 +3,6 @@ package pass
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"strconv"
 
@@ -32,37 +31,15 @@ type Vault struct {
 }
 
 func (s *Service) VaultsList(ctx context.Context) ([]Vault, error) {
-	// Every vault in the answer will be opened with the account's keys, so they
-	// are asked for while the list is on its way.
-	var raw []json.RawMessage
-	if _, err := s.keys.Alongside(ctx, func(ctx context.Context) error {
-		var err error
-		raw, err = s.getShares(ctx)
-		return err
-	}); err != nil {
+	all, err := s.shares(ctx)
+	if err != nil {
 		return nil, err
 	}
-	type share struct {
-		ShareID            string
-		VaultID            string
-		TargetType         int
-		Owner              bool
-		Shared             bool
-		TargetMembers      int
-		AddressID          string
-		Content            string
-		ContentKeyRotation int
-	}
-	var shares []share
-	for _, r := range raw {
-		var sh share
-		if err := json.Unmarshal(r, &sh); err != nil {
-			continue
+	var shares []Share
+	for _, sh := range all {
+		if sh.Vault() {
+			shares = append(shares, sh)
 		}
-		if sh.TargetType != 1 {
-			continue
-		}
-		shares = append(shares, sh)
 	}
 
 	// Each vault's name is encrypted with its own share's key, so every key is
@@ -86,7 +63,7 @@ func (s *Service) VaultsList(ctx context.Context) ([]Vault, error) {
 		v := Vault{
 			ShareID: sh.ShareID, VaultID: sh.VaultID,
 			Owner: sh.Owner, Shared: sh.Shared,
-			Members: sh.TargetMembers, AddressID: sh.AddressID,
+			Members: sh.Members, AddressID: sh.AddressID,
 		}
 		if sh.Content != "" {
 			sk, err := s.decryptShareKeys(ctx, sh.ShareID)
@@ -199,24 +176,15 @@ func DisplayNumber(v int) int {
 }
 
 func (s *Service) VaultEdit(ctx context.Context, shareID string, patch VaultPatch) error {
-	shares, err := s.getShares(ctx)
+	shares, err := s.shares(ctx)
 	if err != nil {
 		return err
 	}
 	var content string
 	var rotation int
 	found := false
-	for _, raw := range shares {
-		var sh struct {
-			ShareID            string
-			TargetType         int
-			Content            string
-			ContentKeyRotation int
-		}
-		if err := json.Unmarshal(raw, &sh); err != nil {
-			continue
-		}
-		if sh.ShareID == shareID && sh.TargetType == 1 {
+	for _, sh := range shares {
+		if sh.ShareID == shareID && sh.Vault() {
 			content, rotation, found = sh.Content, sh.ContentKeyRotation, true
 			break
 		}

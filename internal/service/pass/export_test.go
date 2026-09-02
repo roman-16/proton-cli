@@ -119,8 +119,9 @@ func TestAnExportReadsBackAsWhatWentIn(t *testing.T) {
 			Content:   &pb.ExtraField_Hidden{Hidden: &pb.ExtraHiddenField{Content: "abc"}},
 		}},
 	}
-	exported, err := exportItem(Item{
-		raw: item, Name: "GitHub", ItemID: "i-1", ShareID: "s-1", State: 1,
+	exported, err := exportItem(FullItem{
+		raw:  item,
+		Item: Item{Name: "GitHub", ItemID: "i-1", ShareID: "s-1", State: 1},
 	})
 	if err != nil {
 		t.Fatalf("exportItem: %v", err)
@@ -152,7 +153,7 @@ func TestAnExportReadsBackAsWhatWentIn(t *testing.T) {
 // Proton writes a field it has no value for as an empty one rather than leaving
 // it out, so an export has to do the same or its own importer finds a gap.
 func TestAnExportWritesEveryFieldEvenTheEmptyOnes(t *testing.T) {
-	exported, err := exportItem(Item{
+	exported, err := exportItem(FullItem{
 		raw: &pb.Item{
 			Metadata: &pb.Metadata{Name: "empty"},
 			Content:  &pb.Content{Content: &pb.Content_Login{Login: &pb.ItemLogin{}}},

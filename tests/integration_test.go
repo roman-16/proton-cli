@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -340,6 +341,9 @@ func runAs(profile string, stdin io.Reader, args ...string) (stdout, stderr stri
 	elapsed := time.Since(started)
 
 	exitCode = 0
+	if runErr == nil && answersInvitation(args) {
+		noticesCaused.Add(1)
+	}
 	if runErr != nil {
 		exitErr, ok := runErr.(*exec.ExitError)
 		if !ok {
@@ -398,6 +402,33 @@ func sendsMail(args []string) bool {
 		return false
 	}
 	for _, cmd := range sendingCommands {
+		if indexOfRun(args, cmd...) >= 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// answeringCommands are the commands that make Proton write to whoever offered
+// something. Answering an invitation is the whole set: the owner is told, by
+// mail, and nothing on this end turns that off.
+//
+// It is stated here for the reason sendingCommands is: recognised from the args
+// in the one place a command is run, so no test has to remember that what it
+// just did will land in somebody's inbox a moment later.
+var answeringCommands = [][]string{
+	{"invitations", "accept"},
+	{"invitations", "decline"},
+}
+
+// noticesCaused counts them, for the sweep that clears them up.
+var noticesCaused atomic.Int64
+
+func answersInvitation(args []string) bool {
+	if slices.Contains(args, "--dry-run") {
+		return false
+	}
+	for _, cmd := range answeringCommands {
 		if indexOfRun(args, cmd...) >= 0 {
 			return true
 		}

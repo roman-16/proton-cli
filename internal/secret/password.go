@@ -32,11 +32,26 @@ const (
 const DefaultLength = 20
 
 // Options say what a password may be made of.
+//
+// Words is what decides which kind is made: none of them is a password of
+// characters, and any of them a passphrase of that many words. The three
+// switches read the same either way - digits and capitals in it or not - and
+// Symbols and Separator each belong to one kind.
 type Options struct {
-	Length  int
-	Digits  bool
-	Symbols bool
-	Upper   bool
+	Length    int
+	Words     int
+	Separator string
+	Digits    bool
+	Symbols   bool
+	Upper     bool
+}
+
+// Make is a password or a passphrase, whichever the options ask for.
+func Make(o Options) (string, error) {
+	if o.Words > 0 {
+		return Passphrase(o)
+	}
+	return Password(o)
 }
 
 // Password makes one.
@@ -93,11 +108,20 @@ func Password(o Options) (string, error) {
 }
 
 func pick(alphabet string) (byte, error) {
-	n, err := rand.Int(rand.Reader, big.NewInt(int64(len(alphabet))))
+	n, err := index(len(alphabet))
 	if err != nil {
 		return 0, err
 	}
-	return alphabet[n.Int64()], nil
+	return alphabet[n], nil
+}
+
+// index is a number below n, drawn from the cryptographic source.
+func index(n int) (int, error) {
+	i, err := rand.Int(rand.Reader, big.NewInt(int64(n)))
+	if err != nil {
+		return 0, err
+	}
+	return int(i.Int64()), nil
 }
 
 // shuffle is Fisher-Yates over the cryptographic source, so the guaranteed

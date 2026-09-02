@@ -9,6 +9,7 @@ import (
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
 
 	"github.com/roman-16/proton-cli/internal/account/keys"
+	"github.com/roman-16/proton-cli/internal/crypto/aead"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
 )
@@ -24,10 +25,13 @@ import (
 // what tells the recipient the vault really came from you rather than from
 // whoever happened to send the request.
 
-// vaultInviteContext is the signature context on an invitation to somebody who
+// inviteContext is the signature context on an invitation to somebody who
 // already has a Proton account. Marking it critical means a client that does not
 // understand the notation refuses the signature rather than trusting it blind.
-const vaultInviteContext = "pass.invite.vault.existing-user"
+//
+// It names vaults because that is what sharing was when Proton wrote it; an item
+// invitation is signed under the same context, so both open with one rule.
+const inviteContext = "pass.invite.vault.existing-user"
 
 // What a vault can be shared as. Proton sends these as strings.
 const (
@@ -35,10 +39,6 @@ const (
 	roleWrite   = "2"
 	roleRead    = "3"
 )
-
-// targetVault is the kind of thing an invitation points at. Items can be shared
-// on their own too; this shares vaults.
-const targetVault = 1
 
 // roleWords name what somebody may do, the way --access reads.
 var roleWords = map[string]string{
@@ -58,12 +58,14 @@ func roleFor(access string) (string, error) {
 	return "", fmt.Errorf("unknown access %q", access)
 }
 
-// VaultInvite is somebody who has been offered a vault, or offered you one.
-type VaultInvite struct {
+// Invite is somebody who has been offered a vault or an item, or offered you one.
+type Invite struct {
 	ID string `json:"id"`
-	// ShareID is the vault the invitation is about. It is only known on your own
-	// vaults: an invitation you received names a vault you cannot see yet.
+	// ShareID is the share the invitation was made on. It is only known on your
+	// own: an invitation you received names a share you cannot see yet.
 	ShareID string `json:"share_id,omitempty"`
+	// ItemID is the item offered, and is empty on an invitation to a whole vault.
+	ItemID string `json:"item_id,omitempty"`
 	// Vault is what the sender calls it, which is what an invitation you received
 	// shows instead.
 	Vault   string `json:"vault,omitempty"`
@@ -74,17 +76,91 @@ type VaultInvite struct {
 	Items int `json:"items,omitempty"`
 }
 
+// Kind is what the invitation offers, for a listing that carries both.
+func (i Invite) Kind() string {
+	if i.ItemID != "" {
+		return "item"
+	}
+	return "vault"
+}
+
 // VaultShare offers a vault to somebody.
 //
 // Every rotation of the share key is sent, because an item made before the last
 // rotation is still sealed under the older one - somebody given only the newest
 // key would see a vault half of which will not open.
 func (s *Service) VaultShare(ctx context.Context, shareID, email, access string) error {
-	role, err := roleFor(access)
+	sk, err := s.decryptShareKeys(ctx, shareID)
 	if err != nil {
 		return err
 	}
+	return s.invite(ctx, shareID, "", email, access, sk.keys)
+}
+
+// ItemShare offers one item to somebody, leaving the vault around it alone.
+//
+// What travels is the item's own key rather than the vault's, which is what
+// makes the difference: the person invited can open that item and has no way to
+// reach anything else sealed under the same share.
+func (s *Service) ItemShare(ctx context.Context, shareID, itemID, email, access string) error {
+	keys, err := s.itemKeys(ctx, shareID, itemID)
+	if err != nil {
+		return err
+	}
+	return s.invite(ctx, shareID, itemID, email, access, keys)
+}
+
+// itemKeys opens every rotation of one item's key.
+//
+// An item invitation carries all of them for the reason a vault one does: a
+// revision written under an older rotation still needs that rotation to open.
+func (s *Service) itemKeys(ctx context.Context, shareID, itemID string) (map[int][]byte, error) {
 	sk, err := s.decryptShareKeys(ctx, shareID)
+	if err != nil {
+		return nil, err
+	}
+	var r struct {
+		Keys struct {
+			Keys []struct {
+				Key         string
+				KeyRotation int
+			}
+		}
+	}
+	if err := s.C.Decode(ctx, proton.Request{
+		Method: "GET", Path: fmt.Sprintf("/pass/v1/share/%s/item/%s/key", shareID, itemID),
+	}, &r); err != nil {
+		return nil, err
+	}
+	out := make(map[int][]byte, len(r.Keys.Keys))
+	for _, k := range r.Keys.Keys {
+		shareKey, ok := sk.keys[k.KeyRotation]
+		if !ok {
+			continue
+		}
+		sealed, err := base64.StdEncoding.DecodeString(k.Key)
+		if err != nil {
+			continue
+		}
+		key, err := aead.Decrypt(shareKey, sealed, []byte(aead.TagItemKey))
+		if err != nil {
+			continue
+		}
+		out[k.KeyRotation] = key
+	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("no key of that item will open")
+	}
+	return out, nil
+}
+
+// invite sends the keys that open something to somebody else, encrypted to them
+// and signed with this account's address key.
+//
+// A vault invitation and an item invitation differ only in which keys travel and
+// what the request says they are for, so they are one request built twice.
+func (s *Service) invite(ctx context.Context, shareID, itemID, email, access string, keys map[int][]byte) error {
+	role, err := roleFor(access)
 	if err != nil {
 		return err
 	}
@@ -101,33 +177,37 @@ func (s *Service) VaultShare(ctx context.Context, shareID, email, access string)
 		return err
 	}
 
-	rotations := make([]int, 0, len(sk.keys))
-	for r := range sk.keys {
+	rotations := make([]int, 0, len(keys))
+	for r := range keys {
 		rotations = append(rotations, r)
 	}
 	sort.Ints(rotations)
 
-	keys := make([]map[string]any, 0, len(rotations))
+	sealedKeys := make([]map[string]any, 0, len(rotations))
 	for _, rotation := range rotations {
 		sealed, err := inviteeKR.EncryptWithContext(
-			pgp.NewPlainMessage(sk.keys[rotation]), addrKR,
-			pgp.NewSigningContext(vaultInviteContext, true),
+			pgp.NewPlainMessage(keys[rotation]), addrKR,
+			pgp.NewSigningContext(inviteContext, true),
 		)
 		if err != nil {
-			return fmt.Errorf("encrypt the vault key for %s: %w", email, err)
+			return fmt.Errorf("encrypt the key for %s: %w", email, err)
 		}
-		keys = append(keys, map[string]any{
+		sealedKeys = append(sealedKeys, map[string]any{
 			"Key":         base64.StdEncoding.EncodeToString(sealed.GetBinary()),
 			"KeyRotation": rotation,
 		})
 	}
 
+	body := map[string]any{
+		"Keys": sealedKeys, "Email": email,
+		"ShareRoleID": role, "TargetType": targetVault,
+	}
+	if itemID != "" {
+		body["TargetType"], body["ItemID"] = targetItem, itemID
+	}
 	return s.C.Decode(ctx, proton.Request{
 		Method: "POST", Path: "/pass/v1/share/" + shareID + "/invite",
-		Body: map[string]any{
-			"Keys": keys, "Email": email,
-			"ShareRoleID": role, "TargetType": targetVault,
-		},
+		Body: body,
 	}, nil)
 }
 
@@ -145,15 +225,20 @@ func (s *Service) publicKeyRing(ctx context.Context, email string) (*pgp.KeyRing
 	return kr, nil
 }
 
-// VaultInvitesSent lists who has been offered one of your vaults and has not
-// answered.
-func (s *Service) VaultInvitesSent(ctx context.Context, shareID string) ([]VaultInvite, error) {
+// InvitesSent lists who has been offered something of yours and has not answered.
+//
+// Proton keeps an item's invitations on the share the item lives in, so one
+// request answers for the vault and for everything in it; itemID narrows that to
+// the invitations about one item.
+func (s *Service) InvitesSent(ctx context.Context, shareID, itemID string) ([]Invite, error) {
 	var r struct {
 		Invites []struct {
 			InviteID     string
 			InvitedEmail string
 			InviterEmail string
 			ShareRoleID  string
+			TargetType   int
+			TargetID     string
 		}
 	}
 	if err := s.C.Decode(ctx, proton.Request{
@@ -161,12 +246,19 @@ func (s *Service) VaultInvitesSent(ctx context.Context, shareID string) ([]Vault
 	}, &r); err != nil {
 		return nil, err
 	}
-	out := make([]VaultInvite, 0, len(r.Invites))
+	out := make([]Invite, 0, len(r.Invites))
 	for _, i := range r.Invites {
-		out = append(out, VaultInvite{
+		invite := Invite{
 			ID: i.InviteID, ShareID: shareID, Email: i.InvitedEmail,
 			Inviter: i.InviterEmail, Access: roleWord(i.ShareRoleID),
-		})
+		}
+		if i.TargetType == targetItem {
+			invite.ItemID = i.TargetID
+		}
+		if invite.ItemID != itemID {
+			continue
+		}
+		out = append(out, invite)
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Email < out[j].Email })
 	return out, nil
@@ -175,21 +267,24 @@ func (s *Service) VaultInvitesSent(ctx context.Context, shareID string) ([]Vault
 // roleWord names a role, falling back to the number for one this version has
 // not been told about rather than guessing.
 func roleWord(id string) string {
+	if id == "" {
+		return ""
+	}
 	if w, ok := roleWords[id]; ok {
 		return w
 	}
 	return "role " + id
 }
 
-// VaultInviteRevoke withdraws an offer nobody has answered.
-func (s *Service) VaultInviteRevoke(ctx context.Context, shareID, inviteID string) error {
+// InviteRevoke withdraws an offer nobody has answered.
+func (s *Service) InviteRevoke(ctx context.Context, shareID, inviteID string) error {
 	return s.C.Decode(ctx, proton.Request{
 		Method: "DELETE", Path: "/pass/v1/share/" + shareID + "/invite/" + inviteID,
 	}, nil)
 }
 
-// VaultInvitesReceived lists the vaults other people have offered you.
-func (s *Service) VaultInvitesReceived(ctx context.Context) ([]VaultInvite, error) {
+// InvitesReceived lists what other people have offered you.
+func (s *Service) InvitesReceived(ctx context.Context) ([]Invite, error) {
 	var r struct {
 		Invites []rawUserInvite
 	}
@@ -200,11 +295,14 @@ func (s *Service) VaultInvitesReceived(ctx context.Context) ([]VaultInvite, erro
 	if err != nil {
 		return nil, err
 	}
-	out := make([]VaultInvite, 0, len(r.Invites))
+	out := make([]Invite, 0, len(r.Invites))
 	for _, i := range r.Invites {
-		invite := VaultInvite{
+		invite := Invite{
 			ID: i.InviteToken, Email: i.InvitedEmail, Inviter: i.InviterEmail,
 			Access: roleWord(i.ShareRoleID), Items: i.VaultData.ItemCount,
+		}
+		if i.TargetType == targetItem {
+			invite.ItemID = i.TargetID
 		}
 		// The vault's name is readable before the offer is taken: the invitation
 		// carries the key that opens it, encrypted to the address it was sent to.
@@ -231,6 +329,7 @@ type rawUserInvite struct {
 	InviterEmail     string
 	ShareRoleID      string
 	TargetType       int
+	TargetID         string
 	Keys             []struct {
 		Key         string
 		KeyRotation int
@@ -269,14 +368,14 @@ func (s *Service) openInviteKey(i rawUserInvite, u *keys.Unlocked) ([]byte, erro
 	return nil, fmt.Errorf("the invitation carries no key for its own preview")
 }
 
-// VaultInviteAccept takes a vault somebody offered.
+// InviteAccept takes what somebody offered, whether a vault or one item.
 //
 // The keys arrive encrypted to the address the offer was sent to. They are moved
-// onto the account's own user key here, which is where the CLI reads a vault's
-// keys from afterwards - so accepting is what turns an offer into a vault that
-// opens like any other.
-func (s *Service) VaultInviteAccept(ctx context.Context, token string) error {
-	invite, u, err := s.findVaultInvite(ctx, token)
+// onto the account's own user key here, which is where the CLI reads a share's
+// keys from afterwards - so accepting is what turns an offer into something that
+// opens like anything else.
+func (s *Service) InviteAccept(ctx context.Context, token string) error {
+	invite, u, err := s.findInvite(ctx, token)
 	if err != nil {
 		return err
 	}
@@ -311,16 +410,16 @@ func (s *Service) VaultInviteAccept(ctx context.Context, token string) error {
 	}, nil)
 }
 
-// VaultInviteReject turns an offer down. Nothing is opened: declining is saying
-// no to the offer rather than reading it first.
-func (s *Service) VaultInviteReject(ctx context.Context, token string) error {
+// InviteReject turns an offer down. Nothing is opened: declining is saying no to
+// the offer rather than reading it first.
+func (s *Service) InviteReject(ctx context.Context, token string) error {
 	return s.C.Decode(ctx, proton.Request{
 		Method: "DELETE", Path: "/pass/v1/invite/" + token,
 	}, nil)
 }
 
-// findVaultInvite reads one offer whole, with the account's keys.
-func (s *Service) findVaultInvite(ctx context.Context, token string) (rawUserInvite, *keys.Unlocked, error) {
+// findInvite reads one offer whole, with the account's keys.
+func (s *Service) findInvite(ctx context.Context, token string) (rawUserInvite, *keys.Unlocked, error) {
 	var r struct {
 		Invites []rawUserInvite
 	}

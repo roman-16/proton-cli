@@ -95,6 +95,7 @@ var (
 	Set          = Action{"Set", "set", "set", Ordinary}
 	Invited      = Action{"Invited", "invite", "invited", Ordinary}
 	Revoked      = Action{"Revoked", "revoke", "revoked", Ordinary}
+	Transferred  = Action{"Transferred", "transfer", "transferred", Ordinary}
 	SignedIn     = Action{"Signed in as", "sign in as", "signed_in", Ordinary}
 	SignedOut    = Action{"Signed out", "sign out", "signed_out", Ordinary}
 )
@@ -115,7 +116,7 @@ var Actions = []Action{
 	Labelled, Unlabelled, Starred, Unstarred, MarkedRead, MarkedUnread,
 	Enabled, Disabled, Linked, Unlinked, Added, Removed, Accepted, Declined,
 	Favorited, Unfavorited, Pinned, Unpinned, Responded, Set, Invited, Revoked,
-	SignedIn, SignedOut,
+	Transferred, SignedIn, SignedOut,
 }
 
 // ResultSpec describes what a mutation did.

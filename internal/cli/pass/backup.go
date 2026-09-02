@@ -22,11 +22,14 @@ func exportCmd() *cobra.Command {
 	var passphrase kit.Passphrase
 	c := &cobra.Command{
 		Use:   "export",
-		Short: "Write every vault out as a Proton Pass archive",
-		Long: "Write every vault out as a Proton Pass archive, or to stdout with --dest -.\n\n" +
+		Short: "Write the vaults you own out as a Proton Pass archive",
+		Long: "Write the vaults you own out as a Proton Pass archive, or to stdout with --dest -.\n\n" +
 			"The file is the one Proton Pass itself writes, so it can be read back by\n" +
 			"the app as well as by this tool. Give a passphrase and the contents are\n" +
-			"encrypted to it; without one the archive holds every password in the clear.",
+			"encrypted to it; without one the archive holds every password in the clear.\n\n" +
+			"A vault somebody shared with you is theirs to back up, so it is not in the\n" +
+			"file - restoring this one cannot turn their vault into a second copy under\n" +
+			"your name.",
 		Args: cobra.NoArgs,
 		RunE: kit.Run([]kit.Step{passphrase.Supply}, func(c *kit.Invocation) error {
 			if err := dest.Validate(true); err != nil {
@@ -38,9 +41,13 @@ func exportCmd() *cobra.Command {
 			if !passphrase.Wanted() {
 				c.Warn("This archive is not encrypted; anything that can read the file can read every password in it.")
 			}
-			doc, err := c.App.Pass.Export(c.Ctx, c.App.UserID())
+			doc, skipped, err := c.App.Pass.Export(c.Ctx, c.App.UserID())
 			if err != nil {
 				return err
+			}
+			if skipped > 0 {
+				c.Note("%s shared with you: not in this archive, and backed up by the account that owns them.",
+					ui.Quantity(skipped, "vaults"))
 			}
 			var secret string
 			if passphrase.Wanted() {

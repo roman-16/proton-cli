@@ -20,8 +20,43 @@ import (
 
 func linksCmd() *cobra.Command {
 	c := &cobra.Command{Use: "links", Short: "Links that show an item to somebody without an account"}
-	c.AddCommand(linksListCmd(), linksCreateCmd(), linksRevokeCmd())
+	c.AddCommand(linksListCmd(), linksGetCmd(), linksCreateCmd(), linksRevokeCmd())
 	return c
+}
+
+func linksGetCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "get REF",
+		Short: "Show one link, URL and all",
+		Long: "Show one link, URL and all.\n\n" +
+			"Proton stores the key sealed under the item's own, so a link you mislaid is\n" +
+			"read back here rather than revoked and made again. The URL is the secret,\n" +
+			"which is why it takes a command that says so rather than appearing in a\n" +
+			"listing.",
+		Args: cobra.ExactArgs(1),
+		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
+			found, err := secureLinkList(c).Find(c.Ctx, c.Args[0])
+			if err != nil {
+				return err
+			}
+			link, err := c.App.Pass.SecureLinkGet(c.Ctx, found.LinkID)
+			if err != nil {
+				return err
+			}
+			c.Warn("Anyone with this link can read the item until it expires.")
+			return kit.Show(c, ui.RecordSpec{
+				Object: link,
+				Fields: []ui.Field{
+					{Label: "URL", Value: link.URL},
+					{Label: "Item", Value: kit.JoinPair(link.ShareID, link.ItemID), ID: true},
+					{Label: "Expires", Value: units.Time(link.Expires)},
+					{Label: "Views", Value: reads(*link)},
+					{Label: "Active", Value: yesNo(link.Active)},
+					{Label: "ID", Value: link.LinkID, ID: true},
+				},
+			})
+		}),
+	}
 }
 
 func secureLinkList(c *kit.Invocation) *kit.Lookup[passsvc.SecureLink] {
@@ -30,8 +65,10 @@ func secureLinkList(c *kit.Invocation) *kit.Lookup[passsvc.SecureLink] {
 		Load: func(ctx context.Context) ([]passsvc.SecureLink, error) {
 			return c.App.Pass.SecureLinksList(ctx)
 		},
-		ID:     func(l passsvc.SecureLink) string { return l.LinkID },
-		Handle: func(l passsvc.SecureLink) string { return l.URL },
+		ID: func(l passsvc.SecureLink) string { return l.LinkID },
+		// A link is addressed by its ID or by the item it opens. The URL is not a
+		// handle: pasting one into a command line is the thing this avoids.
+		Handle: func(l passsvc.SecureLink) string { return kit.JoinPair(l.ShareID, l.ItemID) },
 	}
 }
 
@@ -60,9 +97,9 @@ func linksListCmd() *cobra.Command {
 		Use:   "list",
 		Short: "List the links you have made",
 		Long: "List the links you have made.\n\n" +
-			"The whole URL is shown, key and all: Proton stores that key sealed under\n" +
-			"the item's own, so a link you mislaid can be read back here rather than\n" +
-			"having to be revoked and made again.",
+			"The URL is not among them: it carries the key that opens the item, and a\n" +
+			"listing is no place for a secret. `links get` reads one back whole, and\n" +
+			"`items share get` the ones an item has.",
 		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			rows, err := c.App.Pass.SecureLinksList(c.Ctx)

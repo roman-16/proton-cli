@@ -4,7 +4,7 @@ Vaults, logins and secrets.
 
 Every command under `proton pass`, with the arguments and flags it takes. For these commands in use, see [the guide](../apps/pass.md).
 
-Holds `aliases`, `breaches`, `export`, `generate`, `import`, `invitations`, `items`, `links`, `settings`, `trash` and `vaults`.
+Holds `aliases`, `breaches`, `export`, `generate`, `import`, `invitations`, `items`, `links`, `settings`, `shared`, `sharing`, `trash` and `vaults`.
 
 ## `aliases`
 
@@ -197,9 +197,11 @@ proton pass breaches list
 
 ## `export`
 
-Write every vault out as a Proton Pass archive, or to stdout with --dest -.
+Write the vaults you own out as a Proton Pass archive, or to stdout with --dest -.
 
 The file is the one Proton Pass itself writes, so it can be read back by the app as well as by this tool. Give a passphrase and the contents are encrypted to it; without one the archive holds every password in the clear.
+
+A vault somebody shared with you is theirs to back up, so it is not in the file - restoring this one cannot turn their vault into a second copy under your name.
 
 ```
 proton pass export
@@ -226,6 +228,8 @@ It reaches no account and needs no session. The alphabet is Proton's own, which 
 
 Every kind asked for is guaranteed to appear, so a password that has to contain a digit does.
 
+--words makes a passphrase instead, from Proton's own wordlist: that many words, capitalised and each followed by a digit unless --no-uppercase or --no-digits says otherwise.
+
 ```
 proton pass generate
 ```
@@ -234,6 +238,8 @@ proton pass generate
 proton pass generate
 proton pass generate --length 32
 proton pass generate --no-symbols --length 24
+proton pass generate --words 4
+proton pass generate --words 4 --separator space --no-digits
 ```
 
 | Flag | Description |
@@ -242,6 +248,8 @@ proton pass generate --no-symbols --length 24
 | `--no-digits` | Leave the digits out |
 | `--no-symbols` | Leave the symbols out |
 | `--no-uppercase` | Leave the capitals out |
+| `--separator string` | What stands between the words of a passphrase: comma, digit, hyphen, period, space, symbol, underscore (default `hyphen`) |
+| `--words int` | Make a passphrase of this many words instead |
 
 ## `import`
 
@@ -265,15 +273,15 @@ proton pass import --dry-run pass-backup.zip
 
 ## `invitations`
 
-Vaults other people have offered you.
+What other people have offered you.
 
 Holds `accept`, `decline` and `list`.
 
 ### `invitations accept`
 
-Take a vault somebody offered you.
+Take what somebody offered you.
 
-The keys arrive encrypted to the address the offer was sent to and are moved onto your own key, which is what makes the vault open like any other of yours afterwards.
+The keys arrive encrypted to the address the offer was sent to and are moved onto your own key, which is what makes a vault open like any other of yours afterwards. An item taken this way is in no vault of yours, so it is `shared list` that has it.
 
 ```
 proton pass invitations accept REF...
@@ -285,7 +293,7 @@ proton pass invitations accept Work
 
 ### `invitations decline`
 
-Turn down a vault somebody offered you.
+Turn down what somebody offered you.
 
 ```
 proton pass invitations decline REF...
@@ -297,9 +305,9 @@ proton pass invitations decline Work
 
 ### `invitations list`
 
-List vaults other people have offered you.
+List what other people have offered you.
 
-The vault's name and how much is in it are readable before you take it: the invitation carries the key that opens them, encrypted to you. What is in the vault is not, until you accept.
+A vault's name and how much is in it are readable before you take it: the invitation carries the key that opens them, encrypted to you. What is in the vault is not, until you accept. An item offered on its own carries no preview at all.
 
 ```
 proton pass invitations list
@@ -313,21 +321,26 @@ proton pass invitations list
 
 Logins, notes, cards and the rest.
 
-Holds `create`, `delete`, `get`, `list`, `pin`, `revisions`, `totp`, `trash`, `unpin` and `update`.
+Holds `create`, `delete`, `get`, `list`, `move`, `pin`, `revisions`, `share`, `totp`, `trash`, `unpin` and `update`.
 
 ### `items create`
 
 Create an item.
+
+A secret is read from a file or from stdin, never from a flag value: --secret-file NAME=FILE, or --secret-stdin NAME for one of them. NAME is cvv, number, password, pin, private-key, totp-uri, or any name at all, which makes a hidden custom field of it.
+
+--generate-password makes one instead, so a new login needs no file: it is shaped by the same flags `pass generate` takes.
 
 ```
 proton pass items create
 ```
 
 ```bash
-proton pass items create --name GitHub --username roman --password hunter2 --url github.com
+proton pass items create --name GitHub --username roman --url github.com --generate-password
+proton pass items create --name Router --generate-password --words 5
 proton pass items create --type note --name 'Door codes' --note 'Front: 1234'
-proton pass items create --type credit-card --name 'Travel card' --holder 'Roman' --number 4111111111111111 --expiry 2030-04
-proton pass items create --type custom --name Router --field 'Network/SSID=home' --hidden 'Network/Key=hunter2'
+proton pass items create --type credit-card --name 'Travel card' --holder 'Roman' --expiry 2030-04 --secret-file number=/run/secrets/card
+proton pass items create --type custom --name Router --field 'Network/SSID=home' --secret-file 'Network/Key=/run/secrets/wifi'
 ```
 
 | Flag | Description |
@@ -338,7 +351,6 @@ proton pass items create --type custom --name Router --field 'Network/SSID=home'
 | `--company string` | Set the company (identity) |
 | `--country string` | Set the country (identity) |
 | `--county string` | Set the county (identity) |
-| `--cvv string` | Set the card's CVV (credit-card) |
 | `--email string` | Set the email address (login) |
 | `--expiry string` | Set the card expiry, YYYY-MM (credit-card) |
 | `--facebook string` | Set the facebook (identity) |
@@ -347,39 +359,41 @@ proton pass items create --type custom --name Router --field 'Network/SSID=home'
 | `--floor string` | Set the floor (identity) |
 | `--full-name string` | Set the full name (identity) |
 | `--gender string` | Set the gender (identity) |
-| `--hidden stringArray` | Set a hidden custom field, as NAME=VALUE or SECTION/NAME=VALUE (repeatable) |
+| `--generate-password` | Make the password rather than being given one |
 | `--holder string` | Set the cardholder's name (credit-card) |
 | `--instagram string` | Set the instagram (identity) |
 | `--job-title string` | Set the job title (identity) |
 | `--last-name string` | Set the last name (identity) |
+| `--length int` | How many characters (default `20`) |
 | `--license-number string` | Set the license number (identity) |
 | `--linkedin string` | Set the linkedin (identity) |
 | `--middle-name string` | Set the middle name (identity) |
 | `--name string` | Set the item's name |
+| `--no-digits` | Leave the digits out |
+| `--no-symbols` | Leave the symbols out |
+| `--no-uppercase` | Leave the capitals out |
 | `--note string` | Set the note |
-| `--number string` | Set the card number (credit-card) |
 | `--organization string` | Set the organization (identity) |
 | `--passport-number string` | Set the passport number (identity) |
-| `--password string` | Set the password (login, wifi) |
 | `--personal-website string` | Set the personal website (identity) |
 | `--phone string` | Set the phone (identity) |
-| `--pin string` | Set the card's PIN (credit-card) |
 | `--postal-code string` | Set the postal code (identity) |
-| `--private-key string` | Set the private key (ssh-key) |
 | `--public-key string` | Set the public key (ssh-key) |
 | `--reddit string` | Set the reddit (identity) |
 | `--second-phone string` | Set the second phone (identity) |
+| `--secret-file stringArray` | Read a secret field from a file, as NAME=FILE (repeatable) |
+| `--secret-stdin string` | Read the named secret field from stdin |
 | `--security string` | Wi-Fi security (wifi): WPA, WPA2, WPA3, WEP |
+| `--separator string` | What stands between the words of a passphrase: comma, digit, hyphen, period, space, symbol, underscore (default `hyphen`) |
 | `--social-security-number string` | Set the social security number (identity) |
 | `--ssid string` | Set the network name (wifi) |
 | `--state string` | Set the state (identity) |
-| `--totp-field stringArray` | Set a custom field holding a two-factor secret, as NAME=URI (repeatable) |
-| `--totp-uri string` | Set the TOTP URI or secret (login) |
 | `--type string` | What kind of item: login, note, credit-card, wifi, ssh-key, identity, alias, custom (default `login`) |
 | `--url string` | Set the URL (login) |
 | `--username string` | Set the username (login) |
 | `--vault string` | Which vault, by name or ID (default: your first) |
 | `--website string` | Set the website (identity) |
+| `--words int` | Make a passphrase of this many words instead |
 | `--work-email string` | Set the work email (identity) |
 | `--work-phone string` | Set the work phone (identity) |
 | `--x-handle string` | Set the x handle (identity) |
@@ -448,6 +462,24 @@ proton pass items list --type login
 | `--type string` | Match only this kind of item: login, note, credit-card, wifi, ssh-key, identity, alias, custom |
 | `--vault string` | Match only this vault, by name or ID |
 
+### `items move`
+
+Put an item in another vault.
+
+The item keeps its history and everything it holds, and is given a new ID: an item in Pass is only unique together with the vault it is in. The new ID is printed, so a script can go on addressing it.
+
+```
+proton pass items move REF
+```
+
+```bash
+proton pass items move github.com --into Work
+```
+
+| Flag | Description |
+| --- | --- |
+| `--into string` | Which vault to put it in, by name or ID |
+
 ### `items pin`
 
 Keep items at the top of the list.
@@ -464,13 +496,29 @@ proton pass items pin github.com
 
 Earlier versions of an item.
 
-Holds `list`.
+Holds `get` and `list`.
+
+### `items revisions get`
+
+Show one earlier version, decrypted.
+
+The password, TOTP secret and private key that revision held are printed in full, as `items get` prints the current ones: this is the command for reading a password an item used to have.
+
+REVISION_REF is the number `revisions list` shows.
+
+```
+proton pass items revisions get REF REVISION_REF
+```
+
+```bash
+proton pass items revisions get github.com 3
+```
 
 ### `items revisions list`
 
 Show what an item used to be.
 
-Pass keeps every edit, so a password changed by mistake can be read back. Newest first. Use --output json for the full contents of each revision.
+Pass keeps every edit, so a password changed by mistake can be found again. Newest first. This is what changed and when; `revisions get` reads one of them back in full.
 
 ```
 proton pass items revisions list REF
@@ -480,6 +528,77 @@ proton pass items revisions list REF
 proton pass items revisions list github.com
 proton pass items revisions list github.com --output json
 ```
+
+### `items share`
+
+Who else can open an item.
+
+Holds `add`, `get`, `remove` and `update`.
+
+### `items share add`
+
+Offer one item to somebody, leaving the vault around it alone.
+
+What travels is the item's own key rather than the vault's, so they can open that item and nothing else sealed under the same share.
+
+```
+proton pass items share add REF EMAIL
+```
+
+```bash
+proton pass items share add github.com jane@proton.me
+proton pass items share add github.com jane@proton.me --access editor
+```
+
+| Flag | Description |
+| --- | --- |
+| `--access string` | What they may do with it: viewer, editor, manager (default `viewer`) |
+
+### `items share get`
+
+Show how an item is shared: who holds it, who has been offered it, and the links made for it.
+
+A link's URL carries the key that opens the item, so this prints it in full - as `links get` does, and as a listing never does.
+
+```
+proton pass items share get REF
+```
+
+```bash
+proton pass items share get github.com
+```
+
+### `items share remove`
+
+Take somebody's access to an item away.
+
+It withdraws an invitation nobody answered, or removes a member who did.
+
+```
+proton pass items share remove REF EMAIL
+```
+
+```bash
+proton pass items share remove github.com jane@proton.me
+```
+
+### `items share update`
+
+Change what somebody may do with an item.
+
+A member's access changes in place. Somebody who has not answered yet has their offer withdrawn and made again at the new access, which sends them a fresh invitation.
+
+```
+proton pass items share update REF EMAIL
+```
+
+```bash
+proton pass items share update github.com jane@proton.me --access viewer
+```
+
+| Flag | Description |
+| --- | --- |
+| `--access string` | What they may do with it: viewer, editor, manager (default `viewer`) |
 
 ### `items totp`
 
@@ -535,15 +654,19 @@ proton pass items unpin github.com
 
 Change an item's fields.
 
+A secret is read from a file or from stdin, never from a flag value: --secret-file NAME=FILE, or --secret-stdin NAME for one of them. NAME is cvv, number, password, pin, private-key, totp-uri, or any name at all, which makes a hidden custom field of it.
+
+--generate-password replaces the password with one it makes.
+
 ```
 proton pass items update REF
 ```
 
 ```bash
-proton pass items update GitHub --password hunter3
+proton pass items update GitHub --secret-file password=/run/secrets/github
+proton pass items update GitHub --secret-stdin password
 proton pass items update GitHub --username roman-16 --url github.com
-proton pass items update Router --hidden 'Network/Key=hunter3'
-proton pass items update GitHub --totp-field 'Backup=otpauth://totp/GitHub?secret=JBSWY3DPEHPK3PXP'
+proton pass items update GitHub --generate-password
 ```
 
 | Flag | Description |
@@ -554,7 +677,6 @@ proton pass items update GitHub --totp-field 'Backup=otpauth://totp/GitHub?secre
 | `--company string` | Replace the company (identity) |
 | `--country string` | Replace the country (identity) |
 | `--county string` | Replace the county (identity) |
-| `--cvv string` | Replace the card's CVV (credit-card) |
 | `--display-name string` | Replace the name recipients see on mail from it (alias) |
 | `--email string` | Replace the email address (login) |
 | `--expiry string` | Replace the card expiry, YYYY-MM (credit-card) |
@@ -564,38 +686,40 @@ proton pass items update GitHub --totp-field 'Backup=otpauth://totp/GitHub?secre
 | `--floor string` | Replace the floor (identity) |
 | `--full-name string` | Replace the full name (identity) |
 | `--gender string` | Replace the gender (identity) |
-| `--hidden stringArray` | Replace a hidden custom field, as NAME=VALUE or SECTION/NAME=VALUE (repeatable) |
+| `--generate-password` | Make the password rather than being given one |
 | `--holder string` | Replace the cardholder's name (credit-card) |
 | `--instagram string` | Replace the instagram (identity) |
 | `--job-title string` | Replace the job title (identity) |
 | `--last-name string` | Replace the last name (identity) |
+| `--length int` | How many characters (default `20`) |
 | `--license-number string` | Replace the license number (identity) |
 | `--linkedin string` | Replace the linkedin (identity) |
 | `--mailbox stringArray` | Replace where mail to it arrives (alias, repeatable) |
 | `--middle-name string` | Replace the middle name (identity) |
 | `--name string` | Replace the item's name |
+| `--no-digits` | Leave the digits out |
+| `--no-symbols` | Leave the symbols out |
+| `--no-uppercase` | Leave the capitals out |
 | `--note string` | Replace the note |
-| `--number string` | Replace the card number (credit-card) |
 | `--organization string` | Replace the organization (identity) |
 | `--passport-number string` | Replace the passport number (identity) |
-| `--password string` | Replace the password (login, wifi) |
 | `--personal-website string` | Replace the personal website (identity) |
 | `--phone string` | Replace the phone (identity) |
-| `--pin string` | Replace the card's PIN (credit-card) |
 | `--postal-code string` | Replace the postal code (identity) |
-| `--private-key string` | Replace the private key (ssh-key) |
 | `--public-key string` | Replace the public key (ssh-key) |
 | `--reddit string` | Replace the reddit (identity) |
 | `--second-phone string` | Replace the second phone (identity) |
+| `--secret-file stringArray` | Read a secret field from a file, as NAME=FILE (repeatable) |
+| `--secret-stdin string` | Read the named secret field from stdin |
 | `--security string` | Wi-Fi security (wifi): WPA, WPA2, WPA3, WEP |
+| `--separator string` | What stands between the words of a passphrase: comma, digit, hyphen, period, space, symbol, underscore (default `hyphen`) |
 | `--social-security-number string` | Replace the social security number (identity) |
 | `--ssid string` | Replace the network name (wifi) |
 | `--state string` | Replace the state (identity) |
-| `--totp-field stringArray` | Replace a custom field holding a two-factor secret, as NAME=URI (repeatable) |
-| `--totp-uri string` | Replace the TOTP URI or secret (login) |
 | `--url string` | Replace the URL (login) |
 | `--username string` | Replace the username (login) |
 | `--website string` | Replace the website (identity) |
+| `--words int` | Make a passphrase of this many words instead |
 | `--work-email string` | Replace the work email (identity) |
 | `--work-phone string` | Replace the work phone (identity) |
 | `--x-handle string` | Replace the x handle (identity) |
@@ -605,7 +729,7 @@ proton pass items update GitHub --totp-field 'Backup=otpauth://totp/GitHub?secre
 
 Links that show an item to somebody without an account.
 
-Holds `create`, `list` and `revoke`.
+Holds `create`, `get`, `list` and `revoke`.
 
 ### `links create`
 
@@ -629,11 +753,25 @@ proton pass links create github.com --expires 24h --views 1
 | `--expires string` | How long the link lasts (e.g. 7d, 24h) |
 | `--views int` | Stop working after this many openings |
 
+### `links get`
+
+Show one link, URL and all.
+
+Proton stores the key sealed under the item's own, so a link you mislaid is read back here rather than revoked and made again. The URL is the secret, which is why it takes a command that says so rather than appearing in a listing.
+
+```
+proton pass links get REF
+```
+
+```bash
+proton pass links get 5bH2mQxK
+```
+
 ### `links list`
 
 List the links you have made.
 
-The whole URL is shown, key and all: Proton stores that key sealed under the item's own, so a link you mislaid can be read back here rather than having to be revoked and made again.
+The URL is not among them: it carries the key that opens the item, and a listing is no place for a secret. `links get` reads one back whole, and `items share get` the ones an item has.
 
 ```
 proton pass links list
@@ -779,6 +917,48 @@ proton pass settings mailboxes verify me@example.com --code 123456
 | --- | --- |
 | `--code string` | The code Proton emailed the address |
 
+## `shared`
+
+Items other people have shared with you.
+
+Holds `list`.
+
+### `shared list`
+
+List the items other people have shared with you.
+
+These are in no vault of yours, so they are not in `items list`: they are addressed by the ID this shows, or by their name like anything else.
+
+An item whose content will not open is still listed, because knowing it is there is what lets you act on it.
+
+```
+proton pass shared list
+```
+
+```bash
+proton pass shared list
+```
+
+## `sharing`
+
+Items you have shared with other people.
+
+Holds `list`.
+
+### `sharing list`
+
+List the items you have shared with somebody on their own.
+
+`items share get REF` answers the question for one item; this answers the one you actually have, which is what have I left open. A vault you share is in `vaults list`, with the number of people in it, and a link you made is in `links list`.
+
+```
+proton pass sharing list
+```
+
+```bash
+proton pass sharing list
+```
+
 ## `trash`
 
 Items you have removed but not yet deleted.
@@ -830,7 +1010,7 @@ proton pass trash restore --all
 
 The vaults your items live in.
 
-Holds `create`, `delete`, `get`, `list`, `share` and `update`.
+Holds `create`, `delete`, `get`, `list`, `share`, `transfer` and `update`.
 
 ### `vaults create`
 
@@ -888,7 +1068,7 @@ proton pass vaults list
 
 Who else can open a vault.
 
-Holds `add`, `list` and `remove`.
+Holds `add`, `get`, `remove` and `update`.
 
 ### `vaults share add`
 
@@ -909,21 +1089,25 @@ proton pass vaults share add Work jane@proton.me --access editor
 | --- | --- |
 | `--access string` | What they may do with it: viewer, editor, manager (default `viewer`) |
 
-### `vaults share list`
+### `vaults share get`
 
-List who has been offered a vault.
+Show who can open a vault.
+
+Members have accepted; the invited have not answered yet.
 
 ```
-proton pass vaults share list REF
+proton pass vaults share get REF
 ```
 
 ```bash
-proton pass vaults share list Work
+proton pass vaults share get Work
 ```
 
 ### `vaults share remove`
 
-Withdraw an offer nobody has taken.
+Take somebody's access to a vault away.
+
+It withdraws an invitation nobody answered, or removes a member who did. The vault is untouched; anything they already read they have read.
 
 ```
 proton pass vaults share remove REF EMAIL
@@ -931,6 +1115,38 @@ proton pass vaults share remove REF EMAIL
 
 ```bash
 proton pass vaults share remove Work jane@proton.me
+```
+
+### `vaults share update`
+
+Change what somebody may do with a vault.
+
+For a member, nothing is re-encrypted: the key they hold still opens the vault, and only what they may do with it changes. Somebody who has not answered yet holds nothing to change, so the offer is withdrawn and made again at the new access - which sends them a fresh invitation.
+
+```
+proton pass vaults share update REF EMAIL
+```
+
+```bash
+proton pass vaults share update Work jane@proton.me --access manager
+```
+
+| Flag | Description |
+| --- | --- |
+| `--access string` | What they may do with it: viewer, editor, manager (default `viewer`) |
+
+### `vaults transfer`
+
+Make somebody else the owner of a vault.
+
+They have to be a member already, and only the owner can hand a vault over. Afterwards you are a manager of it like anybody else, so this is the one change to a vault you cannot undo on your own.
+
+```
+proton pass vaults transfer REF EMAIL
+```
+
+```bash
+proton pass vaults transfer Work jane@proton.me
 ```
 
 ### `vaults update`

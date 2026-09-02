@@ -13,7 +13,7 @@ import (
 func vaultsCmd() *cobra.Command {
 	c := &cobra.Command{Use: "vaults", Short: "The vaults your items live in"}
 	c.AddCommand(vaultsListCmd(), vaultsGetCmd(), vaultsShareCmd(), vaultsCreateCmd(),
-		vaultsUpdateCmd(), vaultsDeleteCmd())
+		vaultsTransferCmd(), vaultsUpdateCmd(), vaultsDeleteCmd())
 	return c
 }
 

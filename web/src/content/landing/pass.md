@@ -9,6 +9,6 @@ title: Pass
 ```bash frame="none"
 proton pass items list --vault Work
 proton pass items get github.com
-proton pass items create --name GitHub --username roman --url github.com
+proton pass items create --name GitHub --username roman --url github.com --generate-password
 proton pass items totp github.com
 ```

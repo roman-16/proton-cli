@@ -84,7 +84,10 @@ func skipIfPlanRefuses(t *testing.T, g gate, code int, stderr string) {
 		return
 	}
 	if g.refusedByPlan(stderr) {
-		t.Skipf("%s needs a paid plan and this account does not have one", g.feature)
+		// What Proton said goes in the skip: a gate is matched on words, and a
+		// skip that hides the sentence it matched is one nobody can check.
+		t.Skipf("%s needs a paid plan and this account does not have one: %s",
+			g.feature, truncateOutput(strings.TrimSpace(stderr)))
 	}
 	t.Fatalf("%s: exit %d: %s", g.feature, code, truncateOutput(stderr))
 }

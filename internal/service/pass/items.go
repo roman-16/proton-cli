@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/roman-16/proton-cli/internal/crypto/aead"
+	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/fetch"
 	"github.com/roman-16/proton-cli/internal/proton"
 	"github.com/roman-16/proton-cli/internal/ref"
@@ -16,6 +18,13 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// Item is what a listing knows about one item: what it is, where it lives, and
+// the handles somebody addresses it by.
+//
+// It holds nothing that was locked away. A password, a card number, a private
+// key and every hidden field are FullItem's, which is what `items get` reads and
+// what says so in its own help - so a listing cannot spill a secret nobody asked
+// for, whatever format it is printed in.
 type Item struct {
 	ShareID    string   `json:"share_id"`
 	ItemID     string   `json:"item_id"`
@@ -25,31 +34,45 @@ type Item struct {
 	CreateTime int64    `json:"create_time,omitempty"`
 	ModifyTime int64    `json:"modify_time,omitempty"`
 	Name       string   `json:"name,omitempty"`
-	Note       string   `json:"note,omitempty"`
 	Username   string   `json:"username,omitempty"`
 	Email      string   `json:"email,omitempty"`
-	Password   string   `json:"password,omitempty"`
-	TOTP       string   `json:"totp,omitempty"`
 	URLs       []string `json:"urls,omitempty"`
-	Holder     string   `json:"holder,omitempty"`
-	Number     string   `json:"number,omitempty"`
-	Expiry     string   `json:"expiry,omitempty"`
-	CVV        string   `json:"cvv,omitempty"`
-	PIN        string   `json:"pin,omitempty"`
-	SSID       string   `json:"ssid,omitempty"`
-	PublicKey  string   `json:"public_key,omitempty"`
-	PrivateKey string   `json:"private_key,omitempty"`
+
+	// Shares is how many people hold this item on its own, which is what makes it
+	// one of the things you have shared.
+	Shares int `json:"shares,omitempty"`
+	// Access is what this account may do with an item somebody shared with it,
+	// and is empty for an item in a vault of your own.
+	Access string `json:"access,omitempty"`
+
+	// alias: the address and whether it is receiving. The route behind it takes a
+	// request of its own, so it is read with the item rather than listed.
+	Alias       string `json:"alias,omitempty"`
+	AliasStatus string `json:"alias_status,omitempty"`
+}
+
+// FullItem is one item decrypted whole, secrets included.
+type FullItem struct {
+	Item
+	Note       string `json:"note,omitempty"`
+	Password   string `json:"password,omitempty"`
+	TOTP       string `json:"totp,omitempty"`
+	Holder     string `json:"holder,omitempty"`
+	Number     string `json:"number,omitempty"`
+	Expiry     string `json:"expiry,omitempty"`
+	CVV        string `json:"cvv,omitempty"`
+	PIN        string `json:"pin,omitempty"`
+	SSID       string `json:"ssid,omitempty"`
+	PublicKey  string `json:"public_key,omitempty"`
+	PrivateKey string `json:"private_key,omitempty"`
 
 	// Identity is what an identity item holds, keyed by the flag that sets it.
 	// It is a map rather than thirty fields because Pass stores thirty and the
 	// set is IdentityFields' to declare, not this struct's to repeat.
 	Identity map[string]string `json:"identity,omitempty"`
 
-	// alias: the address, and the route behind it. Everything but the status
-	// takes a request of its own, so a list carries the first two and one item
-	// read carries them all.
-	Alias            string         `json:"alias,omitempty"`
-	AliasStatus      string         `json:"alias_status,omitempty"`
+	// the route behind an alias: where its mail arrives, what it sends as, and
+	// what it has carried.
 	AliasMailboxes   []string       `json:"alias_mailboxes,omitempty"`
 	AliasDisplayName string         `json:"alias_display_name,omitempty"`
 	AliasNote        string         `json:"alias_note,omitempty"`
@@ -92,11 +115,24 @@ type ItemField struct {
 func (f ItemField) Ref() string { return FieldRef(f.Section, f.Name) }
 
 // ItemsList reads what is in every vault, or in the one named.
+func (s *Service) ItemsList(ctx context.Context, vaultFilter string) ([]Item, error) {
+	full, err := s.itemsFull(ctx, vaultFilter)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Item, 0, len(full))
+	for _, it := range full {
+		out = append(out, it.Item)
+	}
+	return out, nil
+}
+
+// itemsFull reads every item whole, which only a backup wants.
 //
 // The vaults are read at the same time and their items joined in the order the
 // vaults came in, so the answer does not depend on which vault replied first. A
 // vault that cannot be read is left out, as it was before.
-func (s *Service) ItemsList(ctx context.Context, vaultFilter string) ([]Item, error) {
+func (s *Service) itemsFull(ctx context.Context, vaultFilter string) ([]FullItem, error) {
 	vaults, err := s.VaultsList(ctx)
 	if err != nil {
 		return nil, err
@@ -109,7 +145,7 @@ func (s *Service) ItemsList(ctx context.Context, vaultFilter string) ([]Item, er
 		wanted = append(wanted, v)
 	}
 
-	perVault := make([][]Item, len(wanted))
+	perVault := make([][]FullItem, len(wanted))
 	fetches := make([]func(context.Context) error, len(wanted))
 	for i, v := range wanted {
 		fetches[i] = func(ctx context.Context) error {
@@ -127,14 +163,126 @@ func (s *Service) ItemsList(ctx context.Context, vaultFilter string) ([]Item, er
 	}
 	_ = fetch.Together(ctx, fetches...)
 
-	var out []Item
+	var out []FullItem
 	for _, items := range perVault {
 		out = append(out, items...)
 	}
 	return out, nil
 }
 
-func (s *Service) ItemGet(ctx context.Context, shareID, itemID string) (*Item, error) {
+// SharedWithMe reads the items somebody shared with this account on their own.
+//
+// They are not in a vault of yours - the share points at the item and nothing
+// else - so they are listed apart from `items list` and addressed by the ID this
+// prints.
+func (s *Service) SharedWithMe(ctx context.Context) ([]Item, error) {
+	shares, err := s.shares(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var wanted []Share
+	for _, sh := range shares {
+		if !sh.Vault() {
+			wanted = append(wanted, sh)
+		}
+	}
+
+	out := make([]Item, len(wanted))
+	fetches := make([]func(context.Context) error, len(wanted))
+	for i, sh := range wanted {
+		fetches[i] = func(ctx context.Context) error {
+			it, err := s.ItemGet(ctx, sh.ShareID, sh.TargetID)
+			if err != nil {
+				// An item whose content will not open is still an item you have
+				// been given, and saying so is what lets somebody act on it.
+				out[i] = Item{ShareID: sh.ShareID, ItemID: sh.TargetID, Access: sh.Access}
+				return nil
+			}
+			it.Access = sh.Access
+			out[i] = it.Item
+			return nil
+		}
+	}
+	_ = fetch.Together(ctx, fetches...)
+	return out, nil
+}
+
+// SharedByMe reads the items you have shared on their own.
+//
+// Proton counts an item's shares on the item itself, so this costs no request a
+// listing does not already make. A vault you share is not one of these: it is in
+// `vaults list`, with the members it has.
+func (s *Service) SharedByMe(ctx context.Context) ([]Item, error) {
+	items, err := s.ItemsList(ctx, "")
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Item, 0)
+	for _, it := range items {
+		if it.Shares > 0 {
+			out = append(out, it)
+		}
+	}
+	return out, nil
+}
+
+// ItemMove puts an item in another vault.
+//
+// The item is sealed under the key of the share it lives in, so moving it means
+// handing Proton the same content sealed under the destination's key. It keeps
+// its history and gets a new item ID, because in Pass an item is only unique
+// with its share.
+func (s *Service) ItemMove(ctx context.Context, shareID, itemID, toShareID string) (string, error) {
+	if shareID == toShareID {
+		return itemID, nil
+	}
+	keys, err := s.itemKeys(ctx, shareID, itemID)
+	if err != nil {
+		return "", err
+	}
+	destination, err := s.decryptShareKeys(ctx, toShareID)
+	if err != nil {
+		return "", err
+	}
+	destinationKey, rotation := destination.latest()
+
+	rotations := make([]int, 0, len(keys))
+	for r := range keys {
+		rotations = append(rotations, r)
+	}
+	slices.Sort(rotations)
+
+	sealed := make([]map[string]any, 0, len(rotations))
+	for _, r := range rotations {
+		enc, err := aead.Encrypt(destinationKey, keys[r], []byte(aead.TagItemKey))
+		if err != nil {
+			return "", err
+		}
+		sealed = append(sealed, map[string]any{
+			"Key":         base64.StdEncoding.EncodeToString(enc),
+			"KeyRotation": rotation,
+		})
+	}
+
+	var r struct {
+		Items []struct{ ItemID string }
+	}
+	if err := s.C.Decode(ctx, proton.Request{
+		Method: "PUT", Path: "/pass/v1/share/" + shareID + "/item/share",
+		Body: map[string]any{
+			"ShareID": toShareID,
+			"Items":   []map[string]any{{"ItemID": itemID, "ItemKeys": sealed}},
+		},
+	}, &r); err != nil {
+		return "", err
+	}
+	if len(r.Items) == 0 {
+		return "", fmt.Errorf("the move was accepted but named no item")
+	}
+	return r.Items[0].ItemID, nil
+}
+
+func (s *Service) ItemGet(ctx context.Context, shareID, itemID string) (*FullItem, error) {
 	sk, err := s.decryptShareKeys(ctx, shareID)
 	if err != nil {
 		return nil, err
@@ -216,6 +364,13 @@ func (s *Service) ResolveItem(ctx context.Context, args []string) (string, strin
 	if err != nil {
 		return "", "", err
 	}
+	// An item somebody shared on its own is in no vault of yours, and a name is
+	// the only handle it has: it is reachable here or not at all.
+	shared, err := s.SharedWithMe(ctx)
+	if err != nil {
+		return "", "", err
+	}
+	items = append(items, shared...)
 	// An exact item-ID match wins outright, so the ID printed by `items create`
 	// round-trips as a single REF to get/edit/delete.
 	for _, it := range items {
@@ -226,6 +381,10 @@ func (s *Service) ResolveItem(ctx context.Context, args []string) (string, strin
 	var matches []Item
 	for _, it := range items {
 		if strings.Contains(strings.ToLower(it.Name), needle) {
+			matches = append(matches, it)
+			continue
+		}
+		if it.Alias != "" && strings.Contains(strings.ToLower(it.Alias), needle) {
 			matches = append(matches, it)
 			continue
 		}
@@ -640,8 +799,8 @@ func (s *Service) itemRevision(ctx context.Context, shareID, itemID string) (int
 	return r.Item.Revision, nil
 }
 
-func (s *Service) fetchItems(ctx context.Context, shareID string, sk *shareKeys) ([]Item, error) {
-	var out []Item
+func (s *Service) fetchItems(ctx context.Context, shareID string, sk *shareKeys) ([]FullItem, error) {
+	var out []FullItem
 	var since string
 	for {
 		qv := proton.Query()
@@ -668,6 +827,7 @@ func (s *Service) fetchItems(ctx context.Context, shareID string, sk *shareKeys)
 				CreateTime       int64
 				ModifyTime       int64
 				AliasEmail       string
+				ShareCount       int
 			}
 			if err := json.Unmarshal(raw, &enc); err != nil {
 				continue
@@ -709,6 +869,7 @@ func (s *Service) fetchItems(ctx context.Context, shareID string, sk *shareKeys)
 			item.ModifyTime = enc.ModifyTime
 			item.Alias = enc.AliasEmail
 			item.AliasStatus = aliasStatus(item.Type, enc.Flags)
+			item.Shares = enc.ShareCount
 			out = append(out, *item)
 		}
 		if r.Items.LastToken == "" || len(r.Items.RevisionsData) == 0 {
@@ -719,8 +880,9 @@ func (s *Service) fetchItems(ctx context.Context, shareID string, sk *shareKeys)
 	return out, nil
 }
 
-func itemFromProto(it *pb.Item) *Item {
-	item := &Item{raw: it, Type: itemTypeName(it)}
+func itemFromProto(it *pb.Item) *FullItem {
+	item := &FullItem{raw: it}
+	item.Type = itemTypeName(it)
 	if it.Metadata != nil {
 		item.Name = it.Metadata.Name
 		item.Note = it.Metadata.Note
@@ -814,12 +976,59 @@ type Revision struct {
 	Revision   int   `json:"revision"`
 	CreateTime int64 `json:"create_time,omitempty"`
 	ModifyTime int64 `json:"modify_time,omitempty"`
-	// Item is the item as it stood at this revision.
+	// Item is what the revision was, without what it kept: reading one of those
+	// back is `revisions get`, one revision at a time.
 	Item *Item `json:"item"`
 }
 
-// ItemHistory reads an item's earlier states, newest first.
+// ItemHistory reads what an item used to be, newest first.
 func (s *Service) ItemHistory(ctx context.Context, shareID, itemID string) ([]Revision, error) {
+	full, err := s.itemHistory(ctx, shareID, itemID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Revision, 0, len(full))
+	for _, rev := range full {
+		row := Revision{Revision: rev.Revision, CreateTime: rev.CreateTime, ModifyTime: rev.ModifyTime}
+		if rev.Item != nil {
+			row.Item = &rev.Item.Item
+		}
+		out = append(out, row)
+	}
+	return out, nil
+}
+
+// RevisionGet reads one earlier state whole.
+//
+// It is the command for reading a password an item used to have, so it decrypts
+// that revision and nothing else: the history beside it stays a list of what
+// changed and when.
+func (s *Service) RevisionGet(ctx context.Context, shareID, itemID string, revision int) (*FullItem, error) {
+	history, err := s.itemHistory(ctx, shareID, itemID)
+	if err != nil {
+		return nil, err
+	}
+	for _, rev := range history {
+		if rev.Revision != revision {
+			continue
+		}
+		if rev.Item == nil {
+			return nil, fmt.Errorf("revision %d was written under a key this account no longer holds", revision)
+		}
+		return rev.Item, nil
+	}
+	return nil, &errs.NotFound{Kind: "revision", Ref: strconv.Itoa(revision)}
+}
+
+// fullRevision is one earlier state with its content still in it.
+type fullRevision struct {
+	Revision   int
+	CreateTime int64
+	ModifyTime int64
+	Item       *FullItem
+}
+
+func (s *Service) itemHistory(ctx context.Context, shareID, itemID string) ([]fullRevision, error) {
 	sk, err := s.decryptShareKeys(ctx, shareID)
 	if err != nil {
 		return nil, err
@@ -847,7 +1056,7 @@ func (s *Service) ItemHistory(ctx context.Context, shareID, itemID string) ([]Re
 	}, &r); err != nil {
 		return nil, err
 	}
-	out := make([]Revision, 0, len(r.Revisions.RevisionsData))
+	out := make([]fullRevision, 0, len(r.Revisions.RevisionsData))
 	for _, rev := range r.Revisions.RevisionsData {
 		shareKey, ok := sk.keys[rev.KeyRotation]
 		if !ok {
@@ -858,7 +1067,7 @@ func (s *Service) ItemHistory(ctx context.Context, shareID, itemID string) ([]Re
 			// A revision written under a key this account no longer holds is
 			// still part of the history, so it is reported by its number rather
 			// than dropped.
-			out = append(out, Revision{
+			out = append(out, fullRevision{
 				Revision: rev.Revision, CreateTime: rev.CreateTime, ModifyTime: rev.ModifyTime,
 			})
 			continue
@@ -868,7 +1077,7 @@ func (s *Service) ItemHistory(ctx context.Context, shareID, itemID string) ([]Re
 		item.CreateTime, item.ModifyTime = rev.CreateTime, rev.ModifyTime
 		item.Alias = rev.AliasEmail
 		item.AliasStatus = aliasStatus(item.Type, rev.Flags)
-		out = append(out, Revision{
+		out = append(out, fullRevision{
 			Revision: rev.Revision, CreateTime: rev.CreateTime,
 			ModifyTime: rev.ModifyTime, Item: item,
 		})
@@ -876,14 +1085,14 @@ func (s *Service) ItemHistory(ctx context.Context, shareID, itemID string) ([]Re
 	// Newest first, which is the order somebody looking for "what did it used to
 	// be" reads in. Sorted rather than reversed, so the answer does not depend on
 	// which way round Proton happened to send the page.
-	slices.SortFunc(out, func(a, b Revision) int { return b.Revision - a.Revision })
+	slices.SortFunc(out, func(a, b fullRevision) int { return b.Revision - a.Revision })
 	return out, nil
 }
 
 // decodeItem unwraps one item's content with the share key that sealed it. The
 // current item and every revision of it are stored the same way, so both read
 // through here.
-func decodeItem(shareKey []byte, content, itemKey string) (*Item, error) {
+func decodeItem(shareKey []byte, content, itemKey string) (*FullItem, error) {
 	ikBytes, err := base64.StdEncoding.DecodeString(itemKey)
 	if err != nil {
 		return nil, err

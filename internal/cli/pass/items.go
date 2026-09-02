@@ -3,6 +3,7 @@ package pass
 import (
 	stdctx "context"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -23,10 +24,55 @@ var itemTypes = []string{"login", "note", "credit-card", "wifi", "ssh-key", "ide
 func itemsCmd() *cobra.Command {
 	c := &cobra.Command{Use: "items", Short: "Logins, notes, cards and the rest"}
 	c.AddCommand(itemsListCmd(), itemsGetCmd(), itemsCreateCmd(), itemsUpdateCmd(),
-		itemsRevisionsCmd(), itemsTOTPCmd(),
+		itemsMoveCmd(), itemsRevisionsCmd(), itemsTOTPCmd(), itemsShareCmd(),
 		itemsPinCmd("pin", "Keep items at the top of the list", ui.Pinned, true),
 		itemsPinCmd("unpin", "Stop keeping items at the top", ui.Unpinned, false),
 		itemsTrashCmd(), itemsDeleteCmd())
+	return c
+}
+
+// itemsMoveCmd puts an item in another vault.
+//
+// An item is sealed under the key of the share it lives in, so moving it means
+// sealing it again under the destination's. It keeps its history and gets a new
+// ID, because an item in Pass is only unique together with its vault - so the
+// new one is printed the way a creation's is.
+func itemsMoveCmd() *cobra.Command {
+	var into string
+	c := &cobra.Command{
+		Use:   "move REF",
+		Short: "Put an item in another vault",
+		Long: "Put an item in another vault.\n\n" +
+			"The item keeps its history and everything it holds, and is given a new ID:\n" +
+			"an item in Pass is only unique together with the vault it is in. The new ID\n" +
+			"is printed, so a script can go on addressing it.",
+		Args: cobra.ExactArgs(1),
+		RunE: kit.Run([]kit.Step{kit.StepExpand, func(*kit.Invocation) error {
+			if into == "" {
+				return kit.Fail("Which vault should it go into?").Hint("--into Work")
+			}
+			return nil
+		}}, func(c *kit.Invocation) error {
+			shareID, itemID, err := resolveItem(c, c.Args[0])
+			if err != nil {
+				return err
+			}
+			vault, err := vaultList(c).Find(c.Ctx, into)
+			if err != nil {
+				return err
+			}
+			return kit.Create(c, ui.ResultSpec{
+				Action: ui.Moved, Kind: "items", Detail: "into " + vault.Name,
+			}, func() (string, error) {
+				moved, err := c.App.Pass.ItemMove(c.Ctx, shareID, itemID, vault.ShareID)
+				if err != nil {
+					return "", err
+				}
+				return kit.JoinPair(vault.ShareID, moved), nil
+			})
+		}),
+	}
+	c.Flags().StringVar(&into, "into", "", "Which vault to put it in, by name or ID")
 	return c
 }
 
@@ -114,7 +160,7 @@ func itemsGetCmd() *cobra.Command {
 // itemFields is the record for one item. Every kind shares it: an empty field is
 // dropped, so a note shows a note's fields and a card shows a card's without
 // either needing a layout of its own.
-func itemFields(it *passsvc.Item) []ui.Field {
+func itemFields(it *passsvc.FullItem) []ui.Field {
 	fields := []ui.Field{
 		{Label: "Type", Value: it.Type},
 		{Label: "Name", Value: it.Name},
@@ -157,7 +203,7 @@ func itemFields(it *passsvc.Item) []ui.Field {
 	for _, f := range it.Fields {
 		fields = append(fields, ui.Field{Label: f.Ref(), Value: f.Value})
 	}
-	return append(fields, ui.Field{Label: "ID", Value: itemRef(*it), ID: true})
+	return append(fields, ui.Field{Label: "ID", Value: itemRef(it.Item), ID: true})
 }
 
 // activity is what an alias has carried lately, over the fourteen days Proton
@@ -235,35 +281,97 @@ type fields struct {
 	// service's to declare, so this is a map rather than thirty named members
 	// that would have to be kept in step with it.
 	identity map[string]*string
+	// secrets are the parts of an item that argv may not carry, and generate is
+	// the way to have one that never existed anywhere else.
+	secrets  kit.Secrets
+	generate bool
+	gen      generator
+}
+
+// secretFields are the fields --secret-file names by their own flag's name. A
+// name that is not one of these names a custom field instead.
+var secretFields = map[string]func(nc *passsvc.NewItem, v string){
+	"cvv":         func(nc *passsvc.NewItem, v string) { nc.CVV = v },
+	"number":      func(nc *passsvc.NewItem, v string) { nc.Number = v },
+	"password":    func(nc *passsvc.NewItem, v string) { nc.Password = v },
+	"pin":         func(nc *passsvc.NewItem, v string) { nc.PIN = v },
+	"private-key": func(nc *passsvc.NewItem, v string) { nc.PrivateKey = v },
+	"totp-uri":    func(nc *passsvc.NewItem, v string) { nc.TOTP = v },
+}
+
+// secretFieldNames are those names, for the help that lists them.
+func secretFieldNames() string {
+	names := make([]string, 0, len(secretFields))
+	for name := range secretFields {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return strings.Join(names, ", ")
+}
+
+// readSecrets folds what --secret-file and --secret-stdin carried into the item.
+//
+// A name the item type knows is that field; anything else is a custom field,
+// stored hidden - or, when the value is a TOTP URI, as the two-factor field that
+// is what such a value is for.
+func (d *fields) readSecrets(c *kit.Invocation) error {
+	values, err := d.secrets.Values()
+	if err != nil {
+		return err
+	}
+	if d.generate {
+		password, err := d.gen.make()
+		if err != nil {
+			return err
+		}
+		if _, taken := values["password"]; taken {
+			return kit.Fail("--generate-password and --secret-file password both set the password.").
+				Hint("drop one of them")
+		}
+		values["password"] = password
+		// The item is the answer this command prints, so the password it made goes
+		// beside it rather than into stdout, which carries the new ID.
+		c.Note("Password  %s", password)
+	}
+	names := make([]string, 0, len(values))
+	for name := range values {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		value := values[name]
+		if set, ok := secretFields[name]; ok {
+			set(&d.nc, value)
+			continue
+		}
+		field := name + "=" + value
+		if _, err := otp.Parse(value); err == nil && strings.HasPrefix(value, "otpauth://") {
+			d.nc.ExtraFields.TOTP = append(d.nc.ExtraFields.TOTP, field)
+			continue
+		}
+		d.nc.ExtraFields.Hidden = append(d.nc.ExtraFields.Hidden, field)
+	}
+	return nil
 }
 
 func (d *fields) register(c *cobra.Command, verb string) {
 	f := c.Flags()
 	f.StringVar(&d.nc.Name, "name", "", verb+" the item's name")
 	f.StringVar(&d.nc.Username, "username", "", verb+" the username (login)")
-	f.StringVar(&d.nc.Password, "password", "", verb+" the password (login, wifi)")
 	f.StringVar(&d.nc.Email, "email", "", verb+" the email address (login)")
 	f.StringVar(&d.nc.URL, "url", "", verb+" the URL (login)")
-	f.StringVar(&d.nc.TOTP, "totp-uri", "", verb+" the TOTP URI or secret (login)")
 	f.StringVar(&d.nc.Note, "note", "", verb+" the note")
 	// A field states its own section, so the flag stays one self-contained token
 	// that can be given in any order and read back exactly as it was written.
 	f.StringArrayVar(&d.nc.ExtraFields.Text, "field", nil,
 		verb+" a custom field, as NAME=VALUE or SECTION/NAME=VALUE (repeatable)")
-	f.StringArrayVar(&d.nc.ExtraFields.Hidden, "hidden", nil,
-		verb+" a hidden custom field, as NAME=VALUE or SECTION/NAME=VALUE (repeatable)")
-	// --totp is the two-factor code a re-authentication asks for, so a field
-	// holding a secret that generates one needs a name of its own.
-	f.StringArrayVar(&d.nc.ExtraFields.TOTP, "totp-field", nil,
-		verb+" a custom field holding a two-factor secret, as NAME=URI (repeatable)")
 	f.StringVar(&d.nc.Holder, "holder", "", verb+" the cardholder's name (credit-card)")
-	f.StringVar(&d.nc.Number, "number", "", verb+" the card number (credit-card)")
 	f.StringVar(&d.nc.Expiry, "expiry", "", verb+" the card expiry, YYYY-MM (credit-card)")
-	f.StringVar(&d.nc.CVV, "cvv", "", verb+" the card's CVV (credit-card)")
-	f.StringVar(&d.nc.PIN, "pin", "", verb+" the card's PIN (credit-card)")
 	f.StringVar(&d.nc.SSID, "ssid", "", verb+" the network name (wifi)")
-	f.StringVar(&d.nc.PrivateKey, "private-key", "", verb+" the private key (ssh-key)")
 	f.StringVar(&d.nc.PublicKey, "public-key", "", verb+" the public key (ssh-key)")
+	d.secrets.Declare(c)
+	f.BoolVar(&d.generate, "generate-password", false, "Make the password rather than being given one")
+	d.gen.register(c)
 	// An identity's fields are declared once in the service; the flags are made
 	// from that declaration so the two can never offer different sets.
 	d.identity = make(map[string]*string, len(passsvc.IdentityFields))
@@ -308,10 +416,17 @@ func itemsCreateCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "create",
 		Short: "Create an item",
-		Args:  cobra.NoArgs,
+		Long: "Create an item.\n\n" +
+			"A secret is read from a file or from stdin, never from a flag value:\n" +
+			"--secret-file NAME=FILE, or --secret-stdin NAME for one of them.\n" +
+			"NAME is " + secretFieldNames() + ",\n" +
+			"or any name at all, which makes a hidden custom field of it.\n\n" +
+			"--generate-password makes one instead, so a new login needs no file: it is\n" +
+			"shaped by the same flags `pass generate` takes.",
+		Args: cobra.NoArgs,
 		// What a field says, and whether this kind of item has a section to put it
 		// under, are both answerable from the command line alone.
-		RunE: kit.Run([]kit.Step{func(*kit.Invocation) error {
+		RunE: kit.Run([]kit.Step{d.secrets.Supply, func(*kit.Invocation) error {
 			kind, err := itemType.Value()
 			if err != nil {
 				return err
@@ -328,6 +443,12 @@ func itemsCreateCmd() *cobra.Command {
 			}
 			if d.nc.Name == "" {
 				return kit.Fail("An item needs a name.").Hint("--name GitHub")
+			}
+			if err := d.readSecrets(c); err != nil {
+				return err
+			}
+			if err := d.checkFields(kind); err != nil {
+				return err
 			}
 			d.nc.Type, d.nc.WifiSecurity = kind, wifi
 			d.nc.Identity = d.identityValues()
@@ -364,15 +485,27 @@ func itemsUpdateCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "update REF",
 		Short: "Change an item's fields",
-		Args:  cobra.ExactArgs(1),
+		Long: "Change an item's fields.\n\n" +
+			"A secret is read from a file or from stdin, never from a flag value:\n" +
+			"--secret-file NAME=FILE, or --secret-stdin NAME for one of them.\n" +
+			"NAME is " + secretFieldNames() + ",\n" +
+			"or any name at all, which makes a hidden custom field of it.\n\n" +
+			"--generate-password replaces the password with one it makes.",
+		Args: cobra.ExactArgs(1),
 		// Whether the item has a section to put a field under depends on what
 		// kind it is, which is not known until it is read; what a field says is
 		// known now.
-		RunE: kit.Run([]kit.Step{kit.StepExpand, func(*kit.Invocation) error {
+		RunE: kit.Run([]kit.Step{kit.StepExpand, d.secrets.Supply, func(*kit.Invocation) error {
 			return d.checkFields("")
 		}}, func(c *kit.Invocation) error {
 			wifi, err := security.Value()
 			if err != nil {
+				return err
+			}
+			if err := d.readSecrets(c); err != nil {
+				return err
+			}
+			if err := d.checkFields(""); err != nil {
 				return err
 			}
 			shareID, itemID, err := resolveItem(c, c.Args[0])
@@ -509,7 +642,7 @@ func selectItems(c *kit.Invocation, f *filters) (kit.Selection[passsvc.Item], er
 			if err != nil {
 				return passsvc.Item{}, err
 			}
-			return *it, nil
+			return it.Item, nil
 		},
 	}
 	if f.set() {
@@ -623,8 +756,37 @@ func itemsPinCmd(use, short string, action ui.Action, pinned bool) *cobra.Comman
 // whichever app it is in.
 func itemsRevisionsCmd() *cobra.Command {
 	c := &cobra.Command{Use: "revisions", Short: "Earlier versions of an item"}
-	c.AddCommand(itemsRevisionsListCmd())
+	c.AddCommand(itemsRevisionsGetCmd(), itemsRevisionsListCmd())
 	return c
+}
+
+func itemsRevisionsGetCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "get REF REVISION_REF",
+		Short: "Show one earlier version, decrypted",
+		Long: "Show one earlier version, decrypted.\n\n" +
+			"The password, TOTP secret and private key that revision held are printed in\n" +
+			"full, as `items get` prints the current ones: this is the command for\n" +
+			"reading a password an item used to have.\n\n" +
+			"REVISION_REF is the number `revisions list` shows.",
+		Args: cobra.ExactArgs(2),
+		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
+			revision, err := strconv.Atoi(c.Args[1])
+			if err != nil || revision < 1 {
+				return kit.Fail("%q is not a revision number.", c.Args[1]).
+					Hint("the number in the first column of `pass items revisions list`")
+			}
+			shareID, itemID, err := resolveItem(c, c.Args[0])
+			if err != nil {
+				return err
+			}
+			it, err := c.App.Pass.RevisionGet(c.Ctx, shareID, itemID, revision)
+			if err != nil {
+				return err
+			}
+			return kit.Show(c, ui.RecordSpec{Object: it, Fields: itemFields(it)})
+		}),
+	}
 }
 
 func itemsRevisionsListCmd() *cobra.Command {
@@ -632,8 +794,9 @@ func itemsRevisionsListCmd() *cobra.Command {
 		Use:   "list REF",
 		Short: "Show what an item used to be",
 		Long: "Show what an item used to be.\n\n" +
-			"Pass keeps every edit, so a password changed by mistake can be read back.\n" +
-			"Newest first. Use --output json for the full contents of each revision.",
+			"Pass keeps every edit, so a password changed by mistake can be found again.\n" +
+			"Newest first. This is what changed and when; `revisions get` reads one of\n" +
+			"them back in full.",
 		Args: cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			shareID, itemID, err := resolveItem(c, c.Args[0])

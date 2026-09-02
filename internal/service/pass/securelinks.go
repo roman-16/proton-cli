@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/roman-16/proton-cli/internal/crypto/aead"
+	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
 )
 
@@ -38,6 +39,11 @@ type SecureLink struct {
 	// may be. MaxReads is zero for a link with no limit.
 	Reads    int `json:"reads"`
 	MaxReads int `json:"max_reads,omitempty"`
+
+	// What the URL is rebuilt from, which only a command that hands one over does.
+	url         string
+	sealedKey   string
+	withItemKey bool
 }
 
 // NewSecureLink is what to make.
@@ -121,12 +127,58 @@ func linkURL(url string, linkKey []byte) string {
 	return url + "#" + base64.RawURLEncoding.EncodeToString(linkKey)
 }
 
+// SecureLinkGet reads one link back, URL and all.
+//
+// Proton stores the link key sealed under the item's own, so the whole URL can
+// be rebuilt - which is what makes a link somebody mislaid recoverable rather
+// than something to revoke and make again.
+func (s *Service) SecureLinkGet(ctx context.Context, linkID string) (*SecureLink, error) {
+	links, err := s.secureLinks(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, l := range links {
+		if l.LinkID != linkID {
+			continue
+		}
+		if url, err := s.rebuildLink(ctx, l.ShareID, l.ItemID, l.url, l.sealedKey, l.withItemKey); err == nil {
+			l.URL = url
+		}
+		return &l, nil
+	}
+	return nil, &errs.NotFound{Kind: "link", Ref: linkID}
+}
+
+// SecureLinksForItem reads the links made for one item, URLs included: this is
+// how one item is shared, which is what `items share get` answers.
+func (s *Service) SecureLinksForItem(ctx context.Context, shareID, itemID string) ([]SecureLink, error) {
+	links, err := s.secureLinks(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]SecureLink, 0)
+	for _, l := range links {
+		if l.ShareID != shareID || l.ItemID != itemID {
+			continue
+		}
+		if url, err := s.rebuildLink(ctx, l.ShareID, l.ItemID, l.url, l.sealedKey, l.withItemKey); err == nil {
+			l.URL = url
+		}
+		out = append(out, l)
+	}
+	return out, nil
+}
+
 // SecureLinksList reads every link this account has made.
 //
-// Proton stores the link key sealed under the item's key, so the whole URL can
-// be rebuilt here - which is what makes a link somebody mislaid recoverable
-// rather than lost.
+// The URL is left out: it carries the key that opens the item, and a listing is
+// not where a secret belongs. `links get` rebuilds one, and `items share get`
+// the ones an item has.
 func (s *Service) SecureLinksList(ctx context.Context) ([]SecureLink, error) {
+	return s.secureLinks(ctx)
+}
+
+func (s *Service) secureLinks(ctx context.Context) ([]SecureLink, error) {
 	var r struct {
 		PublicLinks []struct {
 			LinkID                      string
@@ -148,19 +200,13 @@ func (s *Service) SecureLinksList(ctx context.Context) ([]SecureLink, error) {
 
 	out := make([]SecureLink, 0, len(r.PublicLinks))
 	for _, l := range r.PublicLinks {
-		row := SecureLink{
+		out = append(out, SecureLink{
 			LinkID: l.LinkID, ShareID: l.ShareID, ItemID: l.ItemID,
 			Active: l.Active, Expires: l.ExpirationTime,
 			Reads: l.ReadCount, MaxReads: l.MaxReadCount,
-		}
-		// A URL that cannot be rebuilt is left off rather than shown broken: the
-		// link still exists and can still be revoked, which is what the row is
-		// for.
-		if url, err := s.rebuildLink(ctx, l.ShareID, l.ItemID, l.LinkURL, l.EncryptedLinkKey,
-			l.LinkKeyEncryptedWithItemKey); err == nil {
-			row.URL = url
-		}
-		out = append(out, row)
+			url: l.LinkURL, sealedKey: l.EncryptedLinkKey,
+			withItemKey: l.LinkKeyEncryptedWithItemKey,
+		})
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Expires < out[j].Expires })
 	return out, nil

@@ -20,7 +20,7 @@ func New() *cobra.Command {
 		Short: "Vaults, logins and secrets",
 	}
 	c.AddCommand(itemsCmd(), vaultsCmd(), aliasesCmd(), trashCmd(), generateCmd(), breachesCmd(), linksCmd(),
-		invitationsCmd(), settingsCmd(),
+		invitationsCmd(), sharedCmd(), sharingCmd(), settingsCmd(),
 		exportCmd(), importCmd())
 	return c
 }
@@ -54,17 +54,54 @@ func yesNo(b bool) string {
 
 // ── making a password ──
 
+// generator is how a password is shaped, wherever one is made: on its own with
+// `pass generate`, or into an item with --generate-password. One declaration, so
+// the two cannot come to mean different things.
+type generator struct {
+	o                         secret.Options
+	noDigits, noSymbols, noUp bool
+	separator                 *kit.Enum
+}
+
+func (g *generator) register(c *cobra.Command) {
+	f := c.Flags()
+	f.IntVar(&g.o.Length, "length", secret.DefaultLength, "How many characters")
+	f.IntVar(&g.o.Words, "words", 0, "Make a passphrase of this many words instead")
+	f.BoolVar(&g.noDigits, "no-digits", false, "Leave the digits out")
+	f.BoolVar(&g.noSymbols, "no-symbols", false, "Leave the symbols out")
+	f.BoolVar(&g.noUp, "no-uppercase", false, "Leave the capitals out")
+	g.separator = &kit.Enum{
+		Name: "separator", Usage: "What stands between the words of a passphrase",
+		Values: secret.SeparatorNames(), Default: secret.DefaultSeparator,
+	}
+	g.separator.Register(c)
+}
+
+func (g *generator) make() (string, error) {
+	separator, err := g.separator.Value()
+	if err != nil {
+		return "", err
+	}
+	o := g.o
+	o.Separator = separator
+	o.Digits, o.Symbols, o.Upper = !g.noDigits, !g.noSymbols, !g.noUp
+	pw, err := secret.Make(o)
+	if err != nil {
+		return "", kit.Fail("%v", err)
+	}
+	return pw, nil
+}
+
 // Generate makes a password without storing it anywhere.
 //
 // It reaches no account and needs no session: a password is made on this machine
 // and may never leave it. That is also the point - a generator you already have
 // beats reaching for whatever is on the path.
 //
-// The alphabet is Proton's own, which leaves out the characters people misread
-// unless letters are all there is.
+// The alphabet and the wordlist are Proton's own, so what comes out is what Pass
+// itself would have made.
 func generateCmd() *cobra.Command {
-	var o secret.Options
-	var noDigits, noSymbols, noUpper bool
+	var g generator
 	c := &cobra.Command{
 		Use:   "generate",
 		Short: "Make a password",
@@ -73,13 +110,15 @@ func generateCmd() *cobra.Command {
 			"which leaves out i, o, l and their capitals - the characters people misread -\n" +
 			"unless letters are all the password has.\n\n" +
 			"Every kind asked for is guaranteed to appear, so a password that has to\n" +
-			"contain a digit does.",
+			"contain a digit does.\n\n" +
+			"--words makes a passphrase instead, from Proton's own wordlist: that many\n" +
+			"words, capitalised and each followed by a digit unless --no-uppercase or\n" +
+			"--no-digits says otherwise.",
 		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
-			o.Digits, o.Symbols, o.Upper = !noDigits, !noSymbols, !noUpper
-			pw, err := secret.Password(o)
+			pw, err := g.make()
 			if err != nil {
-				return kit.Fail("%v", err)
+				return err
 			}
 			return kit.Show(c, ui.RecordSpec{
 				Object: struct {
@@ -89,9 +128,6 @@ func generateCmd() *cobra.Command {
 			})
 		}),
 	}
-	c.Flags().IntVar(&o.Length, "length", secret.DefaultLength, "How many characters")
-	c.Flags().BoolVar(&noDigits, "no-digits", false, "Leave the digits out")
-	c.Flags().BoolVar(&noSymbols, "no-symbols", false, "Leave the symbols out")
-	c.Flags().BoolVar(&noUpper, "no-uppercase", false, "Leave the capitals out")
+	g.register(c)
 	return c
 }

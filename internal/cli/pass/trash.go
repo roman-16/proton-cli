@@ -129,7 +129,7 @@ func trashTargets(c *kit.Invocation, all bool) ([]passsvc.Item, error) {
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, *it)
+		out = append(out, it.Item)
 	}
 	return out, nil
 }

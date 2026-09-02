@@ -3,7 +3,11 @@ package fixture
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"path"
+	"path/filepath"
+	"slices"
+	"sort"
 	"strings"
 )
 
@@ -27,6 +31,38 @@ type Pin struct {
 	ID     string            // the value identifying it, under the collection's key
 	Fields map[string]string // what else has to match
 	Create []string          // the command that makes it
+	// Secrets are the parts of it that argv may not carry, by the field they
+	// belong to. Each is written to a file of its own for the one command that
+	// reads it, which is what a person does and so what the fixture does.
+	Secrets map[string]string
+}
+
+// withSecrets writes what a pin keeps out of argv and answers with the command
+// that reads it back, and the way to take the files away again.
+func withSecrets(p Pin) ([]string, func(), error) {
+	if len(p.Secrets) == 0 {
+		return p.Create, func() {}, nil
+	}
+	dir, err := os.MkdirTemp("", "proton-cli-fixture-*")
+	if err != nil {
+		return nil, nil, err
+	}
+	done := func() { _ = os.RemoveAll(dir) }
+	fields := make([]string, 0, len(p.Secrets))
+	for field := range p.Secrets {
+		fields = append(fields, field)
+	}
+	sort.Strings(fields)
+	create := slices.Clone(p.Create)
+	for _, field := range fields {
+		file := filepath.Join(dir, strings.ReplaceAll(field, "/", "-"))
+		if err := os.WriteFile(file, []byte(p.Secrets[field]), 0o600); err != nil {
+			done()
+			return nil, nil, err
+		}
+		create = append(create, "--secret-file", field+"="+file)
+	}
+	return create, done, nil
 }
 
 // A Collection is one list the fixture pins rows in.
@@ -90,7 +126,13 @@ func Ensure(run Runner, profile string, c Collection, p Pin) (map[string]any, er
 			return nil, fmt.Errorf("%s: %s: %w", c.What, p.ID, err)
 		}
 	}
-	if _, err := run(profile, append([]string{"--yes"}, p.Create...)...); err != nil {
+	create, done, err := withSecrets(p)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %s: %w", c.What, p.ID, err)
+	}
+	_, err = run(profile, append([]string{"--yes"}, create...)...)
+	done()
+	if err != nil {
 		return nil, fmt.Errorf("%s: %s: %w", c.What, p.ID, err)
 	}
 	list, err = Rows(run, profile, c.List...)

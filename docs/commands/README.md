@@ -14,7 +14,7 @@ Anywhere a command shows `REF`, you can pass a full ID, the eight-character shor
 - **[`proton contacts`](contacts.md)** - contacts, their groups and their pinned keys. 18 commands.
 - **[`proton drive`](drive.md)** - files and folders in Drive. 45 commands.
 - **[`proton mail`](mail.md)** - read, write and organize mail. 77 commands.
-- **[`proton pass`](pass.md)** - vaults, logins and secrets. 49 commands.
+- **[`proton pass`](pass.md)** - vaults, logins and secrets. 60 commands.
 
 ## Account
 

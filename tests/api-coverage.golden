@@ -19,6 +19,7 @@ DELETE /pass/v1/share/{id}/alias/{id}/contact/{n}
 DELETE /pass/v1/share/{id}/invite/{id}
 DELETE /pass/v1/share/{id}/item
 DELETE /pass/v1/share/{id}/item/{id}/pin
+DELETE /pass/v1/share/{id}/user/{id}
 DELETE /pass/v1/user/alias/mailbox/{n}
 DELETE /pass/v1/vault/{id}
 GET /auth/v4/sessions
@@ -83,9 +84,12 @@ GET /pass/v1/share/{id}/alias/{id}/contact
 GET /pass/v1/share/{id}/invite
 GET /pass/v1/share/{id}/item
 GET /pass/v1/share/{id}/item/{id}
+GET /pass/v1/share/{id}/item/{id}/key
 GET /pass/v1/share/{id}/item/{id}/key/latest
 GET /pass/v1/share/{id}/item/{id}/revision
 GET /pass/v1/share/{id}/key
+GET /pass/v1/share/{id}/user
+GET /pass/v1/share/{id}/user/item/{id}
 GET /pass/v1/user/alias/domain
 GET /pass/v1/user/alias/mailbox
 GET /settings/calendar
@@ -181,6 +185,9 @@ PUT /mail/v4/settings/viewmode
 PUT /pass/v1/share/{id}/alias/{id}/contact/{n}/blocked
 PUT /pass/v1/share/{id}/alias/{id}/name
 PUT /pass/v1/share/{id}/alias/{id}/status
+PUT /pass/v1/share/{id}/item/share
 PUT /pass/v1/share/{id}/item/{id}
+PUT /pass/v1/share/{id}/user/{id}
 PUT /pass/v1/user/alias/settings/default_mailbox_id
 PUT /pass/v1/vault/{id}
+PUT /pass/v1/vault/{id}/owner
