@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"log/slog"
 	"strconv"
 
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
@@ -66,23 +67,41 @@ func (s *Service) VaultsList(ctx context.Context) ([]Vault, error) {
 			Members: sh.Members, AddressID: sh.AddressID,
 		}
 		if sh.Content != "" {
-			sk, err := s.decryptShareKeys(ctx, sh.ShareID)
-			if err == nil {
-				if key, ok := sk.keys[sh.ContentKeyRotation]; ok {
-					if vv, err := decryptVault(sh.Content, key); err == nil {
-						v.Name = vv.Name
-						v.Description = vv.Description
-						if d := vv.GetDisplay(); d != nil {
-							v.Icon = DisplayNumber(int(d.Icon))
-							v.Color = DisplayNumber(int(d.Color))
-						}
-					}
-				}
+			if err := describe(ctx, s, sh, &v); err != nil {
+				// Recorded and not counted. The row is on the screen with an empty
+				// name, so nothing has gone missing from the answer - which is what
+				// the tally is for. What is wrong is visible; why is in the log.
+				slog.DebugContext(ctx, "pass: a vault's own record could not be read",
+					"vault", sh.ShareID, "error", err)
 			}
 		}
 		out = append(out, v)
 	}
 	return out, nil
+}
+
+// describe fills in what a vault's own encrypted record says about it: its
+// name, its description and the icon and colour Proton shows it with.
+func describe(ctx context.Context, s *Service, sh Share, v *Vault) error {
+	sk, err := s.decryptShareKeys(ctx, sh.ShareID)
+	if err != nil {
+		return err
+	}
+	key, ok := sk.keys[sh.ContentKeyRotation]
+	if !ok {
+		return fmt.Errorf("no share key for rotation %d", sh.ContentKeyRotation)
+	}
+	vv, err := decryptVault(sh.Content, key)
+	if err != nil {
+		return err
+	}
+	v.Name = vv.Name
+	v.Description = vv.Description
+	if d := vv.GetDisplay(); d != nil {
+		v.Icon = DisplayNumber(int(d.Icon))
+		v.Color = DisplayNumber(int(d.Color))
+	}
+	return nil
 }
 
 func (s *Service) VaultCreate(ctx context.Context, name string) (string, error) {

@@ -9,6 +9,7 @@ import (
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
 	"github.com/roman-16/proton-cli/internal/account/keys"
 	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
+	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
 )
 
@@ -93,14 +94,14 @@ func listQuery(opts ListOptions, recipients bool) (url.Values, error) {
 	if opts.After != "" {
 		t, err := time.Parse("2006-01-02", opts.After)
 		if err != nil {
-			return nil, fmt.Errorf("invalid --after: %w", err)
+			return nil, errs.Problemf("invalid --after: %v", err)
 		}
 		q.Set("Begin", fmt.Sprintf("%d", t.Unix()))
 	}
 	if opts.Before != "" {
 		t, err := time.Parse("2006-01-02", opts.Before)
 		if err != nil {
-			return nil, fmt.Errorf("invalid --before: %w", err)
+			return nil, errs.Problemf("invalid --before: %v", err)
 		}
 		q.Set("End", fmt.Sprintf("%d", t.Unix()))
 	}

@@ -31,7 +31,7 @@ func StatusFromFlag(s string) (int, error) {
 	case "decline":
 		return partstatDeclined, nil
 	}
-	return 0, fmt.Errorf("invalid --status %q (use: accept, tentative, decline)", s)
+	return 0, errs.Problemf("invalid --status %q (use: accept, tentative, decline)", s)
 }
 
 // partstatICS maps an ATTENDEE_STATUS_API value to its iCal PARTSTAT verb.

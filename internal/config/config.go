@@ -25,6 +25,7 @@ import (
 	"github.com/roman-16/proton-cli/internal/confirm"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/profile"
+	"github.com/roman-16/proton-cli/internal/runlog"
 	"github.com/roman-16/proton-cli/internal/ui"
 )
 
@@ -57,6 +58,7 @@ type Settings struct {
 	FullIDs       *bool            `yaml:"full-ids"`
 	NoColor       *bool            `yaml:"no-color"`
 	NoInput       *bool            `yaml:"no-input"`
+	NoLog         *bool            `yaml:"no-log"`
 	NoUpdateCheck *bool            `yaml:"no-update-check"`
 	Confirm       confirm.Document `yaml:"confirm"`
 }
@@ -126,6 +128,7 @@ type Flags struct {
 	FullIDs  *bool
 	NoColor  *bool
 	NoInput  *bool
+	NoLog    *bool
 }
 
 // Resolved is the settled answer for one invocation.
@@ -140,6 +143,7 @@ type Resolved struct {
 	FullIDs       bool
 	NoColor       bool
 	NoInput       bool
+	NoLog         bool
 	NoUpdateCheck bool
 	Confirm       confirm.Policy
 }
@@ -190,6 +194,7 @@ func Resolve(f *File, flags Flags) (Resolved, error) {
 		FullIDs:       firstSet(flags.FullIDs, nil, scoped.FullIDs, global.FullIDs),
 		NoColor:       firstSet(flags.NoColor, present("NO_COLOR"), scoped.NoColor, global.NoColor),
 		NoInput:       firstSet(flags.NoInput, present("PROTON_NO_INPUT"), scoped.NoInput, global.NoInput),
+		NoLog:         firstSet(flags.NoLog, present(NoLogVar), scoped.NoLog, global.NoLog),
 		NoUpdateCheck: firstSet(nil, present("PROTON_NO_UPDATE_CHECK"), scoped.NoUpdateCheck, global.NoUpdateCheck),
 		Confirm:       policy,
 	}, nil
@@ -221,6 +226,19 @@ func resolveZone(global, scoped Settings, flag string) (string, error) {
 
 // ConfirmVar carries the one-line form of the policy.
 const ConfirmVar = "PROTON_CONFIRM"
+
+// NoLogVar turns off the diagnostic log, following the NO_COLOR convention: set
+// to anything at all, even nothing, it means no.
+const NoLogVar = "PROTON_NO_LOG"
+
+// LogDir is where the diagnostic log lives, inside Dir.
+func LogDir() (string, error) {
+	dir, err := Dir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, runlog.DirName), nil
+}
 
 // resolveConfirm gathers the four places a policy can be declared.
 //

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"log/slog"
 	"sort"
 
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
@@ -133,17 +134,25 @@ func (s *Service) itemKeys(ctx context.Context, shareID, itemID string) (map[int
 		return nil, err
 	}
 	out := make(map[int][]byte, len(r.Keys.Keys))
+	// Recorded and not counted: the caller refuses outright when none of them
+	// opens, so nothing is being hidden - the log is here to say which of the
+	// rotations was the problem.
 	for _, k := range r.Keys.Keys {
 		shareKey, ok := sk.keys[k.KeyRotation]
 		if !ok {
+			slog.DebugContext(ctx, "pass: no share key for an item key's rotation",
+				"item", itemID, "count", k.KeyRotation)
 			continue
 		}
 		sealed, err := base64.StdEncoding.DecodeString(k.Key)
 		if err != nil {
+			slog.DebugContext(ctx, "pass: an item key is not base64", "item", itemID, "error", err)
 			continue
 		}
 		key, err := aead.Decrypt(shareKey, sealed, []byte(aead.TagItemKey))
 		if err != nil {
+			slog.DebugContext(ctx, "pass: an item key will not open with its share key",
+				"item", itemID, "error", err)
 			continue
 		}
 		out[k.KeyRotation] = key

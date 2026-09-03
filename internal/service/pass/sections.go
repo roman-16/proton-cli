@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/otp"
 	pb "github.com/roman-16/proton-cli/internal/service/pass/proto"
 )
@@ -58,24 +59,24 @@ func parseExtraField(raw string, kind fieldKind) (extraField, error) {
 	flag := kind.flag()
 	name, value, ok := strings.Cut(raw, "=")
 	if !ok {
-		return extraField{}, fmt.Errorf("invalid --%s %q (expected NAME=VALUE, or SECTION%sNAME=VALUE)",
+		return extraField{}, errs.Problemf("invalid --%s %q (expected NAME=VALUE, or SECTION%sNAME=VALUE)",
 			flag, raw, sectionSeparator)
 	}
 	f := extraField{name: strings.TrimSpace(name), value: value, kind: kind}
 	if section, rest, split := strings.Cut(f.name, sectionSeparator); split {
 		f.section, f.name = strings.TrimSpace(section), strings.TrimSpace(rest)
 		if f.section == "" {
-			return extraField{}, fmt.Errorf("invalid --%s %q (the section has no name)", flag, raw)
+			return extraField{}, errs.Problemf("invalid --%s %q (the section has no name)", flag, raw)
 		}
 	}
 	if f.name == "" {
-		return extraField{}, fmt.Errorf("invalid --%s %q (the field has no name)", flag, raw)
+		return extraField{}, errs.Problemf("invalid --%s %q (the field has no name)", flag, raw)
 	}
 	// A two-factor secret nothing can read is a field that will never produce a
 	// code, and whether it can be read is plain from the value itself.
 	if f.kind == fieldTOTP {
 		if _, err := otp.Parse(f.value); err != nil {
-			return extraField{}, fmt.Errorf("invalid --%s %q: %v", flag, raw, err)
+			return extraField{}, errs.Problemf("invalid --%s %q: %v", flag, raw, err)
 		}
 	}
 	return f, nil

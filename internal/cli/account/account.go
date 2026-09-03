@@ -191,7 +191,7 @@ func logoutCmd() *cobra.Command {
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			targets := []profile.Name{c.App.Profile}
 			if all {
-				profiles, err := session.Profiles()
+				profiles, err := session.Profiles(c.Ctx)
 				if err != nil {
 					return err
 				}

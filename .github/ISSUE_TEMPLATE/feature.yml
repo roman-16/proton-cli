@@ -1,0 +1,33 @@
+name: Feature request
+description: Something proton should be able to do
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        proton mirrors what Proton's own web clients let you do, rather than everything their API exposes. If the official web app cannot do it either, it is probably out of scope - say so and make the case anyway.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What you want to do
+      description: The task, not the flag. What are you trying to get done?
+    validations:
+      required: true
+
+  - type: input
+    id: web
+    attributes:
+      label: Where this lives in Proton's own clients
+      description: The page or menu in Proton Mail, Drive, Calendar, Pass or Contacts that does this today.
+    validations:
+      required: false
+
+  - type: textarea
+    id: shape
+    attributes:
+      label: The command you would want to type
+      description: A guess is fine. It says more about the shape than a paragraph does.
+      render: console
+    validations:
+      required: false

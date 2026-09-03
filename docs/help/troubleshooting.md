@@ -14,11 +14,81 @@ Errors say what happened and what to try, so read the message first. The code is
 | `4` | Ambiguous, or a conflict | Narrow the term, or use the ID it printed |
 | `5` | Network or server problem | Wait and retry. This is not your command's fault |
 | `6` | Refused by your confirmation policy | Nothing about the command was wrong. The policy has to change |
+| `7` | A bug in proton | Nothing you typed caused it. [Report it](#reporting-a-bug) |
 | `130` | Cancelled with Ctrl+C | Nothing to do |
 
 The difference between `2` and `5` matters most to a scheduled job. `2` means fix the credential; `5` means come back later. A rate limit is `5`.
 
 `6` is the one code that retrying never helps. See [Deny](../using/confirmations.md#deny).
+
+`7` means a failure proton never anticipated: no message was written for it, because nobody expected it. It says so on the screen, and it is worth reporting whatever else you do about it.
+
+```console
+$ proton mail messages list
+Error: None of your addresses' keys could be opened.
+Try:   proton report   (this looks like a bug in proton, not something you did)
+```
+
+## Reporting a bug
+
+```console
+$ proton report
+```
+
+That prints everything a fix needs: the version, the platform, how it was installed, your settings, and what the run that failed actually did, request by request. Paste it into an [issue](https://github.com/roman-16/proton-cli/issues/new). To attach it as a file instead, `proton report --dest bug.txt`.
+
+**You do not have to reproduce anything.** Every run records what it did, so the failure you just hit is already written down. `proton report` picks the last run that failed - or `--all` for every run still on disk. See [the diagnostic log](../using/settings.md#the-diagnostic-log) for what is kept and how to turn it off.
+
+**It is safe to post.** Addresses, IDs, filenames, search terms and tokens never enter the log. An address is written as a stand-in like `address:3f9c1e@proton.me`, the same way every time, so a reader can follow which of your addresses failed without learning whose it is. It goes to stdout rather than straight to a file so that you can read it first.
+
+A crash is the same story with fewer words:
+
+```console
+$ proton drive items list
+Error: proton crashed. This is a bug.
+Try:   proton report
+```
+
+The stack trace is not printed - it says nothing to you. It is in the log, and `report` carries it.
+
+## A listing is missing something
+
+```console
+$ proton pass items list --vault Work
+NAME                  TYPE    VAULT    MODIFIED
+aws-root              login   Work     2026-08-30 11:02
+github.com            login   Work     2026-08-14 09:41
+41 items.
+⚠ 1 item could not be decrypted and is not listed.
+  This is a bug or damaged data - `proton report` has the details.
+```
+
+Everything decrypts on your machine, one item at a time, and one that will not open is no reason to refuse the other forty-one. So the listing carries on and then says it is short. The exit code stays `0`: the command answered, just not completely.
+
+In a machine format the same fact is a field, because a script never sees a warning:
+
+```console
+$ proton pass items list --vault Work --output json | jq .skipped
+1
+```
+
+`skipped` is absent when nothing was skipped. A container says what went with it, since how much was inside is exactly what could not be read:
+
+```console
+⚠ 1 vault could not be opened, so nothing inside it is listed.
+⚠ 1 folder could not be opened, so nothing inside it is listed.
+```
+
+The same tally answers a puzzling `get`, where an item that cannot be read is otherwise indistinguishable from one that was never there:
+
+```console
+$ proton pass items get stripe-live
+Error: No item matching "stripe-live".
+Try:   1 item could not be decrypted and is not listed.
+       proton report
+```
+
+Run `proton report` and open an issue. This is not something you can fix from the command line, and it is not your data being gone - it is proton failing to open something Proton still holds.
 
 ## The config file is refused
 
@@ -214,6 +284,12 @@ The exception is the `■` beside a label, folder, calendar or group. That hex i
 
 ## Still stuck
 
-Run the command again with `--log-level debug` and open an [issue](https://github.com/roman-16/proton-cli/issues) with what it printed. Redact the IDs and addresses you would rather not publish; none of them are needed to reproduce a bug.
+```console
+$ proton report
+```
+
+Paste it into an [issue](https://github.com/roman-16/proton-cli/issues/new). Nothing to reproduce and nothing to redact by hand - see [Reporting a bug](#reporting-a-bug).
+
+To watch a run as it happens instead, `--log-level debug` puts on the screen what the log is recording anyway. It is redacted the same way, so it is safe to paste too.
 
 Please do not report a **security** issue in a public issue. [`SECURITY.md`](https://github.com/roman-16/proton-cli/blob/main/SECURITY.md) has the private channels.

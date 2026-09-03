@@ -10,6 +10,7 @@ import (
 	"github.com/roman-16/proton-cli/internal/account/keys"
 	"github.com/roman-16/proton-cli/internal/fetch"
 	"github.com/roman-16/proton-cli/internal/proton"
+	"github.com/roman-16/proton-cli/internal/skip"
 )
 
 type Service struct {
@@ -94,6 +95,7 @@ func (s *Service) fetchShares(ctx context.Context) ([]Share, error) {
 			ContentKeyRotation int
 		}
 		if err := json.Unmarshal(r, &sh); err != nil {
+			skip.Record(ctx, skip.KindVault, "", skip.Malformed, err)
 			continue
 		}
 		out = append(out, Share{
@@ -147,15 +149,18 @@ func (s *Service) decryptShareKeys(ctx context.Context, shareID string) (*shareK
 				KeyRotation int
 			}
 			if err := json.Unmarshal(raw, &k); err != nil {
+				skip.Record(ctx, skip.KindKey, shareID, skip.Malformed, err)
 				continue
 			}
 			kb, err := base64.StdEncoding.DecodeString(k.Key)
 			if err != nil {
+				skip.Record(ctx, skip.KindKey, shareID, skip.Malformed, err)
 				continue
 			}
 			msg := pgp.NewPGPMessage(kb)
 			dec, err := u.UserKR.Decrypt(msg, u.UserKR, pgp.GetUnixTime())
 			if err != nil {
+				skip.Record(ctx, skip.KindKey, shareID, skip.Undecryptable, err)
 				continue
 			}
 			out.keys[k.KeyRotation] = dec.GetBinary()

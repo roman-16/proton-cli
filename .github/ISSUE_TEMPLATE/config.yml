@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security issue
+    url: https://github.com/roman-16/proton-cli/security/advisories/new
+    about: Report a vulnerability privately. Never in a public issue.
+  - name: Question or idea
+    url: https://github.com/roman-16/proton-cli/discussions
+    about: For anything that is not a bug or a specific feature request.
+  - name: Documentation
+    url: https://proton-cli.lerchster.dev
+    about: Every command, every flag, and what to do when one fails.

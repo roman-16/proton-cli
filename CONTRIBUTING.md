@@ -107,7 +107,7 @@ just test                            # every test that runs on the two free acco
 just test-all                        # those, then the ones needing a paid plan
 ```
 
-`just login` and `just seed` sign the accounts in and fill them, for working with them by hand.
+`just login` signs every test account in - it needs a terminal, because Proton may ask for a CAPTCHA and only a person can answer one - and `just seed` fills the two free ones.
 
 The secondary account carries the modes nothing else would reach: it is in Proton's two-password mode, and its Pass is protected with an extra password. Both of its extra secrets are as required as its password, and the suite fails to start without them.
 

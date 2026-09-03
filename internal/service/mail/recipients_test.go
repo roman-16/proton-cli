@@ -1,6 +1,7 @@
 package mail
 
 import (
+	"context"
 	"testing"
 
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
@@ -118,7 +119,7 @@ func TestPlanPinnedRecipient(t *testing.T) {
 
 	t.Run("external no server key encrypts to pinned key (PGP/MIME)", func(t *testing.T) {
 		pin := &PinnedRecipient{ArmoredKeys: []string{pubA}, SignatureVerified: true}
-		p, err := planPinnedRecipient("bob@ext.com", schemeClear, "", pin)
+		p, err := planPinnedRecipient(context.Background(), "bob@ext.com", schemeClear, "", pin)
 		if err != nil {
 			t.Fatalf("planPinnedRecipient: %v", err)
 		}
@@ -132,7 +133,7 @@ func TestPlanPinnedRecipient(t *testing.T) {
 
 	t.Run("pgp-inline scheme selects the inline path", func(t *testing.T) {
 		pin := &PinnedRecipient{ArmoredKeys: []string{pubA}, Scheme: "pgp-inline", SignatureVerified: true}
-		p, err := planPinnedRecipient("bob@ext.com", schemeClear, "", pin)
+		p, err := planPinnedRecipient(context.Background(), "bob@ext.com", schemeClear, "", pin)
 		if err != nil {
 			t.Fatalf("planPinnedRecipient: %v", err)
 		}
@@ -147,7 +148,7 @@ func TestPlanPinnedRecipient(t *testing.T) {
 	t.Run("internal recipient uses pinned copy of the primary key", func(t *testing.T) {
 		// The primary API key is pinned (same key material), so we send to it.
 		pin := &PinnedRecipient{ArmoredKeys: []string{pubA}, SignatureVerified: true}
-		p, err := planPinnedRecipient("alice@proton.me", schemeInternal, pubA, pin)
+		p, err := planPinnedRecipient(context.Background(), "alice@proton.me", schemeInternal, pubA, pin)
 		if err != nil {
 			t.Fatalf("planPinnedRecipient: %v", err)
 		}
@@ -158,21 +159,21 @@ func TestPlanPinnedRecipient(t *testing.T) {
 
 	t.Run("internal recipient whose primary key is not pinned errors", func(t *testing.T) {
 		pin := &PinnedRecipient{ArmoredKeys: []string{pubB}, SignatureVerified: true}
-		if _, err := planPinnedRecipient("alice@proton.me", schemeInternal, pubA, pin); err == nil {
+		if _, err := planPinnedRecipient(context.Background(), "alice@proton.me", schemeInternal, pubA, pin); err == nil {
 			t.Error("expected PRIMARY_NOT_PINNED-style error when the primary key is not pinned")
 		}
 	})
 
 	t.Run("unverified contact signature refuses to send", func(t *testing.T) {
 		pin := &PinnedRecipient{ArmoredKeys: []string{pubA}, SignatureVerified: false}
-		if _, err := planPinnedRecipient("bob@ext.com", schemeClear, "", pin); err == nil {
+		if _, err := planPinnedRecipient(context.Background(), "bob@ext.com", schemeClear, "", pin); err == nil {
 			t.Error("expected an error for an unverified contact signature")
 		}
 	})
 
 	t.Run("no parseable pinned key errors", func(t *testing.T) {
 		pin := &PinnedRecipient{ArmoredKeys: []string{"not-a-key"}, SignatureVerified: true}
-		if _, err := planPinnedRecipient("bob@ext.com", schemeClear, "", pin); err == nil {
+		if _, err := planPinnedRecipient(context.Background(), "bob@ext.com", schemeClear, "", pin); err == nil {
 			t.Error("expected an error when no pinned key is valid for sending")
 		}
 	})

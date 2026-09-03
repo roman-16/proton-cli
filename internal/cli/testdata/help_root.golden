@@ -19,6 +19,7 @@ Account:
 proton itself:
   changelog   Print what each release changed
   completion  Generate a shell completion script
+  report      Collect what a bug report needs
   uninstall   Remove a curl/PowerShell-installed proton
   update      Update proton to the latest release
   version     Print the version and build information
@@ -32,6 +33,7 @@ Flags:
       --log-level string   Logging verbosity: debug, info, warn, error (env: PROTON_LOG_LEVEL)
       --no-color           Disable colored output (env: NO_COLOR)
       --no-input           Never prompt; a missing credential becomes an error (env: PROTON_NO_INPUT)
+      --no-log             Write no diagnostic log for this run (env: PROTON_NO_LOG)
   -o, --output string      Output format: text, json, yaml (default "text")
   -p, --profile string     Profile to act as (env: PROTON_PROFILE; default: default)
   -q, --quiet              Suppress non-essential stderr output

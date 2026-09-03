@@ -2,9 +2,10 @@ package mail
 
 import (
 	"context"
-	"fmt"
+	"log/slog"
 
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
 )
 
@@ -120,7 +121,7 @@ func (s *Service) planRecipient(ctx context.Context, email, eoPassword string, p
 	}
 	scheme, armored := classifyRecipient(resp, eoPassword)
 	if pin != nil && len(pin.ArmoredKeys) > 0 && pinEncrypts(pin) {
-		return planPinnedRecipient(email, scheme, armored, pin)
+		return planPinnedRecipient(ctx, email, scheme, armored, pin)
 	}
 	return plannedRecipient{email: email, scheme: scheme, armoredKey: armored}, nil
 }
@@ -166,26 +167,40 @@ func validForSending(key *pgp.Key) bool {
 //     the web client's PRIMARY_NOT_PINNED error.
 //   - external without a server/WKD key: encrypt (PGP/MIME) to the first valid
 //     pinned key.
-func planPinnedRecipient(email string, base sendScheme, apiArmored string, pin *PinnedRecipient) (plannedRecipient, error) {
+func planPinnedRecipient(ctx context.Context, email string, base sendScheme, apiArmored string, pin *PinnedRecipient) (plannedRecipient, error) {
+	// The three refusals below are about keys this account chose to pin, so each
+	// one is something the person sending can put right and none of them is a
+	// fault in this CLI. Saying so is what keeps them off the exit code that
+	// means "report this".
 	if !pin.SignatureVerified {
-		return plannedRecipient{}, fmt.Errorf(
-			"contact signature for %s could not be verified; refusing to encrypt to an unverified pinned key", email)
+		return plannedRecipient{}, errs.Problemf(
+			"The contact signature for %s could not be verified, so its pinned key is not trusted.", email).
+			Hint("open the contact in a Proton app to re-sign it, or unpin the key")
 	}
 	type pinnedKey struct{ armored, fingerprint string }
 	var valid []pinnedKey
+	// Recorded and not counted. Nothing is hidden: when no pinned key survives,
+	// the refusal below says so and the message is not sent - so the log is here
+	// to say which of the pinned keys was the problem, not to warn about a
+	// listing that came up short.
 	for _, a := range pin.ArmoredKeys {
 		key, err := pgp.NewKeyFromArmored(a)
 		if err != nil {
+			slog.DebugContext(ctx, "mail: a pinned key is not readable armour",
+				"signer", email, "error", err)
 			continue
 		}
 		if !validForSending(key) {
+			slog.DebugContext(ctx, "mail: a pinned key cannot encrypt",
+				"signer", email, "reason", "expired, revoked or not an encryption key")
 			continue
 		}
 		valid = append(valid, pinnedKey{armored: a, fingerprint: key.GetFingerprint()})
 	}
 	if len(valid) == 0 {
-		return plannedRecipient{}, fmt.Errorf(
-			"no valid pinned key for %s (keys are expired, revoked, or not encryption-capable)", email)
+		return plannedRecipient{}, errs.Problemf(
+			"No pinned key for %s can encrypt: they are expired, revoked, or not encryption keys.", email).
+			Hint("proton contacts keys unpin --email " + email)
 	}
 	switch base {
 	case schemeInternal, schemeExternalPGP:
@@ -205,9 +220,10 @@ func planPinnedRecipient(email string, base sendScheme, apiArmored string, pin *
 				return plannedRecipient{email: email, scheme: sendScheme, armoredKey: v.armored}, nil
 			}
 		}
-		return plannedRecipient{}, fmt.Errorf(
-			"the pinned key(s) for %s do not match the recipient's current primary key; "+
-				"update the pinned key before sending", email)
+		return plannedRecipient{}, errs.Problemf(
+			"The pinned key(s) for %s do not match the recipient's current primary key.", email).
+			Hint("update the pinned key before sending",
+				"proton contacts keys pin --email "+email+" --key FILE")
 	default:
 		// External recipient with no server/WKD key: encrypt to the pinned key.
 		return plannedRecipient{email: email, scheme: externalScheme(pin.Scheme), armoredKey: valid[0].armored}, nil

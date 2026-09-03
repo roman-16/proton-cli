@@ -1,6 +1,10 @@
 package selfmanage
 
-import "strings"
+import (
+	"os"
+	"path/filepath"
+	"strings"
+)
 
 // Kind classifies how a proton binary was installed, which decides whether
 // it may replace itself in place.
@@ -19,6 +23,37 @@ const (
 	// KindWinget is a winget install.
 	KindWinget
 )
+
+// String names the install channel, for the diagnostic log and the report: how
+// a binary arrived decides what fixing it looks like, so a reader has to be
+// told which of these they are looking at.
+func (k Kind) String() string {
+	switch k {
+	case KindNix:
+		return "nix"
+	case KindHomebrew:
+		return "homebrew"
+	case KindNpm:
+		return "npm"
+	case KindWinget:
+		return "winget"
+	}
+	return "standalone"
+}
+
+// Source is how the running binary arrived, asking the operating system where
+// it is. A machine that will not say answers "unknown", which is itself worth
+// knowing.
+func Source() string {
+	exe, err := os.Executable()
+	if err != nil {
+		return "unknown"
+	}
+	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
+		exe = resolved
+	}
+	return Classify(exe).String()
+}
 
 // Classify reports how proton was installed, given the resolved path of the
 // running executable (symlinks already evaluated).

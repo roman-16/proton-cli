@@ -7,7 +7,17 @@ import (
 )
 
 // ErrUnauthorized signals that auth failed and token refresh did not recover.
-var ErrUnauthorized = errors.New("unauthorized: session expired")
+//
+// It carries its own exit code rather than being recognised by the layer that
+// classifies errors. An expired session is the most ordinary failure there is,
+// and a classifier that has to know this particular value by sight is one that
+// answers "a bug in the CLI" for it the moment anything else asks the question.
+var ErrUnauthorized error = unauthorized{}
+
+type unauthorized struct{}
+
+func (unauthorized) Error() string { return "unauthorized: session expired" }
+func (unauthorized) ExitCode() int { return 2 }
 
 // NetworkError wraps a transport-level failure (DNS, connection refused, TLS,
 // timeout) where the request never received an HTTP response. It carries exit

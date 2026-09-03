@@ -12,6 +12,7 @@ import (
 
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
 	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
+	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/fetch"
 	"github.com/roman-16/proton-cli/internal/ical"
 	"github.com/roman-16/proton-cli/internal/proton"
@@ -836,7 +837,8 @@ func buildReminders(reminders []string) ([]map[string]any, error) {
 		}
 		trig, err := icalTrigger(spec)
 		if err != nil {
-			return nil, fmt.Errorf("invalid reminder %q: %w", r, err)
+			return nil, errs.Problemf("--remind %q is not a warning time: %v.", r, err).
+				Hint("a reminder is a duration before the start, like 15m, 1h or 1d")
 		}
 		out = append(out, map[string]any{"Type": kind, "Trigger": trig})
 	}

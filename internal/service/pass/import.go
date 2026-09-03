@@ -9,6 +9,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/roman-16/proton-cli/internal/errs"
 	pb "github.com/roman-16/proton-cli/internal/service/pass/proto"
 )
 
@@ -161,7 +162,7 @@ func importItem(in ExportedItem) (*pb.Item, error) {
 	// there is nothing to recreate.
 	kind := importTypeName(in.Data.Type)
 	if kind == "alias" {
-		return nil, fmt.Errorf("an alias belongs to the account that made it, so it cannot be read back")
+		return nil, errs.Problemf("An alias belongs to the account that made it, so it cannot be read back.")
 	}
 
 	content, err := importContent(kind, in.Data.Content)

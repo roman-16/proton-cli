@@ -9,6 +9,7 @@ import (
 
 	"github.com/roman-16/proton-cli/internal/ical"
 	"github.com/roman-16/proton-cli/internal/proton"
+	"github.com/roman-16/proton-cli/internal/skip"
 	"github.com/roman-16/proton-cli/internal/units"
 )
 
@@ -121,6 +122,7 @@ func (s *Service) remindersBetween(ctx context.Context, calendarIDs []string, fr
 	for _, al := range alarms {
 		event, err := load(al.CalendarID, al.EventID)
 		if err != nil {
+			skip.Record(ctx, skip.KindReminder, al.EventID, skip.Unreadable, err)
 			continue
 		}
 		r := reminderFromAlarm(al, event, now)

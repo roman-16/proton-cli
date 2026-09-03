@@ -9,6 +9,7 @@ import (
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
+	"github.com/roman-16/proton-cli/internal/skip"
 )
 
 const sigContextInviter = "drive.share-member.inviter"
@@ -227,6 +228,7 @@ func (s *Service) ResendInvite(ctx context.Context, dc *Context, path, email str
 		}
 		invites, err := s.ListOutgoingInvites(ctx, sid)
 		if err != nil {
+			skip.Record(ctx, skip.KindShare, sid, skip.Unreadable, err)
 			continue
 		}
 		for _, p := range invites {

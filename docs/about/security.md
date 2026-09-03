@@ -57,7 +57,7 @@ Reading works the other way around: content arrives encrypted, is decrypted loca
 
 **What never leaves:** your password, your second password if you have one, your key password, and your private keys.
 
-There is no telemetry, and there is nothing to turn off. proton-cli never reports a command you ran, a feature you used, or the fact that you ran it at all.
+There is no telemetry, and there is nothing to turn off. proton-cli never reports a command you ran, a feature you used, or the fact that you ran it at all. The [diagnostic log](#the-diagnostic-log) is written to your disk and read by nobody unless you run `proton report` and paste it somewhere yourself.
 
 Everything known about how the tool is used comes from counters the distribution channels publish themselves, and is [on the site](https://proton-cli.lerchster.dev/stats/) in full.
 
@@ -80,6 +80,29 @@ Two consequences:
 The caveat that matters: the file still contains the session **refresh token**, so it is not safe to share. Encryption at rest limits the damage of a leaked copy, and revoking neutralises it. Neither is a substitute for protecting the file.
 
 macOS keeps it under `~/Library/Application Support/proton-cli/`, and Windows under `%APPDATA%\proton-cli\`.
+
+## The diagnostic log
+
+Every run writes what it did to `~/.config/proton-cli/logs/`, one file per day, mode `0600`. The last 16 files are kept. `proton report` reads them back so a bug can be reported without you reproducing it, and `--no-log` or `PROTON_NO_LOG` stops it being written ([what it is for](../help/troubleshooting.md#reporting-a-bug)).
+
+It is written to be handed to a stranger, so **nothing that identifies you goes into it**. That is a property of how it is written rather than a promise about what anybody remembered to leave out: every value in a log record is written under a name, and each name has a declared policy saying what may appear for it. A name with no policy cannot be logged at all - the build fails on it.
+
+| What | How it is recorded |
+| --- | --- |
+| An email address | `address:3f9c1e@proton.me`. The local part becomes a stand-in; the domain survives only if it is one of Proton's own, and anything else becomes `@elsewhere` |
+| An ID - message, file, vault, key, share | `message:88ab02`, a stand-in under its own kind |
+| An API path | `/drive/shares/{id}/links/{id}`. The endpoint stays, the arguments go, the query string goes entirely |
+| A local file path | `<path>`. The filename does not survive |
+| A URL | The scheme, host and path shape. The query - where a verification token lives - goes |
+| An error message | Rewritten: addresses, IDs, paths and tokens inside it are replaced before it is written |
+| The command | Its path, and the **names** of the flags that were set. Never a flag's value, never a positional argument |
+| Counts, statuses, durations, endpoints | As they stand. This is what the log is read for |
+
+**Never recorded, under any name:** a password, a second password, a Pass extra password, a session token, key material, a message subject or body, a filename, a contact's details, a search term.
+
+The stand-ins are derived with HMAC-SHA256 under a 32-byte random salt at `~/.config/proton-cli/logs/salt`, mode `0600`, which never leaves the machine and is never in a report. So one address reads the same way in every line of every run here - which is what lets somebody debugging follow it - and means nothing anywhere else: the same address on another machine produces a different stand-in, and no stand-in can be turned back into an address.
+
+`--log-level debug` puts the same records on your screen, redacted the same way, so pasting terminal output is as safe as pasting a report.
 
 ## Elevated operations
 

@@ -9,6 +9,7 @@ import (
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
 	"github.com/roman-16/proton-cli/internal/account/keys"
 	"github.com/roman-16/proton-cli/internal/proton"
+	"github.com/roman-16/proton-cli/internal/skip"
 )
 
 const sigContextMember = "drive.share-member.member"
@@ -44,6 +45,7 @@ func (s *Service) ListInvitations(ctx context.Context) ([]Invitation, error) {
 		for _, inv := range r.Invitations {
 			d, err := s.invitationDetails(ctx, inv.InvitationID)
 			if err != nil {
+				skip.Record(ctx, skip.KindInvitation, inv.InvitationID, skip.Unreadable, err)
 				continue
 			}
 			out = append(out, d)

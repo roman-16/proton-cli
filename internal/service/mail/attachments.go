@@ -158,7 +158,8 @@ func assignInlineContentIDs(c *Content) error {
 			continue
 		}
 		if !c.HTML {
-			return fmt.Errorf("inline attachments need an HTML body (pass --html)")
+			return errs.Problemf("Inline attachments need an HTML body.").
+				Hint("pass --html, or attach the image with --attach instead")
 		}
 		cid, err := newContentID(c.From.Address.Email)
 		if err != nil {

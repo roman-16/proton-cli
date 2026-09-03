@@ -4,7 +4,8 @@
 //	go run ./scripts/seed                     # both accounts
 //	go run ./scripts/seed --profile primary   # one
 //	go run ./scripts/seed --stage             # and make the panel's mail the only unread
-//	go run ./scripts/seed --login             # sign in and stop
+//
+// It assumes the accounts are signed in; `just login` is what does that.
 //
 // Every datum is judged against the fixture before it is touched: absent ones
 // are made, wrong ones are replaced. Presence alone is not enough - a message
@@ -27,45 +28,26 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/roman-16/proton-cli/tests/account"
 	"github.com/roman-16/proton-cli/tests/fixture"
 )
 
-// The accounts. These variables are this program's own, not the CLI's:
-// proton takes an account from a signed-in profile, which signIn establishes.
+// accounts are the two kept for this suite and nothing else, which are the only
+// ones anything here may fill with test data.
 //
-// The secondary account is in Proton's two-password mode, so it carries a second
-// password as well: the one its keys are locked with. That is what makes signing
-// it in exercise the mode on every run. Its Pass is protected with an extra
-// password for the same reason, and that one is handed to the sign-in because a
-// session which has not answered it cannot reach Pass at all.
-var accounts = []struct{ profile, userVar, passwordVar, secondVar, extraVar string }{
-	{"primary", "PROTON_CLI_TEST_PRIMARY_USER", "PROTON_CLI_TEST_PRIMARY_PASSWORD", "", ""},
-	{"secondary", "PROTON_CLI_TEST_SECONDARY_USER", "PROTON_CLI_TEST_SECONDARY_PASSWORD", "PROTON_CLI_TEST_SECONDARY_SECOND_PASSWORD", "PROTON_CLI_TEST_SECONDARY_EXTRA_PASSWORD"},
-}
+// The seed does not sign them in. Signing in can need a person - Proton raises a
+// CAPTCHA at login, and only a browser answers one - so it is `just login`'s
+// job, and this assumes it was done. A session already in place is what every
+// command below runs on.
+var accounts = account.Free()
 
 func main() {
-	var only, stage, loginOnly = flag.String("profile", "", "act on one profile"), flag.Bool("stage", false, "make the panel's mail the only unread"), flag.Bool("login", false, "sign in and stop")
+	var only, stage = flag.String("profile", "", "act on one profile"), flag.Bool("stage", false, "make the panel's mail the only unread")
 	flag.Parse()
 
 	if err := requireCredentials(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
-	}
-	for _, a := range accounts {
-		if err := signIn(a.profile, os.Getenv(a.userVar), os.Getenv(a.passwordVar),
-			os.Getenv(a.secondVar), os.Getenv(a.extraVar)); err != nil {
-			fmt.Fprintf(os.Stderr, "sign in as %s: %v\n", a.profile, err)
-			os.Exit(1)
-		}
-	}
-	if *loginOnly {
-		out, err := run(accounts[0].profile, "account", "profiles", "list")
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
-		fmt.Print(out)
-		return
 	}
 
 	work, err := os.MkdirTemp("", "proton-cli-seed-*")
@@ -86,33 +68,33 @@ func main() {
 	r := &report{}
 	var wg sync.WaitGroup
 	for _, a := range accounts {
-		if *only != "" && *only != a.profile {
+		if *only != "" && *only != a.Profile {
 			continue
 		}
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			address := os.Getenv(a.userVar)
+			address := os.Getenv(a.User)
 			// The calendar is named before anything else, because the events pinned
 			// below are pinned in the calendar that name refers to.
-			r.calendar(a.profile)
+			r.calendar(a.Profile)
 			// Then everything the account holds, in lanes: a folder has to exist
 			// before the file in it, so collections of the same thing keep their
 			// order, while a label and a vault have nothing to do with each other.
-			lanes := lanesOf(fixture.Mailbox(work), func(c fixture.Collection) { r.reconcile(a.profile, c) })
+			lanes := lanesOf(fixture.Mailbox(work), func(c fixture.Collection) { r.reconcile(a.Profile, c) })
 			lanes = append(lanes,
-				func() { r.photos(a.profile, work) },
+				func() { r.photos(a.Profile, work) },
 				func() {
-					if *stage && a.profile == "primary" {
-						r.stage(a.profile, address, work)
+					if *stage && a.Profile == "primary" {
+						r.stage(a.Profile, address, work)
 						return
 					}
-					r.mail(a.profile, address, work)
+					r.mail(a.Profile, address, work)
 				},
 			)
 			runLanes(lanes)
 			// Last, because a sweep puts things in the trash it then empties.
-			r.empty(a.profile)
+			r.empty(a.Profile)
 		}()
 	}
 	wg.Wait()
@@ -177,14 +159,7 @@ func runLanes(lanes []func()) {
 func requireCredentials() error {
 	var missing []string
 	for _, a := range accounts {
-		wanted := []string{a.userVar, a.passwordVar}
-		if a.secondVar != "" {
-			wanted = append(wanted, a.secondVar)
-		}
-		if a.extraVar != "" {
-			wanted = append(wanted, a.extraVar)
-		}
-		for _, v := range wanted {
+		for _, v := range a.Secrets() {
 			if os.Getenv(v) == "" {
 				missing = append(missing, v)
 			}
@@ -195,54 +170,6 @@ func requireCredentials() error {
 			strings.Join(missing, " "))
 	}
 	return nil
-}
-
-// signIn attaches an account to its profile. Signing in again as the same
-// account does nothing, so this costs a read once a session exists.
-//
-// Every secret but the one that signs in goes in a file rather than down the same
-// pipe: standard input has one reader, and each of these is an answer of its own.
-func signIn(profile, address, password, second, extra string) error {
-	args := []string{"account", "login", "--user", address, "--password-stdin"}
-	for _, secret := range []struct{ kind, flag, value string }{
-		{"second", "--second-password-file", second},
-		{"extra", "--extra-password-file", extra},
-	} {
-		if secret.value == "" {
-			continue
-		}
-		file, err := secretFile(profile, secret.kind, secret.value)
-		if err != nil {
-			return err
-		}
-		defer func() { _ = os.Remove(file) }()
-		args = append(args, secret.flag, file)
-	}
-	cmd := command(profile, args...)
-	cmd.Stdin = strings.NewReader(password)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("%s", firstLine(strings.TrimSpace(string(out))))
-	}
-	return nil
-}
-
-// secretFile puts one of a sign-in's secrets somewhere only this user can read it.
-func secretFile(profile, kind, value string) (string, error) {
-	f, err := os.CreateTemp("", "proton-cli-"+profile+"-"+kind+"-*")
-	if err != nil {
-		return "", err
-	}
-	name := f.Name()
-	if err := f.Chmod(0o600); err != nil {
-		_ = f.Close()
-		return "", err
-	}
-	if _, err := f.WriteString(value); err != nil {
-		_ = f.Close()
-		return "", err
-	}
-	return name, f.Close()
 }
 
 func writeFiles(work string) error {
@@ -293,7 +220,7 @@ func writePhotos(work string) error {
 // across seeds what only exists between the two accounts: what the sharing,
 // cross-account delivery and invitation tests look for.
 func (r *report) across(work string) {
-	from, to := os.Getenv(accounts[0].userVar), os.Getenv(accounts[1].userVar)
+	from, to := os.Getenv(accounts[0].User), os.Getenv(accounts[1].User)
 	fmt.Println("between the two")
 
 	found, err := fixture.Rows(seedRunner, "secondary", "mail", "messages", "list", "--subject", "Trip photos", "--folder", "inbox", "--page-size", "1")

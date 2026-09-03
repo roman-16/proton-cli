@@ -11,6 +11,5 @@ package tests
 
 const paidBuild = false
 
-func signInPaid()       {}
 func snapshotPaid()     {}
 func comparePaid() bool { return true }

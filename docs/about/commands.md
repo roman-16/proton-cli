@@ -247,6 +247,7 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton pass vaults update`](../pass/vaults.md#update) | Rename a vault, or change how it looks |
 | [`proton changelog`](../proton.md#changelog) | Print what each release changed |
 | [`proton completion`](../proton.md#completion) | Generate a shell completion script |
+| [`proton report`](../proton.md#report) | Collect what a bug report needs |
 | [`proton uninstall`](../proton.md#uninstall) | Remove a curl/PowerShell-installed proton |
 | [`proton update`](../proton.md#update) | Update proton to the latest release |
 | [`proton version`](../proton.md#version) | Print the version and build information |
@@ -264,6 +265,7 @@ These are declared on the root, so any command takes them and they mean the same
 | `--log-level string` | Logging verbosity: debug, info, warn, error (env: PROTON_LOG_LEVEL) |
 | `--no-color` | Disable colored output (env: NO_COLOR) |
 | `--no-input` | Never prompt; a missing credential becomes an error (env: PROTON_NO_INPUT) |
+| `--no-log` | Write no diagnostic log for this run (env: PROTON_NO_LOG) |
 | `-o, --output string` | Output format: text, json, yaml (default "text") |
 | `-p, --profile string` | Profile to act as (env: PROTON_PROFILE; default: default) |
 | `-q, --quiet` | Suppress non-essential stderr output |

@@ -120,8 +120,9 @@ var Verbs = map[string]string{
 
 	// The tool itself
 	"changelog":  "print what each release changed",
+	"report":     "collect what a bug report needs",
 	"uninstall":  "remove " + Program,
-	"version":    "report the build",
+	"version":    "print the build",
 	"completion": "emit a shell completion script",
 	"api":        "send a raw authenticated request",
 }

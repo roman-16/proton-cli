@@ -8,14 +8,17 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"unicode"
 
 	"github.com/roman-16/proton-cli/internal/cli/kit"
 	"github.com/roman-16/proton-cli/internal/config"
+	"github.com/roman-16/proton-cli/internal/redact"
 	"github.com/roman-16/proton-cli/internal/ui"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -1016,6 +1019,168 @@ func TestNoCommandRedefinesConsent(t *testing.T) {
 	}
 }
 
+// ── rule 14: nothing is logged under a name nobody declared ──
+
+// The diagnostic log is written to be handed to a stranger, and every attribute
+// in it is redacted according to a policy declared for its name. So a name with
+// no policy is a value nobody decided about, which is how an address ends up in
+// a file somebody attaches to a public issue.
+//
+// This reads every log call in the tree and checks its attribute names against
+// redact.Fields. The handler refuses an undeclared name at run time as well -
+// this is the half that says so before anybody ships it.
+func TestNothingIsLoggedUnderAnUndeclaredName(t *testing.T) {
+	for _, call := range logCalls(t, []string{".."}) {
+		for _, name := range call.names {
+			if !redact.Declared(name) {
+				t.Errorf("%s:%d logs under %q, which redact.Fields declares no policy for",
+					call.file, call.line, name)
+			}
+		}
+	}
+}
+
+// And the other direction: the vocabulary holds the names in use and no others.
+//
+// A policy for a name nothing writes is a decision nobody has had to make,
+// carrying the authority of one that somebody did. Left alone it accumulates -
+// this caught five entries describing records that were never written - and a
+// reader can no longer tell the declarations that hold from the ones that are
+// aspirations.
+func TestTheLogVocabularyHoldsOnlyWhatIsWritten(t *testing.T) {
+	written := map[string]bool{}
+	for _, call := range logCalls(t, []string{".."}) {
+		for _, name := range call.names {
+			written[name] = true
+		}
+	}
+	for name := range redact.Fields {
+		if !written[name] {
+			t.Errorf("redact.Fields declares %q and nothing logs under it; "+
+				"declare a name when you write one", name)
+		}
+	}
+}
+
+// logCall is one log statement and the attribute names it writes.
+type logCall struct {
+	file  string
+	line  int
+	names []string
+}
+
+// logCalls finds every Debug/Info/Warn/Error call and reads the attribute names
+// off it.
+//
+// Only the literal names are read: slog takes alternating key/value pairs, so
+// the keys are the even arguments, and a key that is not a literal string is a
+// key nobody can check. Those are reported too, under a name that is declared
+// nowhere on purpose.
+func logCalls(t *testing.T, dirs []string) []logCall {
+	t.Helper()
+	var out []logCall
+	levels := map[string]bool{"Debug": true, "Info": true, "Warn": true, "Error": true,
+		"DebugContext": true, "InfoContext": true, "WarnContext": true, "ErrorContext": true}
+	fset := token.NewFileSet()
+	for _, dir := range dirs {
+		err := filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
+			if err != nil || d.IsDir() || !strings.HasSuffix(p, ".go") || strings.HasSuffix(p, "_test.go") {
+				return err
+			}
+			file, perr := parser.ParseFile(fset, p, nil, parser.SkipObjectResolution)
+			if perr != nil {
+				return nil
+			}
+			ast.Inspect(file, func(n ast.Node) bool {
+				call, ok := n.(*ast.CallExpr)
+				if !ok {
+					return true
+				}
+				sel, ok := call.Fun.(*ast.SelectorExpr)
+				if !ok || !levels[sel.Sel.Name] || !logReceiver(sel.X) {
+					return true
+				}
+				// The message, and a context before it for the Context variants,
+				// come first; the attributes are pairs after that.
+				start := 1
+				if strings.HasSuffix(sel.Sel.Name, "Context") {
+					start = 2
+				}
+				entry := logCall{file: filepath.ToSlash(p), line: fset.Position(call.Pos()).Line}
+				for i := start; i < len(call.Args); i += 2 {
+					lit, ok := call.Args[i].(*ast.BasicLit)
+					if !ok || lit.Kind != token.STRING {
+						entry.names = append(entry.names, "<not a literal name>")
+						continue
+					}
+					name, uerr := strconv.Unquote(lit.Value)
+					if uerr == nil {
+						entry.names = append(entry.names, name)
+					}
+				}
+				if len(entry.names) > 0 {
+					out = append(out, entry)
+				}
+				return true
+			})
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("walk %s: %v", dir, err)
+		}
+	}
+	return out
+}
+
+// logReceiver reports whether what is being called looks like a logger: the
+// slog package, or a field named for one.
+func logReceiver(x ast.Expr) bool {
+	switch v := x.(type) {
+	case *ast.Ident:
+		return v.Name == "slog" || v.Name == "log"
+	case *ast.SelectorExpr:
+		return v.Sel.Name == "log" || v.Sel.Name == "Log" || v.Sel.Name == "Trace"
+	}
+	return false
+}
+
+// ── rule 15: an error is never dropped on the floor ──
+
+// A loop that decrypts cannot stop at the first item it fails to open: one
+// damaged item is no reason to refuse the other forty-one. But carrying on
+// silently is how a listing comes to under-report and exit zero, which is a
+// wrong answer presented as a right one - and it took thirty instances of this
+// exact three-line shape before anybody noticed.
+//
+// So a skipped item is recorded: counted on the invocation where a listing can
+// warn about it, or at minimum written to the log where a report can find it.
+// This finds the shape and checks that something was said.
+func TestNoErrorIsSkippedInSilence(t *testing.T) {
+	srcs := []string{"../service", "../account"}
+	swallow := regexp.MustCompile(`(?m)err\s*!=\s*nil\s*\{\n\s*continue\n`)
+	for _, dir := range srcs {
+		err := filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
+			if err != nil || d.IsDir() || !strings.HasSuffix(p, ".go") || strings.HasSuffix(p, "_test.go") {
+				return err
+			}
+			src, rerr := os.ReadFile(p)
+			if rerr != nil {
+				return rerr
+			}
+			for _, loc := range swallow.FindAllStringIndex(string(src), -1) {
+				line := 1 + strings.Count(string(src[:loc[0]]), "\n")
+				t.Errorf("%s:%d skips an item without recording why; "+
+					"call skip.Record so a listing can say it is short, or log it",
+					filepath.ToSlash(p), line)
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("walk %s: %v", dir, err)
+		}
+	}
+}
+
 // ── helpers ──
 
 // grepGo returns the non-test Go files under the given directories whose source
@@ -1079,12 +1244,25 @@ var layers = map[string][]string{
 	// wrongly, and the alternative to borrowing that is restating it - which is
 	// precisely what produced listings whose rows the next command rejected.
 	// ref is a leaf over errs, so this is a downward import and not an inversion.
-	"ui":       {"units", "progress", "errs", "ref"},
+	// ui reaches redact for the reason it reaches ref: it writes the diagnostic
+	// log, and what may be written in one is declared in redact rather than
+	// restated by each handler. Putting the policy above every destination is
+	// what makes "the log holds nothing sensitive" one rule instead of two.
+	"ui":       {"units", "progress", "errs", "ref", "redact"},
 	"proton":   {"errs", "crypto/aead", "hv", "hv/hvexit"},
 	"errs":     {},
 	"units":    {},
 	"progress": {},
 	"mailtext": {},
+	// redact reaches ref for the reason ui does: it decides which part of an API
+	// path names a thing rather than an endpoint, and what a Proton ID looks like
+	// is declared where references are read and written. A rule of thumb here
+	// instead would disagree with that one, and did.
+	"redact": {"ref"},
+	// skip logs through the package-level logger and counts on the context, so it
+	// needs nothing of ours. That is what lets every service reach it.
+	"skip":   {},
+	"runlog": {},
 	// idcache reaches ref for the reason ui does: it stores whole IDs and answers
 	// short ones, and how the two relate belongs where the notation is declared
 	// rather than restated here.

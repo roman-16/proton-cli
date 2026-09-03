@@ -7,8 +7,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"strings"
 	"syscall"
 
@@ -47,6 +49,7 @@ type globalFlags struct {
 	fullIDs    bool
 	noColor    bool
 	noInput    bool
+	noLog      bool
 	verified   string
 	zone       string
 }
@@ -75,6 +78,7 @@ func (g *globalFlags) settings(pf *pflag.FlagSet) config.Flags {
 		FullIDs:  said("full-ids", g.fullIDs),
 		NoColor:  said("no-color", g.noColor),
 		NoInput:  said("no-input", g.noInput),
+		NoLog:    said("no-log", g.noLog),
 	}
 }
 
@@ -121,6 +125,8 @@ func newRoot() *cobra.Command {
 	pf.BoolVar(&g.fullIDs, "full-ids", false, "Show full IDs in interactive output (default: shortened to 8 chars on TTY)")
 	pf.BoolVar(&g.noColor, "no-color", false, "Disable colored output (env: NO_COLOR)")
 	pf.BoolVar(&g.noInput, "no-input", false, "Never prompt; a missing credential becomes an error (env: PROTON_NO_INPUT)")
+	pf.BoolVar(&g.noLog, "no-log", false,
+		"Write no diagnostic log for this run (env: "+config.NoLogVar+")")
 	pf.StringVar(&g.verified, "verified", "",
 		"A human verification already solved, as the refusal printed it (env: PROTON_VERIFIED)")
 	pf.StringVar(&g.zone, "zone", "",
@@ -169,6 +175,7 @@ func newRoot() *cobra.Command {
 		newCtx := app.WithApp(cmd.Context(), a)
 		cmd.SetContext(newCtx)
 		root.SetContext(newCtx)
+		a.Began(cmd)
 		return nil
 	}
 
@@ -189,8 +196,8 @@ func newRoot() *cobra.Command {
 	}
 	add(kit.GroupApps, mailcmd.New(), drivecmd.New(), calendarcmd.New(), contactscmd.New(), passcmd.New())
 	add(kit.GroupAccount, accountcmd.New(), apicmd.New())
-	add(kit.GroupSelf, selfcmd.ChangelogCmd(), selfcmd.UpdateCmd(version), selfcmd.UninstallCmd(),
-		selfcmd.VersionCmd(version), completionCmd(root))
+	add(kit.GroupSelf, selfcmd.ChangelogCmd(), selfcmd.ReportCmd(version), selfcmd.UpdateCmd(version),
+		selfcmd.UninstallCmd(), selfcmd.VersionCmd(version), completionCmd(root))
 
 	attachExamples(root)
 	installHelp(root)
@@ -212,9 +219,19 @@ func Execute() {
 	}
 
 	root := newRoot()
+	// A crash is the failure a report is most needed for and the one the person
+	// who hit it can say least about, so it is caught here: the stack goes to the
+	// run's log, where a report will find it, and the screen gets a sentence
+	// instead of forty lines of goroutine.
+	defer func() {
+		if value := recover(); value != nil {
+			os.Exit(crashed(os.Stderr, root, value, debug.Stack()))
+		}
+	}()
+
 	cmd, err := root.ExecuteContextC(ctx)
 	if err == nil {
-		announce(cmd)
+		finish(root, cmd, 0, nil)
 		return
 	}
 	// A signal is the user changing their mind. A deadline is the request running
@@ -222,7 +239,7 @@ func Execute() {
 	// "Cancelled." there would blame the user for a stalled connection.
 	if ctx.Err() != nil || errors.Is(err, context.Canceled) {
 		fmt.Fprintln(os.Stderr, "\nCancelled.")
-		os.Exit(130)
+		os.Exit(finish(root, cmd, 130, err))
 	}
 	// A human verification that reaches here was never answered, and what to do
 	// about it depends on why. It becomes an ordinary refusal so that it is
@@ -232,8 +249,52 @@ func Execute() {
 		err = hvFinalError(hvErr, app.FromOrNil(root.Context()))
 	}
 	ui.WriteError(os.Stderr, rewrapFlagError(err, os.Args), errorStyle(root), shortIDs(root))
+	invite(os.Stderr, root, err)
+	os.Exit(finish(root, cmd, exitCode(err), err))
+}
+
+// finish records how the run came out and returns its exit code.
+//
+// It is called on the way out rather than deferred, because os.Exit runs no
+// deferred function and the whole point of the record is that it survives the
+// run that needed it.
+func finish(root *cobra.Command, cmd *cobra.Command, code int, err error) int {
 	announce(cmd)
-	os.Exit(exitCode(err))
+	if a := app.FromOrNil(root.Context()); a != nil {
+		a.Ended(code, err)
+	}
+	return code
+}
+
+// crashed reports a panic as the bug it is.
+//
+// The stack is not printed. It says nothing to the person who hit it, and the
+// one reader it does help is reached by `report` - which is the only thing this
+// screen has to say.
+func crashed(w io.Writer, root *cobra.Command, value any, stack []byte) int {
+	a := app.FromOrNil(root.Context())
+	if a != nil {
+		a.Crashed(value, stack)
+	}
+	ui.WriteError(w, errs.Problemf("%s crashed. This is a bug.", kit.Program).
+		Hint(kit.Program+" report").Exit(errs.ExitBug), errorStyle(root), shortIDs(root))
+	if a != nil {
+		a.Ended(errs.ExitBug, fmt.Errorf("panic: %v", value))
+	}
+	return errs.ExitBug
+}
+
+// invite asks for a report, for the failures that are worth one.
+//
+// Only for those: a line saying "this might be a bug" under every mistyped flag
+// is a line nobody reads by the second week, and the whole value of this one is
+// that it appears when something really did go wrong here rather than there.
+func invite(w io.Writer, root *cobra.Command, err error) {
+	if !ourFault(err) {
+		return
+	}
+	_, _ = fmt.Fprintln(w, errorStyle(root).Paint(ui.Muted,
+		kit.Program+" report  (this looks like a bug in "+kit.Program+", not something you did)"))
 }
 
 // announce mentions a new release below whatever the command produced.

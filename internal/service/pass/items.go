@@ -15,6 +15,7 @@ import (
 	"github.com/roman-16/proton-cli/internal/proton"
 	"github.com/roman-16/proton-cli/internal/ref"
 	pb "github.com/roman-16/proton-cli/internal/service/pass/proto"
+	"github.com/roman-16/proton-cli/internal/skip"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -490,7 +491,7 @@ func (s *Service) ItemCreate(ctx context.Context, shareID string, nc NewItem) (s
 	case "custom":
 		item.Content.Content = &pb.Content_Custom{Custom: &pb.ItemCustom{}}
 	default:
-		return "", fmt.Errorf("unsupported item type %q (supported: login, note, credit-card, wifi, ssh-key, identity, custom)", nc.Type)
+		return "", errs.Problemf("--type accepts: login, note, credit-card, wifi, ssh-key, identity, custom")
 	}
 	fields, err := parseExtraFields(nc.ExtraFields)
 	if err != nil {
@@ -830,6 +831,7 @@ func (s *Service) fetchItems(ctx context.Context, shareID string, sk *shareKeys)
 				ShareCount       int
 			}
 			if err := json.Unmarshal(raw, &enc); err != nil {
+				skip.Record(ctx, skip.KindItem, "", skip.Malformed, err)
 				continue
 			}
 			if enc.State != 1 {
@@ -837,26 +839,32 @@ func (s *Service) fetchItems(ctx context.Context, shareID string, sk *shareKeys)
 			}
 			shareKey, ok := sk.keys[enc.KeyRotation]
 			if !ok {
+				skip.Record(ctx, skip.KindItem, enc.ItemID, skip.NoKey, nil)
 				continue
 			}
 			ikBytes, err := base64.StdEncoding.DecodeString(enc.ItemKey)
 			if err != nil {
+				skip.Record(ctx, skip.KindItem, enc.ItemID, skip.Malformed, err)
 				continue
 			}
 			itemKey, err := aead.Decrypt(shareKey, ikBytes, []byte(aead.TagItemKey))
 			if err != nil {
+				skip.Record(ctx, skip.KindItem, enc.ItemID, skip.Undecryptable, err)
 				continue
 			}
 			cBytes, err := base64.StdEncoding.DecodeString(enc.Content)
 			if err != nil {
+				skip.Record(ctx, skip.KindItem, enc.ItemID, skip.Malformed, err)
 				continue
 			}
 			plain, err := aead.Decrypt(itemKey, cBytes, []byte(aead.TagItemContent))
 			if err != nil {
+				skip.Record(ctx, skip.KindItem, enc.ItemID, skip.Undecryptable, err)
 				continue
 			}
 			var it pb.Item
 			if err := proto.Unmarshal(plain, &it); err != nil {
+				skip.Record(ctx, skip.KindItem, enc.ItemID, skip.Malformed, err)
 				continue
 			}
 			item := itemFromProto(&it)

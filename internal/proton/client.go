@@ -439,7 +439,7 @@ func (c *Client) retrying(ctx context.Context, req Request, once func() (*Respon
 			}
 			delay = retryDelay("", attempt)
 			c.log.Warn(notAnswering, "method", req.Method, "path", req.Path,
-				"err", err, "wait_ms", delay.Milliseconds(), "attempt", attempt)
+				"error", err, "wait_ms", delay.Milliseconds(), "attempt", attempt)
 		case resp.Status == http.StatusTooManyRequests:
 			delay = retryDelay(resp.retryHeader, attempt)
 			c.log.Warn("rate limited by Proton; waiting before trying again",
@@ -607,7 +607,7 @@ func (c *Client) doOnce(ctx context.Context, req Request) (*Response, error) {
 	resp, err := c.hc.Do(r)
 	if err != nil {
 		c.log.Debug("api request failed",
-			"method", req.Method, "path", req.Path, "err", err,
+			"method", req.Method, "path", req.Path, "error", err,
 			"duration_ms", time.Since(start).Milliseconds())
 		return nil, &NetworkError{Err: err}
 	}

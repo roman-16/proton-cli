@@ -89,7 +89,11 @@ type UI struct {
 	Out    io.Writer
 	Err    io.Writer
 	In     io.Reader
-	Log    *slog.Logger
+	// Log records what happened while the work was done, on the commentary
+	// stream and in the run's file.
+	Log *slog.Logger
+	// Trace records the run's own envelope, in the file alone. See newLoggers.
+	Trace *slog.Logger
 
 	// Quiet suppresses confirmations, notes and progress on Err.
 	Quiet bool
@@ -122,6 +126,13 @@ type Options struct {
 	NoInput  bool
 	FullIDs  bool
 	Width    int
+
+	// Log is the run's diagnostic file, which receives every record at full
+	// detail whatever LogLevel says. Nil writes no file.
+	Log io.Writer
+	// Salt keys the handles that stand in for addresses and IDs in both the file
+	// and the commentary stream. Nil makes them stable for this process only.
+	Salt []byte
 }
 
 func New(opts Options) *UI {
@@ -139,12 +150,14 @@ func New(opts Options) *UI {
 	if opts.Format == FormatText && !opts.NoColor {
 		style, errStyle = StyleFor(out), StyleFor(errw)
 	}
+	log, trace := newLoggers(errw, opts.LogLevel, opts.Salt, opts.Log)
 	return &UI{
+		Log:      log,
+		Trace:    trace,
 		Format:   opts.Format,
 		Out:      out,
 		Err:      errw,
 		In:       in,
-		Log:      slog.New(slog.NewTextHandler(errw, &slog.HandlerOptions{Level: opts.LogLevel})),
 		Quiet:    opts.Quiet,
 		NoInput:  opts.NoInput,
 		FullIDs:  opts.FullIDs,

@@ -9,6 +9,7 @@ import (
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/idcache"
 	"github.com/roman-16/proton-cli/internal/ref"
+	"github.com/roman-16/proton-cli/internal/skip"
 	"github.com/roman-16/proton-cli/internal/ui"
 	"github.com/spf13/cobra"
 )
@@ -28,6 +29,42 @@ type Invocation struct {
 	// act on. Select sets it and Mutate reads it, so no command has to pass the
 	// fact along - the same reason --dry-run needs nothing from a handler.
 	computed bool
+
+	// tally counts what the services could not decrypt. List reads it, so an
+	// incomplete listing says so without any command having to check.
+	tally *skip.Tally
+}
+
+// Incomplete is what this invocation could not show, phrased for whatever is
+// about to render the answer.
+//
+// The remedy is added here rather than in the ui package, which never names the
+// program it belongs to.
+func (c *Invocation) Incomplete() ui.IncompleteSpec {
+	if c.tally.Count() == 0 {
+		return ui.IncompleteSpec{}
+	}
+	return ui.IncompleteSpec{
+		Count:  c.tally.Count(),
+		Kind:   string(c.tally.Kind()),
+		Hides:  c.tally.Hides(),
+		Remedy: "This is a bug or damaged data - `" + Program + " report` has the details.",
+	}
+}
+
+// incomplete attaches the tally to a reference that matched nothing.
+//
+// "No item matching that" is the wrong answer when the item was there and could
+// not be read, and the two are indistinguishable to the person who typed it.
+// Whatever could not be decrypted was also not searched, so the search says so.
+func (c *Invocation) incomplete(err error) error {
+	var missing *errs.NotFound
+	if !errors.As(err, &missing) || c.tally.Count() == 0 {
+		return err
+	}
+	spec := c.Incomplete()
+	missing.Try = append(missing.Try, spec.Sentence(), Program+" report")
+	return err
 }
 
 // UI is the renderer for this invocation. It is the only way a command produces
@@ -91,16 +128,21 @@ func Run(steps []Step, h Handler) func(*cobra.Command, []string) error {
 		if err := validateFlags(cmd); err != nil {
 			return err
 		}
-		c := &Invocation{Ctx: cmd.Context(), App: app.From(cmd.Context()), Args: args, Cmd: cmd}
+		// Everything from here on is the command's own work, so a failure with no
+		// words on it is this CLI's rather than the caller's - which is the one
+		// distinction the exit code cannot make for itself, since cobra's
+		// complaints about a command line are just as bare and are nobody's bug.
+		ctx, tally := skip.With(cmd.Context())
+		c := &Invocation{Ctx: ctx, App: app.From(ctx), Args: args, Cmd: cmd, tally: tally}
 		if err := gate(c); err != nil {
-			return err
+			return errs.Bug(err)
 		}
 		for _, s := range steps {
 			if err := s(c); err != nil {
-				return err
+				return errs.Bug(c.incomplete(err))
 			}
 		}
-		return h(c)
+		return errs.Bug(c.incomplete(h(c)))
 	}
 }
 
@@ -112,6 +154,7 @@ func Run(steps []Step, h Handler) func(*cobra.Command, []string) error {
 // Caching here rather than in the ui package is deliberate: remembering an ID is
 // something this CLI does about Proton, not something a table does.
 func List[T any](c *Invocation, spec ui.TableSpec[T], items []T, ids func(T) []string) error {
+	spec.Skipped = c.Incomplete()
 	if ids != nil && c.App.IDCache != nil && len(items) > 0 {
 		seen := make([]string, 0, len(items))
 		for _, it := range items {

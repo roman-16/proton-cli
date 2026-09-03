@@ -6,11 +6,13 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/roman-16/proton-cli/internal/account/keys"
 	"github.com/roman-16/proton-cli/internal/account/session"
@@ -20,6 +22,7 @@ import (
 	"github.com/roman-16/proton-cli/internal/idcache"
 	"github.com/roman-16/proton-cli/internal/profile"
 	"github.com/roman-16/proton-cli/internal/proton"
+	"github.com/roman-16/proton-cli/internal/runlog"
 	"github.com/roman-16/proton-cli/internal/service/account"
 	"github.com/roman-16/proton-cli/internal/service/calendar"
 	"github.com/roman-16/proton-cli/internal/service/contacts"
@@ -64,6 +67,12 @@ type App struct {
 	// cannot be asked a question get past a CAPTCHA at all.
 	Verified string
 
+	// run is this invocation's diagnostic file, or nil when nothing is being
+	// recorded, and started is when it opened.
+	run     *runlog.Run
+	started time.Time
+	version string
+
 	zone  zoneCache
 	mu    sync.Mutex
 	cache *keys.Unlocked
@@ -95,6 +104,11 @@ func New(opts Options) (*App, error) {
 	verified := firstNonEmpty(opts.Verified, os.Getenv("PROTON_VERIFIED"))
 	userAgent := defaultUserAgent(opts.Version)
 
+	run, salt := openLog(opts.NoLog)
+	var logFile io.Writer
+	if run != nil {
+		logFile = run.Writer()
+	}
 	u := ui.New(ui.Options{
 		Format:   opts.Output,
 		LogLevel: opts.LogLevel,
@@ -102,7 +116,14 @@ func New(opts Options) (*App, error) {
 		NoColor:  opts.NoColor,
 		NoInput:  opts.NoInput,
 		FullIDs:  opts.FullIDs,
+		Log:      logFile,
+		Salt:     salt,
 	})
+	// Services log through the package-level logger, so this is what makes a
+	// debug line in a service reach the same two places a client's does. Without
+	// it they went to slog's own default handler, which discards anything below
+	// info and knows nothing about --log-level.
+	slog.SetDefault(u.Log)
 	c := proton.New(proton.Options{
 		BaseURL: apiURL, Logger: u.Log, Profile: profileName.String(),
 		UserAgent: userAgent, DryRun: opts.DryRun,
@@ -117,6 +138,8 @@ func New(opts Options) (*App, error) {
 
 	a := &App{
 		Profile:       profileName,
+		run:           run,
+		version:       opts.Version,
 		Creds:         newCredentials(u, email),
 		API:           c,
 		Account:       account.New(c),

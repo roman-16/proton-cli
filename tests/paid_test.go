@@ -154,9 +154,20 @@ func TestNothingSeedsThePaidAccount(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read the seed: %v", err)
 	}
-	if strings.Contains(string(src), "PROTON_CLI_TEST_PAID") {
-		t.Error("scripts/seed names the paid account; it fills accounts kept for the suite, " +
-			"and a paid one is not that")
+	// The accounts are declared in one place now, so the seed cannot name the
+	// paid one's variables whatever it does - which is what the string this used
+	// to look for would have caught. What decides it is which set the seed asks
+	// for: Free is the two kept for this suite, All is every account there is a
+	// session for.
+	for _, reach := range []string{"account.All()", "account.Get(", "account.Paid"} {
+		if strings.Contains(string(src), reach) {
+			t.Errorf("scripts/seed reaches for %s, which can name the paid account; "+
+				"it fills accounts kept for the suite, and a paid one is not that", reach)
+		}
+	}
+	if !strings.Contains(string(src), "account.Free()") {
+		t.Error("scripts/seed no longer says which accounts it may act on; " +
+			"it takes them from account.Free()")
 	}
 }
 

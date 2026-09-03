@@ -17,6 +17,11 @@ import (
 // Europe/Vienna stays at 09:00 when the clocks change; the same meeting stored
 // as a UTC instant moves to 08:00.
 
+// LocalZone is the zone this machine and its configuration name, and nothing
+// more: the answer that cost no request. It is what the diagnostic log and a
+// report state, neither of which may reach the network to say what they know.
+func (a *App) LocalZone() string { return a.zone.name }
+
 // Zone is the IANA time zone this invocation works in.
 //
 // Configuration answers first, from the flag, the variable, the file and the

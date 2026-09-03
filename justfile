@@ -60,9 +60,9 @@ lint:
     # them. Without this they are the one part of the tree nothing lints.
     golangci-lint run --build-tags=paid ./...
 
-[doc("Sign the two test accounts in, for working with them by hand")]
-login: build
-    go run ./scripts/seed --login
+[doc("Sign every test account in, answering Proton's CAPTCHA if it asks. Needs a terminal")]
+login *args: build
+    go run ./scripts/login {{ args }}
 
 [doc("Print the version and the release notes the current CHANGELOG.md would publish")]
 notes:

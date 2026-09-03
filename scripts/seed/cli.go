@@ -3,12 +3,13 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"github.com/roman-16/proton-cli/tests/fixture"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
+
+	"github.com/roman-16/proton-cli/tests/fixture"
 )
 
 // passwordFiles is where each profile's account password was written, for the
@@ -19,11 +20,11 @@ var passwordFiles = map[string]string{}
 
 func writePasswordFiles(work string) error {
 	for _, a := range accounts {
-		file := filepath.Join(work, a.profile+".password")
-		if err := os.WriteFile(file, []byte(os.Getenv(a.passwordVar)), 0o600); err != nil {
+		file := filepath.Join(work, a.Profile+".password")
+		if err := os.WriteFile(file, []byte(os.Getenv(a.Password)), 0o600); err != nil {
 			return err
 		}
-		passwordFiles[a.profile] = file
+		passwordFiles[a.Profile] = file
 	}
 	return nil
 }
@@ -38,6 +39,11 @@ func binary() string {
 }
 
 // command builds a CLI invocation as one profile.
+//
+// Nothing the seed runs may stop to ask a question: it fills accounts
+// unattended, and a prompt nobody is watching is a run that hangs until
+// somebody notices. Signing in is the exception, and asks for the terminal
+// itself - see attended.
 func command(profile string, args ...string) *exec.Cmd {
 	cmd := exec.Command(binary(), withPassword(profile, args)...)
 	cmd.Env = append(os.Environ(), "PROTON_PROFILE="+profile, "PROTON_NO_INPUT=1")

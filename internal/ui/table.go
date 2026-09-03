@@ -66,6 +66,12 @@ type TableSpec[T any] struct {
 	Rows any
 	// Extra adds fields to the JSON envelope.
 	Extra map[string]any
+
+	// Skipped is what this listing could not show; see IncompleteSpec. It is
+	// filled in by kit.List from the invocation's tally rather than by the
+	// command, so that an incomplete answer says so everywhere instead of
+	// wherever somebody remembered to check.
+	Skipped IncompleteSpec
 }
 
 // flexFloor is the narrowest a flexible column may be squeezed before the table
@@ -91,6 +97,7 @@ func Table[T any](u *UI, spec TableSpec[T], items []T) error {
 		Page: spec.Page, PageSize: spec.PageSize, Limit: spec.Limit,
 		Filtered: spec.Filtered,
 	}))
+	u.Incomplete(spec.Skipped)
 	return nil
 }
 
@@ -122,6 +129,13 @@ func envelope[T any](spec TableSpec[T], items []T) map[string]any {
 	}
 	if spec.Limit > 0 {
 		env["limited"] = len(items) >= spec.Limit
+	}
+	// Omitted when nothing was skipped, so a listing that is complete has exactly
+	// the shape it has always had. A consumer that never sees the key is reading a
+	// whole answer; one that sees it has been told the answer is short, which a
+	// warning on the commentary stream could never tell it.
+	if spec.Skipped.Count > 0 {
+		env["skipped"] = spec.Skipped.Count
 	}
 	for k, v := range spec.Extra {
 		env[k] = v

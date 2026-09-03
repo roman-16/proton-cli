@@ -32,13 +32,14 @@ A package-managed install (apt, dnf, apk, AUR, Homebrew, winget, npm, Nix)
 is refused, with the right command to use instead.
 
 Only the binary goes, under both names it answers to. --purge also deletes
-your saved sessions and the ID cache.`,
+your saved sessions, the ID cache and the diagnostic log.`,
 		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			return runUninstall(c, purge)
 		}),
 	}
-	cmd.Flags().BoolVar(&purge, "purge", false, "Also remove local data (saved sessions and ID cache)")
+	cmd.Flags().BoolVar(&purge, "purge", false,
+		"Also remove local data (saved sessions, ID cache and diagnostic log)")
 	return cmd
 }
 
@@ -61,7 +62,7 @@ func runUninstall(c *kit.Invocation, purge bool) error {
 	}
 	detail := ""
 	if dataDir != "" {
-		detail = "with its saved sessions and ID cache"
+		detail = "with its saved sessions, ID cache and diagnostic log"
 	}
 
 	if err := kit.Mutate(c, ui.ResultSpec{

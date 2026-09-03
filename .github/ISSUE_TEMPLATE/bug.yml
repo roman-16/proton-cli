@@ -1,0 +1,46 @@
+name: Bug report
+description: Something proton did that it should not have
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting this.
+
+        **Please run `proton report` and paste its output below.** It carries the version, the platform, your settings and a trace of the run that failed, which is usually the difference between a fix and a guess.
+
+        It is redacted: addresses, IDs, filenames and search terms are replaced by stand-ins before anything is written, and nothing in it can be turned back into an address or a password. Read it before you paste it - it goes to stdout so that you can.
+
+        If this is a **security** issue, do not file it here. [`SECURITY.md`](https://github.com/roman-16/proton-cli/blob/main/SECURITY.md) has the private channels.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you ran, what you expected, and what happened instead.
+      placeholder: |
+        I ran:
+        I expected:
+        Instead:
+    validations:
+      required: true
+
+  - type: textarea
+    id: report
+    attributes:
+      label: Output of `proton report`
+      description: |
+        Run `proton report` and paste the whole thing. If the command itself will not run, say so here and give `proton version` instead.
+      render: text
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: current
+    attributes:
+      label: Before filing
+      options:
+        - label: I am on the latest release (`proton update`), or the report above says which version this is
+          required: true
+        - label: I have read the report I am pasting
+          required: true

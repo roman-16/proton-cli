@@ -2,6 +2,7 @@
 package session
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"os"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/roman-16/proton-cli/internal/config"
 	"github.com/roman-16/proton-cli/internal/profile"
+	"github.com/roman-16/proton-cli/internal/skip"
 )
 
 // Session is what one profile keeps on disk between runs.
@@ -52,7 +54,7 @@ type Profile struct {
 //
 // It reads the directory rather than any registry: the files are the state, so
 // there is nothing that can disagree with them.
-func Profiles() ([]Profile, error) {
+func Profiles(ctx context.Context) ([]Profile, error) {
 	d, err := Dir()
 	if err != nil {
 		return nil, err
@@ -71,10 +73,12 @@ func Profiles() ([]Profile, error) {
 		}
 		name, err := profile.Parse(strings.TrimSuffix(e.Name(), ".json"))
 		if err != nil {
+			skip.Record(ctx, skip.KindProfile, e.Name(), skip.Malformed, err)
 			continue
 		}
 		s, err := Load(name)
 		if err != nil || s == nil {
+			skip.Record(ctx, skip.KindProfile, name.String(), skip.Unreadable, err)
 			continue
 		}
 		out = append(out, Profile{

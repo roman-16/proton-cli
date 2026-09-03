@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
 )
 
@@ -150,7 +151,7 @@ func (a AutoReply) encode() (*apiAutoResponder, error) {
 		return nil, err
 	}
 	if repeat != repeatDaily && len(a.Days) > 0 {
-		return nil, fmt.Errorf("--days applies to --repeat daily only")
+		return nil, errs.Problemf("--days applies to --repeat daily only")
 	}
 	out := &apiAutoResponder{
 		IsEnabled: a.Enabled, Message: a.Message, Repeat: repeat,
@@ -158,21 +159,21 @@ func (a AutoReply) encode() (*apiAutoResponder, error) {
 	}
 	if repeat == repeatPermanent {
 		if a.Start != "" || a.End != "" {
-			return nil, fmt.Errorf("--repeat permanent takes no --start or --end")
+			return nil, errs.Problemf("--repeat permanent takes no --start or --end")
 		}
 		return out, nil
 	}
 	if a.Start == "" || a.End == "" {
-		return nil, fmt.Errorf("--repeat %s needs --start and --end (%s)", a.Repeat, startEndFormat(repeat))
+		return nil, errs.Problemf("--repeat %s needs --start and --end (%s)", a.Repeat, startEndFormat(repeat))
 	}
 	if out.StartTime, err = encodeBound(a.Start, repeat, loc); err != nil {
-		return nil, fmt.Errorf("invalid --start: %w", err)
+		return nil, errs.Problemf("invalid --start: %v", err)
 	}
 	if out.EndTime, err = encodeBound(a.End, repeat, loc); err != nil {
-		return nil, fmt.Errorf("invalid --end: %w", err)
+		return nil, errs.Problemf("invalid --end: %v", err)
 	}
 	if repeat == repeatFixed && out.EndTime <= out.StartTime {
-		return nil, fmt.Errorf("--end must be after --start")
+		return nil, errs.Problemf("--end must be after --start")
 	}
 	if repeat == repeatDaily {
 		days, err := encodeDays(a.Days)
@@ -286,7 +287,7 @@ func encodeDays(names []string) ([]int, error) {
 			}
 			n, err := parseWeekday(part)
 			if err != nil {
-				return nil, fmt.Errorf("invalid --days: %w", err)
+				return nil, errs.Problemf("invalid --days: %v", err)
 			}
 			if !seen[n] {
 				seen[n] = true
@@ -295,7 +296,7 @@ func encodeDays(names []string) ([]int, error) {
 		}
 	}
 	if len(out) == 0 {
-		return nil, fmt.Errorf("--repeat daily needs --days (e.g. mon,tue,wed,thu,fri)")
+		return nil, errs.Problemf("--repeat daily needs --days (e.g. mon,tue,wed,thu,fri)")
 	}
 	return out, nil
 }

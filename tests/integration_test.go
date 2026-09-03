@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/roman-16/proton-cli/tests/account"
 	"github.com/roman-16/proton-cli/tests/fixture"
 )
 
@@ -52,11 +53,9 @@ func TestMain(m *testing.M) {
 	// the test that reads it, so a run pays only for the fixtures it actually
 	// asks for and one that cannot be made fails those tests rather than all of
 	// them. `just seed` fills an account by hand, through the same declaration.
+	signIn()
 	if paidBuild {
-		signInPaid()
 		snapshotPaid()
-	} else {
-		signIn()
 	}
 
 	code := m.Run()
@@ -81,103 +80,68 @@ func TestMain(m *testing.M) {
 // account from a signed-in profile, which signIn establishes below. The
 // PROTON_CLI_TEST_ prefix keeps them clear of anything the binary reads.
 const (
-	primary   = "primary"
-	secondary = "secondary"
-	// paid is a third account on a plan that includes what Proton gates. It is
-	// optional: without it the suite runs exactly as before and the tests that
-	// need one skip, because no seeding can make a free account able to do what
-	// a subscription buys.
+	primary   = account.Primary
+	secondary = account.Secondary
+	// paid is a third account on a plan that includes what Proton gates, and is
+	// required exactly when the tests that use it are compiled in - see required.
+	// No seeding can make a free account able to do what a subscription buys, so
+	// there is nothing for a run under the tag to fall back to.
 	//
 	// It is a third account rather than an upgrade of the primary, so the free
 	// plan's limits - three calendars, three folders, one filter - keep being
 	// exercised by the tests that exist to exercise them.
-	paid = "paid"
+	paid = account.Paid
 )
 
 // workDir is the per-run temp directory, where the password files live.
 var workDir string
 
 type testAccount struct {
-	profile     string
-	userVar     string
-	passwordVar string
-	// secondVar names the account's second password, set for the account that is
-	// in Proton's two-password mode and empty for the rest.
-	secondVar string
-	// extraVar names the password that account's Pass is protected with, set for
-	// the account that has one and empty for the rest.
-	extraVar string
-	// The files each of those is written to for the run, so a command that has to
-	// be handed one can be.
+	account.Account
+	// The files each of the account's secrets is written to for the run, so a
+	// command that has to be handed one can be.
 	passwordFile string
 	secondFile   string
 	extraFile    string
 }
 
-var accounts = map[string]*testAccount{
-	primary: {
-		profile:     primary,
-		userVar:     "PROTON_CLI_TEST_PRIMARY_USER",
-		passwordVar: "PROTON_CLI_TEST_PRIMARY_PASSWORD",
-	},
-	// The secondary account is in two-password mode, which is the only way this
-	// suite reaches the mode at all: the secret that opens its keys is not the
-	// one that signs it in, so every run signs an account in through that path.
-	//
-	// Its Pass is protected with an extra password for the same reason, and the
-	// sign-in hands that one over too. Proton grants the scope it buys for as long
-	// as the session lives, so the exchange happens on the run that first meets it
-	// and never again - TestPassExtraPasswordProtectsTheSecondaryAccount checks the
-	// outcome every run, and fails if the account is left without one.
-	secondary: {
-		profile:     secondary,
-		userVar:     "PROTON_CLI_TEST_SECONDARY_USER",
-		passwordVar: "PROTON_CLI_TEST_SECONDARY_PASSWORD",
-		secondVar:   "PROTON_CLI_TEST_SECONDARY_SECOND_PASSWORD",
-		extraVar:    "PROTON_CLI_TEST_SECONDARY_EXTRA_PASSWORD",
-	},
-	paid: {
-		profile:     paid,
-		userVar:     "PROTON_CLI_TEST_PAID_USER",
-		passwordVar: "PROTON_CLI_TEST_PAID_PASSWORD",
-	},
-}
+var accounts = accountTable()
 
-// required are the accounts without which there is no suite. The paid one is
-// not among them.
-var required = []string{primary, secondary}
-
-// configured reports whether an account has both its variables set.
-func configured(name string) bool {
-	a := accounts[name]
-	return os.Getenv(a.userVar) != "" && os.Getenv(a.passwordVar) != ""
-}
-
-// signedIn are the accounts this run has: the required two, and the paid one
-// when somebody supplied it.
-func signedIn() []string {
-	out := append([]string{}, required...)
-	if configured(paid) {
-		out = append(out, paid)
+// accountTable is the shared declaration, given somewhere to remember the files
+// this run wrote each secret to.
+func accountTable() map[string]*testAccount {
+	out := map[string]*testAccount{}
+	for _, a := range account.All() {
+		out[a.Profile] = &testAccount{Account: a}
 	}
 	return out
 }
 
-// requireCredentials verifies both accounts are configured before any test runs,
-// exiting instantly - ahead of the expensive binary build - if either is
-// incomplete.
+// required are the accounts without which there is no suite, which is every
+// account the running binary holds tests for.
+//
+// The paid one is required exactly when the paid tests are compiled in. Without
+// the tag there is no paid account in this binary at all - nothing signs it in
+// and nothing reads it - so demanding its credentials would be demanding
+// something the run could not use. With the tag it is as required as the other
+// two, because every test under it acts on that account and a run that skipped
+// them all would report success for having done nothing.
+var required = requiredAccounts()
+
+func requiredAccounts() []string {
+	if paidBuild {
+		return []string{primary, secondary, paid}
+	}
+	return []string{primary, secondary}
+}
+
+// requireCredentials verifies every account this binary has tests for is
+// configured before any test runs, exiting instantly - ahead of the expensive
+// binary build - if one of them is incomplete.
 func requireCredentials() {
 	var missing []string
 	for _, name := range required {
-		a := accounts[name]
-		wanted := []string{a.userVar, a.passwordVar}
-		if a.secondVar != "" {
-			wanted = append(wanted, a.secondVar)
-		}
-		if a.extraVar != "" {
-			wanted = append(wanted, a.extraVar)
-		}
-		for _, v := range wanted {
+		for _, v := range accounts[name].Secrets() {
 			if os.Getenv(v) == "" {
 				missing = append(missing, v)
 			}
@@ -187,15 +151,7 @@ func requireCredentials() {
 		fmt.Fprintf(os.Stderr, "integration tests require these env vars: %s\n", strings.Join(missing, ", "))
 		os.Exit(1)
 	}
-	// Half a paid account is a typo, not a choice, and it would otherwise show up
-	// as every paid test skipping for no stated reason.
-	a := accounts[paid]
-	if (os.Getenv(a.userVar) == "") != (os.Getenv(a.passwordVar) == "") {
-		fmt.Fprintf(os.Stderr, "the paid account needs both %s and %s, or neither\n",
-			a.userVar, a.passwordVar)
-		os.Exit(1)
-	}
-	for _, name := range signedIn() {
+	for _, name := range required {
 		if err := looksSwapped(accounts[name]); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
@@ -211,7 +167,7 @@ func requireCredentials() {
 // demanding a CAPTCHA - so it is worth refusing to start over. Neither value is
 // ever printed: the message says which variables to look at.
 func looksSwapped(a *testAccount) error {
-	user, password := os.Getenv(a.userVar), os.Getenv(a.passwordVar)
+	user, password := os.Getenv(a.User), os.Getenv(a.Password)
 	if user == "" || password == "" {
 		return nil
 	}
@@ -219,7 +175,7 @@ func looksSwapped(a *testAccount) error {
 	// required. Only the pair being the wrong way round is.
 	if !isAddress(user) && isAddress(password) {
 		return fmt.Errorf("%s and %s look swapped: the password holds an address and the user does not",
-			a.userVar, a.passwordVar)
+			a.User, a.Password)
 	}
 	return nil
 }
@@ -239,23 +195,23 @@ func isAddress(v string) bool {
 // key blob sealed at login is a one-way derivation of the password rather than
 // the password itself.
 func writePasswordFiles() {
-	for _, name := range signedIn() {
+	for _, name := range required {
 		a := accounts[name]
 		for _, secret := range []struct {
 			kind  string
 			value string
 			into  *string
 		}{
-			{"password", os.Getenv(a.passwordVar), &a.passwordFile},
-			{"second", os.Getenv(a.secondVar), &a.secondFile},
-			{"extra", os.Getenv(a.extraVar), &a.extraFile},
+			{"password", os.Getenv(a.Password), &a.passwordFile},
+			{"second", os.Getenv(a.Second), &a.secondFile},
+			{"extra", os.Getenv(a.Extra), &a.extraFile},
 		} {
 			if secret.value == "" {
 				continue
 			}
-			path := filepath.Join(workDir, a.profile+"."+secret.kind)
+			path := filepath.Join(workDir, a.Profile+"."+secret.kind)
 			if err := os.WriteFile(path, []byte(secret.value), 0o600); err != nil {
-				fmt.Fprintf(os.Stderr, "failed to write the %s %s file: %v\n", a.profile, secret.kind, err)
+				fmt.Fprintf(os.Stderr, "failed to write the %s %s file: %v\n", a.Profile, secret.kind, err)
 				os.Exit(1)
 			}
 			*secret.into = path
@@ -263,16 +219,40 @@ func writePasswordFiles() {
 	}
 }
 
-// signIn brings both free accounts to a signed-in session, which every test
+// signIn brings every required account to a signed-in session, which every test
 // needs and nothing else can arrange for itself.
+//
+// A session already in place costs one read: `account login` does no SRP
+// exchange while the saved one still works, so an ordinary run pays almost
+// nothing for this and recovers by itself from a session that expired.
+//
+// Establishing one from nothing is a different matter. Proton may raise a
+// CAPTCHA, `go test` gives this binary /dev/null on standard input, and a
+// challenge cannot be solved by anything but a person with a browser - so a run
+// that has to sign in from scratch says which command can, rather than failing
+// with a page nobody is watching for.
 func signIn() {
-	cmd := exec.Command("go", "run", "./scripts/seed", "--login")
-	cmd.Dir = ".."
-	cmd.Env = append(os.Environ(), "PROTON_CLI="+binaryPath)
-	out, err := cmd.CombinedOutput()
-	fmt.Fprint(os.Stderr, string(out))
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to sign the accounts in: %v\n", err)
+	for _, name := range required {
+		a := accounts[name]
+		args := []string{"account", "login", "--user", os.Getenv(a.User)}
+		for _, secret := range []struct{ flag, file string }{
+			{"--password-file", a.passwordFile},
+			{"--second-password-file", a.secondFile},
+			{"--extra-password-file", a.extraFile},
+		} {
+			if secret.file != "" {
+				args = append(args, secret.flag, secret.file)
+			}
+		}
+		_, stderr, code, err := runAs(name, nil, args...)
+		if err == nil && code == 0 {
+			continue
+		}
+		fmt.Fprint(os.Stderr, stderr)
+		fmt.Fprintf(os.Stderr,
+			"\ncould not sign %s in without asking anything.\n"+
+				"Run `just login` once - it can open Proton's CAPTCHA page and wait for you -\n"+
+				"then run this again.\n", name)
 		os.Exit(1)
 	}
 }
@@ -866,10 +846,10 @@ func truncateOutput(s string) string {
 }
 
 // selfEmail returns the primary account's address.
-func selfEmail() string { return os.Getenv(accounts[primary].userVar) }
+func selfEmail() string { return os.Getenv(accounts[primary].User) }
 
 // secondaryEmail returns the second account's address.
-func secondaryEmail() string { return os.Getenv(accounts[secondary].userVar) }
+func secondaryEmail() string { return os.Getenv(accounts[secondary].User) }
 
 // The secondary-account runners. A scenario needs one whenever it genuinely
 // takes two Proton users: accepting a share invitation, receiving mail, or

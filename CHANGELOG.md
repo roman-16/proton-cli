@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 Adding a version section here is what publishes a release, so this file is the one place a version is decided: see [Releases](CONTRIBUTING.md#releases). Versions that shipped before this file existed are on the [releases page](https://github.com/roman-16/proton-cli/releases).
 
+## [3.1.0] - 2026-09-03
+
+### Added
+
+- `proton report` prints what a bug report needs: the build, your settings and a redacted trace of the run that failed. It needs no account and no network. `--all` takes every run still kept, `--dest` writes a file to attach.
+- Every run records what it did to `~/.config/proton-cli/logs/`, one file per day, whatever `--log-level` says. Addresses, IDs and filenames are replaced by stand-ins before anything is written, so a log is safe to attach to an issue. The last 16 files are kept; `--no-log`, `PROTON_NO_LOG` or `no-log:` in the config file writes none.
+- Exit code `7` means the failure is a bug in proton rather than something you typed. Every failure you can act on keeps the code it had.
+
+### Changed
+
+- A crash prints one line pointing at `proton report` instead of a Go stack trace.
+- Refusals that arrived as bare text now say what to do: a pinned key that does not match the recipient's, an inline attachment with no `--html`, a reply to a message with no reply address, an unknown `pass items create --type`, an alias in a Pass import, and a `--remind` that is not a warning time.
+- `uninstall --purge` also removes the diagnostic log.
+
+### Fixed
+
+- A listing that cannot decrypt something says how many are missing instead of dropping them in silence, and `--output json` carries a `skipped` count.
+- "Failed to unlock any address keys." now says which of four things went wrong, and the log records it per key.
+- `--log-level debug` shows what Mail, Drive, Calendar, Contacts and Pass log while they work. It never showed those lines before.
+
 ## [3.0.0] - 2026-09-02
 
 ### Added

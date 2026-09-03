@@ -9,6 +9,7 @@ import (
 	"github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/proton"
 	"github.com/roman-16/proton-cli/internal/ref"
+	"github.com/roman-16/proton-cli/internal/skip"
 	"github.com/roman-16/proton-cli/internal/vcard"
 )
 
@@ -209,6 +210,7 @@ func (s *Service) List(ctx context.Context) ([]Contact, error) {
 		for _, c := range r.Contacts {
 			cards, verdicts, err := pgp.DecryptCardsRaw(c.Cards, u.UserKR, u.UserKR, nil)
 			if err != nil {
+				skip.Record(ctx, skip.KindContact, c.ID, skip.Undecryptable, err)
 				continue
 			}
 			ct := contactFromCards(c.ID, cards)

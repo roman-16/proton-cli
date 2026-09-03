@@ -2,9 +2,9 @@ package mail
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/roman-16/proton-cli/internal/account/keys"
+	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/mailtext"
 )
 
@@ -107,9 +107,10 @@ func (s *Service) Answer(ctx context.Context, parentID string, spec AnswerSpec) 
 	}
 	if !c.HasRecipients() {
 		if action == ActionForward {
-			return Content{}, fmt.Errorf("--to is required when forwarding")
+			return Content{}, errs.Problemf("--to is required when forwarding")
 		}
-		return Content{}, fmt.Errorf("the message being replied to has no reply address; pass --to")
+		return Content{}, errs.Problemf("The message being replied to carries no address to reply to.").
+			Hint("name the recipient yourself with --to")
 	}
 
 	var quote string

@@ -9,10 +9,16 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"bytes"
+	"errors"
+	"fmt"
 	"github.com/ProtonMail/go-srp"
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
 	"github.com/roman-16/proton-cli/internal/account/localkey"
+	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
+	"github.com/roman-16/proton-cli/internal/skip"
+	"strings"
 )
 
 func unlocked(addrs ...Address) *Unlocked {
@@ -131,6 +137,9 @@ type account struct {
 	clientKey []byte
 
 	userKey, addrKey string
+	// addrToken is the token and signature the address key's passphrase is
+	// sealed in, for the hierarchy that cannot open its own address keys.
+	addrToken string
 }
 
 // newAccount locks a fresh hierarchy with the passphrase the secret stretches
@@ -186,7 +195,10 @@ func (a *account) serve(t *testing.T) *proton.Client {
 		case "/core/v4/addresses":
 			body["Addresses"] = []map[string]any{{
 				"ID": "address", "Email": "me@proton.me", "Status": 1, "Send": 1, "Receive": 1,
-				"Keys": []map[string]any{{"ID": "address-key", "PrivateKey": a.addrKey, "Primary": 1, "Active": 1}},
+				"Keys": []map[string]any{{
+					"ID": "address-key", "PrivateKey": a.addrKey, "Primary": 1, "Active": 1,
+					"Token": a.addrToken, "Signature": a.addrToken,
+				}},
 			}}
 		case "/core/v4/keys/salts":
 			body["KeySalts"] = a.salts
@@ -363,4 +375,108 @@ func TestStretchIsProtonsKeyPassword(t *testing.T) {
 	if got != string(want[len(want)-31:]) {
 		t.Errorf("stretch = %q, want the last 31 bytes of Proton's own derivation", got)
 	}
+}
+
+// ── the failure with no words of its own ──
+
+// The user keys open and not one address key follows. Before, every way of
+// reaching this produced the same six words and recorded nothing, so a report
+// of it could not be acted on: the four causes are told apart only by what the
+// loop threw away.
+//
+// This is the shape of it that is actually diagnosable - an address key whose
+// token this account's user key cannot decrypt - and what the run has to say
+// about it afterwards.
+func unopenableAccount(t *testing.T, secret string, twoPassword bool) *account {
+	t.Helper()
+	a := newAccount(t, secret, twoPassword)
+	// A token and a signature the user key has nothing to do with, which is what
+	// a key hierarchy in trouble looks like from here.
+	a.addrToken = lockedKey(t, "someone-else", "another passphrase")
+	return a
+}
+
+func TestUnlockSaysNoneOfTheAddressKeysOpenedAndWhy(t *testing.T) {
+	acct := unopenableAccount(t, "the password", false)
+	var got asked
+
+	ctx, tally := skip.With(context.Background())
+	var records bytes.Buffer
+	restore := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&records, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { slog.SetDefault(restore) })
+
+	_, err := Unlock(ctx, acct.serve(t), got.answer(acct.secret))
+	if err == nil {
+		t.Fatal("the unlock succeeded with no openable address key")
+	}
+
+	// The screen says what happened rather than leaving Go's words on it.
+	if !strings.Contains(err.Error(), "None of your addresses' keys could be opened.") {
+		t.Errorf("the failure is not phrased for a person: %v", err)
+	}
+	// And it is this CLI's fault, not the caller's.
+	var coder errs.ExitCoder
+	if errors.As(err, &coder) && coder.ExitCode() != 1 {
+		t.Errorf("the failure claims exit %d; it is unphrased work, which kit.Run tags", coder.ExitCode())
+	}
+
+	// The log says which of the four causes it was, per key and per address.
+	log := records.String()
+	for _, want := range []string{
+		`msg="not shown" kind=key reason="token not decryptable by user key"`,
+		`msg="not shown" kind=address reason="token not decryptable by user key"`,
+		"addresses=1", "addresses_active=1", "user_keys=1", "address_keys=1", "opened=0",
+		"two_password=false",
+	} {
+		if !strings.Contains(log, want) {
+			t.Errorf("the log does not say %q:\n%s", want, log)
+		}
+	}
+	if tally.Count() == 0 {
+		t.Error("nothing was counted as unshowable")
+	}
+}
+
+// The one fact the original report turned on. Somebody saying "I used 2FA"
+// usually means this, and it changes the advice, so the run has to record it
+// whichever way it got here - including from a session that already held a
+// usable key password, which is the path that never asks.
+func TestUnlockRecordsWhetherTheAccountKeepsTwoPasswords(t *testing.T) {
+	for _, twoPassword := range []bool{true, false} {
+		acct := unopenableAccount(t, "the second password", twoPassword)
+		var got asked
+		var records bytes.Buffer
+		restore := slog.Default()
+		slog.SetDefault(slog.New(slog.NewTextHandler(&records, &slog.HandlerOptions{Level: slog.LevelDebug})))
+
+		_, err := Unlock(context.Background(), acct.serve(t), got.answer(acct.secret))
+		slog.SetDefault(restore)
+
+		if err == nil {
+			t.Fatal("the unlock succeeded with no openable address key")
+		}
+		want := fmt.Sprintf("two_password=%v", twoPassword)
+		if !strings.Contains(records.String(), want) {
+			t.Errorf("the log does not say %q:\n%s", want, records.String())
+		}
+		advice := strings.Contains(err.Error(), "second password") ||
+			hasHint(err, "second password")
+		if advice != twoPassword {
+			t.Errorf("two-password %v: the advice about the second password is %v", twoPassword, advice)
+		}
+	}
+}
+
+func hasHint(err error, substr string) bool {
+	var hinter errs.Hinter
+	if !errors.As(err, &hinter) {
+		return false
+	}
+	for _, h := range hinter.Hints() {
+		if strings.Contains(h, substr) {
+			return true
+		}
+	}
+	return false
 }

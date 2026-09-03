@@ -15,6 +15,7 @@ import (
 	"github.com/roman-16/proton-cli/internal/fetch"
 	"github.com/roman-16/proton-cli/internal/ical"
 	"github.com/roman-16/proton-cli/internal/proton"
+	"github.com/roman-16/proton-cli/internal/skip"
 )
 
 // zoneOf resolves an IANA zone name, defaulting to the host's.
@@ -220,16 +221,18 @@ func (s *Service) unlockCalendar(ctx context.Context, calendarID string) (*calKe
 		for _, k := range b.Keys {
 			locked, err := pgp.NewKeyFromArmored(k.PrivateKey)
 			if err != nil {
+				skip.Record(ctx, skip.KindKey, calendarID, skip.Malformed, err)
 				continue
 			}
 			unlocked, err := locked.Unlock(calPass)
 			if err != nil {
+				skip.Record(ctx, skip.KindKey, calendarID, skip.Unlockable, err)
 				continue
 			}
 			_ = calKR.AddKey(unlocked)
 		}
 		if calKR.CountEntities() == 0 {
-			return nil, fmt.Errorf("failed to unlock calendar keys")
+			return nil, fmt.Errorf("none of this calendar's %d keys could be unlocked", len(b.Keys))
 		}
 		return &calKeys{
 			calKR: calKR, addrKR: addrKR, memberID: me.ID, email: me.Email,

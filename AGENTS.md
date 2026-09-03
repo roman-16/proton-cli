@@ -38,6 +38,30 @@ proton-cli has one grammar, one verb per idea, and one shape per response. All o
 - Selection uses `kit.Select`. Never write a second bulk-filter implementation.
 - `internal/ui` has golden tests. Change a response and run `just golden`, then read the diff - it is the review.
 
+## A failure has to leave a trace
+
+Every run records what it did to `~/.config/proton-cli/logs/`, and `proton report` hands that to the maintainer. A user cannot be asked to reproduce a failure with a flag set, so the trace is written whether or not anything went wrong. **When you write code that can fail, decide what a stranger reading the log will need.**
+
+Where to write a line: **anywhere information is about to be destroyed** - a loop carrying on past an error, an `err == nil` that quietly declines a result, a fallback that swallows why it fell back. A loop that discards the error at each `continue` and then reports "none of them worked" leaves nothing to log later; that failure is unfixable no matter what else is instrumented. `internal/cli/conformance_test.go` fails on an `if err != nil { continue }` under `internal/service` or `internal/account` that records nothing.
+
+Which call to use:
+
+| Situation | Use |
+| --- | --- |
+| Something is missing from the answer | `skip.Record(ctx, kind, ref, reason, err)` |
+| Nothing is hidden - the caller refuses, or the gap is visible on screen | `slog.DebugContext`, plus a comment saying *recorded and not counted* and why |
+| The run's own envelope: what was invoked, how it ended, a panic | `UI.Trace` |
+| Anything during the work | `UI.Log`, or package-level `slog` |
+
+Rules:
+
+- **Declare every attribute name in `redact.Fields`** with a policy. Conformance checks both directions: an undeclared name fails, and so does a declared name nothing writes. Reuse a name before adding one.
+- **Log shape, not content.** Counts, a reason from a closed set, an endpoint, a status, a duration, a boolean about the account. Never a subject, filename, search term, secret, or a flag's *value* - those have no name to be written under. An address, ID or path gets a stand-in from `internal/redact`, which is the only thing that decides this and decides it above every destination.
+- **Make the line distinguish causes.** "It failed" earns nothing. Which of the several ways it fails, and the counts around it, is the whole value. A fact that changes the advice is worth one request once the failure has already happened.
+- **`skip.Record` counts as well as logs**, so `kit.List` warns that a listing is short and the envelope carries `skipped`. Never hand-roll that: a listing that under-reports and exits `0` is a wrong answer presented as a right one. Kinds and reasons are declared in `internal/skip`; `skip.Hides` marks the kinds whose loss takes their contents too.
+- **`--log-level` is the screen only.** The file is always at debug. Never lower a record's level to keep it off the screen - use `UI.Trace`.
+- **Phrase user errors with `errs.Problemf`; leave internal failures bare.** `kit.Run` tags an unphrased error out of a command body as exit `7` and invites a report, so a bare `fmt.Errorf` about a mistyped flag reads as "report this", and a polished sentence over a broken key hierarchy hides a real bug.
+
 ## Quality Gates
 
 After making code changes, run these in order. Stop on the first failure and fix it before continuing.

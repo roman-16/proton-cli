@@ -36,26 +36,6 @@ import (
 
 const paidBuild = true
 
-// signInPaid attaches the paid account to its own profile.
-//
-// `account login` is idempotent, so a run that reuses an existing session pays
-// one read for this.
-func signInPaid() {
-	if !configured(paid) {
-		fmt.Fprintf(os.Stderr,
-			"a paid run needs PROTON_CLI_TEST_PAID_USER and PROTON_CLI_TEST_PAID_PASSWORD\n")
-		os.Exit(1)
-	}
-	a := accounts[paid]
-	stdin := strings.NewReader(os.Getenv(a.passwordVar))
-	_, stderr, code, err := runAs(paid, stdin,
-		"account", "login", "--user", os.Getenv(a.userVar), "--password-stdin")
-	if err != nil || code != 0 {
-		fmt.Fprintf(os.Stderr, "failed to sign in the paid account: %v %s\n", err, stderr)
-		os.Exit(1)
-	}
-}
-
 // ── the canary ──
 
 // photograph is what the account held, as one line per thing.
@@ -342,16 +322,6 @@ func sortedKeys(a, b photograph) []string {
 
 // ── the runners ──
 
-// requirePaid ends a test when nobody supplied an account. Under this tag the
-// run has already refused to start without one, so this is the guard for a test
-// somebody runs on its own.
-func requirePaid(t *testing.T) {
-	t.Helper()
-	if !configured(paid) {
-		t.Skip("needs a paid account: set PROTON_CLI_TEST_PAID_USER and PROTON_CLI_TEST_PAID_PASSWORD")
-	}
-}
-
 // runOKStderrSecondary is runOKStderr for the second account, for the answers
 // that are on the other stream.
 func runOKStderrSecondary(t *testing.T, args ...string) (stdout, stderr string) {
@@ -547,7 +517,6 @@ func TestPaidCanaryNoticesAChange(t *testing.T) {
 // feature being broken.
 func TestPaidAccountIsOnAPaidPlan(t *testing.T) {
 	t.Parallel()
-	requirePaid(t)
 
 	scopes, _ := runJSONPaid(t, "account", "get")["scopes"].([]interface{})
 	for _, s := range scopes {
@@ -563,7 +532,6 @@ func TestPaidAccountIsOnAPaidPlan(t *testing.T) {
 // else's data breach. It is read-only: it says what has already happened.
 func TestPaidPassBreachesAreListedAndRead(t *testing.T) {
 	t.Parallel()
-	requirePaid(t)
 
 	rows := runJSONArrayPaid(t, "pass", "breaches", "list")
 	if len(rows) == 0 {
@@ -618,7 +586,6 @@ func TestPaidPassBreachesAreListedAndRead(t *testing.T) {
 // it was - and the canary checks that rather than taking this test's word.
 func TestPaidCalendarSubscription(t *testing.T) {
 	t.Parallel()
-	requirePaid(t)
 
 	// An address Proton can actually fetch, so what is being tested is
 	// subscribing rather than the address being unreachable. Checked by hand
@@ -646,7 +613,6 @@ func TestPaidCalendarSubscription(t *testing.T) {
 // nobody is left with an empty calendar that never fills.
 func TestPaidCalendarSubscriptionRefusesAnAddressItCannotRead(t *testing.T) {
 	t.Parallel()
-	requirePaid(t)
 
 	name := testID() + "-bad-feed"
 	_, stderr, code := runPaid(t, "--yes", "calendar", "settings", "calendars", "create",
@@ -674,7 +640,6 @@ func TestPaidCalendarSubscriptionRefusesAnAddressItCannotRead(t *testing.T) {
 // The link is made against an item this test creates and both are removed again.
 func TestPaidPassSecureLink(t *testing.T) {
 	t.Parallel()
-	requirePaid(t)
 
 	name := testID() + "-link"
 	out, stderr, code := runPaid(t, "--yes", "pass", "items", "create",
@@ -734,7 +699,6 @@ func TestPaidPassSecureLink(t *testing.T) {
 // account's own is shared even for a moment.
 func TestPaidCalendarSharing(t *testing.T) {
 	t.Parallel()
-	requirePaid(t)
 
 	name := testID() + "-shared"
 	out, stderr, code := runPaid(t, "--yes", "calendar", "settings", "calendars", "create", "--name", name)
@@ -836,7 +800,6 @@ func TestPaidCalendarSharing(t *testing.T) {
 // endpoint from ending a membership somebody is already using.
 func TestPaidCalendarSharingWithdrawnBeforeAnswer(t *testing.T) {
 	t.Parallel()
-	requirePaid(t)
 
 	name := testID() + "-withdrawn"
 	out, stderr, code := runPaid(t, "--yes", "calendar", "settings", "calendars", "create", "--name", name)
@@ -866,7 +829,6 @@ func TestPaidCalendarSharingWithdrawnBeforeAnswer(t *testing.T) {
 // opening anything.
 func TestPaidCalendarInvitationDeclined(t *testing.T) {
 	t.Parallel()
-	requirePaid(t)
 
 	name := testID() + "-declined"
 	out, stderr, code := runPaid(t, "--yes", "calendar", "settings", "calendars", "create", "--name", name)
@@ -912,7 +874,6 @@ func TestPaidCalendarInvitationDeclined(t *testing.T) {
 // none to encrypt to.
 func TestPaidCalendarSharingNeedsAProtonAddress(t *testing.T) {
 	t.Parallel()
-	requirePaid(t)
 
 	name := testID() + "-outside"
 	out, stderr, code := runPaid(t, "--yes", "calendar", "settings", "calendars", "create", "--name", name)
@@ -943,7 +904,6 @@ func TestPaidCalendarSharingNeedsAProtonAddress(t *testing.T) {
 // it was given actually open what is in there.
 func TestPaidPassVaultSharing(t *testing.T) {
 	t.Parallel()
-	requirePaid(t)
 
 	name := testID() + "-shared-vault"
 	out, stderr, code := runPaid(t, "--yes", "pass", "vaults", "create", "--name", name)
@@ -1056,7 +1016,6 @@ func TestPaidPassVaultSharing(t *testing.T) {
 // second paid account to answer it.
 func TestPaidPassItemSharing(t *testing.T) {
 	t.Parallel()
-	requirePaid(t)
 
 	name := testID() + "-shared-item"
 	out, stderr, code := runPaid(t, "--yes", "pass", "items", "create", "--name", name,
@@ -1144,7 +1103,6 @@ func TestPaidPassItemSharing(t *testing.T) {
 // An offer can be withdrawn before it is taken.
 func TestPaidPassVaultShareWithdrawn(t *testing.T) {
 	t.Parallel()
-	requirePaid(t)
 
 	name := testID() + "-withdrawn-vault"
 	out, stderr, code := runPaid(t, "--yes", "pass", "vaults", "create", "--name", name)
@@ -1172,7 +1130,6 @@ func TestPaidPassVaultShareWithdrawn(t *testing.T) {
 // An offer can be turned down, which opens nothing.
 func TestPaidPassVaultInviteDeclined(t *testing.T) {
 	t.Parallel()
-	requirePaid(t)
 
 	name := testID() + "-declined-vault"
 	out, stderr, code := runPaid(t, "--yes", "pass", "vaults", "create", "--name", name)
@@ -1218,7 +1175,6 @@ func TestPaidPassVaultInviteDeclined(t *testing.T) {
 // who is in one: the whole contact, and one of their addresses.
 func TestPaidContactGroups(t *testing.T) {
 	t.Parallel()
-	requirePaid(t)
 
 	gname := testID() + "-group"
 	out, stderr, code := runPaid(t, "--yes", "contacts", "groups", "create",
@@ -1284,7 +1240,6 @@ func groupSize(t *testing.T, group string) int {
 // is the whole feature: without it a reply leaves from the real mailbox.
 func TestPaidPassAliasContacts(t *testing.T) {
 	t.Parallel()
-	requirePaid(t)
 
 	name := testID() + "-alias"
 	prefix := fmt.Sprintf("pcli-%d", time.Now().UnixNano()%1_000_000_000)
@@ -1343,7 +1298,6 @@ func contactField(t *testing.T, alias, field string) interface{} {
 // again, which is the part a run can repeat.
 func TestPaidPassAliasMailbox(t *testing.T) {
 	t.Parallel()
-	requirePaid(t)
 
 	// The second account's own address, because a mailbox has to be one somebody
 	// could actually read the confirmation at.

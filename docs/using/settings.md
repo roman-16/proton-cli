@@ -40,6 +40,7 @@ The top level applies whichever profile you are acting as. `per-profile:` narrow
 | `full-ids` | `--full-ids` |
 | `no-color` | `--no-color`; `NO_COLOR` |
 | `no-input` | `--no-input`; `PROTON_NO_INPUT` |
+| `no-log` | `--no-log`; `PROTON_NO_LOG` |
 | `no-update-check` | `PROTON_NO_UPDATE_CHECK` |
 | `confirm` | `--confirm`; `PROTON_CONFIRM` ([what it does](confirmations.md#making-more-commands-ask)) |
 
@@ -116,6 +117,7 @@ $ proton --quiet=false mail messages list
 | `COLORTERM` | Set to `truecolor` or `24bit` if your terminal takes 24-bit colour and does not advertise it. Only affects how exactly a colour swatch is drawn ([why](../about/why.md#why-colour-is-asked-for-by-name)) |
 | `PROTON_NO_INPUT` | Set to any value, even empty, to never prompt. A missing credential becomes an error |
 | `PROTON_LOG_LEVEL` | `debug`, `info`, `warn` or `error` |
+| `PROTON_NO_LOG` | Set to any value, even empty, to write no diagnostic log ([what that is](#the-diagnostic-log)) |
 | `TZ` | The IANA zone to work in, such as `Europe/Vienna`. POSIX's own variable, read when no flag or file names one |
 | `PROTON_NO_UPDATE_CHECK` | Set to any value, even empty, to never look for a new release ([what that is](../install.md#updating)) |
 | `PROTON_VERIFIED` | A human verification already solved, as the refusal printed it ([when you need it](../help/troubleshooting.md#solving-a-captcha-in-a-script)) |
@@ -128,8 +130,28 @@ $ proton --quiet=false mail messages list
 | `~/.config/proton-cli/sessions/<profile>.json` | Session tokens and the encrypted key password (mode `0600`) |
 | `~/.config/proton-cli/idcache/<profile>.json` | Short-ID lookup table ([what that is](naming.md#short-ids)) |
 | `~/.config/proton-cli/update-check.json` | When proton last looked for a new release ([why](../install.md#updating)) |
+| `~/.config/proton-cli/logs/` | What every run did, one file per day ([below](#the-diagnostic-log)) |
 
 Those are the Linux paths. macOS uses `~/Library/Application Support/proton-cli/`, and Windows uses `%APPDATA%\proton-cli\`. Nothing else is written.
+
+## The diagnostic log
+
+Every run writes what it did to `~/.config/proton-cli/logs/`, one file per day named for it, at full detail whatever `--log-level` says - that flag decides what reaches your screen, not what is recorded. The last **16 files** are kept.
+
+It exists so that `proton report` can tell a maintainer what happened without you having to reproduce it. **Addresses, IDs, filenames and search terms never enter it.** An address is written as a stand-in like `address:3f9c1e@proton.me` - the same address reads the same way in every line, so a reader can follow which one failed, and it cannot be turned back into an address by anybody. What is left is the shape of what ran: which command, which endpoints, which status codes, how long, and what went wrong.
+
+To write nothing at all:
+
+```console
+$ proton --no-log mail messages list
+$ PROTON_NO_LOG=1 proton mail messages list
+```
+
+```yaml
+no-log: true
+```
+
+With the log off, `proton report` has nothing to show but this build and your settings.
 
 ## Global flags
 
@@ -149,6 +171,7 @@ Every command takes these.
 | `--log-level debug\|info\|warn\|error` | Logging verbosity (env: `PROTON_LOG_LEVEL`) |
 | `--zone NAME` | IANA time zone to work in (env: `TZ`) |
 | `--no-input` | Never prompt. A missing credential becomes an error (env: `PROTON_NO_INPUT`) |
+| `--no-log` | Write no diagnostic log for this run (env: `PROTON_NO_LOG`) |
 | `--verified TOKEN` | A human verification already solved, as the refusal printed it (env: `PROTON_VERIFIED`) |
 
 The five you type most have a single-letter form, and they cluster, so `-qn` is a quiet dry run. [Why only five](../about/why.md#why-one-flag-name-means-one-thing).

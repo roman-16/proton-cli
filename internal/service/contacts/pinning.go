@@ -10,6 +10,7 @@ import (
 	"github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
+	"github.com/roman-16/proton-cli/internal/skip"
 	"github.com/roman-16/proton-cli/internal/vcard"
 )
 
@@ -45,7 +46,7 @@ func (s *Service) PinnedKeysFor(ctx context.Context, email string) (*ContactCryp
 	if group == "" {
 		return nil, nil
 	}
-	armored := decodePinnedKeys(vcard.GroupValues(joined, group, "KEY"))
+	armored := decodePinnedKeys(ctx, id, vcard.GroupValues(joined, group, "KEY"))
 	if len(armored) == 0 {
 		return nil, nil
 	}
@@ -87,24 +88,32 @@ func (s *Service) contactIDByEmail(ctx context.Context, email string) (string, b
 }
 
 // decodePinnedKeys turns "data:application/pgp-keys;base64,<b64>" vCard KEY
-// values into armored public keys, dropping any that fail to parse.
-func decodePinnedKeys(values []string) []string {
+// values into armored public keys.
+//
+// A key that will not decode is counted, because a pinned key is a decision
+// somebody made about who they trust: silently listing three of their four
+// pinned keys tells them the fourth is gone when it is only unreadable.
+func decodePinnedKeys(ctx context.Context, contactID string, values []string) []string {
 	var out []string
 	for _, v := range values {
 		_, b64, ok := strings.Cut(v, ",")
 		if !ok {
+			skip.Record(ctx, skip.KindKey, contactID, skip.Malformed, nil)
 			continue
 		}
 		bin, err := base64.StdEncoding.DecodeString(strings.TrimSpace(b64))
 		if err != nil {
+			skip.Record(ctx, skip.KindKey, contactID, skip.Malformed, err)
 			continue
 		}
 		key, err := gopenpgp.NewKey(bin)
 		if err != nil {
+			skip.Record(ctx, skip.KindKey, contactID, skip.Malformed, err)
 			continue
 		}
 		armored, err := key.GetArmoredPublicKey()
 		if err != nil {
+			skip.Record(ctx, skip.KindKey, contactID, skip.Malformed, err)
 			continue
 		}
 		out = append(out, armored)
@@ -151,7 +160,8 @@ func (s *Service) editableSignedCard(ctx context.Context, id string) (*vcard.Sig
 		if c.Type == pgp.CardSigned && !haveSigned {
 			msg := gopenpgp.NewPlainMessageFromString(c.Data)
 			if v := pgp.VerifyDetachedStatus(u.UserKR, msg, c.Signature); v != pgp.Verified {
-				return nil, nil, fmt.Errorf("contact signed card could not be verified; refusing to edit")
+				return nil, nil, errs.Problemf("This contact's signed card could not be verified, so it will not be edited.").
+					Hint("open the contact in a Proton app to re-sign it")
 			}
 			signedData = c.Data
 			haveSigned = true

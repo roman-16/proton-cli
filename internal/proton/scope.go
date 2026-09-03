@@ -197,7 +197,7 @@ func (c *Client) answerSecondFactor(ctx context.Context) func(twoFA) (map[string
 // already finished, so a failure here is worth a log line and nothing more.
 func (c *Client) Relock(ctx context.Context) {
 	if err := c.Decode(ctx, Request{Method: "PUT", Path: lockPath}, nil); err != nil {
-		c.log.Debug("relock failed; the session stays elevated until it expires", "err", err)
+		c.log.Debug("relock failed; the session stays elevated until it expires", "error", err)
 	}
 }
 

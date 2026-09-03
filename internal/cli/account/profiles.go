@@ -28,7 +28,7 @@ func profilesListCmd() *cobra.Command {
 		// No authentication: this reads the filesystem, and being able to see
 		// which accounts are configured without contacting Proton is the point.
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
-			profiles, err := session.Profiles()
+			profiles, err := session.Profiles(c.Ctx)
 			if err != nil {
 				return err
 			}

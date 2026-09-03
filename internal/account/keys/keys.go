@@ -15,6 +15,7 @@ import (
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/fetch"
 	"github.com/roman-16/proton-cli/internal/proton"
+	"github.com/roman-16/proton-cli/internal/skip"
 )
 
 type Unlocked struct {
@@ -144,9 +145,19 @@ func Unlock(ctx context.Context, c *proton.Client, ask KeyPassword) (*Unlocked, 
 	}
 
 	if sealed != "" {
-		u, err := open(user, addrs, sealed)
+		u, err := open(ctx, user, addrs, sealed)
 		if err == nil {
 			return u, nil
+		}
+		// The user keys opened and the address keys did not follow. The sealed
+		// passphrase is therefore the right one, so deriving it again would try
+		// the same secret and fail the same way: this is the answer, not a step
+		// on the way to one. Whether the account keeps two passwords has to be
+		// asked for here, which is a request worth making only now that
+		// something has gone wrong.
+		var unopened *unopenable
+		if errors.As(err, &unopened) {
+			return nil, unopenedKeys(ctx, askTwoPassword(ctx, c), unopened)
 		}
 		if !errors.Is(err, errWrongKeyPass) {
 			return nil, err
@@ -160,10 +171,15 @@ func Unlock(ctx context.Context, c *proton.Client, ask KeyPassword) (*Unlocked, 
 	if err != nil {
 		return nil, err
 	}
-	u, err := open(user, addrs, d.pass)
+	u, err := open(ctx, user, addrs, d.pass)
 	if err != nil {
 		if errors.Is(err, errWrongKeyPass) {
 			return nil, wrongSecret(d.twoPassword)
+		}
+		var unopened *unopenable
+		if errors.As(err, &unopened) {
+			// Deriving already asked, so nothing is asked twice.
+			return nil, unopenedKeys(ctx, d.twoPassword, unopened)
 		}
 		return nil, err
 	}
@@ -173,22 +189,109 @@ func Unlock(ctx context.Context, c *proton.Client, ask KeyPassword) (*Unlocked, 
 
 // open unlocks the hierarchy with a passphrase: the user keys, then the address
 // keys they hold the tokens for.
-func open(user *User, addrs []Address, skp string) (*Unlocked, error) {
-	userKR, err := unlockKeyRing(user.Keys, []byte(skp), nil)
+//
+// Every address is tried and every failure is recorded, because "none of them
+// opened" is four different problems wearing one sentence - keys Proton has
+// retired, tokens this user key cannot decrypt, armour that will not parse, a
+// passphrase that is simply wrong - and they have four different answers. The
+// shape of the account is written down beside them, since a hierarchy in trouble
+// is a thing you diagnose by counting.
+func open(ctx context.Context, user *User, addrs []Address, skp string) (*Unlocked, error) {
+	userKR, err := unlockKeyRing(ctx, user.Keys, []byte(skp), nil)
 	if err != nil {
 		return nil, errWrongKeyPass
 	}
 
 	addrKRs := map[string]*pgp.KeyRing{}
+	active, addressKeys := 0, 0
 	for _, a := range addrs {
-		if kr, err := unlockKeyRing(a.Keys, []byte(skp), userKR); err == nil {
-			addrKRs[a.ID] = kr
+		if a.Status != 0 {
+			active++
 		}
+		addressKeys += len(a.Keys)
+		kr, err := unlockKeyRing(ctx, a.Keys, []byte(skp), userKR)
+		if err != nil {
+			skip.Record(ctx, skip.KindAddress, a.ID, reasonFor(err), nil)
+			continue
+		}
+		addrKRs[a.ID] = kr
 	}
+	shape := &unopenable{
+		addresses: len(addrs), active: active,
+		userKeys: len(user.Keys), addressKeys: addressKeys,
+	}
+	slog.DebugContext(ctx, "keys: address keys opened",
+		"addresses", shape.addresses, "addresses_active", shape.active,
+		"user_keys", shape.userKeys, "address_keys", shape.addressKeys,
+		"opened", len(addrKRs))
 	if len(addrKRs) == 0 {
-		return nil, fmt.Errorf("failed to unlock any address keys")
+		return nil, shape
 	}
 	return &Unlocked{UserKR: userKR, AddrKRs: addrKRs, Addresses: addrs}, nil
+}
+
+// unopenable is the account's shape when the user keys opened and not one
+// address key followed.
+//
+// It carries the counts rather than a sentence, because the sentence depends on
+// something open cannot know without a request - see unopenedKeys - and because
+// the counts are what somebody reading a report diagnoses this from.
+type unopenable struct {
+	addresses, active, userKeys, addressKeys int
+}
+
+func (e *unopenable) Error() string {
+	return fmt.Sprintf("none of %d addresses' keys could be opened", e.addresses)
+}
+
+// unopenedKeys is the only place this failure is phrased. Both ways of reaching
+// it come through here, so one failure cannot wear two faces.
+//
+// It is not a mistake anybody made at the terminal, so it says what it is and
+// points at the one thing that can move it forward. In two-password mode the
+// second password is worth naming as a possibility, because it is the one
+// secret involved that Proton never proves over SRP - it opened the user keys,
+// which is why the run got this far, and can still be wrong for keys that were
+// re-encrypted elsewhere.
+func unopenedKeys(ctx context.Context, twoPassword bool, shape *unopenable) error {
+	slog.DebugContext(ctx, "keys: no address key opened",
+		"addresses", shape.addresses, "addresses_active", shape.active,
+		"user_keys", shape.userKeys, "address_keys", shape.addressKeys,
+		"two_password", twoPassword)
+
+	problem := errs.Problemf("None of your addresses' keys could be opened.")
+	if twoPassword {
+		problem = problem.Hint("if you changed your second password recently, sign in again")
+	}
+	return fmt.Errorf("%w: %w", problem, shape)
+}
+
+// askTwoPassword asks whether this account keeps its sign-in and its keys
+// behind separate passwords, for the one caller that has not already been told.
+//
+// A failure to ask is not a failure to report: the answer decides one line of
+// advice, so not knowing costs that line and nothing else.
+func askTwoPassword(ctx context.Context, c *proton.Client) bool {
+	twoPassword, err := twoPasswordMode(ctx, c)
+	if err != nil {
+		slog.DebugContext(ctx, "keys: could not ask whether this account keeps two passwords",
+			"error", err.Error())
+		return false
+	}
+	return twoPassword
+}
+
+// reasonFor names which of the four ways unlocking fails happened, for the log.
+func reasonFor(err error) skip.Reason {
+	switch {
+	case errors.Is(err, errNoActiveKey):
+		return skip.Inactive
+	case errors.Is(err, errTokenUndecryptable):
+		return skip.Untokenized
+	case errors.Is(err, errKeyMalformed):
+		return skip.Malformed
+	}
+	return skip.Unlockable
 }
 
 // wrongSecret says which of the account's secrets failed to open its keys.
@@ -217,12 +320,12 @@ func sealedKeyPass(ctx context.Context, c *proton.Client) string {
 	}
 	key, err := localkey.Get(ctx, c)
 	if err != nil {
-		slog.Debug("localkey: the session's client key could not be fetched; deriving the key password instead", "err", err)
+		slog.Debug("localkey: the session's client key could not be fetched; deriving the key password instead", "error", err)
 		return ""
 	}
 	skp, err := localkey.Unwrap(blob, key)
 	if err != nil {
-		slog.Debug("localkey: the sealed key password could not be opened; deriving one instead", "err", err)
+		slog.Debug("localkey: the sealed key password could not be opened; deriving one instead", "error", err)
 		return ""
 	}
 	return skp
@@ -320,16 +423,16 @@ func saltOf(keys []Key, salts []salt) string {
 func wrapAndPersist(ctx context.Context, c *proton.Client, skp string) {
 	key, err := localkey.Generate()
 	if err != nil {
-		slog.Debug("localkey: generate failed; key password not persisted this run", "err", err)
+		slog.Debug("localkey: generate failed; key password not persisted this run", "error", err)
 		return
 	}
 	if err := localkey.Put(ctx, c, key); err != nil {
-		slog.Debug("localkey: put failed; key password not persisted this run", "err", err)
+		slog.Debug("localkey: put failed; key password not persisted this run", "error", err)
 		return
 	}
 	blob, err := localkey.Wrap(skp, key)
 	if err != nil {
-		slog.Debug("localkey: wrap failed; key password not persisted this run", "err", err)
+		slog.Debug("localkey: wrap failed; key password not persisted this run", "error", err)
 		return
 	}
 	c.SetEncKeyBlob(blob)
@@ -415,35 +518,60 @@ func getAddresses(ctx context.Context, c *proton.Client) ([]Address, error) {
 	return r.Addresses, nil
 }
 
-func unlockKeyRing(keys []Key, passphrase []byte, userKR *pgp.KeyRing) (*pgp.KeyRing, error) {
+// The four ways one key fails to open. They are told apart because the answers
+// differ: a retired key is normal, a token this user key cannot decrypt means
+// the hierarchy itself is wrong, armour that will not parse means Proton sent
+// something unexpected, and a key that will not unlock means the passphrase is
+// not the one it was locked with.
+var (
+	errNoActiveKey        = errors.New("no active key")
+	errTokenUndecryptable = errors.New("token not decryptable by the user key")
+	errKeyMalformed       = errors.New("key is not readable armour")
+	errKeyLocked          = errors.New("key did not unlock with the passphrase")
+)
+
+func unlockKeyRing(ctx context.Context, keys []Key, passphrase []byte, userKR *pgp.KeyRing) (*pgp.KeyRing, error) {
 	kr, err := pgp.NewKeyRing(nil)
 	if err != nil {
 		return nil, err
 	}
+	// The reason the last key failed for, which stands for the address when the
+	// caller phrases one sentence about it. Every key's own reason is recorded as
+	// it happens, so nothing is lost by the summary being approximate: a reader
+	// with the log has the whole picture and a reader with the sentence has the
+	// common case, which is an address with one key.
+	last := errNoActiveKey
 	for _, k := range keys {
 		if k.Active == 0 {
+			skip.Record(ctx, skip.KindKey, k.ID, skip.Inactive, nil)
 			continue
 		}
 		secret := passphrase
 		if k.Token != "" && k.Signature != "" && userKR != nil {
 			s, err := decryptToken(k.Token, k.Signature, userKR)
 			if err != nil {
+				last = errTokenUndecryptable
+				skip.Record(ctx, skip.KindKey, k.ID, skip.Untokenized, err)
 				continue
 			}
 			secret = s
 		}
 		locked, err := pgp.NewKeyFromArmored(k.PrivateKey)
 		if err != nil {
+			last = errKeyMalformed
+			skip.Record(ctx, skip.KindKey, k.ID, skip.Malformed, err)
 			continue
 		}
 		unlocked, err := locked.Unlock(secret)
 		if err != nil {
+			last = errKeyLocked
+			skip.Record(ctx, skip.KindKey, k.ID, skip.Unlockable, err)
 			continue
 		}
 		_ = kr.AddKey(unlocked)
 	}
 	if kr.CountEntities() == 0 {
-		return nil, fmt.Errorf("no keys could be unlocked")
+		return nil, fmt.Errorf("no keys could be unlocked: %w", last)
 	}
 	return kr, nil
 }
@@ -507,6 +635,12 @@ func Published(ctx context.Context, c proton.Doer, email string) (*pgp.KeyRing, 
 		}
 		key, err := pgp.NewKeyFromArmored(k.PublicKey)
 		if err != nil {
+			// Recorded and not counted. The caller's answer is "this recipient has
+			// no key we can encrypt to", which it goes on to handle; nothing has
+			// been hidden from anybody, so there is nothing for a listing to warn
+			// about.
+			slog.DebugContext(ctx, "keys: a recipient's published key is not readable armour",
+				"signer", email, "error", err)
 			continue
 		}
 		_ = kr.AddKey(key)

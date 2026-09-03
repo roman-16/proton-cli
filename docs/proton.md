@@ -41,13 +41,39 @@ Completion knows the whole command tree, every flag, and the values each enumera
 proton completion
 ```
 
+## `report`
+
+Collect what a bug report needs: this build, your settings, and a redacted trace of the run that failed.
+
+The last run that failed, or --all for every run still on disk. One file per day; the last 16 are kept.
+
+Addresses, IDs and file paths are replaced by stable stand-ins before anything is written, so the same address reads as the same name throughout and as nothing at all to anybody else. Nothing here can be turned back into an address, a password, a subject or a filename.
+
+Reads only what is already on this machine: no account, no network.
+
+```
+proton report
+```
+
+```bash
+proton report
+proton report --all
+proton report --dest bug.txt
+```
+
+| Flag | Description |
+| --- | --- |
+| `--all` | Act on everything in scope, rather than a subset |
+| `--dest string` | Write to this path, or - for stdout |
+| `--force` | Overwrite a file that already exists |
+
 ## `uninstall`
 
 Remove a proton binary installed with the curl or PowerShell installer, or downloaded by hand.
 
 A package-managed install (apt, dnf, apk, AUR, Homebrew, winget, npm, Nix) is refused, with the right command to use instead.
 
-Only the binary goes, under both names it answers to. --purge also deletes your saved sessions and the ID cache.
+Only the binary goes, under both names it answers to. --purge also deletes your saved sessions, the ID cache and the diagnostic log.
 
 ```
 proton uninstall
@@ -61,7 +87,7 @@ proton uninstall --yes --purge
 
 | Flag | Description |
 | --- | --- |
-| `--purge` | Also remove local data (saved sessions and ID cache) |
+| `--purge` | Also remove local data (saved sessions, ID cache and diagnostic log) |
 
 ## `update`
 

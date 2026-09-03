@@ -3,11 +3,13 @@ package drive
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
+	"github.com/roman-16/proton-cli/internal/skip"
 )
 
 // The kinds a link can be. A response says what a thing is rather than which
@@ -83,6 +85,10 @@ func (s *Service) walk(ctx context.Context, shareID, linkID string, parentKR *pg
 	for _, r := range raw {
 		name, err := decryptName(r.Name, parentKR)
 		if err != nil {
+			// The row stays, so nothing has gone missing from the answer and there
+			// is nothing to count: the name on the screen says what happened.
+			slog.DebugContext(ctx, "drive: a child's name could not be decrypted",
+				"link", r.LinkID, "parent", linkID, "error", err)
 			name = "(decrypt failed)"
 		}
 		full := prefix + "/" + name
@@ -90,10 +96,12 @@ func (s *Service) walk(ctx context.Context, shareID, linkID string, parentKR *pg
 		if r.Type == 1 {
 			childKR, err := unlockNode(&r, parentKR, nil)
 			if err != nil {
+				skip.Record(ctx, skip.KindFolder, r.LinkID, skip.Unlockable, err)
 				continue
 			}
 			nested, err := s.walk(ctx, shareID, r.LinkID, childKR, full)
 			if err != nil {
+				skip.Record(ctx, skip.KindFolder, r.LinkID, skip.Unreadable, err)
 				continue
 			}
 			out = append(out, nested...)

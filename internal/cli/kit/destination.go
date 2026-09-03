@@ -78,6 +78,19 @@ func (d *Destination) free(path string) error {
 // Stdout reports whether the payload streams to standard output.
 func (d *Destination) Stdout() bool { return d.dest == "-" }
 
+// WriteNamed writes data to the path the user named, and is the one place that
+// decides what to do when something is already there.
+//
+// A path somebody typed is refused rather than replaced: they named that exact
+// file, and destroying something they did not mention is not a thing a command
+// may do quietly. --force is how they say they meant it.
+func WriteNamed(path string, data []byte, force bool) (string, error) {
+	if !force && exists(path) {
+		return "", Fail("%s already exists.", path).Hint("--force to overwrite it.")
+	}
+	return path, os.WriteFile(path, data, 0o600)
+}
+
 // Describe names the destination for a confirmation.
 func (d *Destination) Describe() string {
 	switch {
@@ -105,10 +118,7 @@ func (d *Destination) Write(c *Invocation, name string, data []byte) (string, er
 		return "", err
 	}
 	if d.dest != "" {
-		if !d.force && exists(d.dest) {
-			return "", Fail("%s already exists.", d.dest).Hint("--force to overwrite it.")
-		}
-		return d.dest, os.WriteFile(d.dest, data, 0o600)
+		return WriteNamed(d.dest, data, d.force)
 	}
 	if d.destDir != "" {
 		if err := EnsureDir(d.destDir); err != nil {

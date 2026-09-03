@@ -340,3 +340,48 @@ func stripANSI(s string) string {
 	}
 	return b.String()
 }
+
+// A listing that is short says so, on the commentary stream and in the
+// envelope: the warning is for the person reading and the field is for the
+// script that never sees a warning.
+func TestTableThatIsShortSaysSo(t *testing.T) {
+	u, out, errb := fixture(t, Options{})
+	spec := TableSpec[message]{
+		Noun: "messages", Columns: messageColumns(), Total: Unknown, Page: Unpaged,
+		Skipped: IncompleteSpec{
+			Count: 1, Kind: "message",
+			Remedy: "This is a bug or damaged data - `proton report` has the details.",
+		},
+	}
+	if err := Table(u, spec, messages()); err != nil {
+		t.Fatal(err)
+	}
+	check(t, "table_incomplete", out, errb)
+}
+
+func TestTableThatLostAContainerSaysWhatWentWithIt(t *testing.T) {
+	u, out, errb := fixture(t, Options{})
+	spec := TableSpec[message]{
+		Noun: "messages", Columns: messageColumns(), Total: Unknown, Page: Unpaged,
+		Skipped: IncompleteSpec{
+			Count: 1, Kind: "folder", Hides: true,
+			Remedy: "This is a bug or damaged data - `proton report` has the details.",
+		},
+	}
+	if err := Table(u, spec, messages()); err != nil {
+		t.Fatal(err)
+	}
+	check(t, "table_incomplete_container", out, errb)
+}
+
+func TestTheEnvelopeSaysHowManyItCouldNotShow(t *testing.T) {
+	u, out, errb := fixture(t, Options{Format: FormatJSON})
+	spec := TableSpec[message]{
+		Noun: "messages", Columns: messageColumns(), Total: 312, Page: 0, PageSize: 3,
+		Skipped: IncompleteSpec{Count: 1, Kind: "message"},
+	}
+	if err := Table(u, spec, messages()[:1]); err != nil {
+		t.Fatal(err)
+	}
+	check(t, "table_envelope_incomplete_json", out, errb)
+}

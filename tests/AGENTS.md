@@ -25,9 +25,13 @@ just test-one TestDriveItemsMove      # a single one
 just test-report                      # where the time went, and how deep each request graph was
 ```
 
-`just login` and `just seed` sign the accounts in and fill them, for working with them by hand.
+`just login` signs every account in, and `just seed` fills the two free ones, for working with them by hand.
 
-The suite requires all six of `PROTON_CLI_TEST_PRIMARY_USER`, `PROTON_CLI_TEST_PRIMARY_PASSWORD`, `PROTON_CLI_TEST_SECONDARY_USER`, `PROTON_CLI_TEST_SECONDARY_PASSWORD`, `PROTON_CLI_TEST_SECONDARY_SECOND_PASSWORD` and `PROTON_CLI_TEST_SECONDARY_EXTRA_PASSWORD`. `PROTON_CLI_TEST_PAID_USER` and `PROTON_CLI_TEST_PAID_PASSWORD` are optional - see [The paid account](#the-paid-account). `.env.example` lists all of them.
+**Signing in is the one thing here that can need a person.** Proton raises a CAPTCHA at login, a challenge belongs to the run it was issued to, and only a browser answers one - so `just login` inherits your terminal, and it is the only thing in this repository that may wait. `go test` hands the test binary `/dev/null` on standard input, so nothing inside `TestMain` can ever present one. A run that finds a working session pays one read for its own sign-in (`account login` does no SRP exchange while the saved session works); a run that would have to sign in from scratch stops and says to run `just login`.
+
+The suite requires all six of `PROTON_CLI_TEST_PRIMARY_USER`, `PROTON_CLI_TEST_PRIMARY_PASSWORD`, `PROTON_CLI_TEST_SECONDARY_USER`, `PROTON_CLI_TEST_SECONDARY_PASSWORD`, `PROTON_CLI_TEST_SECONDARY_SECOND_PASSWORD` and `PROTON_CLI_TEST_SECONDARY_EXTRA_PASSWORD`.
+
+`PROTON_CLI_TEST_PAID_USER` and `PROTON_CLI_TEST_PAID_PASSWORD` are required by **`just test-paid`, `just test-all` and `just coverage`**, and by nothing else. An account is required exactly where the binary holds tests for it: without the `paid` build tag there is no paid account compiled in, so demanding its credentials would demand something the run cannot use; with the tag every test acts on it, and a run that skipped them all would report success for having done nothing. `required` in `integration_test.go` says which, from `paidBuild`. `.env.example` lists all of them.
 
 ## The two accounts
 
@@ -39,7 +43,7 @@ Its **Pass is protected with an extra password** for the same reason, so `PROTON
 
 These are the harness's own variables, not the CLI's: proton takes an account from a signed-in profile, which `TestMain` establishes. The `PROTON_CLI_TEST_` prefix keeps them clear of anything the binary reads.
 
-`TestMain` signs both profiles in before any test runs, over stdin - the secondary's second password goes in a `0600` file beside it, because standard input has one reader - and writes each account password to a `0600` file for the rest of the run. The file is needed because a session cannot carry elevation: Proton re-authenticates over SRP for its guarded operations, `calendar settings calendars delete` among them, and that needs the password itself - the key blob sealed at login is a one-way derivation of it. `account login` is idempotent, so a run that reuses an existing session pays nothing.
+`TestMain` signs every required profile in before any test runs, each secret from a `0600` file of its own, and leaves those files in place for the rest of the run. The file is needed because a session cannot carry elevation: Proton re-authenticates over SRP for its guarded operations, `calendar settings calendars delete` among them, and that needs the password itself - the key blob sealed at login is a one-way derivation of it. `account login` is idempotent, so a run that reuses an existing session pays nothing.
 
 `runAs` builds the child environment from an **allowlist** rather than inheriting one. It is the single place a target account is chosen, so it is the single place the choice can be enforced: whatever you happen to have exported, the binary under test sees a stated environment and can act only as the profile named there.
 
@@ -93,7 +97,7 @@ tests/
 
 1. `TestMain` in `integration_test.go` builds the binary once into a temp directory.
 2. Each test calls the binary as a subprocess via `run()` / `runOK()` / `runJSON()`.
-3. `TestMain` signs both profiles in and seeds nothing. What the account has to hold is brought about by the test that reads it.
+3. `TestMain` signs every required profile in and seeds nothing. What the account has to hold is brought about by the test that reads it.
 4. Each invocation names its profile through `PROTON_PROFILE` in a scrubbed child environment, and the session is reused across invocations.
 5. Tests run **one at a time**, and every one of them calls `t.Parallel()`. What two tests cannot both have at once is declared and leased - see below.
 

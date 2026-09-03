@@ -9,6 +9,7 @@
 package errs
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -16,8 +17,36 @@ import (
 // ExitCoder is implemented by errors that carry a specific process exit code.
 //
 //	1 user error · 2 auth · 3 not found · 4 conflict or ambiguity · 5 network
+//	6 refused by policy · 7 a bug
 type ExitCoder interface {
 	ExitCode() int
+}
+
+// ExitBug is what a failure nobody phrased exits with.
+//
+// Every failure a user can cause is given words and a code by whatever raised
+// it. A failure that comes out of a command's own work still wearing whatever Go
+// wrote is, by that fact alone, one this CLI did not anticipate - so it is not
+// the caller's mistake, and reporting it as one costs somebody an afternoon
+// looking for the argument they got wrong.
+//
+// It is applied by the seam every command body passes through rather than by
+// the classifier at the top, because the distinction is about where an error
+// came from and only that seam knows: everything cobra raises about a command
+// line happens before a body runs, and is a user error however bare it looks.
+const ExitBug = 7
+
+// Bug marks a failure as this CLI's own, unless something has already said what
+// it is. Returns nil for nil.
+func Bug(err error) error {
+	if err == nil {
+		return nil
+	}
+	var coder ExitCoder
+	if errors.As(err, &coder) {
+		return err
+	}
+	return &Exit{Code: ExitBug, Err: err}
 }
 
 // Hinter is implemented by errors that know how the user might fix them. The ui
@@ -71,6 +100,11 @@ type NotFound struct {
 	// Kind is the singular noun for what was looked for: "message", "contact".
 	Kind string
 	Ref  string
+	// Try holds what to do about it. It is how a search that was itself
+	// incomplete admits as much: something that could not be decrypted was also
+	// not searched, and "no item matching that" is the wrong answer if the item
+	// was there and unreadable.
+	Try []string
 }
 
 func (e *NotFound) Error() string {
@@ -79,7 +113,8 @@ func (e *NotFound) Error() string {
 	}
 	return fmt.Sprintf("No %s matching %q.", e.Kind, e.Ref)
 }
-func (e *NotFound) ExitCode() int { return 3 }
+func (e *NotFound) ExitCode() int   { return 3 }
+func (e *NotFound) Hints() []string { return e.Try }
 
 // Exists means the name is already taken where it was going to be written. Exit
 // 4, the same code as an ambiguous reference, because both are the answer that

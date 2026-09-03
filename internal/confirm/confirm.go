@@ -219,6 +219,29 @@ func (s Source) settles(cmd Command, outcome Outcome) (Class, bool) {
 	return class, found
 }
 
+// Describe writes the policy back out in the one-line form it can be read from,
+// so a report can state which commands this machine stops for.
+//
+// An unstated policy is "default", which is the word for it in every place a
+// policy can be written, rather than an empty string that reads as a fact
+// nobody established.
+func (p Policy) Describe() string {
+	var parts []string
+	for _, source := range p {
+		for _, d := range source {
+			if len(d.Path) == 0 {
+				parts = append(parts, d.Class.String())
+				continue
+			}
+			parts = append(parts, d.Class.String()+":"+strings.Join(d.Path, " "))
+		}
+	}
+	if len(parts) == 0 {
+		return Default.String()
+	}
+	return strings.Join(parts, ",")
+}
+
 // Paths is every scope the policy names, so a caller holding the command tree
 // can check that each one is a command.
 func (p Policy) Paths() [][]string {
