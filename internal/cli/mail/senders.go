@@ -65,7 +65,7 @@ func sendersListCmd() *cobra.Command {
 			return kit.List(c, ui.TableSpec[mailsvc.SenderRule]{
 				Noun: "rules", Columns: senderColumns(),
 				Total: ui.Unknown, Page: ui.Unpaged,
-			}, rules, func(r mailsvc.SenderRule) []string { return []string{r.ID} })
+			}, rules)
 		}),
 	}
 }

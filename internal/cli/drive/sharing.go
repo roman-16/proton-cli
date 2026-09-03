@@ -306,7 +306,7 @@ func invitationsListCmd() *cobra.Command {
 					{Header: "ROLE", Cell: func(i drivesvc.Invitation) string { return i.Role }},
 					{Header: "CREATED", Cell: func(i drivesvc.Invitation) string { return units.Time(i.CreateTime) }},
 				},
-			}, invitations, func(i drivesvc.Invitation) []string { return []string{i.InvitationID} })
+			}, invitations)
 		}),
 	}
 }
@@ -403,7 +403,7 @@ func trashListCmd() *cobra.Command {
 			return kit.List(c, ui.TableSpec[drivesvc.TrashEntry]{
 				Noun: "items", Columns: trashColumns(),
 				Total: total, Page: page.Number, PageSize: page.Size,
-			}, rows, func(e drivesvc.TrashEntry) []string { return []string{e.LinkID} })
+			}, rows)
 		}),
 	}
 	order.Register(c, "name", "size", "trashed")
@@ -503,7 +503,7 @@ func sharedCmd() *cobra.Command {
 			return kit.List(c, ui.TableSpec[drivesvc.SharedItem]{
 				Noun: "items", Columns: cols,
 				Total: ui.Unknown, Page: ui.Unpaged,
-			}, items, func(i drivesvc.SharedItem) []string { return []string{i.LinkID, i.ShareID} })
+			}, items)
 		}),
 	})
 	return c
@@ -525,7 +525,7 @@ func sharingCmd() *cobra.Command {
 			return kit.List(c, ui.TableSpec[drivesvc.SharedItem]{
 				Noun: "items", Columns: sharedItemColumns(),
 				Total: ui.Unknown, Page: ui.Unpaged,
-			}, items, func(i drivesvc.SharedItem) []string { return []string{i.LinkID, i.ShareID} })
+			}, items)
 		}),
 	})
 	return c

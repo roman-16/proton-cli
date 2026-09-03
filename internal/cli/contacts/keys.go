@@ -78,7 +78,7 @@ func keysListCmd() *cobra.Command {
 					{Header: "SCHEME", Cell: func(k pinnedKey) string { return k.Scheme }},
 					{Header: "VERIFIED", Cell: func(k pinnedKey) string { return yesNo(k.Verified) }},
 				},
-			}, rows, nil)
+			}, rows)
 		}),
 	}
 }

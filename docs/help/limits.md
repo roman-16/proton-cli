@@ -10,6 +10,18 @@ A refusal that comes from Proton rather than from proton-cli belongs to [Trouble
 
 Closing this needs a public key built into the binary, and there is not one yet. Until then, an install from a package manager is verified by the package manager.
 
+**Post-quantum encryption is not supported.** Proton offered it for two weeks in May before pausing the rollout, and an account that opted in during that window holds keys - ML-DSA and ML-KEM, in version 6 OpenPGP packets - that the Go libraries proton-cli is built on do not implement.
+
+Such an account cannot sign in, and neither a message nor a share reaches somebody else who opted in. Every command that runs into one says so and exits `8`:
+
+```console
+$ proton account login
+Error: Your account uses post-quantum encryption, which is not supported yet.
+Try:   Proton's own apps can read these keys
+```
+
+The algorithms exist in Proton's own builds of those libraries, so this is a matter of testing rather than of cryptography: it lands here once Proton resumes the rollout and an account can be made to carry these keys on purpose.
+
 **A recurring event needs a zone that can be named.** proton reads one from `TZ`, `/etc/localtime` or `/etc/timezone`, then falls back to your Proton calendar settings.
 
 Where none of those answers, a new event is stored as a plain UTC instant, and a recurring one then drifts by an hour when the clocks change. Pass `--zone Europe/Vienna` to be sure.

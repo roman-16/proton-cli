@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
 	"github.com/roman-16/proton-cli/internal/skip"
@@ -155,6 +156,9 @@ func (s *Service) addressKeyRing(ctx context.Context, email string) (*pgp.KeyRin
 	}
 	key, err := pgp.NewKeyFromArmored(r.Address.Keys[0].PublicKey)
 	if err != nil {
+		if pgphelper.PostQuantum(r.Address.Keys[0].PublicKey) {
+			return nil, pgphelper.NotSupported(email)
+		}
 		return nil, err
 	}
 	return pgp.NewKeyRing(key)

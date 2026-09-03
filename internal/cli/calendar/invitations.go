@@ -38,7 +38,7 @@ func invitationList(c *kit.Invocation) *kit.Lookup[calsvc.CalendarInvitation] {
 func invitationColumns() []ui.Column[calsvc.CalendarInvitation] {
 	return []ui.Column[calsvc.CalendarInvitation]{
 		{Header: "ID", ID: true, Cell: func(i calsvc.CalendarInvitation) string { return i.ID }},
-		{Header: "CALENDAR", Flex: true, Cell: func(i calsvc.CalendarInvitation) string { return i.Name }},
+		{Header: "CALENDAR", Flex: true, Handle: true, Cell: func(i calsvc.CalendarInvitation) string { return i.Name }},
 		{Header: "FROM", Cell: func(i calsvc.CalendarInvitation) string { return i.Sender }},
 		{Header: "ACCESS", Cell: func(i calsvc.CalendarInvitation) string { return i.Access }},
 		{Header: "STATUS", Cell: func(i calsvc.CalendarInvitation) string { return i.Status }},
@@ -59,7 +59,7 @@ func invitationsListCmd() *cobra.Command {
 			return kit.List(c, ui.TableSpec[calsvc.CalendarInvitation]{
 				Noun: "invitations", Columns: invitationColumns(),
 				Total: len(rows), Page: ui.Unpaged,
-			}, rows, func(i calsvc.CalendarInvitation) []string { return []string{i.ID} })
+			}, rows)
 		}),
 	}
 }

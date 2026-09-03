@@ -59,7 +59,7 @@ func TestExpandPairExpandsBothHalves(t *testing.T) {
 
 	dir := t.TempDir()
 	a := &app.App{IDCache: idcache.New(filepath.Join(dir, "ids.json"))}
-	if err := a.IDCache.Save(share, item); err != nil {
+	if err := a.IDCache.Save(idcache.Entry{Collection: "pass items", Ref: JoinPair(share, item)}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -118,8 +118,8 @@ func TestEveryVerbIsExplained(t *testing.T) {
 }
 
 func TestEveryPlaceholderIsExplained(t *testing.T) {
-	for name, meaning := range Placeholders {
-		if strings.TrimSpace(meaning) == "" {
+	for name, p := range Placeholders {
+		if strings.TrimSpace(p.Means) == "" {
 			t.Errorf("%q has no meaning recorded", name)
 		}
 		if name != strings.ToUpper(name) {

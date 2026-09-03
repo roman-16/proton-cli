@@ -24,10 +24,10 @@ func remindersCmd() *cobra.Command {
 
 func reminderColumns() []ui.Column[calsvc.Reminder] {
 	return []ui.Column[calsvc.Reminder]{
-		{Header: "ID", ID: true, Cell: func(r calsvc.Reminder) string { return eventRef(r.Event) }},
+		{Header: "ID", Ref: "calendar events", Cell: func(r calsvc.Reminder) string { return eventRef(r.Event) }},
 		{Header: "FIRES", Cell: func(r calsvc.Reminder) string { return r.Fires.Format("2006-01-02 15:04") }},
 		{Header: "REMIND", Right: true, Cell: func(r calsvc.Reminder) string { return r.Remind }},
-		{Header: "TITLE", Flex: true, Cell: func(r calsvc.Reminder) string { return r.Title }},
+		{Header: "TITLE", Flex: true, Handle: true, Cell: func(r calsvc.Reminder) string { return r.Title }},
 		{Header: "STARTS", Cell: func(r calsvc.Reminder) string {
 			if r.AllDay {
 				return r.Start.Format("2006-01-02") + " all day"
@@ -63,7 +63,7 @@ func remindersListCmd() *cobra.Command {
 			return kit.List(c, ui.TableSpec[calsvc.Reminder]{
 				Noun: "reminders", Columns: reminderColumns(),
 				Total: ui.Unknown, Page: ui.Unpaged,
-			}, reminders, func(r calsvc.Reminder) []string { return []string{r.CalendarID, r.ID} })
+			}, reminders)
 		}),
 	}
 	c.Flags().StringVar(&calendar, "calendar", "", "Which calendar, by name or ID (default: all of them)")
@@ -93,14 +93,13 @@ func remindersWatchCmd() *cobra.Command {
 			return kit.Watch(c, ui.StreamSpec[calsvc.Reminder]{
 				Columns: []ui.StreamColumn[calsvc.Reminder]{
 					{Width: 5, Cell: func(r calsvc.Reminder) string { return r.Fires.Format("15:04") }},
-					{ID: true, Cell: func(r calsvc.Reminder) string { return eventRef(r.Event) }},
+					{Ref: "calendar events", Cell: func(r calsvc.Reminder) string { return eventRef(r.Event) }},
 					{Cell: func(r calsvc.Reminder) string { return r.Says }},
 				},
 				Opening: "Watching " + ui.Listing(names) + ". Ctrl+C to stop.",
-			}, func(r calsvc.Reminder) []string { return []string{r.CalendarID, r.ID} },
-				func(emit func(calsvc.Reminder) error) error {
-					return c.App.Calendar.RemindersWatch(c.Ctx, calIDs, emit)
-				})
+			}, func(emit func(calsvc.Reminder) error) error {
+				return c.App.Calendar.RemindersWatch(c.Ctx, calIDs, emit)
+			})
 		}),
 	}
 	c.Flags().StringVar(&calendar, "calendar", "", "Which calendar, by name or ID (default: all of them)")

@@ -1,24 +1,26 @@
 package keys
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
-	"bytes"
-	"errors"
-	"fmt"
 	"github.com/ProtonMail/go-srp"
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
 	"github.com/roman-16/proton-cli/internal/account/localkey"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
 	"github.com/roman-16/proton-cli/internal/skip"
-	"strings"
 )
 
 func unlocked(addrs ...Address) *Unlocked {
@@ -183,8 +185,7 @@ func lockedKey(t *testing.T, name, passphrase string) string {
 // serve answers the four requests a first unlock makes, and the two a seal does.
 func (a *account) serve(t *testing.T) *proton.Client {
 	t.Helper()
-	t.Helper()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return client(t, func(w http.ResponseWriter, r *http.Request) {
 		body := map[string]any{"Code": 1000}
 		switch r.URL.Path {
 		case "/core/v4/users":
@@ -215,7 +216,13 @@ func (a *account) serve(t *testing.T) *proton.Client {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(body)
-	}))
+	})
+}
+
+// client points a session at a server that answers for Proton.
+func client(t *testing.T, handler http.HandlerFunc) *proton.Client {
+	t.Helper()
+	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)
 
 	c := proton.New(proton.Options{BaseURL: srv.URL, Logger: slog.New(slog.DiscardHandler)})
@@ -377,12 +384,11 @@ func TestStretchIsProtonsKeyPassword(t *testing.T) {
 	}
 }
 
-// ── the failure with no words of its own ──
+// ── the failure nobody at a terminal can cause ──
 
-// The user keys open and not one address key follows. Before, every way of
-// reaching this produced the same six words and recorded nothing, so a report
-// of it could not be acted on: the four causes are told apart only by what the
-// loop threw away.
+// The user keys open and not one address key follows. The four causes are told
+// apart only by what the unlocking loop writes down, so a run that says nothing
+// about which one it was cannot be acted on from a report.
 //
 // This is the shape of it that is actually diagnosable - an address key whose
 // token this account's user key cannot decrypt - and what the run has to say
@@ -415,10 +421,14 @@ func TestUnlockSaysNoneOfTheAddressKeysOpenedAndWhy(t *testing.T) {
 	if !strings.Contains(err.Error(), "None of your addresses' keys could be opened.") {
 		t.Errorf("the failure is not phrased for a person: %v", err)
 	}
-	// And it is this CLI's fault, not the caller's.
+	// And it is this CLI's fault, not the caller's - the code a script reads, and
+	// what makes the screen ask for the report that carries the log.
 	var coder errs.ExitCoder
-	if errors.As(err, &coder) && coder.ExitCode() != 1 {
-		t.Errorf("the failure claims exit %d; it is unphrased work, which kit.Run tags", coder.ExitCode())
+	if !errors.As(err, &coder) {
+		t.Fatalf("the failure carries no exit code: %v", err)
+	}
+	if coder.ExitCode() != errs.ExitBug {
+		t.Errorf("the failure exits %d, want %d", coder.ExitCode(), errs.ExitBug)
 	}
 
 	// The log says which of the four causes it was, per key and per address.
@@ -479,4 +489,66 @@ func hasHint(err error, substr string) bool {
 		}
 	}
 	return false
+}
+
+// ── post-quantum keys ──
+
+// An account that turned on post-quantum encryption holds v6 ML-DSA-65 keys,
+// and nothing here can read one. What that account must not be told is that its
+// password is wrong or that it has found a bug: both send somebody looking for
+// something to fix, and there is nothing on their side to fix.
+
+func TestUnlockRefusesAPostQuantumAccount(t *testing.T) {
+	acct := newAccount(t, "the password", false)
+	acct.userKey = postQuantumKey(t, "postquantum-private.asc")
+
+	var got asked
+	_, err := Unlock(context.Background(), acct.serve(t), got.answer(acct.secret))
+	if err == nil {
+		t.Fatal("a post-quantum account unlocked")
+	}
+	if want := "Your account uses post-quantum encryption, which is not supported yet."; err.Error() != want {
+		t.Errorf("error = %q, want %q", err.Error(), want)
+	}
+	var coder errs.ExitCoder
+	if !errors.As(err, &coder) || coder.ExitCode() != errs.ExitUnsupported {
+		t.Errorf("the refusal does not exit %d: %v", errs.ExitUnsupported, err)
+	}
+}
+
+// The other half of it is somebody else's keys: a share, an invitation and a
+// sent message all go to the key Proton publishes for them. "Proton holds no
+// key for them" is what an unreadable one used to become, which is a false
+// statement about a real Proton address.
+func TestPublishedRefusesAPostQuantumRecipient(t *testing.T) {
+	published := postQuantumKey(t, "postquantum-public.asc")
+	c := client(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"Code": 1000,
+			"Address": map[string]any{
+				"Keys": []map[string]any{{"PublicKey": published, "Primary": 1}},
+			},
+		})
+	})
+
+	kr, err := Published(context.Background(), c, "them@proton.me")
+	if err == nil {
+		t.Fatalf("a post-quantum recipient came back with a key ring: %v", kr)
+	}
+	if want := "them@proton.me uses post-quantum encryption, which is not supported yet."; err.Error() != want {
+		t.Errorf("error = %q, want %q", err.Error(), want)
+	}
+}
+
+// postQuantumKey is a sample key of the kind Proton generates on opt-in. It
+// lives beside the code that recognises one, which is the only place a build
+// without those algorithms can keep a key that uses them.
+func postQuantumKey(t *testing.T, name string) string {
+	t.Helper()
+	armored, err := os.ReadFile(filepath.Join("..", "..", "crypto", "pgp", "testdata", name))
+	if err != nil {
+		t.Fatalf("read the post-quantum key: %v", err)
+	}
+	return string(armored)
 }

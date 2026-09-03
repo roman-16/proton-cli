@@ -206,7 +206,14 @@ func planPinnedRecipient(ctx context.Context, email string, base sendScheme, api
 	case schemeInternal, schemeExternalPGP:
 		primaryFingerprint := ""
 		if apiArmored != "" {
-			if k, err := pgp.NewKeyFromArmored(apiArmored); err == nil {
+			// Recorded and not counted. The refusal below is on the screen and the
+			// message is not sent, so nothing is hidden - this is here because a
+			// primary key that could not be read and one that genuinely differs from
+			// the pinned key reach that refusal looking identical.
+			if k, err := pgp.NewKeyFromArmored(apiArmored); err != nil {
+				slog.DebugContext(ctx, "mail: a recipient's primary key is not readable armour",
+					"signer", email, "error", err)
+			} else {
 				primaryFingerprint = k.GetFingerprint()
 			}
 		}

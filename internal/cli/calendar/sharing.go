@@ -86,7 +86,7 @@ func shareListCmd() *cobra.Command {
 			}
 			return kit.List(c, ui.TableSpec[calsvc.CalendarMember]{
 				Noun: "members", Columns: memberColumns(), Total: len(rows), Page: ui.Unpaged,
-			}, rows, func(m calsvc.CalendarMember) []string { return []string{m.ID} })
+			}, rows)
 		}),
 	}
 }

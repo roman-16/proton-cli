@@ -209,7 +209,7 @@ func settingsListCmd(scope string, specs map[string]Setting) *cobra.Command {
 					{Header: "PAGE", Cell: func(r settingRow) string { return r.Page }},
 					{Header: "DESCRIPTION", Flex: true, Cell: func(r settingRow) string { return r.Desc }},
 				},
-			}, rows, nil)
+			}, rows)
 		}),
 	}
 }

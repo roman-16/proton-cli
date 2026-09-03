@@ -46,7 +46,7 @@ func sessionsListCmd() *cobra.Command {
 						},
 					},
 				},
-			}, sessions, func(s proton.Session) []string { return []string{s.UID} })
+			}, sessions)
 		}),
 	}
 }

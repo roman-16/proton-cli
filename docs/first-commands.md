@@ -63,7 +63,7 @@ proton completion bash | sudo tee /etc/bash_completion.d/proton
 proton completion fish > ~/.config/fish/completions/proton.fish
 ```
 
-Completion covers every command and flag, and offers real values as you type: your folder names, item types, output formats and setting keys.
+Completion covers every command and flag, and offers real values as you type: your folder names, item types, output formats and setting keys. Where a command takes a `REF` it offers back what your listings showed - see [naming what to act on](using/naming.md#tab-completion).
 
 ## Preview a change before making it
 

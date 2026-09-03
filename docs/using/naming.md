@@ -29,6 +29,37 @@ Short IDs carry no ellipsis and never start with a dash, so they copy cleanly ou
 
 **A short ID only works on the machine that printed it.** The lookup table lives in `~/.config/proton-cli/idcache/<profile>.json`. If you copied one from elsewhere, run the matching `list` here first, or use the full ID.
 
+## Tab completion
+
+With [completion installed](../install.md#shell-completions), a `REF` completes from what your listings showed you - the short ID, and the subject, name or address beside it.
+
+```console
+$ proton mail conversations list
+ID        FROM                       SUBJECT                                MESSAGES  DATE
+ketTSogw  Gastronaut Reservierungen  Reservation Confirmation - Vero Sushi          1  2026-08-31 19:31
+
+$ proton mail conversations get ket⇥
+ketTSogw  -- Reservation Confirmation - Vero Sushi
+```
+
+The subject completes too, because it is a reference just as much as the ID is. Your shell decides between them by what you have already typed:
+
+```console
+$ proton mail messages get Invo⇥
+Invoice #2291 is ready  -- 5bH2mQxK
+
+$ proton contacts get jane⇥
+Jane Doe          -- QmxLp2Rt
+jane@example.com  -- QmxLp2Rt
+```
+
+**It offers only what this machine has seen.** Completion reads the same table short IDs come from, so it never waits on Proton - and a collection you have not listed yet has nothing to offer, and says which listing would fill it:
+
+```console
+$ proton pass items get ⇥
+Nothing seen yet - run `proton pass items list` first
+```
+
 ## Two IDs in one
 
 A Pass item and a calendar event each need two IDs, written as one slash-separated token. Lists print them this way, and you paste them back the same way. Short IDs work on both halves at once.

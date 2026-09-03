@@ -17,7 +17,7 @@ import (
 // ExitCoder is implemented by errors that carry a specific process exit code.
 //
 //	1 user error · 2 auth · 3 not found · 4 conflict or ambiguity · 5 network
-//	6 refused by policy · 7 a bug
+//	6 refused by policy · 7 a bug · 8 not supported yet
 type ExitCoder interface {
 	ExitCode() int
 }
@@ -47,6 +47,21 @@ func Bug(err error) error {
 		return err
 	}
 	return &Exit{Code: ExitBug, Err: err}
+}
+
+// ExitUnsupported is what a Proton feature this build does not implement exits
+// with.
+//
+// Nothing about the command was wrong and there is nothing to report: what it
+// reached for is a gap somebody has already written down, so neither a retry nor
+// different arguments changes the answer. That is what separates it from the
+// mistake exit 1 describes and the bug exit 7 asks to be told about.
+const ExitUnsupported = 8
+
+// Unsupportedf starts a refusal for something this build does not implement
+// (exit 8). Remedies are added with Hint, as with any other problem.
+func Unsupportedf(format string, a ...any) *Problem {
+	return &Problem{Msg: Sentence(fmt.Sprintf(format, a...)), Code: ExitUnsupported}
 }
 
 // Hinter is implemented by errors that know how the user might fix them. The ui

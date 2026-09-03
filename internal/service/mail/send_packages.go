@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 )
 
 // buildBodyPackages encrypts the body once under a shared session key and
@@ -30,9 +31,9 @@ func (s *Service) buildBodyPackages(c Content, del Delivery, atts []*draftAttach
 	for _, p := range plans {
 		switch p.scheme {
 		case schemeInternal:
-			recKR, err := keyRingFromArmored(p.armoredKey)
+			recKR, err := keyRingFromArmored(p.armoredKey, p.email)
 			if err != nil {
-				return nil, fmt.Errorf("parse recipient key for %s: %w", p.email, err)
+				return nil, err
 			}
 			recKP, err := recKR.EncryptSessionKey(sessionKey)
 			if err != nil {
@@ -126,9 +127,9 @@ func (s *Service) buildInlinePackage(c Content, atts []*draftAttachment, plans [
 			sessionKey = sk
 			bodyB64 = base64.StdEncoding.EncodeToString(enc)
 		}
-		recKR, err := keyRingFromArmored(p.armoredKey)
+		recKR, err := keyRingFromArmored(p.armoredKey, p.email)
 		if err != nil {
-			return nil, false, fmt.Errorf("parse recipient key for %s: %w", p.email, err)
+			return nil, false, err
 		}
 		recKP, err := recKR.EncryptSessionKey(sessionKey)
 		if err != nil {
@@ -196,9 +197,9 @@ func (s *Service) buildPGPMIMEPackage(ctx context.Context, c Content, atts []*dr
 			}
 			bodyB64 = base64.StdEncoding.EncodeToString(enc)
 		}
-		recKR, err := keyRingFromArmored(p.armoredKey)
+		recKR, err := keyRingFromArmored(p.armoredKey, p.email)
 		if err != nil {
-			return nil, false, fmt.Errorf("parse recipient key for %s: %w", p.email, err)
+			return nil, false, err
 		}
 		kp, err := recKR.EncryptSessionKey(sessionKey)
 		if err != nil {
@@ -236,10 +237,13 @@ func (s *Service) mimeParts(ctx context.Context, atts []*draftAttachment) ([]mim
 	return out, nil
 }
 
-func keyRingFromArmored(armored string) (*pgp.KeyRing, error) {
+func keyRingFromArmored(armored, email string) (*pgp.KeyRing, error) {
 	key, err := pgp.NewKeyFromArmored(armored)
 	if err != nil {
-		return nil, err
+		if pgphelper.PostQuantum(armored) {
+			return nil, pgphelper.NotSupported(email)
+		}
+		return nil, fmt.Errorf("parse recipient key for %s: %w", email, err)
 	}
 	return pgp.NewKeyRing(key)
 }

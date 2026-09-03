@@ -59,7 +59,7 @@ func convListCmd() *cobra.Command {
 				Noun: "conversations", Columns: conversationColumns(),
 				Total: total, Page: opts.Page, PageSize: opts.PageSize,
 				Filtered: f.narrowed(),
-			}, convs, func(cv mailsvc.Conversation) []string { return []string{cv.ID} })
+			}, convs)
 		}),
 	}
 	f.registerNarrowing(c, "inbox")
@@ -112,7 +112,7 @@ func threadDocument(conv *mailsvc.ConversationFull, shape string, bodyOnly, stri
 	return ui.DocumentSpec{
 		Object: conv,
 		Header: []ui.Field{
-			{Label: "Subject", Value: conv.Conversation.Subject},
+			{Label: "Subject", Value: conv.Conversation.Subject, Handle: true},
 			{Label: "Messages", Value: fmt.Sprintf("%d", n)},
 			{Label: "ID", Value: conv.Conversation.ID, ID: true},
 		},
@@ -157,7 +157,7 @@ func threadSummary(c *kit.Invocation, conv *mailsvc.ConversationFull) error {
 				return flags(false, false, p.Attachments)
 			}},
 		},
-	}, rows, nil)
+	}, rows)
 }
 
 // ── organising ──
@@ -387,7 +387,7 @@ func convAttachmentTableSpec(includeInline bool) ui.TableSpec[mailsvc.Conversati
 		{Header: "NAME", Flex: true, Cell: func(a mailsvc.ConversationAttachment) string { return a.Name }},
 		{Header: "SIZE", Right: true, Cell: func(a mailsvc.ConversationAttachment) string { return units.Size(a.Size) }},
 		{Header: "TYPE", Flex: true, Cell: func(a mailsvc.ConversationAttachment) string { return a.MIMEType }},
-		{Header: "MESSAGE_ID", ID: true, Cell: func(a mailsvc.ConversationAttachment) string { return a.MessageID }},
+		{Header: "MESSAGE_ID", Ref: "mail messages", Cell: func(a mailsvc.ConversationAttachment) string { return a.MessageID }},
 	}
 	if includeInline {
 		cols = append(cols, ui.Column[mailsvc.ConversationAttachment]{
@@ -419,8 +419,7 @@ func convAttachmentsListCmd() *cobra.Command {
 			if err != nil {
 				return wrongTable(err, "attachments list")
 			}
-			return kit.List(c, convAttachmentTableSpec(includeInline), atts,
-				func(a mailsvc.ConversationAttachment) []string { return []string{a.ID, a.MessageID} })
+			return kit.List(c, convAttachmentTableSpec(includeInline), atts)
 		}),
 	}
 	c.Flags().BoolVar(&includeInline, "include-inline", false, "Include inline attachments")

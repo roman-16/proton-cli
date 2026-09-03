@@ -150,7 +150,7 @@ func New(opts Options) (*App, error) {
 		Confirm:       opts.Confirm,
 		NoUpdateCheck: opts.NoUpdateCheck,
 		Verified:      verified,
-		IDCache:       idcache.New(idCachePath(profileName)),
+		IDCache:       Seen(profileName),
 		userID:        userID,
 		email:         email,
 	}
@@ -251,6 +251,14 @@ func (a *App) rememberIdentity(userID, email string) {
 	a.userID, a.email = userID, email
 	a.sessionMu.Unlock()
 }
+
+// Seen is a profile's record of the references it has been shown.
+//
+// It is reachable without an App because a shell completion has none: answering
+// what a listing showed needs no client, no session and no settings but which
+// profile is being typed about, and building the rest of an invocation to find
+// that out would log a run nobody made.
+func Seen(name profile.Name) *idcache.Cache { return idcache.New(idCachePath(name)) }
 
 // idCachePath mirrors the session-file convention.
 func idCachePath(name profile.Name) string {

@@ -52,7 +52,7 @@ func profilesListCmd() *cobra.Command {
 						},
 					},
 				},
-			}, profiles, nil)
+			}, profiles)
 		}),
 	}
 }

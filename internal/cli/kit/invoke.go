@@ -3,6 +3,7 @@ package kit
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/roman-16/proton-cli/internal/app"
 	"github.com/roman-16/proton-cli/internal/confirm"
@@ -148,20 +149,29 @@ func Run(steps []Step, h Handler) func(*cobra.Command, []string) error {
 
 // ── responses ──
 
-// List renders a collection and remembers the IDs it showed, so a short ID read
-// off this output resolves on the next command.
+// List renders a collection and remembers the references it showed, so a short
+// ID read off this output resolves on the next command and a shell can offer it
+// back.
 //
-// Caching here rather than in the ui package is deliberate: remembering an ID is
-// something this CLI does about Proton, not something a table does.
-func List[T any](c *Invocation, spec ui.TableSpec[T], items []T, ids func(T) []string) error {
+// What was shown is read from the columns rather than declared a second time
+// beside them: the table already says which cell is the row's reference, which
+// points into another collection, and which is the name a person would use. Two
+// declarations of the same thing would only give the CLI a way to disagree with
+// its own screen.
+func List[T any](c *Invocation, spec ui.TableSpec[T], items []T) error {
 	spec.Skipped = c.Incomplete()
-	if ids != nil && c.App.IDCache != nil && len(items) > 0 {
-		seen := make([]string, 0, len(items))
-		for _, it := range items {
-			seen = append(seen, ids(it)...)
+	var seen []idcache.Entry
+	for _, it := range items {
+		row := showing{in: Holding(c.Cmd)}
+		for _, col := range spec.Columns {
+			if col.Cell == nil {
+				continue
+			}
+			row.cell(col.ID, col.Ref, col.Handle, col.Cell(it))
 		}
-		_ = c.App.IDCache.Save(seen...)
+		seen = append(seen, row.entries()...)
 	}
+	c.remember(seen)
 	return ui.Table(c.UI(), spec, items)
 }
 
@@ -172,23 +182,98 @@ func List[T any](c *Invocation, spec ui.TableSpec[T], items []T, ids func(T) []s
 // response is finished. run is handed the way to report a thing, and returns
 // when the reader stops watching.
 //
-// IDs are remembered as they go past, exactly as a listing remembers them, so a
-// short ID read off a stream resolves in the next command.
-func Watch[T any](c *Invocation, spec ui.StreamSpec[T], ids func(T) []string, run func(emit func(T) error) error) error {
+// References are remembered as they go past, exactly as a listing remembers
+// them, so a short ID read off a stream resolves in the next command.
+func Watch[T any](c *Invocation, spec ui.StreamSpec[T], run func(emit func(T) error) error) error {
+	mine := Holding(c.Cmd)
 	stream := ui.Open(c.UI(), spec)
 	return run(func(item T) error {
-		if ids != nil && c.App.IDCache != nil {
-			_ = c.App.IDCache.Save(ids(item)...)
+		row := showing{in: mine}
+		for _, col := range spec.Columns {
+			if col.Cell == nil {
+				continue
+			}
+			row.cell(col.ID, col.Ref, col.Handle, col.Cell(item))
 		}
+		c.remember(row.entries())
 		return stream.Emit(item)
 	})
 }
 
-// Show renders one object.
-func Show(c *Invocation, spec ui.RecordSpec) error { return ui.Record(c.UI(), spec) }
+// Show renders one object, remembering the references it showed.
+//
+// A record is how a thing reached by its handle first tells you its ID, and how
+// one thing points at another - the item a link opens, the calendar an account
+// writes to by default. Both are references that were on the screen, so both are
+// references the next command line can start typing.
+func Show(c *Invocation, spec ui.RecordSpec) error {
+	c.remember(shown(c, spec.Fields))
+	return ui.Record(c.UI(), spec)
+}
 
-// Read renders decrypted content meant to be read.
-func Read(c *Invocation, spec ui.DocumentSpec) error { return ui.Document(c.UI(), spec) }
+// Read renders decrypted content meant to be read, remembering the references in
+// its header for the same reason Show does.
+func Read(c *Invocation, spec ui.DocumentSpec) error {
+	fields := spec.Header
+	for _, p := range spec.Parts {
+		fields = append(fields, p.Header...)
+	}
+	c.remember(shown(c, fields))
+	return ui.Document(c.UI(), spec)
+}
+
+// shown is the references in a block of fields, filed where each belongs.
+func shown(c *Invocation, fields []ui.Field) []idcache.Entry {
+	row := showing{in: Holding(c.Cmd)}
+	for _, f := range fields {
+		row.cell(f.ID, f.Ref, f.Handle, f.Value)
+	}
+	return row.entries()
+}
+
+// showing gathers what one thing's row or record put on the screen.
+//
+// The handles go to the reference the response is about, which is the first one
+// drawn: every table opens with the row's own ID and every record with the
+// thing's own, so anything further along points at something else, whose name
+// this response never showed.
+type showing struct {
+	in      string
+	refs    []idcache.Entry
+	handles []string
+}
+
+func (s *showing) cell(id bool, elsewhere string, handle bool, value string) {
+	switch {
+	case id || elsewhere != "":
+		in := s.in
+		if elsewhere != "" {
+			in = elsewhere
+		}
+		s.refs = append(s.refs, idcache.Entry{Collection: in, Ref: value})
+	case handle && value != "" && !strings.HasPrefix(value, "("):
+		// A parenthesised stand-in is what a listing prints where a name could
+		// not be decrypted, and offering it back would complete to nothing.
+		s.handles = append(s.handles, value)
+	}
+}
+
+func (s *showing) entries() []idcache.Entry {
+	if len(s.refs) > 0 {
+		s.refs[0].Handles = s.handles
+	}
+	return s.refs
+}
+
+// remember files what a response showed, so far as there is anywhere to file it.
+// A cache that cannot be written is not worth failing a command over: the
+// listing on the screen is the answer, and the memory of it is a convenience.
+func (c *Invocation) remember(entries []idcache.Entry) {
+	if len(entries) == 0 || c.App == nil || c.App.IDCache == nil {
+		return
+	}
+	_ = c.App.IDCache.Save(entries...)
+}
 
 // Mutate performs a change and reports it - or, under --dry-run, reports what it
 // would have done and changes nothing.

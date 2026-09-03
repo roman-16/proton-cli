@@ -35,8 +35,8 @@ func New() *cobra.Command {
 func columns() []ui.Column[ctsvc.Contact] {
 	return []ui.Column[ctsvc.Contact]{
 		{Header: "ID", ID: true, Cell: func(c ctsvc.Contact) string { return c.ID }},
-		{Header: "NAME", Flex: true, Cell: func(c ctsvc.Contact) string { return c.Name }},
-		{Header: "EMAIL", Flex: true, Cell: func(c ctsvc.Contact) string { return c.Email }},
+		{Header: "NAME", Flex: true, Handle: true, Cell: func(c ctsvc.Contact) string { return c.Name }},
+		{Header: "EMAIL", Flex: true, Handle: true, Cell: func(c ctsvc.Contact) string { return c.Email }},
 		{Header: "PHONE", Cell: func(c ctsvc.Contact) string { return c.Phone }},
 	}
 }
@@ -78,7 +78,7 @@ func listCmd() *cobra.Command {
 			rows, total := kit.Slice(page, all)
 			s := spec()
 			s.Total, s.Page, s.PageSize, s.Filtered = total, page.Number, page.Size, keyword != ""
-			return kit.List(c, s, rows, func(ct ctsvc.Contact) []string { return []string{ct.ID} })
+			return kit.List(c, s, rows)
 		}),
 	}
 	c.Flags().StringVar(&keyword, "keyword", "", "Match text in the name or the address")
@@ -120,7 +120,7 @@ func getCmd() *cobra.Command {
 				return err
 			}
 			fields := []ui.Field{
-				{Label: "Name", Value: ct.Name},
+				{Label: "Name", Value: ct.Name, Handle: true},
 				{Label: "First Name", Value: ct.FirstName},
 				{Label: "Last Name", Value: ct.LastName},
 				{Label: "Nickname", Value: ct.Nickname},

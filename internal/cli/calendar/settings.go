@@ -118,7 +118,7 @@ func settingsCmd() *cobra.Command {
 				{Label: "Show Secondary", Value: view.ShowSecondary, Always: true},
 				{Label: "Auto-import Invitations", Value: view.AutoImportInvite, Always: true},
 				{Label: "Invitation Language", Value: view.InviteLocale},
-				{Label: "Default Calendar", Value: view.DefaultCalendar, ID: true},
+				{Label: "Default Calendar", Value: view.DefaultCalendar, Ref: "calendar settings calendars"},
 			},
 		})
 	})
@@ -138,7 +138,7 @@ func calendarsCmd() *cobra.Command {
 func calendarColumns() []ui.Column[calsvc.Calendar] {
 	return []ui.Column[calsvc.Calendar]{
 		{Header: "ID", ID: true, Cell: func(cal calsvc.Calendar) string { return cal.ID }},
-		{Header: "NAME", Flex: true, Cell: func(cal calsvc.Calendar) string { return cal.Name }},
+		{Header: "NAME", Flex: true, Handle: true, Cell: func(cal calsvc.Calendar) string { return cal.Name }},
 		kit.ColorColumn(func(cal calsvc.Calendar) string { return cal.Color }),
 		{Header: "KIND", Cell: func(cal calsvc.Calendar) string { return cal.Kind }},
 		{Header: "MEMBERS", Right: true, Cell: func(cal calsvc.Calendar) string {
@@ -169,7 +169,7 @@ func calendarsListCmd() *cobra.Command {
 			return kit.List(c, ui.TableSpec[calsvc.Calendar]{
 				Noun: "calendars", Columns: calendarColumns(),
 				Total: ui.Unknown, Page: ui.Unpaged,
-			}, cals, func(cal calsvc.Calendar) []string { return []string{cal.ID} })
+			}, cals)
 		}),
 	}
 }
@@ -226,7 +226,7 @@ func calendarsGetCmd() *cobra.Command {
 			return kit.Show(c, ui.RecordSpec{
 				Object: view,
 				Fields: []ui.Field{
-					{Label: "Name", Value: cal.Name},
+					{Label: "Name", Value: cal.Name, Handle: true},
 					{Label: "Color", Value: cal.Color},
 					{Label: "Kind", Value: cal.Kind},
 					{Label: "Description", Value: cal.Description},

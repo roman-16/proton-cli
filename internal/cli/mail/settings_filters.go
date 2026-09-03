@@ -104,7 +104,7 @@ func filtersReorderCmd() *cobra.Command {
 func filterColumns() []ui.Column[mailsvc.Filter] {
 	return []ui.Column[mailsvc.Filter]{
 		{Header: "ID", ID: true, Cell: func(f mailsvc.Filter) string { return f.ID }},
-		{Header: "NAME", Flex: true, Cell: func(f mailsvc.Filter) string { return f.Name }},
+		{Header: "NAME", Flex: true, Handle: true, Cell: func(f mailsvc.Filter) string { return f.Name }},
 		{Header: "ENABLED", Cell: func(f mailsvc.Filter) string { return yesNo(f.Status == 1) }},
 		{Header: "VERSION", Right: true, Cell: func(f mailsvc.Filter) string {
 			return strconv.Itoa(f.Version)
@@ -134,7 +134,7 @@ func filtersListCmd() *cobra.Command {
 			return kit.List(c, ui.TableSpec[mailsvc.Filter]{
 				Noun: "filters", Columns: filterColumns(),
 				Total: ui.Unknown, Page: ui.Unpaged,
-			}, rows, func(f mailsvc.Filter) []string { return []string{f.ID} })
+			}, rows)
 		}),
 	}
 }
@@ -399,7 +399,7 @@ func filtersGetCmd() *cobra.Command {
 				return err
 			}
 			fields := []ui.Field{
-				{Label: "Name", Value: detail.Name},
+				{Label: "Name", Value: detail.Name, Handle: true},
 				{Label: "Enabled", Value: yesNo(detail.Status == 1), Always: true},
 			}
 			fields = append(fields, ruleFields(detail)...)

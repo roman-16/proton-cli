@@ -47,7 +47,7 @@ func linksGetCmd() *cobra.Command {
 				Object: link,
 				Fields: []ui.Field{
 					{Label: "URL", Value: link.URL},
-					{Label: "Item", Value: kit.JoinPair(link.ShareID, link.ItemID), ID: true},
+					{Label: "Item", Value: kit.JoinPair(link.ShareID, link.ItemID), Ref: "pass items"},
 					{Label: "Expires", Value: units.Time(link.Expires)},
 					{Label: "Views", Value: reads(*link)},
 					{Label: "Active", Value: yesNo(link.Active)},
@@ -74,7 +74,7 @@ func secureLinkList(c *kit.Invocation) *kit.Lookup[passsvc.SecureLink] {
 func linkColumns() []ui.Column[passsvc.SecureLink] {
 	return []ui.Column[passsvc.SecureLink]{
 		{Header: "ID", ID: true, Cell: func(l passsvc.SecureLink) string { return l.LinkID }},
-		{Header: "ITEM", ID: true, Cell: func(l passsvc.SecureLink) string {
+		{Header: "ITEM", Ref: "pass items", Cell: func(l passsvc.SecureLink) string {
 			return kit.JoinPair(l.ShareID, l.ItemID)
 		}},
 		{Header: "EXPIRES", Cell: func(l passsvc.SecureLink) string { return units.Time(l.Expires) }},
@@ -107,7 +107,7 @@ func linksListCmd() *cobra.Command {
 			}
 			return kit.List(c, ui.TableSpec[passsvc.SecureLink]{
 				Noun: "links", Columns: linkColumns(), Total: len(rows), Page: ui.Unpaged,
-			}, rows, func(l passsvc.SecureLink) []string { return []string{l.LinkID} })
+			}, rows)
 		}),
 	}
 }
@@ -118,6 +118,9 @@ func linksCreateCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "create REF",
 		Short: "Make a link that shows one item",
+		// The one command whose REF is not what the tree above it holds: it sits
+		// under links and names the item a link is to be made for.
+		Annotations: map[string]string{kit.Addresses: "pass items"},
 		Long: "Make a link that shows one item to somebody with no Proton account.\n\n" +
 			"The URL is the secret. The key that opens the item travels in the part\n" +
 			"after the '#', which a browser never sends to Proton, so anyone holding the\n" +

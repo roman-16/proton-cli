@@ -151,6 +151,14 @@ func newRoot() *cobra.Command {
 	root.TraverseChildren = true
 
 	root.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+		// A shell asking what may come next is not an invocation of this CLI. It
+		// reads one file and answers, so it needs no client, no session and no
+		// settings but which profile is being typed about - and building the rest
+		// would put a line in the diagnostic log for every press of the tab key,
+		// crowding out the runs somebody would report a bug about.
+		if completing(cmd) {
+			return nil
+		}
 		// Everything the configuration decides is settled here, before any command
 		// body runs and so before anything reaches the network: a file that does not
 		// parse, a format that is not one, a policy naming a command that is not
@@ -201,8 +209,16 @@ func newRoot() *cobra.Command {
 
 	attachExamples(root)
 	installHelp(root)
+	kit.CompleteReferences(root)
 
 	return root
+}
+
+// completing reports whether this run is a shell asking what may come next.
+// Asking without descriptions is an alias of the same command, so both arrive
+// under the one name.
+func completing(cmd *cobra.Command) bool {
+	return cmd.Name() == cobra.ShellCompRequestCmd
 }
 
 func Execute() {

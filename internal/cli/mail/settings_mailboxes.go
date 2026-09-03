@@ -44,7 +44,7 @@ func mailboxTree(noun, short string, folder bool) *cobra.Command {
 func mailboxColumns(folder bool) []ui.Column[mailsvc.Label] {
 	cols := []ui.Column[mailsvc.Label]{
 		{Header: "ID", ID: true, Cell: func(l mailsvc.Label) string { return l.ID }},
-		{Header: "NAME", Flex: true, Cell: func(l mailsvc.Label) string { return l.Name }},
+		{Header: "NAME", Flex: true, Handle: true, Cell: func(l mailsvc.Label) string { return l.Name }},
 		kit.ColorColumn(func(l mailsvc.Label) string { return l.Color }),
 	}
 	if folder {
@@ -103,7 +103,7 @@ func mailboxListCmd(noun string, folder bool) *cobra.Command {
 			return kit.List(c, ui.TableSpec[mailsvc.Label]{
 				Noun: noun, Columns: mailboxColumns(folder),
 				Total: ui.Unknown, Page: ui.Unpaged,
-			}, rows, func(l mailsvc.Label) []string { return []string{l.ID} })
+			}, rows)
 		}),
 	}
 }

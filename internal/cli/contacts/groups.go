@@ -13,7 +13,7 @@ import (
 func groupColumns() []ui.Column[ctsvc.Group] {
 	return []ui.Column[ctsvc.Group]{
 		{Header: "ID", ID: true, Cell: func(g ctsvc.Group) string { return g.ID }},
-		{Header: "NAME", Flex: true, Cell: func(g ctsvc.Group) string { return g.Name }},
+		{Header: "NAME", Flex: true, Handle: true, Cell: func(g ctsvc.Group) string { return g.Name }},
 		kit.ColorColumn(func(g ctsvc.Group) string { return g.Color }),
 	}
 }
@@ -61,7 +61,7 @@ func groupsGetCmd() *cobra.Command {
 				Members []ctsvc.ContactEmail `json:"members"`
 			}{group, members}
 			fields := []ui.Field{
-				{Label: "Name", Value: group.Name},
+				{Label: "Name", Value: group.Name, Handle: true},
 				{Label: "Color", Value: group.Color},
 				{Label: "Addresses", Value: strconv.Itoa(len(members)), Always: true},
 			}
@@ -89,7 +89,7 @@ func groupsListCmd() *cobra.Command {
 			return kit.List(c, ui.TableSpec[ctsvc.Group]{
 				Noun: "groups", Columns: groupColumns(),
 				Total: ui.Unknown, Page: ui.Unpaged,
-			}, groups, func(g ctsvc.Group) []string { return []string{g.ID} })
+			}, groups)
 		}),
 	}
 }

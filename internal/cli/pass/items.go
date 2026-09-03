@@ -80,7 +80,7 @@ func itemColumns() []ui.Column[passsvc.Item] {
 	return []ui.Column[passsvc.Item]{
 		{Header: "ID", ID: true, Cell: itemRef},
 		{Header: "TYPE", Cell: func(it passsvc.Item) string { return it.Type }},
-		{Header: "NAME", Flex: true, Cell: func(it passsvc.Item) string { return it.Name }},
+		{Header: "NAME", Flex: true, Handle: true, Cell: func(it passsvc.Item) string { return it.Name }},
 		{Header: "USERNAME", Flex: true, Cell: func(it passsvc.Item) string {
 			if it.Username != "" {
 				return it.Username
@@ -126,7 +126,7 @@ func itemsListCmd() *cobra.Command {
 				Noun: "items", Columns: itemColumns(),
 				Total: total, Page: page.Number, PageSize: page.Size,
 				Filtered: f.narrowed(),
-			}, rows, func(it passsvc.Item) []string { return []string{it.ShareID, it.ItemID} })
+			}, rows)
 		}),
 	}
 	f.registerNarrowing(c)
@@ -163,10 +163,10 @@ func itemsGetCmd() *cobra.Command {
 func itemFields(it *passsvc.FullItem) []ui.Field {
 	fields := []ui.Field{
 		{Label: "Type", Value: it.Type},
-		{Label: "Name", Value: it.Name},
+		{Label: "Name", Value: it.Name, Handle: true},
 		{Label: "Username", Value: it.Username},
 		{Label: "Email", Value: it.Email},
-		{Label: "Alias", Value: it.Alias},
+		{Label: "Alias", Value: it.Alias, Handle: true},
 		{Label: "Status", Value: it.AliasStatus},
 	}
 	for _, m := range it.AliasMailboxes {
@@ -833,7 +833,7 @@ func itemsRevisionsListCmd() *cobra.Command {
 						return r.Item.Email
 					}},
 				},
-			}, revs, nil)
+			}, revs)
 		}),
 	}
 }

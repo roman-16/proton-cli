@@ -20,7 +20,7 @@ func vaultsCmd() *cobra.Command {
 func vaultColumns() []ui.Column[passsvc.Vault] {
 	return []ui.Column[passsvc.Vault]{
 		{Header: "ID", ID: true, Cell: func(v passsvc.Vault) string { return v.ShareID }},
-		{Header: "NAME", Flex: true, Cell: func(v passsvc.Vault) string {
+		{Header: "NAME", Flex: true, Handle: true, Cell: func(v passsvc.Vault) string {
 			if v.Name == "" {
 				return "(could not be decrypted)"
 			}
@@ -56,7 +56,7 @@ func vaultsListCmd() *cobra.Command {
 			return kit.List(c, ui.TableSpec[passsvc.Vault]{
 				Noun: "vaults", Columns: vaultColumns(),
 				Total: ui.Unknown, Page: ui.Unpaged,
-			}, vaults, func(v passsvc.Vault) []string { return []string{v.ShareID} })
+			}, vaults)
 		}),
 	}
 }
@@ -184,7 +184,7 @@ func vaultsGetCmd() *cobra.Command {
 			return kit.Show(c, ui.RecordSpec{
 				Object: v,
 				Fields: []ui.Field{
-					{Label: "Name", Value: v.Name},
+					{Label: "Name", Value: v.Name, Handle: true},
 					{Label: "Description", Value: v.Description},
 					{Label: "Icon", Value: displayNumber(v.Icon)},
 					{Label: "Color", Value: displayNumber(v.Color)},

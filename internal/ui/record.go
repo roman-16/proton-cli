@@ -17,8 +17,17 @@ type Field struct {
 	// Always keeps the field even when Value is empty, for facts whose absence
 	// is itself information ("Signature: (none)").
 	Always bool
-	// ID paints the value as a Proton reference and shortens it on a terminal.
+	// ID paints the value as a Proton reference to the record itself and shortens
+	// it on a terminal.
 	ID bool
+	// Ref paints the value as a reference to something in another collection,
+	// named by the command line that lists it. It reads like ID; the difference is
+	// where the reference belongs, which is what lets the item a link points at be
+	// found again under items.
+	Ref string
+	// Handle marks the value as the name a person would use for the record - a
+	// subject, a title, an address - which is a reference to it just as its ID is.
+	Handle bool
 	// Role says what the value means, for the fields that carry a verdict rather
 	// than plain data.
 	Role Role
@@ -75,7 +84,7 @@ func writeFields(u *UI, fields []Field, indent string) {
 		label := pad(f.Label+":", width, false)
 		value := f.Value
 		switch {
-		case f.ID:
+		case f.ID || f.Ref != "":
 			value = style.Paint(Accent, Short(value, short))
 		case f.Swatch != "":
 			value = style.Swatch(f.Swatch, GlyphSwatch) + " " + value

@@ -82,7 +82,7 @@ func itemsListCmd() *cobra.Command {
 				Noun: "items", Columns: childColumns(),
 				Total: total, Page: page.Number, PageSize: page.Size,
 				Filtered: f.narrowed(),
-			}, rows, func(ch drivesvc.Child) []string { return []string{ch.LinkID} })
+			}, rows)
 		}),
 	}
 	f.registerNarrowing(c.Flags())
@@ -642,7 +642,7 @@ func revisionsListCmd() *cobra.Command {
 					{Header: "CREATED", Cell: func(r drivesvc.Revision) string { return units.Time(r.CreateTime) }},
 					{Header: "AUTHOR", Flex: true, Cell: func(r drivesvc.Revision) string { return r.Author }},
 				},
-			}, revs, func(r drivesvc.Revision) []string { return []string{r.ID} })
+			}, revs)
 		}),
 	}
 }

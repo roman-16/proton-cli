@@ -148,20 +148,38 @@ type Resolved struct {
 	Confirm       confirm.Policy
 }
 
+// Profile settles which profile an invocation acts as: what was typed, then the
+// environment, then the file.
+//
+// It stands apart from Resolve because a shell completion needs this answer and
+// none of the others: which cache to read is the whole of what it asks, and
+// having it settle the log level on the way would let a setting it never uses
+// refuse it an answer.
+func Profile(f *File, flag string) (profile.Name, error) {
+	name := ""
+	if f != nil {
+		name = f.Profile
+	}
+	p, err := profile.Parse(firstNonEmpty(flag, os.Getenv("PROTON_PROFILE"), name))
+	if err != nil {
+		return profile.Name{}, errs.Problemf("%v.", err).Hint("profiles are named like `work` or `my-work.2`")
+	}
+	return p, nil
+}
+
 // Resolve settles every setting from the file, the environment and the flags.
 //
 // The profile is settled first, because which per-profile section applies
 // depends on it and nothing about it depends on the section.
 func Resolve(f *File, flags Flags) (Resolved, error) {
 	var global, scoped Settings
-	name := ""
 	if f != nil {
-		global, name = f.Settings, f.Profile
+		global = f.Settings
 	}
 
-	profileName, err := profile.Parse(firstNonEmpty(flags.Profile, os.Getenv("PROTON_PROFILE"), name))
+	profileName, err := Profile(f, flags.Profile)
 	if err != nil {
-		return Resolved{}, errs.Problemf("%v.", err).Hint("profiles are named like `work` or `my-work.2`")
+		return Resolved{}, err
 	}
 	if f != nil {
 		scoped = f.PerProfile[profileName.String()]

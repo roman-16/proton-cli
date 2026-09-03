@@ -48,7 +48,7 @@ func trashListCmd() *cobra.Command {
 			return kit.List(c, ui.TableSpec[passsvc.Item]{
 				Noun: "items", Columns: itemColumns(),
 				Total: ui.Unknown, Page: ui.Unpaged,
-			}, items, func(it passsvc.Item) []string { return []string{it.ShareID, it.ItemID} })
+			}, items)
 		}),
 	}
 }

@@ -63,7 +63,7 @@ proton calendar events list
 proton pass items totp github.com
 ```
 
-Every command reads the same way, `proton <app> <collection> <verb>`, and anywhere one wants an ID, a subject, name, path or address works too.
+Every command reads the same way, `proton <app> <collection> <verb>`, and anywhere one wants an ID, a subject, name, path or address works too. With completion installed, Tab offers back whatever your last listing showed.
 
 → [First commands](docs/first-commands.md) · [How a command is built](docs/commands.md)
 

@@ -38,7 +38,7 @@ func sharedCmd() *cobra.Command {
 				Columns: []ui.Column[passsvc.Item]{
 					{Header: "ID", ID: true, Cell: itemRef},
 					{Header: "TYPE", Cell: func(it passsvc.Item) string { return it.Type }},
-					{Header: "NAME", Flex: true, Cell: func(it passsvc.Item) string {
+					{Header: "NAME", Flex: true, Handle: true, Cell: func(it passsvc.Item) string {
 						if it.Name == "" {
 							return "(could not be decrypted)"
 						}
@@ -46,7 +46,7 @@ func sharedCmd() *cobra.Command {
 					}},
 					{Header: "ACCESS", Cell: func(it passsvc.Item) string { return it.Access }},
 				},
-			}, rows, func(it passsvc.Item) []string { return []string{it.ShareID, it.ItemID} })
+			}, rows)
 		}),
 	})
 	return c
@@ -72,12 +72,12 @@ func sharingCmd() *cobra.Command {
 				Columns: []ui.Column[passsvc.Item]{
 					{Header: "ID", ID: true, Cell: itemRef},
 					{Header: "TYPE", Cell: func(it passsvc.Item) string { return it.Type }},
-					{Header: "NAME", Flex: true, Cell: func(it passsvc.Item) string { return it.Name }},
+					{Header: "NAME", Flex: true, Handle: true, Cell: func(it passsvc.Item) string { return it.Name }},
 					{Header: "SHARES", Right: true, Cell: func(it passsvc.Item) string {
 						return strconv.Itoa(it.Shares)
 					}},
 				},
-			}, rows, func(it passsvc.Item) []string { return []string{it.ShareID, it.ItemID} })
+			}, rows)
 		}),
 	})
 	return c

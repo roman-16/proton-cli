@@ -30,7 +30,7 @@ func aliasContactsCmd() *cobra.Command {
 func aliasContactColumns() []ui.Column[passsvc.AliasContact] {
 	return []ui.Column[passsvc.AliasContact]{
 		{Header: "ID", ID: true, Cell: func(a passsvc.AliasContact) string { return strconv.Itoa(a.ID) }},
-		{Header: "EMAIL", Flex: true, Cell: func(a passsvc.AliasContact) string { return a.Email }},
+		{Header: "EMAIL", Flex: true, Handle: true, Cell: func(a passsvc.AliasContact) string { return a.Email }},
 		{Header: "WRITE TO", Flex: true, Cell: func(a passsvc.AliasContact) string { return a.ReverseAlias }},
 		{Header: "BLOCKED", Cell: func(a passsvc.AliasContact) string { return yesNo(a.Blocked) }},
 		{Header: "FORWARDED", Right: true, Cell: func(a passsvc.AliasContact) string {
@@ -56,7 +56,7 @@ func aliasContactsListCmd() *cobra.Command {
 			return kit.List(c, ui.TableSpec[passsvc.AliasContact]{
 				Noun: "contacts", Columns: aliasContactColumns(),
 				Total: ui.Unknown, Page: ui.Unpaged,
-			}, rows, func(a passsvc.AliasContact) []string { return []string{strconv.Itoa(a.ID)} })
+			}, rows)
 		}),
 	}
 }
@@ -96,7 +96,7 @@ func aliasContactsCreateCmd() *cobra.Command {
 
 func aliasContactsDeleteCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "delete REF CONTACT_REF...",
+		Use:   "delete REF ALIAS_CONTACT_REF...",
 		Short: "Remove an address an alias can write to",
 		Args:  cobra.MinimumNArgs(2),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
@@ -109,7 +109,7 @@ func aliasContactsDeleteCmd() *cobra.Command {
 
 func aliasContactBlockCmd(use, short string, action ui.Action, blocked bool) *cobra.Command {
 	return &cobra.Command{
-		Use:   use + " REF CONTACT_REF...",
+		Use:   use + " REF ALIAS_CONTACT_REF...",
 		Short: short,
 		Args:  cobra.MinimumNArgs(2),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {

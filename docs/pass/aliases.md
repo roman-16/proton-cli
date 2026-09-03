@@ -17,7 +17,7 @@ Holds `allow`, `block`, `create`, `delete` and `list`.
 Let a contact's mail reach you again.
 
 ```
-proton pass aliases contacts allow REF CONTACT_REF...
+proton pass aliases contacts allow REF ALIAS_CONTACT_REF...
 ```
 
 ```bash
@@ -29,7 +29,7 @@ proton pass aliases contacts allow shopping seller@example.com
 Stop a contact's mail reaching you.
 
 ```
-proton pass aliases contacts block REF CONTACT_REF...
+proton pass aliases contacts block REF ALIAS_CONTACT_REF...
 ```
 
 ```bash
@@ -60,7 +60,7 @@ proton pass aliases contacts create shopping seller@example.com --name "The sell
 Remove an address an alias can write to.
 
 ```
-proton pass aliases contacts delete REF CONTACT_REF...
+proton pass aliases contacts delete REF ALIAS_CONTACT_REF...
 ```
 
 ```bash

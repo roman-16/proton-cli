@@ -775,6 +775,9 @@ func (s *Service) attendeeKeyRing(ctx context.Context, email string) (*pgp.KeyRi
 	}
 	key, err := pgp.NewKeyFromArmored(r.Address.Keys[0].PublicKey)
 	if err != nil {
+		if pgphelper.PostQuantum(r.Address.Keys[0].PublicKey) {
+			return nil, pgphelper.NotSupported(email)
+		}
 		return nil, fmt.Errorf("parse the key for %s: %w", email, err)
 	}
 	return pgp.NewKeyRing(key)

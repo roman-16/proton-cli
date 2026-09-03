@@ -17,9 +17,17 @@ type Column[T any] struct {
 	// Cell extracts the text. It is what every column but a status column uses;
 	// see Marks for the exception.
 	Cell func(T) string
-	// ID marks the cell as a Proton reference: shortened on a terminal unless
-	// full IDs were asked for, and painted as one.
+	// ID marks the cell as a Proton reference to the row itself: shortened on a
+	// terminal unless full IDs were asked for, and painted as one.
 	ID bool
+	// Ref marks the cell as a reference to something in another collection,
+	// named by the command line that lists it. It is painted and shortened like
+	// ID; the difference is where the reference belongs, which is what lets a
+	// message ID shown beside an attachment be found again under messages.
+	Ref string
+	// Handle marks the cell as the name a person would use for the row - a
+	// subject, a title, an address - which is a reference to it just as its ID is.
+	Handle bool
 	// Role says what the cell's value means, for the columns that carry a verdict
 	// or a marker rather than plain data. Nil is Plain throughout.
 	Role func(T) Role
@@ -158,7 +166,7 @@ func writeTable[T any](u *UI, spec TableSpec[T], items []T) {
 			case c.Marks != nil:
 				paint[i].marks = c.Marks(it)
 				v = paint[i].marks.String()
-			case c.ID:
+			case c.ID || c.Ref != "":
 				v = Short(c.Cell(it), short)
 				paint[i].role = Accent
 			default:

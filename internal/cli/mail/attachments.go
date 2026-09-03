@@ -58,8 +58,7 @@ func attachmentsListCmd() *cobra.Command {
 			if err != nil {
 				return wrongTable(err, "attachments list")
 			}
-			return kit.List(c, attachmentTableSpec(includeInline), atts,
-				func(a mailsvc.Attachment) []string { return []string{a.ID} })
+			return kit.List(c, attachmentTableSpec(includeInline), atts)
 		}),
 	}
 	c.Flags().BoolVar(&includeInline, "include-inline", false, "Include inline attachments, such as signature graphics")

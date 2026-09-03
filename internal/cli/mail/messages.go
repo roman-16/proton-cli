@@ -60,7 +60,7 @@ func listCmd() *cobra.Command {
 				Noun: "messages", Columns: messageColumns(),
 				Total: total, Page: opts.Page, PageSize: opts.PageSize,
 				Filtered: f.narrowed(),
-			}, msgs, func(m mailsvc.Message) []string { return []string{m.ID} })
+			}, msgs)
 		}),
 	}
 	f.registerNarrowing(c, "inbox")
@@ -138,7 +138,7 @@ func messagePart(msg *mailsvc.Full, shape string, stripQuotes, includeInline boo
 // recipient lists.
 func messageHeader(msg *mailsvc.Full) []ui.Field {
 	fields := []ui.Field{
-		{Label: "Subject", Value: msg.Subject},
+		{Label: "Subject", Value: msg.Subject, Handle: true},
 		{Label: "From", Value: addressLine(msg.Sender)},
 	}
 	for _, group := range []struct {

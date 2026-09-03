@@ -192,7 +192,7 @@ func mailboxesListCmd() *cobra.Command {
 					}},
 					{Header: "PENDING", Cell: func(m passsvc.Mailbox) string { return m.Pending }},
 				},
-			}, rows, func(m passsvc.Mailbox) []string { return []string{m.Email} })
+			}, rows)
 		}),
 	}
 }
@@ -230,7 +230,7 @@ func domainsListCmd() *cobra.Command {
 						return yesNo(d.MXVerified)
 					}},
 				},
-			}, rows, func(d passsvc.Domain) []string { return []string{d.Domain} })
+			}, rows)
 		}),
 	}
 }

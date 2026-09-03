@@ -48,7 +48,7 @@ func messageColumns() []ui.Column[mailsvc.Message] {
 			}
 			return m.FromAddress
 		}},
-		{Header: "SUBJECT", Flex: true, Cell: func(m mailsvc.Message) string { return m.Subject }},
+		{Header: "SUBJECT", Flex: true, Handle: true, Cell: func(m mailsvc.Message) string { return m.Subject }},
 		{Header: "DATE", Cell: func(m mailsvc.Message) string { return units.Time(m.Time) }},
 		{Header: "FLAGS", Marks: func(m mailsvc.Message) ui.Marks {
 			return flags(m.Unread == 1, m.Starred(), m.NumAttachments)
@@ -60,7 +60,7 @@ func conversationColumns() []ui.Column[mailsvc.Conversation] {
 	return []ui.Column[mailsvc.Conversation]{
 		{Header: "ID", ID: true, Cell: func(c mailsvc.Conversation) string { return c.ID }},
 		{Header: "FROM", Flex: true, Cell: func(c mailsvc.Conversation) string { return firstSender(c) }},
-		{Header: "SUBJECT", Flex: true, Cell: func(c mailsvc.Conversation) string { return c.Subject }},
+		{Header: "SUBJECT", Flex: true, Handle: true, Cell: func(c mailsvc.Conversation) string { return c.Subject }},
 		{Header: "MESSAGES", Right: true, Cell: func(c mailsvc.Conversation) string {
 			return strconv.Itoa(c.NumMessages)
 		}},
@@ -76,7 +76,7 @@ func conversationColumns() []ui.Column[mailsvc.Conversation] {
 func draftColumns() []ui.Column[mailsvc.Message] {
 	return []ui.Column[mailsvc.Message]{
 		{Header: "ID", ID: true, Cell: func(m mailsvc.Message) string { return m.ID }},
-		{Header: "SUBJECT", Flex: true, Cell: func(m mailsvc.Message) string { return m.Subject }},
+		{Header: "SUBJECT", Flex: true, Handle: true, Cell: func(m mailsvc.Message) string { return m.Subject }},
 		{Header: "SAVED", Cell: func(m mailsvc.Message) string { return units.Time(m.Time) }},
 		{Header: "FLAGS", Marks: func(m mailsvc.Message) ui.Marks {
 			return flags(false, m.Starred(), m.NumAttachments)

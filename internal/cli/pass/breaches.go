@@ -67,7 +67,7 @@ func breachesListCmd() *cobra.Command {
 			return kit.List(c, ui.TableSpec[passsvc.MonitoredAddress]{
 				Noun: "watched addresses", Columns: breachColumns(),
 				Total: len(rows), Page: ui.Unpaged,
-			}, rows, func(a passsvc.MonitoredAddress) []string { return []string{a.AddressID} })
+			}, rows)
 		}),
 	}
 }

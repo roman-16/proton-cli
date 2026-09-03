@@ -26,8 +26,14 @@ func completionCmd(root *cobra.Command) *cobra.Command {
 
 Completion knows the whole command tree, every flag, and the values each
 enumerated flag accepts - so it offers folder names, item types, output formats
-and setting keys as you type them. One script covers both ` + kit.Program +
-			` and ` + kit.Alias + `.
+and setting keys as you type them.
+
+Where a command takes a reference it offers back what your listings showed: the
+short ID, and the subject, name or address beside it. It reads what this machine
+remembers rather than asking Proton, so a collection you have not listed yet
+offers nothing and says which listing would fill it.
+
+One script covers both ` + kit.Program + ` and ` + kit.Alias + `.
 
   bash        ` + kit.Program + ` completion bash > /etc/bash_completion.d/` + kit.Program + `
   zsh         ` + kit.Program + ` completion zsh > "${fpath[1]}/_` + kit.Program + `"

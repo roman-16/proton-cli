@@ -138,21 +138,104 @@ func TestUsageUsesOnlyDeclaredPlaceholders(t *testing.T) {
 	}
 }
 
-// argTokens extracts the argument names from a Use string, stripping the command
-// name and the optional/variadic decorations.
+// An argument that names one of the CLI's own things completes from a collection
+// something lists, and a command's REF from one that can be listed by naming it
+// alone.
+//
+// That is the whole promise behind a reference completing: what the shell offers
+// back is what a listing put on the screen, so there has to be a listing that
+// could have put it there. The stricter half is what a REF needs, because a REF
+// is the first thing typed and nothing has been named yet - which is why
+// `messages attachments download` has to reach past attachments to messages,
+// whose listing needs nothing, while the attachment it takes second comes from a
+// listing that had to be told which message.
+func TestEveryReferenceCompletesFromSomethingListable(t *testing.T) {
+	leaves, _ := partition(t)
+	for _, c := range leaves {
+		for i, arg := range kit.Arguments(c.Use) {
+			picks := kit.Placeholders[arg.Name].Picks
+			if picks == "" {
+				continue
+			}
+			collection := kit.Picks(c, arg)
+			if collection == "" {
+				t.Errorf("%s: argument %d (%s) has no collection to complete from",
+					cmdPath(c), i+1, arg.Name)
+				continue
+			}
+			if !lists(c.Root(), collection) {
+				t.Errorf("%s: argument %d (%s) completes from %q, which nothing lists",
+					cmdPath(c), i+1, arg.Name, collection)
+				continue
+			}
+			if picks == kit.PicksAddressed && !listable(c.Root(), collection) {
+				t.Errorf("%s: argument %d (%s) completes from %q, which cannot be listed "+
+					"without naming something first", cmdPath(c), i+1, arg.Name, collection)
+			}
+		}
+	}
+}
+
+// A column or field that files its reference under another collection names one
+// that exists, so a typo cannot quietly send what was shown somewhere nothing
+// reads it. The declarations are inside closures, so the source is where they can
+// be found.
+func TestEveryCrossReferenceNamesACollection(t *testing.T) {
+	root := newRoot()
+	names := regexp.MustCompile(`Ref: +"([^"]+)"`)
+	err := filepath.WalkDir(".", func(p string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(p, ".go") || strings.HasSuffix(p, "_test.go") {
+			return err
+		}
+		src, rerr := os.ReadFile(p)
+		if rerr != nil {
+			return rerr
+		}
+		for _, m := range names.FindAllStringSubmatch(string(src), -1) {
+			if !listable(root, m[1]) {
+				t.Errorf("%s: Ref: %q names no collection that anything lists",
+					filepath.ToSlash(p), m[1])
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk: %v", err)
+	}
+}
+
+// lists reports whether a command line names a collection with a list of its
+// own, which is what puts anything into that collection's memory at all.
+func lists(root *cobra.Command, collection string) bool {
+	return listing(root, collection) != nil
+}
+
+// listable reports whether that list needs nothing named first.
+func listable(root *cobra.Command, collection string) bool {
+	l := listing(root, collection)
+	return l != nil && len(kit.Arguments(l.Use)) == 0
+}
+
+func listing(root *cobra.Command, collection string) *cobra.Command {
+	found, _, err := root.Find(strings.Fields(collection))
+	if err != nil || found == root || found.CommandPath() != kit.Program+" "+collection {
+		return nil
+	}
+	for _, sub := range found.Commands() {
+		if sub.Name() == "list" {
+			return sub
+		}
+	}
+	return nil
+}
+
+// argTokens is the placeholder names in a Use string, read the way the CLI
+// itself reads them.
 func argTokens(use string) []string {
-	var out []string
-	fields := strings.Fields(use)
-	for _, f := range fields[min(1, len(fields)):] {
-		f = strings.Trim(f, "[]{}()")
-		f = strings.TrimSuffix(f, "...")
-		if f == "" || f == "|" {
-			continue
-		}
-		// Only shouted tokens are placeholders; a literal subcommand word is not.
-		if f == strings.ToUpper(f) && strings.ContainsFunc(f, unicode.IsLetter) {
-			out = append(out, f)
-		}
+	args := kit.Arguments(use)
+	out := make([]string, 0, len(args))
+	for _, a := range args {
+		out = append(out, a.Name)
 	}
 	return out
 }

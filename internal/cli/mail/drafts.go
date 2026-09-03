@@ -36,7 +36,7 @@ func draftsListCmd() *cobra.Command {
 			return kit.List(c, ui.TableSpec[mailsvc.Message]{
 				Noun: "drafts", Columns: draftColumns(),
 				Total: total, Page: page, PageSize: pageSize,
-			}, msgs, func(m mailsvc.Message) []string { return []string{m.ID} })
+			}, msgs)
 		}),
 	}
 	c.Flags().IntVar(&page, "page", 0, "Which page of results, counting from zero")

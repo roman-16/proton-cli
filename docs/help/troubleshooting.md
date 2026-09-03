@@ -15,18 +15,19 @@ Errors say what happened and what to try, so read the message first. The code is
 | `5` | Network or server problem | Wait and retry. This is not your command's fault |
 | `6` | Refused by your confirmation policy | Nothing about the command was wrong. The policy has to change |
 | `7` | A bug in proton | Nothing you typed caused it. [Report it](#reporting-a-bug) |
+| `8` | Not supported yet | Nothing was wrong with the command. See [What it can't do](limits.md) |
 | `130` | Cancelled with Ctrl+C | Nothing to do |
 
 The difference between `2` and `5` matters most to a scheduled job. `2` means fix the credential; `5` means come back later. A rate limit is `5`.
 
-`6` is the one code that retrying never helps. See [Deny](../using/confirmations.md#deny).
+`6` and `8` are the codes retrying never helps. See [Deny](../using/confirmations.md#deny) and [What it can't do](limits.md).
 
 `7` means a failure proton never anticipated: no message was written for it, because nobody expected it. It says so on the screen, and it is worth reporting whatever else you do about it.
 
 ```console
 $ proton mail messages list
 Error: None of your addresses' keys could be opened.
-Try:   proton report   (this looks like a bug in proton, not something you did)
+proton report  (this looks like a bug in proton, not something you did)
 ```
 
 ## Reporting a bug

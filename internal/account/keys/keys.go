@@ -12,6 +12,7 @@ import (
 	"github.com/ProtonMail/go-srp"
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
 	"github.com/roman-16/proton-cli/internal/account/localkey"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/fetch"
 	"github.com/roman-16/proton-cli/internal/proton"
@@ -199,6 +200,14 @@ func Unlock(ctx context.Context, c *proton.Client, ask KeyPassword) (*Unlocked, 
 func open(ctx context.Context, user *User, addrs []Address, skp string) (*Unlocked, error) {
 	userKR, err := unlockKeyRing(ctx, user.Keys, []byte(skp), nil)
 	if err != nil {
+		// Post-quantum keys answer any failure to open a hierarchy that holds
+		// them: nothing here reads one, so blaming the passphrase or calling it a
+		// bug sends the reader looking where there is nothing to find. Asked after
+		// the attempt and not before it, because an account can hold such a key
+		// and still open every address with the rest.
+		if postQuantum(user, addrs) {
+			return nil, pgphelper.NotSupported("Your account")
+		}
 		return nil, errWrongKeyPass
 	}
 
@@ -225,9 +234,30 @@ func open(ctx context.Context, user *User, addrs []Address, skp string) (*Unlock
 		"user_keys", shape.userKeys, "address_keys", shape.addressKeys,
 		"opened", len(addrKRs))
 	if len(addrKRs) == 0 {
+		if postQuantum(user, addrs) {
+			return nil, pgphelper.NotSupported("Your account")
+		}
 		return nil, shape
 	}
 	return &Unlocked{UserKR: userKR, AddrKRs: addrKRs, Addresses: addrs}, nil
+}
+
+// postQuantum reports whether Proton holds a key for this account that no build
+// here can read.
+func postQuantum(user *User, addrs []Address) bool {
+	for _, k := range user.Keys {
+		if pgphelper.PostQuantum(k.PrivateKey) {
+			return true
+		}
+	}
+	for _, a := range addrs {
+		for _, k := range a.Keys {
+			if pgphelper.PostQuantum(k.PrivateKey) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // unopenable is the account's shape when the user keys opened and not one
@@ -247,23 +277,30 @@ func (e *unopenable) Error() string {
 // unopenedKeys is the only place this failure is phrased. Both ways of reaching
 // it come through here, so one failure cannot wear two faces.
 //
-// It is not a mistake anybody made at the terminal, so it says what it is and
-// points at the one thing that can move it forward. In two-password mode the
-// second password is worth naming as a possibility, because it is the one
-// secret involved that Proton never proves over SRP - it opened the user keys,
-// which is why the run got this far, and can still be wrong for keys that were
-// re-encrypted elsewhere.
+// Nothing typed at a terminal reaches it: a secret that does not open the user
+// keys fails earlier and by name, so what is left is a hierarchy this CLI cannot
+// walk. That is its own fault, which is the exit code it takes and the reason
+// the screen asks for a report - the log is the only thing that says which key
+// it was, and somebody has to send it. In two-password mode the second password
+// is worth naming as a possibility, because it is the one secret involved that
+// Proton never proves over SRP - it opened the user keys, which is why the run
+// got this far, and can still be wrong for keys that were re-encrypted
+// elsewhere.
+//
+// The counts stay in the log rather than the sentence. How many addresses there
+// were changes nothing about what the reader does next, and a report carries
+// them either way.
 func unopenedKeys(ctx context.Context, twoPassword bool, shape *unopenable) error {
 	slog.DebugContext(ctx, "keys: no address key opened",
 		"addresses", shape.addresses, "addresses_active", shape.active,
 		"user_keys", shape.userKeys, "address_keys", shape.addressKeys,
 		"two_password", twoPassword)
 
-	problem := errs.Problemf("None of your addresses' keys could be opened.")
+	problem := errs.Problemf("None of your addresses' keys could be opened.").Exit(errs.ExitBug)
 	if twoPassword {
 		problem = problem.Hint("if you changed your second password recently, sign in again")
 	}
-	return fmt.Errorf("%w: %w", problem, shape)
+	return problem
 }
 
 // askTwoPassword asks whether this account keeps its sign-in and its keys
@@ -281,9 +318,11 @@ func askTwoPassword(ctx context.Context, c *proton.Client) bool {
 	return twoPassword
 }
 
-// reasonFor names which of the four ways unlocking fails happened, for the log.
+// reasonFor names which of the ways unlocking fails happened, for the log.
 func reasonFor(err error) skip.Reason {
 	switch {
+	case errors.Is(err, errPostQuantum):
+		return skip.PostQuantum
 	case errors.Is(err, errNoActiveKey):
 		return skip.Inactive
 	case errors.Is(err, errTokenUndecryptable):
@@ -518,16 +557,18 @@ func getAddresses(ctx context.Context, c *proton.Client) ([]Address, error) {
 	return r.Addresses, nil
 }
 
-// The four ways one key fails to open. They are told apart because the answers
+// The ways one key fails to open. They are told apart because the answers
 // differ: a retired key is normal, a token this user key cannot decrypt means
 // the hierarchy itself is wrong, armour that will not parse means Proton sent
-// something unexpected, and a key that will not unlock means the passphrase is
-// not the one it was locked with.
+// something unexpected, a key that will not unlock means the passphrase is not
+// the one it was locked with, and a post-quantum key is a gap in this build
+// rather than anything wrong with the account.
 var (
 	errNoActiveKey        = errors.New("no active key")
 	errTokenUndecryptable = errors.New("token not decryptable by the user key")
 	errKeyMalformed       = errors.New("key is not readable armour")
 	errKeyLocked          = errors.New("key did not unlock with the passphrase")
+	errPostQuantum        = errors.New("key uses post-quantum algorithms")
 )
 
 func unlockKeyRing(ctx context.Context, keys []Key, passphrase []byte, userKR *pgp.KeyRing) (*pgp.KeyRing, error) {
@@ -558,8 +599,12 @@ func unlockKeyRing(ctx context.Context, keys []Key, passphrase []byte, userKR *p
 		}
 		locked, err := pgp.NewKeyFromArmored(k.PrivateKey)
 		if err != nil {
+			reason := skip.Malformed
 			last = errKeyMalformed
-			skip.Record(ctx, skip.KindKey, k.ID, skip.Malformed, err)
+			if pgphelper.PostQuantum(k.PrivateKey) {
+				reason, last = skip.PostQuantum, errPostQuantum
+			}
+			skip.Record(ctx, skip.KindKey, k.ID, reason, err)
 			continue
 		}
 		unlocked, err := locked.Unlock(secret)
@@ -635,6 +680,12 @@ func Published(ctx context.Context, c proton.Doer, email string) (*pgp.KeyRing, 
 		}
 		key, err := pgp.NewKeyFromArmored(k.PublicKey)
 		if err != nil {
+			// A post-quantum key is refused rather than passed over: the caller's
+			// "Proton holds no key for them" would be a false statement about a real
+			// Proton address, and about the one thing the sender cannot work around.
+			if pgphelper.PostQuantum(k.PublicKey) {
+				return nil, pgphelper.NotSupported(email)
+			}
 			// Recorded and not counted. The caller's answer is "this recipient has
 			// no key we can encrypt to", which it goes on to handle; nothing has
 			// been hidden from anybody, so there is nothing for a listing to warn

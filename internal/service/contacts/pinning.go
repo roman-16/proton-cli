@@ -255,6 +255,9 @@ func (s *Service) UnpinKey(ctx context.Context, id, email string) error {
 func encodePinnedKey(armored string) (string, error) {
 	key, err := gopenpgp.NewKeyFromArmored(strings.TrimSpace(armored))
 	if err != nil {
+		if pgp.PostQuantum(armored) {
+			return "", pgp.NotSupported("That key")
+		}
 		return "", fmt.Errorf("invalid public key: %w", err)
 	}
 	bin, err := key.GetPublicKey()

@@ -35,6 +35,14 @@ type StreamColumn[T any] struct {
 	// as one, and never truncated - a reference that cannot be pasted back is
 	// worse than a ragged line.
 	ID bool
+	// Ref marks the cell as a reference to something in another collection, named
+	// by the command line that lists it. It reads like ID; the difference is where
+	// the reference belongs, which is what lets a message streamed by a watch be
+	// found again under messages.
+	Ref string
+	// Handle marks the cell as the name a person would use for the thing, which
+	// is a reference to it just as its ID is.
+	Handle bool
 	// Role says what the cell's value means. Nil is Plain.
 	Role func(T) Role
 }
@@ -104,11 +112,11 @@ func (s *Stream[T]) draw(item T) {
 	for _, c := range s.spec.Columns {
 		text, role := c.Cell(item), Plain
 		switch {
-		case c.ID:
+		case c.ID || c.Ref != "":
 			text, role = Short(text, short), Accent
 		case c.Role != nil:
 			role = c.Role(item)
-		case !c.ID && c.Width > 0:
+		case c.Width > 0:
 			text = truncateCells(text, c.Width)
 		}
 		cells = append(cells, s.u.style.Paint(role, padCells(text, c.Width, false)))

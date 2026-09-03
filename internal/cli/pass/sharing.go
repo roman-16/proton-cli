@@ -203,7 +203,7 @@ func shareGetCmd(t target) *cobra.Command {
 						ui.Field{Label: "Link", Value: l.URL},
 						ui.Field{Label: "Link Expires", Value: units.Time(l.Expires)},
 						ui.Field{Label: "Link Views", Value: reads(l)},
-						ui.Field{Label: "Link ID", Value: l.LinkID, ID: true},
+						ui.Field{Label: "Link ID", Value: l.LinkID, Ref: "pass links"},
 					)
 				}
 			}
@@ -409,7 +409,7 @@ func receivedColumns() []ui.Column[passsvc.Invite] {
 	return []ui.Column[passsvc.Invite]{
 		{Header: "ID", ID: true, Cell: func(i passsvc.Invite) string { return i.ID }},
 		{Header: "KIND", Cell: func(i passsvc.Invite) string { return i.Kind() }},
-		{Header: "VAULT", Flex: true, Cell: func(i passsvc.Invite) string { return i.Vault }},
+		{Header: "VAULT", Flex: true, Handle: true, Cell: func(i passsvc.Invite) string { return i.Vault }},
 		{Header: "FROM", Cell: func(i passsvc.Invite) string { return i.Inviter }},
 		{Header: "ACCESS", Cell: func(i passsvc.Invite) string { return i.Access }},
 		{Header: "ITEMS", Right: true, Cell: func(i passsvc.Invite) string {
@@ -437,7 +437,7 @@ func invitationsListCmd() *cobra.Command {
 			}
 			return kit.List(c, ui.TableSpec[passsvc.Invite]{
 				Noun: "invitations", Columns: receivedColumns(), Total: len(rows), Page: ui.Unpaged,
-			}, rows, func(i passsvc.Invite) []string { return []string{i.ID} })
+			}, rows)
 		}),
 	}
 }

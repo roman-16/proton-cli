@@ -93,7 +93,7 @@ func eventColumns() []ui.Column[calsvc.Event] {
 		{Header: "DURATION", Right: true, Cell: func(e calsvc.Event) string {
 			return units.Duration(e.End.Sub(e.Start))
 		}},
-		{Header: "TITLE", Flex: true, Cell: func(e calsvc.Event) string { return e.Title }},
+		{Header: "TITLE", Flex: true, Handle: true, Cell: func(e calsvc.Event) string { return e.Title }},
 		{Header: "LOCATION", Flex: true, Cell: func(e calsvc.Event) string { return e.Location }},
 	}
 }
@@ -123,7 +123,7 @@ func eventsListCmd() *cobra.Command {
 			return kit.List(c, ui.TableSpec[calsvc.Event]{
 				Noun: "events", Columns: eventColumns(),
 				Total: ui.Unknown, Page: ui.Unpaged,
-			}, events, func(e calsvc.Event) []string { return []string{e.CalendarID, e.ID} })
+			}, events)
 		}),
 	}
 	c.Flags().StringVar(&calendar, "calendar", "", "Which calendar, by name or ID (default: all of them)")
@@ -158,7 +158,7 @@ func eventsGetCmd() *cobra.Command {
 			return kit.Show(c, ui.RecordSpec{
 				Object: ev,
 				Fields: []ui.Field{
-					{Label: "Title", Value: ev.Title},
+					{Label: "Title", Value: ev.Title, Handle: true},
 					{Label: "Start", Value: when},
 					{Label: "End", Value: until},
 					{Label: "Duration", Value: units.Duration(ev.End.Sub(ev.Start))},

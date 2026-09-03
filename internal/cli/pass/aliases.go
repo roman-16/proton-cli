@@ -43,10 +43,10 @@ func aliasesListCmd() *cobra.Command {
 				Columns: []ui.Column[passsvc.Item]{
 					{Header: "ID", ID: true, Cell: itemRef},
 					{Header: "STATUS", Cell: func(it passsvc.Item) string { return it.AliasStatus }},
-					{Header: "ADDRESS", Flex: true, Cell: func(it passsvc.Item) string { return it.Alias }},
-					{Header: "NAME", Flex: true, Cell: func(it passsvc.Item) string { return it.Name }},
+					{Header: "ADDRESS", Flex: true, Handle: true, Cell: func(it passsvc.Item) string { return it.Alias }},
+					{Header: "NAME", Flex: true, Handle: true, Cell: func(it passsvc.Item) string { return it.Name }},
 				},
-			}, aliases, func(it passsvc.Item) []string { return []string{it.ShareID, it.ItemID} })
+			}, aliases)
 		}),
 	}
 	c.Flags().StringVar(&vault, "vault", "", "Show only this vault, by name or ID")
@@ -187,7 +187,7 @@ func aliasesOptionsCmd() *cobra.Command {
 					{Header: "VALUE", Flex: true, Cell: func(o option) string { return o.Value }},
 					{Header: "ID", Cell: func(o option) string { return o.ID }},
 				},
-			}, rows, nil)
+			}, rows)
 		}),
 	}
 }

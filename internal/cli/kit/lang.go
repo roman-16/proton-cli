@@ -205,25 +205,59 @@ var SettingsPages = map[string]string{
 	"pass settings mailboxes":     "Aliases",
 }
 
+// Placeholder is one argument name: what it stands for, and where the things it
+// may name are found.
+type Placeholder struct {
+	// Means is the sentence that explains the name.
+	Means string
+	// Picks is the collection whose things the argument names, for the arguments
+	// that name one. It is a command line, or one of the two answers that depend
+	// on the command asking. It is empty for an argument naming something this
+	// CLI does not hold - a local file, an address, a setting key - and such an
+	// argument is left to the shell, which knows about files and does not need
+	// telling not to.
+	Picks string
+}
+
+// The two collections an argument can name that are not the same wherever the
+// argument appears. Neither reads as a command line, so neither can be mistaken
+// for one.
+const (
+	// PicksAddressed is what a command's REF names: the nearest collection above
+	// it that can be listed without naming something first, unless the command
+	// says otherwise with Addresses.
+	PicksAddressed = "the collection this command acts on"
+	// PicksHolding is the collection the command is part of, which is what a
+	// second reference names - the attachments of the message it addresses, the
+	// revisions of the file.
+	PicksHolding = "the collection this command is part of"
+)
+
+// Addresses is how a command declares the collection its REF comes from, for
+// the one whose REF is not what the tree above it would say: `pass links create`
+// sits under links and names an item.
+const Addresses = "addresses"
+
 // Placeholders is every argument name a usage string may contain.
 //
 // One name per idea, so `REF` means the same thing in every command that takes
 // one: a full ID, an eight-character short ID, or a human handle such as a
 // subject, a name, a path or an email address.
-var Placeholders = map[string]string{
-	"REF":            "a full ID, a short ID, or a human handle",
-	"PATH":           "a Drive path that does not exist yet",
-	"SRC":            "a local file or directory to read",
-	"DEST":           "a Drive folder to write into",
-	"EMAIL":          "an email address",
-	"NEW_NAME":       "the name to change something to",
-	"KEY":            "a setting key",
-	"VALUE":          "a setting value",
-	"METHOD":         "an HTTP method",
-	"ENDPOINT":       "a Proton API path",
-	"VERSION":        "a " + Program + " release, as X.Y.Z",
-	"ATTACHMENT_REF": "an attachment on the addressed message",
-	"REVISION_REF":   "a revision of the addressed file",
-	"CONTACT_REF":    "a contact, when the command already addresses something else",
-	"PHOTO_REF":      "a photo, when the command already addresses an album",
+var Placeholders = map[string]Placeholder{
+	"ALIAS_CONTACT_REF": {Means: "an address the addressed alias may write to", Picks: PicksHolding},
+	"ATTACHMENT_REF":    {Means: "an attachment on the addressed message", Picks: PicksHolding},
+	"CONTACT_REF":       {Means: "a contact, when the command already addresses something else", Picks: "contacts"},
+	"DEST":              {Means: "a Drive folder to write into"},
+	"EMAIL":             {Means: "an email address"},
+	"ENDPOINT":          {Means: "a Proton API path"},
+	"KEY":               {Means: "a setting key"},
+	"METHOD":            {Means: "an HTTP method"},
+	"NEW_NAME":          {Means: "the name to change something to"},
+	"PATH":              {Means: "a Drive path that does not exist yet"},
+	"PHOTO_REF":         {Means: "a photo, when the command already addresses an album", Picks: "drive photos"},
+	"REF":               {Means: "a full ID, a short ID, or a human handle", Picks: PicksAddressed},
+	"REVISION_REF":      {Means: "a revision of the addressed file", Picks: PicksHolding},
+	"SRC":               {Means: "a local file or directory to read"},
+	"VALUE":             {Means: "a setting value"},
+	"VERSION":           {Means: "a " + Program + " release, as X.Y.Z"},
 }

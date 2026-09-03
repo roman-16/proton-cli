@@ -32,7 +32,7 @@ func addressesListCmd() *cobra.Command {
 				Total: ui.Unknown, Page: ui.Unpaged,
 				Columns: []ui.Column[mailsvc.Address]{
 					{Header: "ID", ID: true, Cell: func(a mailsvc.Address) string { return a.ID }},
-					{Header: "EMAIL", Flex: true, Cell: func(a mailsvc.Address) string { return a.Email }},
+					{Header: "EMAIL", Flex: true, Handle: true, Cell: func(a mailsvc.Address) string { return a.Email }},
 					{Header: "DISPLAY_NAME", Flex: true, Cell: func(a mailsvc.Address) string { return a.DisplayName }},
 					{Header: "STATUS", Cell: func(a mailsvc.Address) string { return addressStatus(a) }},
 					{Header: "TYPE", Cell: func(a mailsvc.Address) string { return addressType(a.Type) }},
@@ -40,7 +40,7 @@ func addressesListCmd() *cobra.Command {
 						return yesNo(a.Signature != "")
 					}},
 				},
-			}, addrs, func(a mailsvc.Address) []string { return []string{a.ID} })
+			}, addrs)
 		}),
 	}
 }
@@ -62,7 +62,7 @@ func addressesGetCmd() *cobra.Command {
 			return kit.Show(c, ui.RecordSpec{
 				Object: a,
 				Fields: []ui.Field{
-					{Label: "Email", Value: a.Email},
+					{Label: "Email", Value: a.Email, Handle: true},
 					{Label: "Display Name", Value: a.DisplayName},
 					{Label: "Type", Value: addressType(a.Type)},
 					{Label: "Status", Value: addressStatus(*a), Always: true},

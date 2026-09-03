@@ -114,6 +114,15 @@ func idcachePath(t *testing.T) string {
 	return filepath.Join(cd, "proton-cli", "idcache", primary+".json")
 }
 
+// cacheEntry mirrors what the CLI writes down about something it showed. The
+// suite reads the file rather than the package so that the shape a completion
+// depends on is checked as it lands on disk.
+type cacheEntry struct {
+	Collection string   `json:"collection"`
+	Ref        string   `json:"ref"`
+	Handles    []string `json:"handles"`
+}
+
 func TestShortIDCacheFilePopulated(t *testing.T) {
 	t.Parallel()
 	// Run any list command to populate the cache.
@@ -124,22 +133,54 @@ func TestShortIDCacheFilePopulated(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read cache: %v", err)
 	}
-	var ids []string
-	if err := json.Unmarshal(data, &ids); err != nil {
+	var entries []cacheEntry
+	if err := json.Unmarshal(data, &entries); err != nil {
 		t.Fatalf("cache file is not a JSON array: %v\n%s", err, data)
 	}
-	if len(ids) == 0 {
+	if len(entries) == 0 {
 		t.Errorf("cache should be non-empty after list command")
 	}
 	// The cache exists to turn a short prefix back into the whole thing, so what
 	// it stores must never itself be shortened. Not every Proton ID is base64
 	// ending in "==" - a session UID is 32 lowercase characters - so length is
 	// the invariant, not shape.
-	for _, id := range ids {
-		if len(id) <= 8 {
-			t.Errorf("cached ID is not a full one: %q", id)
+	for _, e := range entries {
+		if len(e.Ref) <= 8 {
+			t.Errorf("cached reference is not a full one: %q", e.Ref)
+		}
+		if e.Collection == "" {
+			t.Errorf("cached reference %q says nothing about what it is", e.Ref)
 		}
 	}
+}
+
+// A listing remembers the name beside the reference, which is what lets a shell
+// show what it is offering and lets a subject be typed back in place of an ID.
+// Only a real listing proves the columns are marked where the handles are.
+func TestShortIDCacheRemembersSubjects(t *testing.T) {
+	t.Parallel()
+	_, _, subject := plainMail(t)
+	runOK(t, "mail", "messages", "list", "--keyword", subject)
+
+	data, err := os.ReadFile(idcachePath(t))
+	if err != nil {
+		t.Fatalf("read cache: %v", err)
+	}
+	var entries []cacheEntry
+	if err := json.Unmarshal(data, &entries); err != nil {
+		t.Fatalf("cache file is not a JSON array: %v\n%s", err, data)
+	}
+	for _, e := range entries {
+		if e.Collection != "mail messages" {
+			continue
+		}
+		for _, h := range e.Handles {
+			if h == subject {
+				return
+			}
+		}
+	}
+	t.Errorf("no cached message carries the subject %q that was just listed", subject)
 }
 
 func TestShortIDRoundTripMail(t *testing.T) {
@@ -202,7 +243,10 @@ func TestShortIDAmbiguousErrors(t *testing.T) {
 	pad := strings.Repeat("A", 78)
 	idA := "abcd1234" + "FIRSTabc" + pad + "=="
 	idB := "abcd1234" + "SECONDab" + pad + "=="
-	body, _ := json.Marshal([]string{idA, idB})
+	body, _ := json.Marshal([]cacheEntry{
+		{Collection: "mail messages", Ref: idA},
+		{Collection: "mail messages", Ref: idB},
+	})
 	if err := os.WriteFile(path, body, 0600); err != nil {
 		t.Fatalf("write cache: %v", err)
 	}

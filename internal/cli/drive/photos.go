@@ -96,7 +96,7 @@ func listPhotos(c *kit.Invocation, photos []drivesvc.Photo) error {
 	return kit.List(c, ui.TableSpec[drivesvc.Photo]{
 		Noun: "photos", Columns: photoColumns(),
 		Total: ui.Unknown, Page: ui.Unpaged,
-	}, photos, func(p drivesvc.Photo) []string { return []string{p.LinkID} })
+	}, photos)
 }
 
 func photosUploadCmd() *cobra.Command {
@@ -256,7 +256,7 @@ func albumsCmd() *cobra.Command {
 func albumColumns() []ui.Column[drivesvc.Album] {
 	return []ui.Column[drivesvc.Album]{
 		{Header: "ID", ID: true, Cell: func(a drivesvc.Album) string { return a.LinkID }},
-		{Header: "NAME", Flex: true, Cell: func(a drivesvc.Album) string { return a.Name }},
+		{Header: "NAME", Flex: true, Handle: true, Cell: func(a drivesvc.Album) string { return a.Name }},
 		{Header: "PHOTOS", Right: true, Cell: func(a drivesvc.Album) string {
 			return strconv.Itoa(a.PhotoCount)
 		}},
@@ -329,7 +329,7 @@ func albumsListCmd() *cobra.Command {
 			return kit.List(c, ui.TableSpec[drivesvc.Album]{
 				Noun: "albums", Columns: albumColumns(),
 				Total: ui.Unknown, Page: ui.Unpaged,
-			}, albums, func(a drivesvc.Album) []string { return []string{a.LinkID} })
+			}, albums)
 		}),
 	}
 }

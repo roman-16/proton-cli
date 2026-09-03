@@ -35,15 +35,14 @@ func watchCmd() *cobra.Command {
 			return kit.Watch(c, ui.StreamSpec[mailsvc.Message]{
 				Columns: []ui.StreamColumn[mailsvc.Message]{
 					{Width: 5, Cell: func(mailsvc.Message) string { return time.Now().Format("15:04") }},
-					{ID: true, Cell: func(m mailsvc.Message) string { return m.ID }},
+					{Ref: "mail messages", Cell: func(m mailsvc.Message) string { return m.ID }},
 					{Width: senderWidth, Cell: sender},
-					{Cell: func(m mailsvc.Message) string { return m.Subject }},
+					{Handle: true, Cell: func(m mailsvc.Message) string { return m.Subject }},
 				},
 				Opening: "Watching " + ui.Listing(names(in)) + ". Ctrl+C to stop.",
-			}, func(m mailsvc.Message) []string { return []string{m.ID} },
-				func(emit func(mailsvc.Message) error) error {
-					return c.App.Mail.Watch(c.Ctx, opts, emit)
-				})
+			}, func(emit func(mailsvc.Message) error) error {
+				return c.App.Mail.Watch(c.Ctx, opts, emit)
+			})
 		}),
 	}
 	registerFolder(c, &folder, "", "the ones that notify")
