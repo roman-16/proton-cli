@@ -89,11 +89,20 @@ var untested = map[string]string{
 	"POST /mail/v4/messages/{id}/unsubscribe":        "reaching it needs a message from a real mailing list carrying a List-Unsubscribe header, which no seeding can put on these accounts",
 	"GET /calendar/v1/{id}/events/{id}/attendees":    "reaching it needs an event with more attendees than a page holds, which would mean inviting a hundred addresses from these accounts",
 
-	// Renewing a session needs an access token that has expired, which takes a day
-	// the suite does not have. A test could put a bogus token in the session file
-	// and watch the next command renew it and carry on, which is the shape the
-	// missing test has.
-	"POST /auth/v4/refresh": "reaching it needs an expired access token",
+	// Setting a forwarding up is a paid feature - Proton's own settings page shows
+	// the button only to hasPaidMail - so the two free accounts reach the listings
+	// and nothing that writes. Closing this means a paid test, which would put a
+	// forwarding rule on an account somebody actually uses.
+	"POST /mail/v4/forwardings":              "setting a forwarding up needs a paid plan, and the free accounts cannot",
+	"DELETE /mail/v4/forwardings/{id}":       "there is nothing to take down, because nothing could be set up",
+	"PUT /mail/v4/forwardings/{id}/reinvite": "the same: no pending forwarding to ask about again",
+
+	// Pausing needs a forwarding the forwardee has accepted, and accepting one
+	// writes an address key and re-signs the Signed Key List - which proton does
+	// not do, by design. So no run of this suite can ever produce an active
+	// forwarding to pause. See docs/help/limits.md.
+	"PUT /mail/v4/forwardings/{id}/pause":  "pausing needs an accepted forwarding, and accepting one is not built",
+	"PUT /mail/v4/forwardings/{id}/resume": "the other half of the same gap",
 }
 
 func TestEveryRequestTheCLICanSendIsOneTheSuiteSends(t *testing.T) {

@@ -4,7 +4,7 @@ How Mail behaves.
 
 Every command under `proton mail settings`, with the arguments and flags it takes. For these commands in use, see [the mail guide](README.md).
 
-Holds `addresses`, `autoreply`, `filters`, `folders`, `get`, `labels`, `list`, `senders` and `set`.
+Holds `addresses`, `autoreply`, `filters`, `folders`, `forwarding`, `get`, `labels`, `list`, `senders` and `set`.
 
 ## `addresses`
 
@@ -356,6 +356,104 @@ proton mail settings folders update Receipts --notify
 | `--name string` | New name |
 | `--notify` | Tell you when mail arrives here (default `true`) |
 | `--parent string` | Move it inside this folder, by ID |
+
+## `forwarding`
+
+Mail forwarded to and from your addresses.
+
+Holds `create`, `delete`, `disable`, `enable`, `get`, `list` and `resend`.
+
+### `forwarding create`
+
+Forward one of your addresses to another Proton address.
+
+REF is the address of yours mail arrives at, EMAIL is the Proton address it is handed to. Mail stays end-to-end encrypted: a key is derived from your address key so Proton can re-wrap each message for them without reading it.
+
+Nothing is forwarded until they accept, which they do in a Proton client - accepting one writes a new address key, and proton changes no key material.
+
+Forwarding to an address outside Proton is not built: Proton emails it a link its owner must follow, which no command can answer.
+
+```
+proton mail settings forwarding create REF EMAIL
+```
+
+```bash
+proton mail settings forwarding create me@proton.me jane@proton.me
+```
+
+### `forwarding delete`
+
+Stop forwardings, in either direction.
+
+```
+proton mail settings forwarding delete REF...
+```
+
+```bash
+proton mail settings forwarding delete jane@proton.me
+```
+
+### `forwarding disable`
+
+Pause forwardings without taking them down.
+
+```
+proton mail settings forwarding disable REF...
+```
+
+```bash
+proton mail settings forwarding disable jane@proton.me
+```
+
+### `forwarding enable`
+
+Resume paused forwardings.
+
+```
+proton mail settings forwarding enable REF...
+```
+
+```bash
+proton mail settings forwarding enable jane@proton.me
+```
+
+### `forwarding get`
+
+Show one forwarding.
+
+```
+proton mail settings forwarding get REF
+```
+
+```bash
+proton mail settings forwarding get jane@proton.me
+```
+
+### `forwarding list`
+
+List forwardings in both directions.
+
+Outgoing is mail leaving one of your addresses for somebody else's; incoming is mail somebody else is sending to you. A forwarding is pending until the forwardee accepts it, and outdated once the forwarder's key changes.
+
+```
+proton mail settings forwarding list
+```
+
+```bash
+proton mail settings forwarding list
+```
+
+### `forwarding resend`
+
+Ask the forwardee again.
+
+```
+proton mail settings forwarding resend REF...
+```
+
+```bash
+proton mail settings forwarding resend jane@proton.me
+```
 
 ## `get`
 

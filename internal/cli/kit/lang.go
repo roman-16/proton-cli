@@ -198,6 +198,7 @@ var SettingsPages = map[string]string{
 	"mail settings addresses":     "Identity and addresses",
 	"mail settings autoreply":     "Forward and auto-reply",
 	"mail settings filters":       "Filters",
+	"mail settings forwarding":    "Forward and auto-reply",
 	"mail settings folders":       "Folders and labels",
 	"mail settings labels":        "Folders and labels",
 	"mail settings senders":       "Spam, block, and allow lists",

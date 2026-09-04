@@ -89,7 +89,20 @@ const (
 const (
 	alreadyExistsCode        = 2500
 	tooManyActiveFiltersCode = 50016
+	noSuchAddressCode        = 33103
 )
+
+// NoSuchAddress reports whether err is Proton saying it holds no address by that
+// name, which is how an address outside Proton answers a key lookup made with
+// InternalOnly.
+//
+// It is not a failure everywhere it happens: to somebody asking whether a
+// message can be encrypted it is the answer, and only the caller knows whether
+// having no key is a refusal or an ordinary outcome.
+func NoSuchAddress(err error) bool {
+	var apiErr *APIError
+	return errors.As(err, &apiErr) && apiErr.Code == noSuchAddressCode
+}
 
 // DoesNotExist reports whether err is Proton saying that what was named is not
 // there, so a caller holding the reference can say so in its own words.

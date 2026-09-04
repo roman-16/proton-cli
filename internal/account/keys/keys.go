@@ -12,7 +12,6 @@ import (
 	"github.com/ProtonMail/go-srp"
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
 	"github.com/roman-16/proton-cli/internal/account/localkey"
-	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/fetch"
 	"github.com/roman-16/proton-cli/internal/proton"
@@ -200,14 +199,6 @@ func Unlock(ctx context.Context, c *proton.Client, ask KeyPassword) (*Unlocked, 
 func open(ctx context.Context, user *User, addrs []Address, skp string) (*Unlocked, error) {
 	userKR, err := unlockKeyRing(ctx, user.Keys, []byte(skp), nil)
 	if err != nil {
-		// Post-quantum keys answer any failure to open a hierarchy that holds
-		// them: nothing here reads one, so blaming the passphrase or calling it a
-		// bug sends the reader looking where there is nothing to find. Asked after
-		// the attempt and not before it, because an account can hold such a key
-		// and still open every address with the rest.
-		if postQuantum(user, addrs) {
-			return nil, pgphelper.NotSupported("Your account")
-		}
 		return nil, errWrongKeyPass
 	}
 
@@ -234,30 +225,9 @@ func open(ctx context.Context, user *User, addrs []Address, skp string) (*Unlock
 		"user_keys", shape.userKeys, "address_keys", shape.addressKeys,
 		"opened", len(addrKRs))
 	if len(addrKRs) == 0 {
-		if postQuantum(user, addrs) {
-			return nil, pgphelper.NotSupported("Your account")
-		}
 		return nil, shape
 	}
 	return &Unlocked{UserKR: userKR, AddrKRs: addrKRs, Addresses: addrs}, nil
-}
-
-// postQuantum reports whether Proton holds a key for this account that no build
-// here can read.
-func postQuantum(user *User, addrs []Address) bool {
-	for _, k := range user.Keys {
-		if pgphelper.PostQuantum(k.PrivateKey) {
-			return true
-		}
-	}
-	for _, a := range addrs {
-		for _, k := range a.Keys {
-			if pgphelper.PostQuantum(k.PrivateKey) {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 // unopenable is the account's shape when the user keys opened and not one
@@ -321,8 +291,6 @@ func askTwoPassword(ctx context.Context, c *proton.Client) bool {
 // reasonFor names which of the ways unlocking fails happened, for the log.
 func reasonFor(err error) skip.Reason {
 	switch {
-	case errors.Is(err, errPostQuantum):
-		return skip.PostQuantum
 	case errors.Is(err, errNoActiveKey):
 		return skip.Inactive
 	case errors.Is(err, errTokenUndecryptable):
@@ -560,15 +528,13 @@ func getAddresses(ctx context.Context, c *proton.Client) ([]Address, error) {
 // The ways one key fails to open. They are told apart because the answers
 // differ: a retired key is normal, a token this user key cannot decrypt means
 // the hierarchy itself is wrong, armour that will not parse means Proton sent
-// something unexpected, a key that will not unlock means the passphrase is not
-// the one it was locked with, and a post-quantum key is a gap in this build
-// rather than anything wrong with the account.
+// something unexpected, and a key that will not unlock means the passphrase is
+// not the one it was locked with.
 var (
 	errNoActiveKey        = errors.New("no active key")
 	errTokenUndecryptable = errors.New("token not decryptable by the user key")
 	errKeyMalformed       = errors.New("key is not readable armour")
 	errKeyLocked          = errors.New("key did not unlock with the passphrase")
-	errPostQuantum        = errors.New("key uses post-quantum algorithms")
 )
 
 func unlockKeyRing(ctx context.Context, keys []Key, passphrase []byte, userKR *pgp.KeyRing) (*pgp.KeyRing, error) {
@@ -599,12 +565,8 @@ func unlockKeyRing(ctx context.Context, keys []Key, passphrase []byte, userKR *p
 		}
 		locked, err := pgp.NewKeyFromArmored(k.PrivateKey)
 		if err != nil {
-			reason := skip.Malformed
 			last = errKeyMalformed
-			if pgphelper.PostQuantum(k.PrivateKey) {
-				reason, last = skip.PostQuantum, errPostQuantum
-			}
-			skip.Record(ctx, skip.KindKey, k.ID, reason, err)
+			skip.Record(ctx, skip.KindKey, k.ID, skip.Malformed, err)
 			continue
 		}
 		unlocked, err := locked.Unlock(secret)
@@ -640,12 +602,38 @@ func decryptToken(tokenArm, sigArm string, kr *pgp.KeyRing) ([]byte, error) {
 	return dec.GetBinary(), nil
 }
 
-// Published returns the keys Proton holds for somebody else's address.
+// Unreadable is what a Proton address whose published key will not parse
+// becomes, phrased once for everything that encrypts to somebody else.
+//
+// It is deliberately not the sentence about an address outside Proton. The
+// address is real and Proton does publish a key for it; what failed is this
+// build's reading of that key, which is nothing the sender can act on and
+// everything a report can be built from.
+func Unreadable(email string) error {
+	return errs.Problemf("Proton publishes a key for %s that this build cannot read.", email).
+		Hint("run `proton report`").Exit(errs.ExitBug)
+}
+
+// Published returns the primary key Proton holds for somebody else's address.
 //
 // Handing a person something encrypted - a calendar's passphrase, a vault's key -
-// means encrypting it to the key Proton publishes for them. An address Proton
-// holds none for is one nothing can be shared with, which is what makes this the
-// place that decides whether a share is possible at all.
+// means encrypting it to the key Proton publishes for them, so this is the place
+// that decides whether a share is possible at all. It answers three different
+// questions at once, and the caller needs all three apart:
+//
+//	a ring   the key to encrypt to
+//	nil, nil Proton publishes no key, so the address is outside Proton
+//	nil, err there is a key and this build cannot read it
+//
+// Asking with InternalOnly makes Proton refuse an address it does not hold
+// rather than answer with an empty list, and that refusal is this question's
+// answer rather than a failure: whether having no key is a problem is the
+// caller's to decide, and a calendar attendee outside Proton is no problem at
+// all.
+//
+// Collapsing the last into the second is how a real Proton address comes to be
+// called an address outside Proton, which is false and points the reader at the
+// one thing that is not the problem.
 //
 // Only the primary key is returned: it is what Proton's own clients encrypt to,
 // and adding the others would mean sealing a secret under keys the owner may
@@ -667,6 +655,9 @@ func Published(ctx context.Context, c proton.Doer, email string) (*pgp.KeyRing, 
 	if err := c.Decode(ctx, proton.Request{
 		Method: "GET", Path: "/core/v4/keys/all", Query: q,
 	}, &r); err != nil {
+		if proton.NoSuchAddress(err) {
+			return nil, nil
+		}
 		return nil, err
 	}
 
@@ -680,19 +671,12 @@ func Published(ctx context.Context, c proton.Doer, email string) (*pgp.KeyRing, 
 		}
 		key, err := pgp.NewKeyFromArmored(k.PublicKey)
 		if err != nil {
-			// A post-quantum key is refused rather than passed over: the caller's
-			// "Proton holds no key for them" would be a false statement about a real
-			// Proton address, and about the one thing the sender cannot work around.
-			if pgphelper.PostQuantum(k.PublicKey) {
-				return nil, pgphelper.NotSupported(email)
-			}
-			// Recorded and not counted. The caller's answer is "this recipient has
-			// no key we can encrypt to", which it goes on to handle; nothing has
-			// been hidden from anybody, so there is nothing for a listing to warn
-			// about.
-			slog.DebugContext(ctx, "keys: a recipient's published key is not readable armour",
+			// Recorded and not counted: the run stops here with a sentence naming
+			// the address, so nothing is hidden and there is no short listing to
+			// warn about. The log is what carries which key it was.
+			slog.DebugContext(ctx, "keys: a published key is not readable armour",
 				"signer", email, "error", err)
-			continue
+			return nil, Unreadable(email)
 		}
 		_ = kr.AddKey(key)
 	}

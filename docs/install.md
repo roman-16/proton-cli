@@ -16,7 +16,6 @@ The command is `proton`. Every install also puts `proton-cli` beside it as a sec
 | **Alpine** | `sudo apk add --allow-untrusted ./proton-cli_*.apk` |
 | **Nix** | `environment.systemPackages = [ pkgs.proton-cli ];` |
 | **npm** | `npm install -g @roman-16/proton-cli` |
-| **Go** | `go install github.com/roman-16/proton-cli/cmd/proton@latest` |
 
 Then [sign in and run your first commands](first-commands.md).
 

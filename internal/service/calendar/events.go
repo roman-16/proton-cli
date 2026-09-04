@@ -11,6 +11,7 @@ import (
 	"time"
 
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	"github.com/roman-16/proton-cli/internal/account/keys"
 	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/fetch"
@@ -760,27 +761,7 @@ func (s *Service) resolveAttendees(ctx context.Context, uid string, emails []str
 // attendeeKeyRing is an address's public key, or nil when the address has no
 // Proton account and therefore no calendar to deliver to.
 func (s *Service) attendeeKeyRing(ctx context.Context, email string) (*pgp.KeyRing, error) {
-	var r struct {
-		Address struct {
-			Keys []struct{ PublicKey string }
-		}
-	}
-	if err := s.C.Decode(ctx, proton.Request{
-		Method: "GET", Path: "/core/v4/keys/all", Query: proton.Query("Email", email),
-	}, &r); err != nil {
-		return nil, err
-	}
-	if len(r.Address.Keys) == 0 {
-		return nil, nil
-	}
-	key, err := pgp.NewKeyFromArmored(r.Address.Keys[0].PublicKey)
-	if err != nil {
-		if pgphelper.PostQuantum(r.Address.Keys[0].PublicKey) {
-			return nil, pgphelper.NotSupported(email)
-		}
-		return nil, fmt.Errorf("parse the key for %s: %w", email, err)
-	}
-	return pgp.NewKeyRing(key)
+	return keys.Published(ctx, s.C, email)
 }
 
 // ── resolving ──

@@ -70,6 +70,8 @@ GET /mail/v4/conversations
 GET /mail/v4/conversations/{id}
 GET /mail/v4/filters
 GET /mail/v4/filters/{id}
+GET /mail/v4/forwardings/incoming
+GET /mail/v4/forwardings/outgoing
 GET /mail/v4/incomingdefaults
 GET /mail/v4/messages
 GET /mail/v4/messages/{id}
@@ -93,6 +95,7 @@ GET /pass/v1/share/{id}/user/item/{id}
 GET /pass/v1/user/alias/domain
 GET /pass/v1/user/alias/mailbox
 GET /settings/calendar
+POST /auth/v4/refresh
 POST /calendar/v1
 POST /calendar/v1/subscription/validate
 POST /calendar/v1/{id}/keys

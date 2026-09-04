@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 Adding a version section here is what publishes a release, so this file is the one place a version is decided: see [Releases](CONTRIBUTING.md#releases). Versions that shipped before this file existed are on the [releases page](https://github.com/roman-16/proton-cli/releases).
 
+## [3.3.0] - 2026-09-04
+
+### Added
+
+- `proton mail settings forwarding` hands mail arriving at one of your addresses to another Proton account, end-to-end encrypted: `list`, `get`, `create`, `delete`, `enable`, `disable`, `resend`. Accepting a forwarding somebody sent you is not built - that happens in a Proton client.
+
+### Changed
+
+- An account or recipient using post-quantum encryption now works instead of exiting `8`. Signing in, sending, and sharing a calendar, file or vault all read Proton's ML-DSA and ML-KEM keys. `proton` still never creates one.
+- Sharing with an address outside Proton exits `1` with a sentence naming the address, instead of `4` carrying Proton's own error. Affects `calendar settings calendars share add`, `pass vaults share add` and `drive items share add`.
+- `proton report` links the bug form directly and no longer asks in its own words for what the form already asks for.
+- `proton report` says where your settings came from rather than the file's path, which holds your home directory.
+
+### Removed
+
+- The `go install` row from the install instructions. It resolved to a version from before the command moved and installed nothing; use a package manager, the install script or a release binary.
+
+### Fixed
+
+- Sharing with a Proton address whose key this build cannot read says so, instead of calling it an address outside Proton.
+- `proton report` carries the whole run. A report of a listing that made 750 requests held two lines. A run too large for an issue form is trimmed to its first and last records plus everything above debug between them, and says how many it left out; `--dest` writes all of it.
+- `proton report` runs on the defaults when the config file is too broken to parse, and says what was wrong with it. It was the one command that could not run in exactly the situation worth reporting.
+
 ## [3.2.0] - 2026-09-03
 
 ### Added

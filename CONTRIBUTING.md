@@ -111,6 +111,8 @@ just test-all                        # those, then the ones needing a paid plan
 
 The secondary account carries the modes nothing else would reach: it is in Proton's two-password mode, and its Pass is protected with an extra password. Both of its extra secrets are as required as its password, and the suite fails to start without them.
 
+`PROTON_CLI_TEST_EXTERNAL_RECIPIENT` is a mailbox outside Proton, and is required for the same reason: encrypting to somebody with no Proton account, and emailing an invitation to an attendee with no Proton calendar, are branches neither test account can enter.
+
 Never point any of this at an account you care about. Credentials can go in a local `.env` file (see `.env.example`), which the devbox shell loads automatically.
 
 Unit test files are named after the file they test (`size.go` → `size_test.go`). The integration tests are grouped by feature area instead.

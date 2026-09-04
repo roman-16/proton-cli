@@ -10,17 +10,9 @@ A refusal that comes from Proton rather than from proton-cli belongs to [Trouble
 
 Closing this needs a public key built into the binary, and there is not one yet. Until then, an install from a package manager is verified by the package manager.
 
-**Post-quantum encryption is not supported.** Proton offered it for two weeks in May before pausing the rollout, and an account that opted in during that window holds keys - ML-DSA and ML-KEM, in version 6 OpenPGP packets - that the Go libraries proton-cli is built on do not implement.
+**Post-quantum keys are read, never generated.** An account that opted in during Proton's rollout holds ML-DSA and ML-KEM keys in version 6 OpenPGP packets. proton reads them: such an account signs in, and a message or a share reaches somebody else who opted in. Turning the setting on is done in Proton's own settings, as it is for every other credential proton does not change.
 
-Such an account cannot sign in, and neither a message nor a share reaches somebody else who opted in. Every command that runs into one says so and exits `8`:
-
-```console
-$ proton account login
-Error: Your account uses post-quantum encryption, which is not supported yet.
-Try:   Proton's own apps can read these keys
-```
-
-The algorithms exist in Proton's own builds of those libraries, so this is a matter of testing rather than of cryptography: it lands here once Proton resumes the rollout and an account can be made to carry these keys on purpose.
+Proton paused the rollout, so no account can be made to carry these keys on purpose and the live suite cannot cover them. What is verified here is the reading itself, against sample keys of the kind Proton generates.
 
 **A recurring event needs a zone that can be named.** proton reads one from `TZ`, `/etc/localtime` or `/etc/timezone`, then falls back to your Proton calendar settings.
 
@@ -35,7 +27,7 @@ Each of these has an equivalent in a web client, and each is unbuilt for a state
 | What is missing | Why |
 | --- | --- |
 | Drive computers and shared bookmarks | Neither exists until you use a desktop client or open somebody's link, so neither can be tested |
-| Mail forwarding to another Proton address | Needs an OpenPGP forwarding primitive the Go libraries do not implement |
+| Accepting a forwarding somebody sent you | Accepting one writes a new address key and re-signs the address's Signed Key List. proton changes no key material, for the reason the rows below give. Setting one up, pausing it and taking it down are built |
 | Mail forwarding to a non-Proton address | Proton emails the address a link its owner must follow, so a command can start the flow but never finish it |
 | Turning the Pass [extra password](../pass/README.md#an-extra-password) on or off | It is a credential, and proton changes none of them. Setting one from a file cannot ask you to type it twice the way Proton's own clients do, and a typo would leave every item in Pass unreachable. Removing one signs every device out of every app. *Answering* an extra password, so the commands work, is built |
 

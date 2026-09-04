@@ -60,7 +60,7 @@ func TestSecondAccountFoo(t *testing.T) {
 
 Run order matters: the *primary* invites or sends, then the *secondary* accepts or receives, then verify on whichever side the state landed. Register cleanup on **both** sides - a mutation made as the secondary needs `cleanupRunSecondary`.
 
-An **external, non-Proton** recipient comes from `PROTON_CLI_TEST_EXTERNAL_RECIPIENT`. Tests that need one skip when it is unset. Sending to a fake `@example.com` address instead bounces (nullMX) and litters the inbox with MAILER-DAEMON returns.
+An **external, non-Proton** recipient comes from `PROTON_CLI_TEST_EXTERNAL_RECIPIENT`, and the suite refuses to start without it. It is required for the reason the accounts are: encrypting to somebody with no Proton account, and emailing an invitation to an attendee with no Proton calendar, are branches the two test accounts cannot enter, so a run without it would pass having never tried them. Sending to a fake `@example.com` address instead bounces (nullMX) and litters the inbox with MAILER-DAEMON returns.
 
 ## Layout
 
@@ -221,7 +221,7 @@ func TestDriveItemsFoo(t *testing.T) {
 | `secondaryEmail()` | The second account's address |
 | `runSecondary` / `runOKSecondary` / `runJSONSecondary` / `runJSONArraySecondary` / `cleanupRunSecondary` | The same runners, as the second account |
 | `lease(t, ...)` | Take exclusive use of shared state for this test (see Leases) |
-| `externalRecipient(t)` | A non-Proton recipient; skips the test when none is configured |
+| `externalRecipient(t)` | A non-Proton recipient; the suite refuses to start without one |
 
 ## The sending allowance, and the fixtures that protect it
 

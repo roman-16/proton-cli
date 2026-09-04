@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
-	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 )
 
 // buildBodyPackages encrypts the body once under a shared session key and
@@ -240,9 +239,6 @@ func (s *Service) mimeParts(ctx context.Context, atts []*draftAttachment) ([]mim
 func keyRingFromArmored(armored, email string) (*pgp.KeyRing, error) {
 	key, err := pgp.NewKeyFromArmored(armored)
 	if err != nil {
-		if pgphelper.PostQuantum(armored) {
-			return nil, pgphelper.NotSupported(email)
-		}
 		return nil, fmt.Errorf("parse recipient key for %s: %w", email, err)
 	}
 	return pgp.NewKeyRing(key)

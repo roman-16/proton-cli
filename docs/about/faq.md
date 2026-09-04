@@ -134,7 +134,7 @@ Yes. Content arrives encrypted, is decrypted on your machine with your own keys,
 
 Linux, macOS and Windows, on amd64 and arm64, as one static binary.
 
-Install it with Homebrew, winget, APT, AUR, Nix, npm, `go install`, a shell one-liner, or by downloading a checksummed binary. See [Install](../install.md).
+Install it with Homebrew, winget, APT, AUR, Nix, npm, a shell one-liner, or by downloading a checksummed binary. See [Install](../install.md).
 
 ## Is the source open, and is it audited?
 

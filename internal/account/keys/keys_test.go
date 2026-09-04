@@ -493,62 +493,143 @@ func hasHint(err error, substr string) bool {
 
 // ── post-quantum keys ──
 
-// An account that turned on post-quantum encryption holds v6 ML-DSA-65 keys,
-// and nothing here can read one. What that account must not be told is that its
-// password is wrong or that it has found a bug: both send somebody looking for
-// something to fix, and there is nothing on their side to fix.
+// An account that turned on post-quantum encryption holds a v6 ML-DSA-65
+// primary with an ML-KEM-768 subkey. Reading one depends on the -proton tags of
+// go-crypto and gopenpgp, which carry the algorithms the upstream releases do
+// not - and which sort *below* the plain tags in semver, so an ordinary
+// dependency update drops them without a word. These two tests are what notices.
 
-func TestUnlockRefusesAPostQuantumAccount(t *testing.T) {
+func TestUnlockOpensAPostQuantumAccount(t *testing.T) {
 	acct := newAccount(t, "the password", false)
-	acct.userKey = postQuantumKey(t, "postquantum-private.asc")
+	stretched, err := stretch(acct.secret, acct.keySalt)
+	if err != nil {
+		t.Fatalf("stretch: %v", err)
+	}
+	acct.userKey = postQuantumKey(t, "postquantum-private.asc", stretched)
+	acct.addrKey = postQuantumKey(t, "postquantum-private.asc", stretched)
 
 	var got asked
-	_, err := Unlock(context.Background(), acct.serve(t), got.answer(acct.secret))
-	if err == nil {
-		t.Fatal("a post-quantum account unlocked")
+	u, err := Unlock(context.Background(), acct.serve(t), got.answer(acct.secret))
+	if err != nil {
+		t.Fatalf("a post-quantum account did not unlock: %v", err)
 	}
-	if want := "Your account uses post-quantum encryption, which is not supported yet."; err.Error() != want {
+	if u.UserKR.CountEntities() == 0 {
+		t.Error("the user key ring is empty")
+	}
+	if _, ok := u.AddrKRs["address"]; !ok {
+		t.Error("the address key did not open")
+	}
+}
+
+// The other half of it is somebody else's key: a share, an invitation and a
+// sent message all go to the key Proton publishes for them.
+func TestPublishedReadsAPostQuantumRecipient(t *testing.T) {
+	kr, err := Published(context.Background(), publishing(t, publishedKey(t, "postquantum-public.asc")), "them@proton.me")
+	if err != nil {
+		t.Fatalf("a post-quantum recipient's key did not come back: %v", err)
+	}
+	if kr == nil || kr.CountEntities() == 0 {
+		t.Fatal("the recipient came back with no key ring")
+	}
+}
+
+// ── what a published key can be ──
+
+// An address Proton publishes no key for is one outside Proton, and the caller
+// phrases that itself. An address whose key will not parse is a real Proton
+// address, and calling it the first thing is a false statement about the one
+// thing the sender cannot work around.
+
+// Asking with InternalOnly makes Proton refuse an address outside Proton rather
+// than answer with an empty list, so both shapes have to mean the same thing.
+// Getting this wrong is how a calendar invitation to somebody's work address
+// stops going out.
+func TestPublishedReturnsNothingForAnAddressOutsideProton(t *testing.T) {
+	for name, c := range map[string]*proton.Client{
+		"an empty key list": publishing(t),
+		"Proton's refusal":  refusing(t),
+	} {
+		t.Run(name, func(t *testing.T) {
+			kr, err := Published(context.Background(), c, "them@example.com")
+			if err != nil {
+				t.Fatalf("Published: %v", err)
+			}
+			if kr != nil {
+				t.Errorf("an address Proton holds no key for came back with a ring: %v", kr)
+			}
+		})
+	}
+}
+
+// refusing answers the way Proton does for an address it does not hold.
+func refusing(t *testing.T) *proton.Client {
+	t.Helper()
+	return client(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"Code": 33103, "Error": "This address does not exist. Please try again",
+		})
+	})
+}
+
+func TestPublishedNamesAKeyItCannotRead(t *testing.T) {
+	kr, err := Published(context.Background(), publishing(t, "-----BEGIN PGP PUBLIC KEY BLOCK-----\n\nnope\n-----END PGP PUBLIC KEY BLOCK-----\n"), "them@proton.me")
+	if err == nil {
+		t.Fatalf("an unreadable key came back as a ring: %v", kr)
+	}
+	if want := "Proton publishes a key for them@proton.me that this build cannot read."; err.Error() != want {
 		t.Errorf("error = %q, want %q", err.Error(), want)
 	}
 	var coder errs.ExitCoder
-	if !errors.As(err, &coder) || coder.ExitCode() != errs.ExitUnsupported {
-		t.Errorf("the refusal does not exit %d: %v", errs.ExitUnsupported, err)
+	if !errors.As(err, &coder) || coder.ExitCode() != errs.ExitBug {
+		t.Errorf("the failure does not exit %d: %v", errs.ExitBug, err)
 	}
 }
 
-// The other half of it is somebody else's keys: a share, an invitation and a
-// sent message all go to the key Proton publishes for them. "Proton holds no
-// key for them" is what an unreadable one used to become, which is a false
-// statement about a real Proton address.
-func TestPublishedRefusesAPostQuantumRecipient(t *testing.T) {
-	published := postQuantumKey(t, "postquantum-public.asc")
-	c := client(t, func(w http.ResponseWriter, _ *http.Request) {
+// publishing answers the key lookup with the primary keys given, or with an
+// address Proton holds none for when given nothing.
+func publishing(t *testing.T, armored ...string) *proton.Client {
+	t.Helper()
+	keys := make([]map[string]any, 0, len(armored))
+	for _, a := range armored {
+		keys = append(keys, map[string]any{"PublicKey": a, "Primary": 1})
+	}
+	return client(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"Code": 1000,
-			"Address": map[string]any{
-				"Keys": []map[string]any{{"PublicKey": published, "Primary": 1}},
-			},
+			"Code":    1000,
+			"Address": map[string]any{"Keys": keys},
 		})
 	})
-
-	kr, err := Published(context.Background(), c, "them@proton.me")
-	if err == nil {
-		t.Fatalf("a post-quantum recipient came back with a key ring: %v", kr)
-	}
-	if want := "them@proton.me uses post-quantum encryption, which is not supported yet."; err.Error() != want {
-		t.Errorf("error = %q, want %q", err.Error(), want)
-	}
 }
 
-// postQuantumKey is a sample key of the kind Proton generates on opt-in. It
-// lives beside the code that recognises one, which is the only place a build
-// without those algorithms can keep a key that uses them.
-func postQuantumKey(t *testing.T, name string) string {
+// publishedKey is a sample key of the kind Proton generates on opt-in, as it is
+// published.
+func publishedKey(t *testing.T, name string) string {
 	t.Helper()
-	armored, err := os.ReadFile(filepath.Join("..", "..", "crypto", "pgp", "testdata", name))
+	armored, err := os.ReadFile(filepath.Join("testdata", name))
 	if err != nil {
-		t.Fatalf("read the post-quantum key: %v", err)
+		t.Fatalf("read %s: %v", name, err)
 	}
 	return string(armored)
+}
+
+// postQuantumKey is the same key locked with the passphrase the account's secret
+// stretches into, which is the shape Proton hands one back in.
+func postQuantumKey(t *testing.T, name, passphrase string) string {
+	t.Helper()
+	key, err := pgp.NewKeyFromArmored(publishedKey(t, name))
+	if err != nil {
+		t.Fatalf("parse %s: %v", name, err)
+	}
+	locked, err := key.Lock([]byte(passphrase))
+	if err != nil {
+		t.Fatalf("lock %s: %v", name, err)
+	}
+	armored, err := locked.Armor()
+	if err != nil {
+		t.Fatalf("armor %s: %v", name, err)
+	}
+	return armored
 }

@@ -147,6 +147,15 @@ func requireCredentials() {
 			}
 		}
 	}
+	// A mailbox outside Proton is not a credential, and it is required for the
+	// same reason the accounts are: what it covers is reached no other way. Mail
+	// encrypted for somebody with no Proton account, and an attendee emailed an
+	// invitation because they have no Proton calendar, are both branches the two
+	// test accounts cannot enter. Left optional, a run without it passes having
+	// never tried them.
+	if os.Getenv(externalRecipientVar) == "" {
+		missing = append(missing, externalRecipientVar)
+	}
 	if len(missing) > 0 {
 		fmt.Fprintf(os.Stderr, "integration tests require these env vars: %s\n", strings.Join(missing, ", "))
 		os.Exit(1)
@@ -901,17 +910,16 @@ func cleanupRunSecondary(t *testing.T, description string, args ...string) {
 	})
 }
 
-// externalRecipient is a non-Proton mailbox, for tests that must deliver outside
-// Proton. Sending to a fake @example.com address instead bounces (nullMX),
-// littering the inbox with MAILER-DAEMON returns, so a test that needs one skips
-// when none is configured.
+// externalRecipientVar names the mailbox outside Proton the suite delivers to.
+// A fake @example.com address bounces (nullMX) and litters the inbox with
+// MAILER-DAEMON returns, so it has to be one that accepts mail.
+const externalRecipientVar = "PROTON_CLI_TEST_EXTERNAL_RECIPIENT"
+
+// externalRecipient is that mailbox. requireCredentials has already refused to
+// start without it, so this never skips.
 func externalRecipient(t *testing.T) string {
 	t.Helper()
-	v := os.Getenv("PROTON_CLI_TEST_EXTERNAL_RECIPIENT")
-	if v == "" {
-		t.Skip("PROTON_CLI_TEST_EXTERNAL_RECIPIENT is not set")
-	}
-	return v
+	return os.Getenv(externalRecipientVar)
 }
 
 // ── mail delivery + polling ──

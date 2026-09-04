@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
-	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
+	"github.com/roman-16/proton-cli/internal/account/keys"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
 	"github.com/roman-16/proton-cli/internal/skip"
@@ -142,26 +142,18 @@ func (s *Service) RemoveMember(ctx context.Context, dc *Context, path, email str
 	return &errs.NotFound{Kind: "member", Ref: email}
 }
 
+// addressKeyRing is the key Proton publishes for an address, refused with a
+// sentence rather than an empty ring when there is none.
 func (s *Service) addressKeyRing(ctx context.Context, email string) (*pgp.KeyRing, error) {
-	var r struct {
-		Address struct {
-			Keys []struct{ PublicKey string }
-		}
-	}
-	if err := s.C.Decode(ctx, proton.Request{Method: "GET", Path: "/core/v4/keys/all", Query: proton.Query("Email", email)}, &r); err != nil {
-		return nil, err
-	}
-	if len(r.Address.Keys) == 0 {
-		return nil, fmt.Errorf("%s is not a Proton user (external invitations are not supported)", email)
-	}
-	key, err := pgp.NewKeyFromArmored(r.Address.Keys[0].PublicKey)
+	kr, err := keys.Published(ctx, s.C, email)
 	if err != nil {
-		if pgphelper.PostQuantum(r.Address.Keys[0].PublicKey) {
-			return nil, pgphelper.NotSupported(email)
-		}
 		return nil, err
 	}
-	return pgp.NewKeyRing(key)
+	if kr == nil {
+		return nil, errs.Problemf("%s is not a Proton address, so there is no key to share with.", email).
+			Hint("a file can only be shared with another Proton account")
+	}
+	return kr, nil
 }
 
 // ── changing what somebody may do ──

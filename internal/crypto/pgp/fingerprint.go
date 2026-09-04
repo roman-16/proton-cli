@@ -15,9 +15,6 @@ import (
 func Fingerprint(armored string) string {
 	key, err := pgp.NewKeyFromArmored(armored)
 	if err != nil {
-		if PostQuantum(armored) {
-			return "(post-quantum)"
-		}
 		return "(unreadable)"
 	}
 	fp := strings.ToUpper(key.GetFingerprint())

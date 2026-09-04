@@ -296,7 +296,7 @@ func (d *attendeeDoer) Decode(_ context.Context, r proton.Request, out any) erro
 	case strings.Contains(r.Path, "/keys/all"):
 		keys := []map[string]any{}
 		if d.proton[r.Query.Get("Email")] {
-			keys = append(keys, map[string]any{"PublicKey": testPublicKey})
+			keys = append(keys, map[string]any{"PublicKey": testPublicKey, "Primary": 1})
 		}
 		body, _ = json.Marshal(map[string]any{"Address": map[string]any{"Keys": keys}})
 	default:

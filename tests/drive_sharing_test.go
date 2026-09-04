@@ -195,8 +195,8 @@ func TestDriveShareAddNotProtonUser(t *testing.T) {
 	if code == 0 {
 		t.Error("expected non-zero exit inviting a non-Proton address")
 	}
-	if !strings.Contains(stderr, "not a Proton user") {
-		t.Errorf("expected 'not a Proton user' error, got: %s", stderr)
+	if !strings.Contains(stderr, "not a Proton address") {
+		t.Errorf("expected 'not a Proton address' error, got: %s", stderr)
 	}
 }
 

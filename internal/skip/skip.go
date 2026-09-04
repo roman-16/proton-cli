@@ -33,9 +33,6 @@ const (
 	Malformed Reason = "malformed"
 	// NoKey is a thing whose key never arrived, so there was nothing to try.
 	NoKey Reason = "no key"
-	// PostQuantum is a key Proton wrote with post-quantum algorithms, which the
-	// OpenPGP libraries here do not implement.
-	PostQuantum Reason = "post-quantum"
 	// Undecryptable is a blob that parsed and that the key would not open.
 	Undecryptable Reason = "undecryptable"
 	// Unreadable is a thing a further request was needed for, and the request

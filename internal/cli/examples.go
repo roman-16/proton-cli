@@ -547,8 +547,15 @@ var examples = map[string][]string{
 		"proton mail settings autoreply set --repeat permanent --message 'Away until Monday.'",
 		"proton mail settings autoreply set --message 'On holiday.' --start 2026-07-01T09:00 --end 2026-07-14T17:00",
 	},
-	"proton mail settings autoreply enable":  {"proton mail settings autoreply enable"},
-	"proton mail settings autoreply disable": {"proton mail settings autoreply disable"},
+	"proton mail settings autoreply enable":   {"proton mail settings autoreply enable"},
+	"proton mail settings autoreply disable":  {"proton mail settings autoreply disable"},
+	"proton mail settings forwarding list":    {"proton mail settings forwarding list"},
+	"proton mail settings forwarding get":     {"proton mail settings forwarding get jane@proton.me"},
+	"proton mail settings forwarding create":  {"proton mail settings forwarding create me@proton.me jane@proton.me"},
+	"proton mail settings forwarding enable":  {"proton mail settings forwarding enable jane@proton.me"},
+	"proton mail settings forwarding disable": {"proton mail settings forwarding disable jane@proton.me"},
+	"proton mail settings forwarding resend":  {"proton mail settings forwarding resend jane@proton.me"},
+	"proton mail settings forwarding delete":  {"proton mail settings forwarding delete jane@proton.me"},
 
 	// ── pass ──
 	"proton pass vaults share add": {

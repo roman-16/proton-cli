@@ -173,6 +173,13 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton mail settings folders delete`](../mail/settings.md#folders-delete) | Delete folders |
 | [`proton mail settings folders list`](../mail/settings.md#folders-list) | List your folders |
 | [`proton mail settings folders update`](../mail/settings.md#folders-update) | Rename or recolor a folder |
+| [`proton mail settings forwarding create`](../mail/settings.md#forwarding-create) | Forward one of your addresses to another Proton address |
+| [`proton mail settings forwarding delete`](../mail/settings.md#forwarding-delete) | Stop forwardings, in either direction |
+| [`proton mail settings forwarding disable`](../mail/settings.md#forwarding-disable) | Pause forwardings without taking them down |
+| [`proton mail settings forwarding enable`](../mail/settings.md#forwarding-enable) | Resume paused forwardings |
+| [`proton mail settings forwarding get`](../mail/settings.md#forwarding-get) | Show one forwarding |
+| [`proton mail settings forwarding list`](../mail/settings.md#forwarding-list) | List forwardings in both directions |
+| [`proton mail settings forwarding resend`](../mail/settings.md#forwarding-resend) | Ask the forwardee again |
 | [`proton mail settings get`](../mail/settings.md#get) | Show the mail settings now in effect |
 | [`proton mail settings labels create`](../mail/settings.md#labels-create) | Create a label |
 | [`proton mail settings labels delete`](../mail/settings.md#labels-delete) | Delete labels |

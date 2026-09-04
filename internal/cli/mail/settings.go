@@ -243,7 +243,7 @@ func settingsCmd() *cobra.Command {
 		})
 	})
 	c.AddCommand(addressesCmd(), foldersCmd(), labelsCmd(), filtersCmd(),
-		autoreplyCmd(), sendersCmd())
+		autoreplyCmd(), forwardingCmd(), sendersCmd())
 	return c
 }
 

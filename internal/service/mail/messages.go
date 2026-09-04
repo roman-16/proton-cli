@@ -11,6 +11,7 @@ import (
 	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
+	"github.com/roman-16/proton-cli/internal/skip"
 )
 
 type rawListMessage struct {
@@ -209,9 +210,20 @@ func senderAddress(sender map[string]any) string {
 	return ""
 }
 
-// senderKeyRing fetches and caches the public key ring for an email address,
-// used to verify message-body signatures. Returns nil (cached) when the
-// address is empty or has no published keys (e.g. external senders).
+// senderKeyRing fetches and caches the public key ring a message body's
+// signature is verified against.
+//
+// Every key Proton holds for the sender goes in, external ones included: a
+// message from outside Proton is signed with the key its sender published there,
+// and this is the only thing that would check it. That is what separates this
+// from keys.Published, which answers the narrower question of what a secret may
+// be sealed to.
+//
+// A key that cannot be reached or read is not a failure to show the message, so
+// it is recorded rather than raised. What it costs the reader is the difference
+// between "this was not signed" and "nobody could check", which looks the same on
+// screen - so the log is the only thing that can tell them apart, and it says
+// which of the two happened.
 func (s *Service) senderKeyRing(ctx context.Context, email string) *pgp.KeyRing {
 	if email == "" {
 		return nil
@@ -224,26 +236,39 @@ func (s *Service) senderKeyRing(ctx context.Context, email string) *pgp.KeyRing 
 	if kr, ok := s.senderKeys[email]; ok {
 		return kr
 	}
+	s.senderKeys[email] = s.fetchSenderKeyRing(ctx, email)
+	return s.senderKeys[email]
+}
+
+func (s *Service) fetchSenderKeyRing(ctx context.Context, email string) *pgp.KeyRing {
 	var r struct {
 		Address struct {
 			Keys []struct{ PublicKey string }
 		}
 	}
-	var kr *pgp.KeyRing
-	if err := s.C.Decode(ctx, proton.Request{Method: "GET", Path: "/core/v4/keys/all", Query: proton.Query("Email", email)}, &r); err == nil {
-		if ring, err := pgp.NewKeyRing(nil); err == nil {
-			for _, k := range r.Address.Keys {
-				if key, err := pgp.NewKeyFromArmored(k.PublicKey); err == nil {
-					_ = ring.AddKey(key)
-				}
-			}
-			if ring.CountEntities() > 0 {
-				kr = ring
-			}
-		}
+	if err := s.C.Decode(ctx, proton.Request{
+		Method: "GET", Path: "/core/v4/keys/all", Query: proton.Query("Email", email),
+	}, &r); err != nil {
+		skip.Record(ctx, skip.KindKey, email, skip.Unreadable, err)
+		return nil
 	}
-	s.senderKeys[email] = kr
-	return kr
+	ring, err := pgp.NewKeyRing(nil)
+	if err != nil {
+		skip.Record(ctx, skip.KindKey, email, skip.Unreadable, err)
+		return nil
+	}
+	for _, k := range r.Address.Keys {
+		key, err := pgp.NewKeyFromArmored(k.PublicKey)
+		if err != nil {
+			skip.Record(ctx, skip.KindKey, email, skip.Malformed, err)
+			continue
+		}
+		_ = ring.AddKey(key)
+	}
+	if ring.CountEntities() == 0 {
+		return nil
+	}
+	return ring
 }
 
 func (s *Service) Read(ctx context.Context, id string) (*Full, error) {

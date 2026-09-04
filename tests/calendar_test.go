@@ -267,6 +267,35 @@ func TestCalendarEventWithProtonAttendee(t *testing.T) {
 	runOK(t, "calendar", "events", "get", eventID)
 }
 
+// An attendee outside Proton has no calendar to deliver to, so they are emailed
+// the invitation instead. What decides which of the two happens is the key
+// lookup, and Proton answers that for an address it does not hold by refusing
+// rather than by returning no keys - so the refusal has to read as "nobody here"
+// and not as a failure.
+//
+// Nothing else in the suite invites one. Reading a refusal as a failure breaks
+// every invitation to a work address, and the free accounts would go on passing.
+func TestCalendarEventWithAttendeeOutsideProton(t *testing.T) {
+	t.Parallel()
+	// Creating this event emails the attendee, and no two sends overlap.
+	lease(t, sending)
+	guest := externalRecipient(t)
+	calID := firstCalendarID(t)
+
+	title := testID() + "-external-attendee"
+	eventID := strings.TrimSpace(runOK(t, "calendar", "events", "create",
+		"--calendar", calID, "--title", title,
+		"--start", "2026-08-18T10:00", "--duration", "30m",
+		"--attendee", guest))
+	cleanupRun(t, fmt.Sprintf("Delete event: proton calendar events delete %s", eventID),
+		"calendar", "events", "delete", eventID)
+
+	if !looksLikeID(eventID) {
+		t.Fatalf("expected an event ID on stdout, got %q", eventID)
+	}
+	assertContains(t, runOK(t, "calendar", "events", "get", eventID), guest)
+}
+
 func TestCalendarCalendarsRename(t *testing.T) {
 	t.Parallel()
 	lease(t, calendarSlot)

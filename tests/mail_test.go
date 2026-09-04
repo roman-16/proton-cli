@@ -2104,3 +2104,38 @@ func TestMailFiltersReorderNeedsEveryFilter(t *testing.T) {
 		t.Errorf("the refusal should say to name them all, got: %s", stderr)
 	}
 }
+
+// ── forwarding ──
+
+// Both directions come back as one collection, which is the only part of
+// forwarding these accounts can reach: setting one up is a paid feature, and
+// accepting one is not built. See `untested` in internal/cli/coverage_test.go.
+func TestMailForwardingListsBothDirections(t *testing.T) {
+	t.Parallel()
+
+	rows := runJSONArray(t, "mail", "settings", "forwarding", "list")
+	for _, row := range rows {
+		m, _ := row.(map[string]interface{})
+		switch m["direction"] {
+		case "incoming", "outgoing":
+		default:
+			t.Errorf("a forwarding came back going neither way: %v", m["direction"])
+		}
+	}
+}
+
+// Forwarding to an address outside Proton is refused before anything is
+// derived: Proton emails such an address a link its owner must follow, which no
+// command can answer.
+func TestMailForwardingRefusesAnAddressOutsideProton(t *testing.T) {
+	t.Parallel()
+
+	_, stderr, code := run(t, "mail", "settings", "forwarding", "create", selfEmail(), "nobody@example.com")
+	if code == 0 {
+		t.Fatal("an address outside Proton was accepted")
+	}
+	if !strings.Contains(stderr, "not a Proton address") &&
+		!strings.Contains(stderr, "address does not exist") {
+		t.Errorf("the refusal does not name the address as the problem: %s", truncateOutput(stderr))
+	}
+}
