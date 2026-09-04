@@ -299,7 +299,7 @@ An account in [two-password mode](../account/README.md#two-password-mode) needs 
 
 ### Commands that ask for the password again
 
-Proton asks for your password again before `calendar settings calendars delete`, `mail messages expire` and `mail settings autoreply set`. A session cannot answer for it, so those commands take `--password-file` and `--password-stdin` of their own.
+Proton asks for your password again before `calendar settings calendars delete`, `mail messages expire`, `mail settings autoreply set`, `mail settings autoreply enable` and `mail settings autoreply disable` - it guards the autoresponder whichever way the switch goes. A session cannot answer for it, so those commands take `--password-file` and `--password-stdin` of their own.
 
 ### Secrets you store
 

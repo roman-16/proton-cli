@@ -27,7 +27,7 @@ go build ./cmd/proton  # quick build (no CAPTCHA helper)
 just build             # release-shaped binary
 just run -- mail messages list
 just lint              # format, regenerate, and check everything; run before every commit
-just test-fast         # unit, golden and conformance tests
+just test-fast         # everything decidable without Proton
 just docs              # regenerate the command reference from the tree
 just golden            # update the pinned bytes of every response and help screen
 just flake             # build the nix package, after a dependency bump
@@ -86,36 +86,50 @@ The card a link preview shows is `assets/og.svg`, hand-drawn, and `assets/og.png
 
 ## Tests
 
-`just test-fast` runs the unit, golden and conformance tests. No credentials, no network, seconds to finish, safe to run any time:
+There are two tiers, and one thing separates them: **does answering the question need Proton.**
+
+`just test-fast` is everything that does not - unit, golden, conformance, the rules the live suite is held to, and an offline suite that runs the real binary with no session and the API pointed at a dead port. No credentials, no network, about two seconds, safe to run any time:
 
 ```bash
 just test-fast
 ```
 
-The suite under `tests/` is different: those are **integration tests against the live Proton API**. They run on the primary and secondary accounts, create and delete real data in them, and take several minutes.
+`just test` is that, then the suite under `tests/live` - **integration tests against the live Proton API**. They create and delete real data on three accounts and take the best part of an hour.
 
 ```bash
-export PROTON_CLI_TEST_PRIMARY_USER=primary@proton.me      # never your own account
+just test-one TestMailMessagesList   # a single live test
+just test                            # every test there is
+```
+
+Nothing else decides a tier. A subscription is a property of an account, not of a question, so the tests that need one act as the paid account like any other and run in the same pass. There is no separate recipe, no build tag and no "this needs a plan" skip.
+
+**All nine variables are required**, and the suite refuses to start rather than skipping what it cannot reach:
+
+```bash
+export PROTON_CLI_TEST_PRIMARY_USER=primary@proton.me        # never your own account
 export PROTON_CLI_TEST_PRIMARY_PASSWORD=...
 export PROTON_CLI_TEST_SECONDARY_USER=secondary@proton.me
 export PROTON_CLI_TEST_SECONDARY_PASSWORD=...
 export PROTON_CLI_TEST_SECONDARY_SECOND_PASSWORD=...
 export PROTON_CLI_TEST_SECONDARY_EXTRA_PASSWORD=...
-
-just test-one TestMailSendAndRead    # a single integration test
-just test                            # every test that runs on the two free accounts
-just test-all                        # those, then the ones needing a paid plan
+export PROTON_CLI_TEST_PAID_USER=...                         # a real account, see below
+export PROTON_CLI_TEST_PAID_PASSWORD=...
+export PROTON_CLI_TEST_EXTERNAL_RECIPIENT=you@example.com    # a mailbox outside Proton
 ```
 
-`just login` signs every test account in - it needs a terminal, because Proton may ask for a CAPTCHA and only a person can answer one - and `just seed` fills the two free ones.
+`just login` signs every account in - it needs a terminal, because Proton may ask for a CAPTCHA and only a person can answer one - and `just seed` fills the two free ones.
 
-The secondary account carries the modes nothing else would reach: it is in Proton's two-password mode, and its Pass is protected with an extra password. Both of its extra secrets are as required as its password, and the suite fails to start without them.
+The **secondary** account carries the modes nothing else would reach: it is in Proton's two-password mode, and its Pass is protected with an extra password. `PROTON_CLI_TEST_EXTERNAL_RECIPIENT` is required for the same kind of reason - encrypting to somebody with no Proton account, and emailing an invitation to an attendee with no Proton calendar, are branches no Proton account can enter.
 
-`PROTON_CLI_TEST_EXTERNAL_RECIPIENT` is a mailbox outside Proton, and is required for the same reason: encrypting to somebody with no Proton account, and emailing an invitation to an attendee with no Proton calendar, are branches neither test account can enter.
+The **paid** account is the one exception to "never your own": Proton gates a good deal of what the web clients offer behind a subscription, and buying a second one to test with is not a reasonable thing to ask. So it is a real account, under one rule - **a run has to be reversible.** Nothing seeds it, a test acts only on what it made, a handful of commands are refused outright, and the account is photographed before and after so anything left behind fails the run and is named.
 
-Never point any of this at an account you care about. Credentials can go in a local `.env` file (see `.env.example`), which the devbox shell loads automatically.
+It needs no setup. The one thing that outlives a run is a single Pass alias, which the first run makes and every run after reuses - an alias address cannot be un-minted, so the suite spends one for the life of the account rather than one per run, and `tests/rules` fails on a test that tries to make its own.
 
-Unit test files are named after the file they test (`size.go` → `size_test.go`). The integration tests are grouped by feature area instead.
+Where a feature cannot be exercised reversibly, it is not exercised: the auto-reply and single-item Pass sharing are declared gaps in `internal/cli/coverage_test.go` rather than tests.
+
+Never point the primary or secondary at an account you care about. Credentials can go in a local `.env` file (see `.env.example`), which the devbox shell loads automatically.
+
+Unit test files are named after the file they test (`size.go` → `size_test.go`). The live suite is one file per collection, named the way the command is: `mail_messages_test.go`, `pass_vaults_test.go`.
 
 ## Project layout
 
@@ -128,7 +142,8 @@ Unit test files are named after the file they test (`size.go` → `size_test.go`
 | `internal/proton/` | API client, request plumbing, error types |
 | `internal/crypto/`, `internal/account/` | Key handling, SRP login, sessions |
 | `internal/ui/` | Output formatting: tables, records, documents, JSON, YAML, progress |
-| `tests/` | Live-API integration tests |
+| `tests/live/` | Live-API integration tests, one file per collection |
+| `tests/` | Everything the suite is built from, and the rules it is held to - all of it decidable without Proton |
 | `scripts/` | Command-reference and OpenAPI generators, installers, release helpers, README demo |
 | `assets/` | Logo and the generated README demo images |
 | `docs/` | User documentation: guides by hand, the command reference generated |

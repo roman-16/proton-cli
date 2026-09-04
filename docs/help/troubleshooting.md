@@ -205,10 +205,12 @@ proton account login --user "$ACCOUNT" --password-file "$CRED"
 
 ## It asks for my password again
 
-Three commands reach endpoints Proton guards behind an elevated session. Proton re-authenticates against the password itself rather than accepting your session:
+A few commands reach endpoints Proton guards behind an elevated session. Proton re-authenticates against the password itself rather than accepting your session:
 
 - `calendar settings calendars delete`
 - `mail messages expire`
+- `mail settings autoreply disable`
+- `mail settings autoreply enable`
 - `mail settings autoreply set`
 
 They prompt, or take `--password-file` and `--password-stdin`. The key password sealed into your session cannot stand in: it is a one-way derivation.

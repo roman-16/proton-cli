@@ -56,9 +56,6 @@ lint:
     goreleaser check
     shellcheck scripts/*.sh scripts/terminal-demo/*.sh
     golangci-lint run ./...
-    # The paid tests are behind a build tag, so the pass above does not compile
-    # them. Without this they are the one part of the tree nothing lints.
-    golangci-lint run --build-tags=paid ./...
 
 [doc("Sign every test account in, answering Proton's CAPTCHA if it asks. Needs a terminal")]
 login *args: build
@@ -110,59 +107,41 @@ snapshot: build
     export TAP_WINGET_TOKEN="${TAP_WINGET_TOKEN:-unused}"
     goreleaser release --snapshot --clean --skip=publish
 
-# How many live tests run at once.
+# There are two tiers, and one thing separates them: does answering the question
+# need Proton.
 #
-# One: what limits this is not the client but what the free plan meters, and
-# making an alias is the tightest of them. Several tests need one of their own
-# and Proton allows few per hour, so anything above this has them refused.
-# Raise it one step at a time and only after a full run shows no rate limiting -
-# the suite fails on the first sign of it - and never past eight.
-parallel := "1"
+# `test-fast` is every package but the live suite - unit, golden, conformance,
+# the rules the suite is held to, and the offline suite that runs the real binary
+# with no session and the API pointed at a dead port. No credentials, no network,
+# a couple of seconds. `test` is that, then the live suite against all three
+# accounts.
+#
+# Nothing else decides a tier. A subscription is a property of an account, not of
+# a question, so the tests that need one act as the paid account like any other
+# and run in the same pass.
+# The one package that needs an account, and the vendored Go inside the
+# documentation site's node_modules, which is nobody's to test.
+notFast := "/tests/live$|/node_modules/"
 
-# The timeouts say how long a run may take before something is wrong, not how long
-# it takes, so they are sized to the setting above rather than to an ambition.
-# One at a time, the suite is several hundred tests that each wait on Proton in
-# turn, which is twenty minutes of honest work - a ten-minute limit timed every
-# run out mid-suite and read as a hang. Raising `parallel` is what makes it quick
-# again; until then the limit has to clear the serial cost, and one test still
-# answers in seconds.
-[doc("The live-API suite against the two free test accounts, and everything that needs no account")]
+# The live suite runs one test at a time. It is bound by waiting for Proton, so
+# overlapping would be faster - but what gives out first is whatever the free
+# plan meters hardest, and rate limiting arrives before any time is saved. The
+# timeout says how long a run may take before something is wrong, not how long it
+# takes: several hundred tests that each wait on Proton in turn is a good half
+# hour of honest work.
+[doc("Every test there is: the fast ones, then the live suite against all three accounts")]
 test: test-fast
-    go test ./tests/ -v -count=1 -timeout 30m -parallel {{ parallel }} -shuffle=on
+    go test ./tests/live/ -v -count=1 -timeout 45m -parallel 1 -shuffle=on
 
-[doc("The tests that need a paid plan, against the account in PROTON_CLI_TEST_PAID_*")]
-test-paid: test-fast
+[doc("Everything decidable without Proton: unit, golden, conformance, rules, offline")]
+test-fast:
     #!/usr/bin/env bash
     set -euo pipefail
-    # A separate recipe, and a build tag, because this is the only thing here
-    # that touches an account somebody depends on. `just test` cannot reach it:
-    # without the tag those tests are not compiled in at all.
-    #
-    # Only the paid tests: the free suite has its own recipe and running it here
-    # would spend the sending allowance for nothing. Every test that needs the
-    # account says Paid in its name, which TestEveryPaidTestSaysSoInItsName
-    # enforces so the filter cannot quietly miss one.
-    #
-    # One at a time, because there is no second paid account to spread the load
-    # over and nothing here is worth racing.
-    go test ./tests/ -tags=paid -v -count=1 -timeout 20m -parallel 1 -run Paid
-
-# Both suites, which is two recipes rather than one because they run against
-# different accounts under different rules. This is the only place they are
-# named together: `test` still cannot reach the paid account, since without the
-# build tag those tests are not compiled in at all, and that is the property
-# worth keeping. Asking for them here is opting in, out loud.
-[doc("Every test there is: the free suite, then the paid one")]
-test-all: test
-    just test-paid
-
-[doc("Unit, golden, conformance and offline tests: no API, no credentials, seconds not minutes")]
-test-fast:
-    go test ./cmd/... ./internal/... ./scripts/... ./tests/offline/ -count=1
+    go test $(go list ./... | grep --invert-match --extended-regexp '{{ notFast }}') -count=1
 
 [doc("Run a single test (or a `|`-separated regex of test names)")]
 test-one pattern:
-    go test ./tests/ -v -count=1 -run '{{ pattern }}' -timeout 5m
+    go test ./tests/live/ -v -count=1 -run '{{ pattern }}' -timeout 10m
 
 [doc("Report what the live suite spent its time on, and how deep each command's request graph was")]
 test-report *pattern=".":
@@ -170,7 +149,7 @@ test-report *pattern=".":
     set -euo pipefail
     trace="${PROTON_CLI_TEST_TRACE:-/tmp/proton-cli-trace.jsonl}"
     PROTON_CLI_TEST_TRACE="$trace" PROTON_CLI_TEST_TRACE_REQUESTS=1 \
-        go test ./tests/ -v -count=1 -run '{{ pattern }}' -timeout 20m -parallel {{ parallel }} || true
+        go test ./tests/live/ -v -count=1 -run '{{ pattern }}' -timeout 45m -parallel 1 || true
     go run ./scripts/testreport "$trace"
 
 [doc("Record which of Proton's API the live suite reaches, for the check that no change quietly narrows it")]
@@ -179,23 +158,8 @@ coverage:
     set -euo pipefail
     trace="${PROTON_CLI_TEST_TRACE:-/tmp/proton-cli-trace.jsonl}"
     PROTON_CLI_TEST_TRACE="$trace" PROTON_CLI_TEST_TRACE_REQUESTS=1 \
-        go test ./tests/ -v -count=1 -timeout 30m -parallel {{ parallel }}
-    # Both suites, because the golden is what every request the CLI can send has
-    # to appear in, and some of them only a paid plan can reach. Without a paid
-    # account the free half is recorded on its own and the paid endpoints show up
-    # as gaps, which is the truth for that machine.
-    traces="$trace"
-    if [ -n "${PROTON_CLI_TEST_PAID_USER:-}" ]; then
-        paid="${trace%.jsonl}-paid.jsonl"
-        PROTON_CLI_TEST_TRACE="$paid" PROTON_CLI_TEST_TRACE_REQUESTS=1 \
-            go test ./tests/ -tags=paid -v -count=1 -timeout 20m -parallel 1 -run Paid
-        traces="$traces $paid"
-    else
-        echo "no paid account configured; recording the free suite only" >&2
-    fi
-    # shellcheck disable=SC2086
-    cat $traces > "${trace%.jsonl}-all.jsonl"
-    go run ./scripts/testreport --coverage "${trace%.jsonl}-all.jsonl" > tests/api-coverage.golden
+        go test ./tests/live/ -v -count=1 -timeout 45m -parallel 1
+    go run ./scripts/testreport --coverage "$trace" > tests/api-coverage.golden
     git --no-pager diff --stat tests/api-coverage.golden || true
 
 [doc("Move every dependency and tool to the latest version")]

@@ -7,11 +7,10 @@ import (
 
 // What the accounts hold for the suite to read.
 //
-// Both accounts hold the same of it, so a test can act as either and the README
-// panel is a photograph of it. The names read like somebody's account rather
-// than like fixtures for that second reason: nothing here uses the
-// `proton-cli-test-` prefix, which belongs to what the suite makes and clears up
-// itself.
+// Both free accounts hold the same of it, so a test can act as either and the
+// README panel is a photograph of it. The names read like somebody's account
+// rather than like fixtures for that second reason: nothing here uses
+// TestPrefix, which belongs to what the suite makes and clears up itself.
 //
 // Declaring it here rather than in either place that acts on it is what keeps
 // the two in step - the seed and the suite bring about exactly the same thing,
@@ -39,7 +38,9 @@ var files = map[string]string{
 	"panorama.jpg":     "",
 }
 
-func Mailbox(work string) []Collection {
+// Free is what each of the two accounts kept for the suite holds. Anything
+// missing is made by whoever asks for it first.
+func Free(work string) []Collection {
 	return []Collection{{
 		What:   "label",
 		List:   []string{"mail", "settings", "labels", "list"},
@@ -199,6 +200,35 @@ func Mailbox(work string) []Collection {
 			Create: []string{"calendar", "events", "create", "--title", "Standup",
 				"--start", InDays(3) + "T09:00", "--duration", "15m",
 				"--rrule", "FREQ=WEEKLY;COUNT=5", "--remind", "15m"},
+		}},
+	}}
+}
+
+// Paid is what the paid account holds for the suite.
+//
+// One alias, made on the first run that needs it and never removed - which is
+// the whole reason it is a fixture rather than something a test makes: an alias
+// address cannot be un-minted, so a test that made its own would spend one of
+// somebody's for every run. Declaring it here means the suite mints at most one,
+// ever.
+//
+// There is no Remove, so a row that disagrees with this is reported rather than
+// replaced. Deleting the account's alias to make a better one is not a trade the
+// suite gets to make.
+//
+// The listing is `aliases list` rather than `items list` because it is unpaged:
+// a real account can hold more items than a page, and a fixture that fell off
+// the end of one would be minted again on every run.
+func Paid() []Collection {
+	return []Collection{{
+		What:   "Pass alias",
+		List:   []string{"pass", "aliases", "list"},
+		Key:    "name",
+		IDKeys: []string{"share_id", "item_id"},
+		Pins: []Pin{{
+			ID:     PaidAlias,
+			Fields: map[string]string{"type": "alias"},
+			Create: []string{"pass", "aliases", "create", "--prefix", PaidAliasPrefix, "--name", PaidAlias},
 		}},
 	}}
 }

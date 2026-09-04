@@ -81,7 +81,7 @@ func main() {
 			// Then everything the account holds, in lanes: a folder has to exist
 			// before the file in it, so collections of the same thing keep their
 			// order, while a label and a vault have nothing to do with each other.
-			lanes := lanesOf(fixture.Mailbox(work), func(c fixture.Collection) { r.reconcile(a.Profile, c) })
+			lanes := lanesOf(fixture.Free(work), func(c fixture.Collection) { r.reconcile(a.Profile, c) })
 			lanes = append(lanes,
 				func() { r.photos(a.Profile, work) },
 				func() {

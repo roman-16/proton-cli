@@ -936,6 +936,8 @@ func TestReauthCommandsAreDeclared(t *testing.T) {
 		"proton account login",
 		"proton calendar settings calendars delete",
 		"proton mail messages expire",
+		"proton mail settings autoreply disable",
+		"proton mail settings autoreply enable",
 		"proton mail settings autoreply set",
 	}
 	leaves, _ := partition(t)

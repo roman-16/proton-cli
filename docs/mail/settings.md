@@ -77,6 +77,12 @@ proton mail settings autoreply disable
 proton mail settings autoreply disable
 ```
 
+| Flag | Description |
+| --- | --- |
+| `--password-file string` | Read the account password from a file |
+| `--password-stdin` | Read the account password from stdin |
+| `--totp string` | Two-factor code |
+
 ### `autoreply enable`
 
 Turn the auto-reply on, keeping its schedule.
@@ -88,6 +94,12 @@ proton mail settings autoreply enable
 ```bash
 proton mail settings autoreply enable
 ```
+
+| Flag | Description |
+| --- | --- |
+| `--password-file string` | Read the account password from a file |
+| `--password-stdin` | Read the account password from stdin |
+| `--totp string` | Two-factor code |
 
 ### `autoreply get`
 

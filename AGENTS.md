@@ -66,26 +66,27 @@ Rules:
 
 After making code changes, run these in order. Stop on the first failure and fix it before continuing.
 
-**The live suites are the user's to run, never the agent's.** `just test` and `just test-paid` take minutes, spend allowances Proton meters by the hour, and act on real accounts. An agent runs **`just test-fast`** and nothing else. When a change wants one of the live suites - a new command, anything touching a request, a fix that only the live API can confirm - say so, say which one and why, and let the user decide. Never start one to find out.
+**The live suite is the user's to run, never the agent's.** `just test` takes the best part of an hour, spends allowances Proton meters by the hour, and acts on three real accounts - one of them somebody's own. An agent runs **`just test-fast`** and nothing else. When a change wants the live suite - a new command, anything touching a request, a fix that only the live API can confirm - say so, say why, and let the user decide. Never start one to find out.
 
-1. **Tests** - `just test-fast` is the gate an agent runs: unit, golden, conformance and offline, no credentials, about a second. `just test` adds the live suite against the two accounts one test at a time, and `just test-paid` the ones needing a subscription; both are the user's. A live run fails on the first sign of Proton rate-limiting rather than pressing on, so a failure that says so means wait, not fix the code.
+1. **Tests** - `just test-fast` is the gate an agent runs: unit, golden, conformance, the rules the live suite is held to, and the offline suite. No credentials, about two seconds. `just test` adds the live suite, one test at a time, against all three accounts; it is the user's. A live run fails on the first sign of Proton rate-limiting rather than pressing on, so a failure that says so means wait, not fix the code.
 2. **Lint** - **always run `just lint`** and fix everything before considering the work done. It formats Go and Nix and regenerates the command reference, then checks the workflows with `actionlint`, the release configuration with `goreleaser check`, the shell scripts with `shellcheck`, and the Go with `golangci-lint` (CGO-free, so no C compiler needed). CI runs the same recipe and then fails on anything it rewrote, so leaving a generated file stale is the same failure as leaving a finding.
 3. **Build** - `just build` produces the release-shaped binary; it needs the toolchain from `devbox shell`.
 4. **Nix, when `go.mod` moved** - `just flake` builds the flake package from the working tree. `vendorHash` in `flake.nix` goes stale on every dependency change and nothing else catches it; the recipe prints the hash to paste in.
 5. **Packaging, when the release surface moved** - `just snapshot` builds every artifact a tag would, without publishing. Run it after touching `.goreleaser.yaml`, the completions or the embedded helpers.
-6. **Coverage, when the CLI's requests moved** - `just coverage` re-records which of Proton's API the live suite reaches. It runs both live suites, so it is the user's too. `just test-fast` fails when the CLI can send a request no test has ever sent, which is how an agent finds out it needs one; ask for the re-record and read the diff together. See [Testing](#testing).
+6. **Coverage, when the CLI's requests moved** - `just coverage` re-records which of Proton's API the live suite reaches. It is a live run, so it is the user's too. `just test-fast` fails when the CLI can send a request no test has ever sent, which is how an agent finds out it needs one; ask for the re-record and read the diff together. See [Testing](#testing).
 
 ## Testing
 
-Tests are **integration tests** that run against the live Proton API. They run on the primary and secondary test accounts, and require `PROTON_CLI_TEST_PRIMARY_USER`, `PROTON_CLI_TEST_PRIMARY_PASSWORD`, `PROTON_CLI_TEST_SECONDARY_USER`, `PROTON_CLI_TEST_SECONDARY_PASSWORD`, and the secondary's `PROTON_CLI_TEST_SECONDARY_SECOND_PASSWORD` and `PROTON_CLI_TEST_SECONDARY_EXTRA_PASSWORD` - that account carries two-password mode and a Pass extra password so the suite reaches both.
+There are **two tiers, and one thing separates them: does answering the question need Proton.** Nothing else - not a subscription, not which account, not how fast it is. `tests/AGENTS.md` is the whole story; the parts that decide what an agent may do:
 
-- **`just test-fast` is always safe** - no API, no credentials, about a second to run, and the only one an agent starts
-- **`just test` and `just test-paid` are the user's**, not the agent's: minutes each, against real accounts, spending allowances that are metered by the hour. An agent that wants one asks for it and says why.
-- **What limits how often you can run it is the sending allowance, not the clock.** A run sends about seventeen messages and these are free accounts, which Proton caps at fifty an hour and a hundred and fifty a day. Two runs back to back are fine; four in an hour will start failing on the quota, and those failures look like bugs but are not. When in doubt, wait rather than debug.
-- **Single tests are cheaper** (`just test-one TestName`) when verifying one change
-- **`just test-report`** says where the time went and how deep each command's request graph was
-- **`just docs`** regenerates the command reference from the tree; `just lint` runs it too, and CI fails on the diff. Inside an app's directory every markdown file except `README.md` is generated, one per collection - never edit one. Change the command's `Short`, `Long`, flag usage or `examples.go` entry
-- **Unit test file naming**: name a unit test file after the source file it tests, with `_test.go` appended (e.g. `size.go` → `size_test.go`) - never after a symbol or after a file that doesn't exist. The integration tests under `tests/` are the exception: they are grouped by feature area.
+- **`just test-fast` is always safe** - every package but `tests/live`, no API, no credentials, about two seconds, and the only one an agent starts.
+- **`just test` is the user's.** It signs in all three accounts, including a paid one somebody actually uses, and runs the live suite one test at a time. An agent that wants it asks for it and says why.
+- **All nine `PROTON_CLI_TEST_*` variables are required**, and the suite refuses to start rather than skipping what it cannot reach. `tests/account` is the list.
+- **What limits how often it can be run is the sending allowance, not the clock.** The free accounts are capped at fifty messages an hour and a hundred and fifty a day. Two runs back to back are fine; four in an hour will start failing on the quota, and those failures look like bugs but are not. When in doubt, wait rather than debug.
+- **Single tests are cheaper** (`just test-one TestName`) when verifying one change.
+- **`just test-report`** says where the time went and how deep each command's request graph was.
+- **`just docs`** regenerates the command reference from the tree; `just lint` runs it too, and CI fails on the diff. Inside an app's directory every markdown file except `README.md` is generated, one per collection - never edit one. Change the command's `Short`, `Long`, flag usage or `examples.go` entry.
+- **Unit test file naming**: name a unit test file after the source file it tests, with `_test.go` appended (e.g. `size.go` → `size_test.go`) - never after a symbol or after a file that doesn't exist. The live suite is one file per collection, named the way the command is: `mail_messages_test.go`, `pass_vaults_test.go`.
 
 ## Reference Source
 

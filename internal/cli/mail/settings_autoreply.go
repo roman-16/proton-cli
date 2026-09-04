@@ -116,16 +116,28 @@ func autoreplySetCmd() *cobra.Command {
 }
 
 func autoreplyToggleCmd(use, short string, action ui.Action, enabled bool) *cobra.Command {
-	return &cobra.Command{
+	var reauth kit.Reauth
+	c := &cobra.Command{
 		Use:   use,
 		Short: short,
 		Args:  cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
+			if err := reauth.Supply(c); err != nil {
+				return err
+			}
 			return kit.Mutate(c, ui.ResultSpec{
 				Action: action, Kind: "settings", Count: 1, Name: "auto-reply",
-			}, func() error { return c.App.Mail.AutoReplyToggle(c.Ctx, enabled) })
+			}, func() error {
+				// Proton guards the autoresponder whichever way the switch goes,
+				// so turning one off asks for the password exactly as setting one
+				// up does. Nothing here arranges the elevation: the client does it
+				// when the server asks, and all this owes the user is a reason.
+				return c.App.Mail.AutoReplyToggle(app.WithScopeReason(c.Ctx, "change your auto-reply"), enabled)
+			})
 		}),
 	}
+	reauth.Declare(c)
+	return c
 }
 
 func boolInt(b bool) int {

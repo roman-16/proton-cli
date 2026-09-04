@@ -1,31 +1,32 @@
-// Package fixture declares the mail the integration suite reads.
+// Package fixture declares what the test accounts hold for the suite to read.
 //
-// Most mail tests need *a* real, delivered, encrypted message of a particular
-// shape rather than a freshly sent one. Sending those shapes on every run costs
-// two things: a delivery to wait for, and a message from a sending allowance that
-// a free plan caps at fifty an hour. Spending four of them on fixtures is what
-// decides how often the suite can be run, so they live on the account instead and
-// `scripts/seed` puts them there once.
+// Most tests need *a* real, delivered, encrypted thing of a particular shape
+// rather than a freshly made one. Making those shapes on every run costs two
+// things: a delivery to wait for, and - for mail - a message from a sending
+// allowance that a free plan caps at fifty an hour. So they live on the account
+// instead, and the accessor a test calls finds one, makes it if the account has
+// not got it, and remembers it for the rest of the run.
 //
-// Declaring them here rather than in either place is what keeps the two in step:
-// the seed creates exactly what the suite looks for, because both read this.
+// Declaring them here rather than in either place that acts on them is what
+// keeps the two in step: `scripts/seed` fills an account by hand and the suite
+// fills it as it goes, and both read this.
 //
-// A test that MUTATES a message (mark, star, move, trash) or exercises the send
-// path itself must not use these - it sends its own.
+// A test that MUTATES its fixture, or that exercises the making of one, must not
+// read a shared one - it makes its own.
 package fixture
 
 // Mail is one message the suite expects to find in the inbox.
 type Mail struct {
 	// Subject identifies it. It reads like somebody's mail rather than like a
-	// fixture, for the same reason the rest of the seed does, and it never carries
-	// the `proton-cli-test-` prefix, which belongs to what the suite makes and
-	// clears up itself.
+	// fixture, for the same reason the rest of the seed does, and it never
+	// carries the TestPrefix, which belongs to what the suite makes and clears
+	// up itself.
 	Subject string
 	// Body is sent verbatim.
 	Body string
 	// HTML sends the body as HTML, which an inline image needs.
 	HTML bool
-	// Attach and Inline name files in the seed's work directory.
+	// Attach and Inline name files in Files.
 	Attach string
 	Inline string
 }
@@ -64,13 +65,14 @@ var Attachments = Mail{
 	Inline:  "inline-image.png",
 }
 
-// Mutable are messages a test may change and change back: marked unread, starred,
-// moved, trashed and restored. The change is the subject of those tests, not the
-// sending, so they take one of these instead of sending their own.
+// Mutable are messages a test may change and change back: marked unread,
+// starred, moved, trashed and restored. The change is the subject of those
+// tests, not the sending, so they take one of these instead of sending their
+// own.
 //
-// There are several because tests run at the same time and each needs a message
-// nobody else is changing; they are handed out one at a time. They read like
-// ordinary mail for the same reason the rest does.
+// There are several because each test needs a message no other test is
+// changing; they are handed out one at a time. They read like ordinary mail for
+// the same reason the rest does.
 var Mutable = []Mail{
 	{Subject: "Library books are due on Friday", Body: "Two of them can be renewed online.\n"},
 	{Subject: "Your parcel is on its way", Body: "It should arrive between nine and noon.\n"},
@@ -78,13 +80,40 @@ var Mutable = []Mail{
 	{Subject: "Water meter reading", Body: "The reading for this quarter is recorded.\n"},
 }
 
-// All is every message the suite expects, for the seed to reconcile.
-func All() []Mail { return append([]Mail{Plain, Quoted, Attachments}, Mutable...) }
+// AllMail is every message the suite expects, for the seed to reconcile.
+func AllMail() []Mail { return append([]Mail{Plain, Quoted, Attachments}, Mutable...) }
 
-// AliasName is the Pass alias the suite reads rather than makes.
+// AliasName is the Pass alias on the free accounts that the suite reads rather
+// than makes.
 //
-// Making an alias is the tightest thing the free plan meters - a handful an
-// hour, against five tests that each want one - so only the test about creating
-// one makes its own. The address behind this is Proton's to choose and differs
+// Making an alias is what Proton meters hardest here - a handful an hour,
+// against several tests that each want one - so only the test about making an
+// alias makes its own. The address behind this is Proton's to choose and differs
 // per account, which is why the name is what identifies it.
 const AliasName = "Newsletters"
+
+// PaidAlias is the Pass alias on the paid account: made once, kept for good.
+//
+// Alias contacts need a subscription, so the only account that can test them is
+// somebody's real one - and an alias address cannot be un-minted, so a test that
+// made its own would spend one of theirs on every run. This is made by the first
+// run that needs it and then never removed, so the cost is one address for the
+// life of the account rather than one an hour. Every run hangs contacts off it
+// and takes them away again; contacts are reversible, the address is not.
+//
+// The name is deliberately outside TestPrefix, because Sweep deletes everything
+// carrying that prefix and this is the one fixture that must survive - and it
+// says what it is, because it is sitting in somebody's real password manager.
+const PaidAlias = "proton-cli fixture"
+
+// PaidAliasPrefix is the front of the address Proton mints for it. Proton
+// appends a word of its own, so the address is not predictable and the prefix is
+// only ever used once.
+const PaidAliasPrefix = "protoncli"
+
+// TestPrefix is the namespace the suite makes its own artifacts under.
+//
+// The suite clears up after itself; a run that was killed cannot, and what it
+// leaves is indistinguishable from the account's own contents to everything
+// except this prefix.
+const TestPrefix = "proton-cli-test-"

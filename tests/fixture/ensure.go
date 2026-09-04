@@ -108,18 +108,21 @@ func (c Collection) Pin(id string) (Pin, bool) {
 // A wrong row is worse than a missing one - it passes a presence check and then
 // fails an assertion somewhere far away - so a row that disagrees is removed and
 // made again rather than accepted.
-func Ensure(run Runner, profile string, c Collection, p Pin) (map[string]any, error) {
-	list, err := Rows(run, profile, c.List...)
-	if err != nil {
-		return nil, err
-	}
+//
+// It judges the listing it is handed rather than making one, because a caller
+// that swept the collection already has it. Only a create costs a second read.
+func Ensure(run Runner, profile string, c Collection, p Pin, list []map[string]any) (map[string]any, error) {
 	row, found := Find(list, c.Key, p.ID)
-	switch {
-	case found && agrees(row, p.Fields):
+	if found && agrees(row, p.Fields) {
 		return row, nil
-	case found:
+	}
+	if found {
+		// A collection with no way to remove a row holds something too costly to
+		// replace - the paid account's alias, whose address cannot be re-minted.
+		// Deleting it to make a better one is not a trade to make quietly.
 		if len(c.Remove) == 0 {
-			return nil, fmt.Errorf("%s: %s does not match the fixture and cannot be replaced", c.What, p.ID)
+			return nil, fmt.Errorf("the %s account's %s called %q is not what the fixture declares,"+
+				" and replacing it would mean deleting it: %v", profile, c.What, p.ID, row)
 		}
 		target := append(append([]string{"--yes"}, c.Remove...), c.Target(row, p.ID))
 		if _, err := run(profile, target...); err != nil {
@@ -135,26 +138,23 @@ func Ensure(run Runner, profile string, c Collection, p Pin) (map[string]any, er
 	if err != nil {
 		return nil, fmt.Errorf("%s: %s: %w", c.What, p.ID, err)
 	}
-	list, err = Rows(run, profile, c.List...)
+	made, err := Rows(run, profile, c.List...)
 	if err != nil {
 		return nil, err
 	}
-	if row, found := Find(list, c.Key, p.ID); found {
+	if row, found := Find(made, c.Key, p.ID); found {
 		return row, nil
 	}
 	return nil, fmt.Errorf("%s: %s was made and is not in the listing", c.What, p.ID)
 }
 
-// TestPrefix is the namespace the suite makes its artifacts under.
-const TestPrefix = "proton-cli-test-"
-
 // Sweep removes what an interrupted run left behind, from a listing already in
 // hand.
 //
-// The suite clears up after itself; a run that was killed cannot, and what it
-// leaves is indistinguishable from the account's own contents to everything
-// except this prefix. It costs nothing where a fixture was being looked up
-// anyway, which is why it takes the listing rather than making one.
+// It costs nothing where a fixture was being looked up anyway, which is why it
+// takes the listing rather than making one. Only the free accounts are ever
+// swept: on the paid one there is nothing of the suite's to clear, and a filter
+// over somebody's real data is the mistake the paid rules exist to prevent.
 //
 // A recurring event is listed once per occurrence and removed as a series, so a
 // reference already swept is not swept again.

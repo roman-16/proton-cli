@@ -10,10 +10,12 @@
 // reports: 1.0 is a chain, and a command with eight requests and an overlap of 1.0
 // is paying eight round trips to learn what one could have told it.
 //
-// With PROTON_CLI_TEST_TRACE_REQUESTS set, --coverage instead prints every request
-// the run actually made, as a method and a path template. That set is the suite's
-// real reach into the live API: anything the CLI can send but the run never sent
-// is somewhere Proton can change and no test will notice.
+// With PROTON_CLI_TEST_TRACE_REQUESTS set, --coverage instead prints every
+// request the run made and Proton answered, as a method and a path template.
+// That set is the suite's real reach into the live API: anything the CLI can send
+// but the run never sent is somewhere Proton can change and no test will notice.
+// A refused request does not count - an endpoint listed on the strength of a 401
+// is a gap wearing the clothes of coverage.
 package main
 
 import (
@@ -293,6 +295,12 @@ func printCoverage(runs []invocation) {
 			continue
 		}
 		for _, q := range r.Requests {
+			// A request Proton refused is not one the suite reaches. Recording it
+			// would let an endpoint sit in the golden on the strength of an error,
+			// which is the opposite of what the golden is for.
+			if q.Status < 200 || q.Status > 299 {
+				continue
+			}
 			seen[q.Method+" "+template(q.Path)] = true
 		}
 	}

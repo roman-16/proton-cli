@@ -31,7 +31,7 @@ func (r *report) mail(profile, address, work string) {
 	}
 	// What the suite reads. Kept here rather than sent by the suite itself, so a
 	// run spends its sending allowance on the send path it is testing.
-	for _, m := range fixture.All() {
+	for _, m := range fixture.AllMail() {
 		r.deliver(profile, address, work, m)
 	}
 }

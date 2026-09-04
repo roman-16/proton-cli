@@ -2,8 +2,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/roman-16/proton-cli/tests/fixture"
 	"sync"
+
+	"github.com/roman-16/proton-cli/tests/fixture"
 )
 
 // sweep removes what an interrupted suite run left behind.
@@ -37,15 +38,13 @@ func (r *report) reconcile(profile string, c fixture.Collection) {
 	}
 	r.sweep(profile, c, list)
 	for _, p := range c.Pins {
-		before := len(list)
-		if _, err := fixture.Ensure(seedRunner, profile, c, p); err != nil {
+		if _, err := fixture.Ensure(seedRunner, profile, c, p, list); err != nil {
 			r.fail(fmt.Sprintf("%s: %s", c.What, p.ID), err)
 			continue
 		}
 		if _, found := fixture.Find(list, c.Key, p.ID); !found {
 			r.note("+", profile, fmt.Sprintf("%s: %s", c.What, p.ID))
 		}
-		_ = before
 	}
 }
 

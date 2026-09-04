@@ -45,6 +45,10 @@ const (
 // unreachable are the requests the suite cannot make, and why. They are the
 // exceptions that have to be argued for, not a list to grow when a test is
 // inconvenient to write.
+//
+// "The accounts do not have the plan for it" is not one of them any more: the
+// suite signs a paid account in on every run. What is left is what no run of
+// anything could do.
 var unreachable = map[string]string{
 	"DELETE /auth/v4/sessions":      "revoking every other session would end the run",
 	"DELETE /auth/v4/sessions/{id}": "the only session there is to revoke is the one running",
@@ -81,20 +85,38 @@ var untested = map[string]string{
 	"GET /pass/v1/user/alias/mailbox/{n}/verify":  "sending the confirmation code again",
 	"POST /pass/v1/user/alias/mailbox/{n}/verify": "handing the confirmation code back",
 
-	// Reading a breach needs an address that has been in one. The paid test asks
-	// for the list and stops when every watched address is clean, which is the
-	// good outcome and an untestable one.
+	// The auto-reply is a paid feature, so only the paid account could reach it -
+	// and it is the one setting a run cannot put back. Proton keeps the last
+	// message even while the auto-reply is off and offers no way to clear it
+	// (`set --message ""` is refused), so a test would leave its own text in
+	// somebody's real settings for good. Turning it off restores the behaviour
+	// and not the state, which is not the same thing.
+	"PUT /mail/v4/settings/autoresponder": "writing an auto-reply cannot be undone, and only a real account has the plan for one",
+
+	// A refresh happens when a session expires mid-run, which is Proton's to
+	// decide and no test can arrange - so whether a run reaches it is luck. It
+	// stays listed rather than being relied on: a golden line that appears and
+	// disappears with the age of a saved session is not coverage. The exchange
+	// itself is covered by internal/proton's own tests against a stub, and a run
+	// that does happen to refresh will report this entry as stale.
+	"POST /auth/v4/refresh": "only an expiring session causes one, and a run cannot make its session expire",
+
+	// Reading a breach needs an address that has been in one. TestPassBreaches...
+	// asks for the list and stops when every watched address is clean, which is
+	// the good outcome and an untestable one.
 	"GET /pass/v1/breach/address/{id}/breaches":      "needs a watched address that has actually been breached",
 	"GET /pass/v1/breach/custom_email/{id}/breaches": "needs a breached address added by hand, which is the same problem",
 	"POST /mail/v4/messages/{id}/unsubscribe":        "reaching it needs a message from a real mailing list carrying a List-Unsubscribe header, which no seeding can put on these accounts",
 	"GET /calendar/v1/{id}/events/{id}/attendees":    "reaching it needs an event with more attendees than a page holds, which would mean inviting a hundred addresses from these accounts",
 
-	// Setting a forwarding up is a paid feature - Proton's own settings page shows
-	// the button only to hasPaidMail - so the two free accounts reach the listings
-	// and nothing that writes. Closing this means a paid test, which would put a
-	// forwarding rule on an account somebody actually uses.
-	"POST /mail/v4/forwardings":              "setting a forwarding up needs a paid plan, and the free accounts cannot",
-	"DELETE /mail/v4/forwardings/{id}":       "there is nothing to take down, because nothing could be set up",
+	// Setting a forwarding up is a paid feature, and the paid account is the one
+	// account that could - but a forwarding rule on somebody's real mailbox
+	// redirects their mail, and Proton emails the forwardee a link only they can
+	// follow, so the rule sits pending on a real account until somebody notices.
+	// Creating and deleting one is reversible on paper and not in effect, which
+	// is the line the paid rules draw.
+	"POST /mail/v4/forwardings":              "it redirects real mail on a real account, and the invitation cannot be withdrawn from the forwardee's inbox",
+	"DELETE /mail/v4/forwardings/{id}":       "there is nothing to take down, because nothing is set up",
 	"PUT /mail/v4/forwardings/{id}/reinvite": "the same: no pending forwarding to ask about again",
 
 	// Pausing needs a forwarding the forwardee has accepted, and accepting one

@@ -125,10 +125,12 @@ proton account login --user alice@proton.me \
 
 ### Commands that ask for the password again
 
-Three commands reach an endpoint Proton guards behind an elevated session, and ask for your password again at that moment:
+These commands reach an endpoint Proton guards behind an elevated session, and ask for your password again at that moment:
 
 - `calendar settings calendars delete`
 - `mail messages expire`
+- `mail settings autoreply disable`
+- `mail settings autoreply enable`
 - `mail settings autoreply set`
 
 ```bash

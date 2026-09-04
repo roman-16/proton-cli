@@ -7,6 +7,7 @@ package account
 
 import (
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/roman-16/proton-cli/internal/account/session"
@@ -56,11 +57,21 @@ func getCmd() *cobra.Command {
 			st := state{Account: acct, Profile: c.App.Profile.String(), Session: "valid"}
 			if sess, err := session.Load(c.App.Profile); err == nil {
 				st.Unlocked = sess.Unlocked()
+			} else {
+				// Recorded and not counted: the record shows "Unlocked: no",
+				// which is what a session that cannot be read amounts to. Without
+				// this line the two causes are indistinguishable on screen.
+				slog.DebugContext(c.Ctx, "session unreadable, reporting locked", "error", err.Error())
 			}
 			// Scopes are informative rather than essential: an account whose
 			// session cannot list them is still worth reporting.
 			if scopes, err := c.App.API.Scopes(c.Ctx); err == nil {
 				st.Scopes = scopes
+			} else {
+				// Recorded and not counted: the field is omitted, which reads as
+				// an account with no scopes. Anything judging a plan by them needs
+				// to be able to tell that apart from the lookup having failed.
+				slog.DebugContext(c.Ctx, "scopes unavailable, omitting them", "error", err.Error())
 			}
 
 			return kit.Show(c, ui.RecordSpec{
