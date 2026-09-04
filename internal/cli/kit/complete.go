@@ -206,11 +206,11 @@ func profileFor(c *cobra.Command) profile.Name {
 	if f := c.Flags().Lookup("profile"); f != nil {
 		flag = f.Value.String()
 	}
-	path, named, err := config.Path(configFlag(c))
+	path, from, err := config.Path(configFlag(c))
 	if err != nil {
 		return profile.Name{}
 	}
-	file, err := config.Load(path, named)
+	file, _, err := config.Load(path, from)
 	if err != nil {
 		file = nil
 	}

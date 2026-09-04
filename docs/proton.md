@@ -53,6 +53,8 @@ The last run that failed, or --all for every run still on disk. One file per day
 
 Addresses, IDs and file paths are replaced by stable stand-ins before anything is written, so the same address reads as the same name throughout and as nothing at all to anybody else. Nothing here can be turned back into an address, a password, a subject or a filename.
 
+A long run is shortened to what an issue form takes: its first and last records, and everything above debug in between. --dest writes the whole of it to a file instead.
+
 Reads only what is already on this machine: no account, no network.
 
 ```

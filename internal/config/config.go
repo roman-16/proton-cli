@@ -15,6 +15,7 @@ package config
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -25,6 +26,7 @@ import (
 	"github.com/roman-16/proton-cli/internal/confirm"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/profile"
+	"github.com/roman-16/proton-cli/internal/redact"
 	"github.com/roman-16/proton-cli/internal/runlog"
 	"github.com/roman-16/proton-cli/internal/ui"
 )
@@ -76,23 +78,67 @@ type File struct {
 	PerProfile map[string]Settings `yaml:"per-profile"`
 }
 
-// Path is the file to read, and whether it was named rather than assumed.
+// Source is where an invocation's settings came from, in the terms a bug report
+// may carry: which of the three places named the file, whether there was one,
+// and what stopped it being honoured.
+//
+// Never the path. A configuration path holds a home directory, which is a
+// person's name on every platform this runs on, and a report is pasted in
+// public.
+type Source struct {
+	// Named is what pointed at the file, or empty for the default location.
+	Named string
+	// Present is whether there was a file there to read.
+	Present bool
+	// Problem is why the settings in force are not this file's, phrased without
+	// the path.
+	Problem error
+}
+
+// Describe says where the settings came from, in one line, for a report.
+func (s Source) Describe() string {
+	where := "default location"
+	if s.Named != "" {
+		where = "named by " + s.Named
+	}
+	switch {
+	case s.Problem != nil:
+		return where + ", ignored: " + s.Problem.Error()
+	case s.Present:
+		return where
+	}
+	return "none"
+}
+
+// Ignoring is this source carrying the reason its settings are not in force.
+//
+// The first reason stands: what stopped the file being read says more than
+// whatever the run made of the settings afterwards, and it is the one already
+// phrased without the path.
+func (s Source) Ignoring(why error) Source {
+	if s.Problem == nil {
+		s.Problem = why
+	}
+	return s
+}
+
+// Path is the file to read, and where that answer came from.
 //
 // A file somebody named and that is not there is a mistake worth reporting; the
 // default one being absent is the ordinary case of having written no
 // configuration.
-func Path(flag string) (path string, named bool, err error) {
+func Path(flag string) (path string, from Source, err error) {
 	if flag != "" {
-		return flag, true, nil
+		return flag, Source{Named: "--config"}, nil
 	}
 	if env := os.Getenv(PathVar); env != "" {
-		return env, true, nil
+		return env, Source{Named: PathVar}, nil
 	}
 	dir, err := Dir()
 	if err != nil {
-		return "", false, err
+		return "", Source{}, err
 	}
-	return filepath.Join(dir, Name), false, nil
+	return filepath.Join(dir, Name), Source{}, nil
 }
 
 // Load reads the file, rejecting a key it does not recognise.
@@ -101,19 +147,29 @@ func Path(flag string) (path string, named bool, err error) {
 // skipped with a warning. It carries the confirmation policy, and a policy that
 // quietly does not load is one that fails open - which is the one outcome a
 // guard may never have.
-func Load(path string, named bool) (*File, error) {
+//
+// It answers with what it learned about the file as well as with the file, so a
+// report can say whether there was one and what was wrong with it. The error
+// names the path, because whoever fixes it has to find it; the source carries
+// the same fact without it, because a report is read by somebody else.
+func Load(path string, from Source) (*File, Source, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
-		if os.IsNotExist(err) && !named {
-			return nil, nil
+		if os.IsNotExist(err) {
+			if from.Named == "" {
+				return nil, from, nil
+			}
+			return nil, from.Ignoring(errors.New("not there")), fmt.Errorf("could not read %s: %w", path, err)
 		}
-		return nil, fmt.Errorf("could not read %s: %w", path, err)
+		return nil, from.Ignoring(redact.WithoutPath(err)), fmt.Errorf("could not read %s: %w", path, err)
 	}
+	from.Present = true
 	var f File
 	if err := yaml.NewDecoder(bytes.NewReader(b), yaml.Strict()).Decode(&f); err != nil {
-		return nil, fmt.Errorf("%s: %s", path, yaml.FormatError(err, false, false))
+		detail := yaml.FormatError(err, false, false)
+		return nil, from.Ignoring(errors.New(detail)), fmt.Errorf("%s: %s", path, detail)
 	}
-	return &f, nil
+	return &f, from, nil
 }
 
 // Flags is what the command line said. A nil boolean is a flag left alone.
@@ -146,6 +202,19 @@ type Resolved struct {
 	NoLog         bool
 	NoUpdateCheck bool
 	Confirm       confirm.Policy
+	// Source is where these came from, which a report says and nothing else
+	// reads.
+	Source Source
+}
+
+// Defaults is what a run gets when it has been told nothing: no file, no flags,
+// no variables, and for the zone whatever the host itself answers.
+//
+// It is spelled out rather than resolved, because it is what a report falls back
+// to when resolving is the thing that failed, and a fallback that can fail is
+// not one.
+func Defaults() Resolved {
+	return Resolved{Output: ui.FormatText, LogLevel: slog.LevelWarn, Zone: hostZone()}
 }
 
 // Profile settles which profile an invocation acts as: what was typed, then the

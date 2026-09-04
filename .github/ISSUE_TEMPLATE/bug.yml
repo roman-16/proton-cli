@@ -30,7 +30,7 @@ body:
     attributes:
       label: Output of `proton report`
       description: |
-        Run `proton report` and paste the whole thing. If the command itself will not run, say so here and give `proton version` instead.
+        Run `proton report` and paste the whole thing. A long run is shortened to fit this box; when it says so, `proton report --dest bug.txt` writes the whole of it to a file you can drag in here.
       render: text
     validations:
       required: true

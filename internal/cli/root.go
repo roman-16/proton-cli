@@ -163,8 +163,13 @@ func newRoot() *cobra.Command {
 		// body runs and so before anything reaches the network: a file that does not
 		// parse, a format that is not one, a policy naming a command that is not
 		// there - none of them should first cost a sign-in to discover.
+		//
+		// Except for the command whose whole job is a machine that is not working.
+		// A configuration too broken to run on is exactly what somebody reports, and
+		// a report that refuses to run over it leaves them with nothing to send. It
+		// runs on the defaults instead and says what was wrong with theirs.
 		settings, err := resolveSettings(root, g.settings(pf))
-		if err != nil {
+		if err != nil && cmd.Name() != selfcmd.ReportName {
 			return err
 		}
 		a, err := app.New(app.Options{

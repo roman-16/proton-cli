@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"os"
 	"runtime"
 	"runtime/debug"
 	"sort"
@@ -52,13 +53,17 @@ func (a *App) Log() *runlog.Run { return a.run }
 // flag's value is a subject, a recipient, a path or a search term, and the names
 // alone already answer the question a reader has, which is which of two ways of
 // invoking the thing was taken.
+//
+// The terminal is part of what the run was. Output that came out wrapped,
+// uncoloured or in the wrong shade came out that way on a terminal of some
+// width calling itself something, and nobody reporting it afterwards can be
+// asked what those were at the time.
 func (a *App) Began(cmd *cobra.Command) {
 	if a.run == nil {
 		return
 	}
 	a.started = time.Now()
 	a.UI.Trace.Info("run",
-		"run", a.run.ID,
 		"command", cmd.CommandPath(),
 		"flags", strings.Join(flagsSet(cmd), " "),
 		"version", a.version,
@@ -69,6 +74,9 @@ func (a *App) Began(cmd *cobra.Command) {
 		"profile", a.Profile.String(),
 		"output", string(a.UI.Format),
 		"tty", a.UI.IsTTY(),
+		"term", os.Getenv("TERM"),
+		"colorterm", os.Getenv("COLORTERM"),
+		"width", a.UI.Columns(),
 		"dry_run", a.DryRun,
 		"zone", a.zone.name,
 	)
@@ -94,11 +102,9 @@ func (a *App) Ended(code int, err error) {
 		detail = err.Error()
 	}
 	if code == 0 {
-		a.UI.Trace.Info("run finished",
-			"run", a.run.ID, "exit", code, "duration", elapsed, "error", detail)
+		a.UI.Trace.Info("run finished", "exit", code, "duration", elapsed, "error", detail)
 	} else {
-		a.UI.Trace.Error("run failed",
-			"run", a.run.ID, "exit", code, "duration", elapsed, "error", detail)
+		a.UI.Trace.Error("run failed", "exit", code, "duration", elapsed, "error", detail)
 	}
 	_ = a.run.Close()
 }
@@ -111,7 +117,6 @@ func (a *App) Crashed(value any, stack []byte) {
 		return
 	}
 	a.UI.Trace.Error("panic",
-		"run", a.run.ID,
 		"panic", fmt.Sprint(value),
 		"stack", string(stack),
 	)

@@ -1152,8 +1152,9 @@ type logCall struct {
 	names []string
 }
 
-// logCalls finds every Debug/Info/Warn/Error call and reads the attribute names
-// off it.
+// logCalls finds every attribute name a record can be written under: the pairs
+// passed to a Debug/Info/Warn/Error call, and the attributes attached to a
+// handler, which name one in every record that handler writes.
 //
 // Only the literal names are read: slog takes alternating key/value pairs, so
 // the keys are the even arguments, and a key that is not a literal string is a
@@ -1164,6 +1165,8 @@ func logCalls(t *testing.T, dirs []string) []logCall {
 	var out []logCall
 	levels := map[string]bool{"Debug": true, "Info": true, "Warn": true, "Error": true,
 		"DebugContext": true, "InfoContext": true, "WarnContext": true, "ErrorContext": true}
+	attrs := map[string]bool{"Any": true, "Bool": true, "Duration": true, "Float64": true,
+		"Group": true, "Int": true, "Int64": true, "String": true, "Time": true, "Uint64": true}
 	fset := token.NewFileSet()
 	for _, dir := range dirs {
 		err := filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
@@ -1180,7 +1183,21 @@ func logCalls(t *testing.T, dirs []string) []logCall {
 					return true
 				}
 				sel, ok := call.Fun.(*ast.SelectorExpr)
-				if !ok || !levels[sel.Sel.Name] || !logReceiver(sel.X) {
+				if !ok {
+					return true
+				}
+				if pkg, named := sel.X.(*ast.Ident); named && pkg.Name == "slog" && attrs[sel.Sel.Name] {
+					if len(call.Args) > 0 {
+						if lit, isString := call.Args[0].(*ast.BasicLit); isString && lit.Kind == token.STRING {
+							if name, uerr := strconv.Unquote(lit.Value); uerr == nil {
+								out = append(out, logCall{file: filepath.ToSlash(p),
+									line: fset.Position(call.Pos()).Line, names: []string{name}})
+							}
+						}
+					}
+					return true
+				}
+				if !levels[sel.Sel.Name] || !logReceiver(sel.X) {
 					return true
 				}
 				// The message, and a context before it for the Context variants,

@@ -18,6 +18,8 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -200,6 +202,21 @@ var (
 // filename is the most telling thing on a disk, and "the third file in the
 // folder" is not a fact any bug turns on.
 const pathStandIn = "<path>"
+
+// WithoutPath is a filesystem failure with the name the operating system
+// attached to it taken off, leaving what went wrong: permission denied, a
+// directory where a file was expected, too many links.
+//
+// It is for the failures a report states in its own words rather than logs. A
+// home directory is a person's name on every platform this runs on, and the
+// reason is the whole of what a reader needs.
+func WithoutPath(err error) error {
+	var pathErr *os.PathError
+	if errors.As(err, &pathErr) {
+		return pathErr.Err
+	}
+	return err
+}
 
 // text rewrites prose that was assembled somewhere this package cannot reach.
 //

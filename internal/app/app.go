@@ -59,6 +59,8 @@ type App struct {
 	Confirm confirm.Policy
 	// NoUpdateCheck suppresses the look for a new release.
 	NoUpdateCheck bool
+	// Settings is where this run's preferences came from, which a report says.
+	Settings config.Source
 
 	IDCache *idcache.Cache
 
@@ -106,8 +108,9 @@ func New(opts Options) (*App, error) {
 
 	run, salt := openLog(opts.NoLog)
 	var logFile io.Writer
+	runID := ""
 	if run != nil {
-		logFile = run.Writer()
+		logFile, runID = run.Writer(), run.ID
 	}
 	u := ui.New(ui.Options{
 		Format:   opts.Output,
@@ -117,6 +120,7 @@ func New(opts Options) (*App, error) {
 		NoInput:  opts.NoInput,
 		FullIDs:  opts.FullIDs,
 		Log:      logFile,
+		Run:      runID,
 		Salt:     salt,
 	})
 	// Services log through the package-level logger, so this is what makes a
@@ -149,6 +153,7 @@ func New(opts Options) (*App, error) {
 		Yes:           opts.Yes,
 		Confirm:       opts.Confirm,
 		NoUpdateCheck: opts.NoUpdateCheck,
+		Settings:      opts.Source,
 		Verified:      verified,
 		IDCache:       Seen(profileName),
 		userID:        userID,

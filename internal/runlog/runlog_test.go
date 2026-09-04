@@ -15,9 +15,10 @@ func TestARunIsWrittenAndReadBack(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
-	_, _ = fmt.Fprintf(run.Writer(), `{"time":%q,"run":%q,"command":"proton mail messages list"}`+"\n",
+	_, _ = fmt.Fprintf(run.Writer(),
+		`{"time":%q,"run":%q,"command":"proton mail messages list","version":"2.4.1"}`+"\n",
 		time.Now().UTC().Format(time.RFC3339Nano), run.ID)
-	_, _ = fmt.Fprintf(run.Writer(), `{"run":%q,"exit":7}`+"\n", run.ID)
+	_, _ = fmt.Fprintf(run.Writer(), `{"run":%q,"exit":7,"duration":3039}`+"\n", run.ID)
 	if err := run.Close(); err != nil {
 		t.Fatalf("close: %v", err)
 	}
@@ -36,8 +37,14 @@ func TestARunIsWrittenAndReadBack(t *testing.T) {
 	if e.Command != "proton mail messages list" {
 		t.Errorf("command is %q", e.Command)
 	}
+	if e.Version != "2.4.1" {
+		t.Errorf("version is %q, want the build the run was on", e.Version)
+	}
 	if e.Exit != 7 || !e.Ended || !e.Failed() {
 		t.Errorf("exit %d, ended %v, failed %v; want 7, true, true", e.Exit, e.Ended, e.Failed())
+	}
+	if e.Took != 3039*time.Millisecond {
+		t.Errorf("took %v, want 3.039s", e.Took)
 	}
 	if len(e.Lines) != 2 {
 		t.Errorf("kept %d records, want 2", len(e.Lines))
@@ -50,7 +57,7 @@ func TestTheRunToReportIsTheOneThatFailed(t *testing.T) {
 	write(t, dir, "2026-09-02.jsonl", `{"run":"bbbb","command":"b","exit":7}`)
 	write(t, dir, "2026-09-03.jsonl", `{"run":"cccc","command":"c","exit":0}`)
 
-	got, ok := Latest(dir, "")
+	got, ok := newest(t, dir)
 	if !ok {
 		t.Fatal("found no run to report")
 	}
@@ -64,7 +71,7 @@ func TestWithNoFailureTheNewestRunIsTheOne(t *testing.T) {
 	write(t, dir, "2026-09-01.jsonl", `{"run":"aaaa","exit":0}`)
 	write(t, dir, "2026-09-02.jsonl", `{"run":"bbbb","exit":0}`)
 
-	got, ok := Latest(dir, "")
+	got, ok := newest(t, dir)
 	if !ok {
 		t.Fatal("found no run to report")
 	}
@@ -73,22 +80,8 @@ func TestWithNoFailureTheNewestRunIsTheOne(t *testing.T) {
 	}
 }
 
-func TestTheRunDoingTheReportingIsNotTheSubject(t *testing.T) {
-	dir := t.TempDir()
-	write(t, dir, "2026-09-01.jsonl", `{"run":"aaaa","exit":0}`)
-	write(t, dir, "2026-09-02.jsonl", `{"run":"bbbb","exit":0}`)
-
-	got, ok := Latest(dir, "bbbb")
-	if !ok {
-		t.Fatal("found no run to report")
-	}
-	if got.ID != "aaaa" {
-		t.Errorf("picked %q, want aaaa; the reporting run has nothing wrong with it", got.ID)
-	}
-}
-
 func TestNoRunsIsNoAnswerRatherThanAnEmptyOne(t *testing.T) {
-	if _, ok := Latest(t.TempDir(), ""); ok {
+	if _, ok := newest(t, t.TempDir()); ok {
 		t.Error("claimed to have found a run in an empty directory")
 	}
 }
@@ -111,6 +104,15 @@ func TestClearingADirectoryThatIsNotThereIsFine(t *testing.T) {
 	if err := Clear(filepath.Join(t.TempDir(), "never-existed")); err != nil {
 		t.Errorf("clear: %v", err)
 	}
+}
+
+func newest(t *testing.T, dir string) (Entry, bool) {
+	t.Helper()
+	entries, err := List(dir)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	return Newest(entries)
 }
 
 func write(t *testing.T, dir, name, body string) {
@@ -195,7 +197,7 @@ func TestOneBadLineDoesNotLoseTheDay(t *testing.T) {
 	if len(entries) != 2 {
 		t.Fatalf("read %d runs, want the 2 that are readable", len(entries))
 	}
-	got, ok := Latest(dir, "")
+	got, ok := newest(t, dir)
 	if !ok || got.ID != "cccc" {
 		t.Errorf("the failure after the torn line was not found: %+v", got)
 	}
@@ -237,7 +239,7 @@ func TestALongGapDoesNotEraseTheDaysBeforeIt(t *testing.T) {
 	if len(entries) != 2 {
 		t.Fatalf("kept %v, want both days", ids(entries))
 	}
-	got, ok := Latest(dir, "")
+	got, ok := newest(t, dir)
 	if !ok || got.ID != "old0" {
 		t.Errorf("the failure from before the gap was lost: %+v", got)
 	}

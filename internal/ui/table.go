@@ -324,6 +324,11 @@ func (u *UI) width() int {
 	return cols
 }
 
+// Columns is the width this run laid its tables out against, which the run's
+// record carries: output that came out wrapped came out wrapped at a width, and
+// nobody reporting it can be asked to measure their terminal afterwards.
+func (u *UI) Columns() int { return u.width() }
+
 func pad(s string, width int, right bool) string { return padCells(s, width, right) }
 
 func truncate(s string, max int) string { return truncateCells(s, max) }

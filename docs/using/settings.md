@@ -138,7 +138,7 @@ Those are the Linux paths. macOS uses `~/Library/Application Support/proton-cli/
 
 Every run writes what it did to `~/.config/proton-cli/logs/`, one file per day named for it, at full detail whatever `--log-level` says - that flag decides what reaches your screen, not what is recorded. The last **16 files** are kept.
 
-It exists so that `proton report` can tell a maintainer what happened without you having to reproduce it. **Addresses, IDs, filenames and search terms never enter it.** An address is written as a stand-in like `address:3f9c1e@proton.me` - the same address reads the same way in every line, so a reader can follow which one failed, and it cannot be turned back into an address by anybody. What is left is the shape of what ran: which command, which endpoints, which status codes, how long, and what went wrong.
+It exists so that `proton report` can tell a maintainer what happened without you having to reproduce it. **Addresses, IDs, filenames and search terms never enter it.** An address is written as a stand-in like `address:3f9c1e@proton.me` - the same address reads the same way in every line, so a reader can follow which one failed, and it cannot be turned back into an address by anybody. What is left is the shape of what ran: which command, which endpoints, which status codes, how long, what terminal it drew to, and what went wrong. Every record names the run it belongs to, so a day's file reads back as the runs that made it up.
 
 To write nothing at all:
 

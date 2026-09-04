@@ -19,27 +19,30 @@ package redact
 // test checks both directions for that reason.
 var Fields = map[string]Policy{
 	// ── the run itself ──
-	"run":      Keep, // the four-character name for one invocation
-	"command":  Keep, // the command path, without its arguments
-	"flags":    Keep, // the names of the flags that were set, never their values
-	"version":  Keep,
-	"revision": Keep,
-	"go":       Keep,
-	"platform": Keep,
-	"install":  Keep, // how this binary arrived: release, go install, unknown
-	"profile":  Keep, // the user's own word for one account, validated to be one
-	"exit":     Keep,
-	"panic":    Text,   // the value a panic carried
-	"stack":    Text,   // the goroutine's stack at the panic
-	"tty":      Keep,   // whether the answer was going to a terminal
-	"output":   Keep,   // text, json, yaml
-	"zone":     Keep,   // an IANA zone name, which names a region and not a person
-	"error":    Text,   // the chain of what was being attempted, and what stopped it
-	"duration": Keep,   // how long the run took, in milliseconds
-	"reason":   Keep,   // one of a fixed set of words, declared where it is raised
-	"kind":     Keep,   // the singular noun for what a skip was about
-	"ref":      Handle, // the thing a skip was about, whatever kind it is
-	"path":     Route,  // an API path
+	"run":       Keep, // the four-character name for one invocation
+	"command":   Keep, // the command path, without its arguments
+	"flags":     Keep, // the names of the flags that were set, never their values
+	"version":   Keep,
+	"revision":  Keep,
+	"go":        Keep,
+	"platform":  Keep,
+	"install":   Keep, // how this binary arrived: release, go install, unknown
+	"profile":   Keep, // the user's own word for one account, validated to be one
+	"exit":      Keep,
+	"panic":     Text,   // the value a panic carried
+	"stack":     Text,   // the goroutine's stack at the panic
+	"tty":       Keep,   // whether the answer was going to a terminal
+	"term":      Keep,   // the terminfo name the terminal calls itself
+	"colorterm": Keep,   // what the terminal advertises about colour depth
+	"width":     Keep,   // the column budget the output was laid out against
+	"output":    Keep,   // text, json, yaml
+	"zone":      Keep,   // an IANA zone name, which names a region and not a person
+	"error":     Text,   // the chain of what was being attempted, and what stopped it
+	"duration":  Keep,   // how long the run took, in milliseconds
+	"reason":    Keep,   // one of a fixed set of words, declared where it is raised
+	"kind":      Keep,   // the singular noun for what a skip was about
+	"ref":       Handle, // the thing a skip was about, whatever kind it is
+	"path":      Route,  // an API path
 
 	// ── counts, which describe a shape and never a person ──
 	"count":  Keep,

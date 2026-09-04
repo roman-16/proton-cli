@@ -13,7 +13,7 @@ import (
 func recorded(t *testing.T, level slog.Level, write func(log, trace *slog.Logger)) (screen string, file []map[string]any) {
 	t.Helper()
 	var errb, jsonl bytes.Buffer
-	log, trace := newLoggers(&errb, level, []byte("a salt to test with"), &jsonl)
+	log, trace := newLoggers(&errb, level, []byte("a salt to test with"), &jsonl, "a91f")
 	write(log, trace)
 
 	for line := range strings.SplitSeq(strings.TrimSpace(jsonl.String()), "\n") {
@@ -27,6 +27,28 @@ func recorded(t *testing.T, level slog.Level, write func(log, trace *slog.Logger
 		file = append(file, record)
 	}
 	return errb.String(), file
+}
+
+// A day's file holds every run of that day and is read back as the runs that
+// made it up, so a record naming none belongs to nothing and is lost. The screen
+// has only ever one run on it and says nothing about which.
+func TestEveryRecordedLineNamesItsRun(t *testing.T) {
+	screen, file := recorded(t, slog.LevelDebug, func(log, trace *slog.Logger) {
+		log.Debug("api request", "method", "GET", "path", "/core/v4/users", "status", 200)
+		log.Warn("not shown", "kind", "item", "reason", "no key")
+		trace.Info("run finished", "exit", 0)
+	})
+	if len(file) != 3 {
+		t.Fatalf("the file got %d records, want 3", len(file))
+	}
+	for _, record := range file {
+		if record["run"] != "a91f" {
+			t.Errorf("a record names no run, so a report would drop it: %v", record)
+		}
+	}
+	if strings.Contains(screen, "a91f") {
+		t.Errorf("the screen carried the run's name, which only the file needs: %q", screen)
+	}
 }
 
 func TestTheFileGetsEverythingWhateverTheScreenIsSet(t *testing.T) {
@@ -46,7 +68,7 @@ func TestTheFileGetsEverythingWhateverTheScreenIsSet(t *testing.T) {
 
 func TestTheRunsOwnRecordsNeverReachTheScreen(t *testing.T) {
 	screen, file := recorded(t, slog.LevelDebug, func(_, trace *slog.Logger) {
-		trace.Error("run failed", "run", "a91f", "exit", 7, "error", "something went wrong")
+		trace.Error("run failed", "exit", 7, "error", "something went wrong")
 	})
 	if screen != "" {
 		t.Errorf("the run's own record was printed as well as recorded: %q", screen)
@@ -101,9 +123,9 @@ func TestBothDestinationsAgreeOnAHandle(t *testing.T) {
 
 func TestWithNoFileTheScreenStillWorks(t *testing.T) {
 	var errb bytes.Buffer
-	log, trace := newLoggers(&errb, slog.LevelDebug, nil, nil)
+	log, trace := newLoggers(&errb, slog.LevelDebug, nil, nil, "a91f")
 	log.Warn("rate limited by Proton; waiting before trying again", "method", "GET", "wait_ms", 5000)
-	trace.Error("run failed", "run", "a91f", "exit", 7)
+	trace.Error("run failed", "exit", 7)
 
 	if !strings.Contains(errb.String(), "rate limited") {
 		t.Errorf("the screen lost its warning: %q", errb.String())

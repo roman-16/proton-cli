@@ -36,11 +36,13 @@ proton report  (this looks like a bug in proton, not something you did)
 $ proton report
 ```
 
-That prints everything a fix needs: the version, the platform, how it was installed, your settings, and what the run that failed actually did, request by request. Paste it into an [issue](https://github.com/roman-16/proton-cli/issues/new). To attach it as a file instead, `proton report --dest bug.txt`.
+That prints everything a fix needs: the version, the platform, how it was installed, your settings, and what the run that failed actually did, request by request. Paste it into the [bug form](https://github.com/roman-16/proton-cli/issues/new?template=bug.yml), which asks separately what you ran and what you expected.
 
 **You do not have to reproduce anything.** Every run records what it did, so the failure you just hit is already written down. `proton report` picks the last run that failed - or `--all` for every run still on disk. See [the diagnostic log](../using/settings.md#the-diagnostic-log) for what is kept and how to turn it off.
 
-**It is safe to post.** Addresses, IDs, filenames, search terms and tokens never enter the log. An address is written as a stand-in like `address:3f9c1e@proton.me`, the same way every time, so a reader can follow which of your addresses failed without learning whose it is. It goes to stdout rather than straight to a file so that you can read it first.
+**A long run is shortened to fit the form**: its first and last records, and everything above debug in between. When it says so, `proton report --dest bug.txt` writes the whole run to a file you can attach instead.
+
+**It is safe to post.** Addresses, IDs, filenames, search terms and tokens never enter the log. An address is written as a stand-in like `address:3f9c1e@proton.me`, the same way every time, so a reader can follow which of your addresses failed without learning whose it is. Your configuration file is named by where it is - the default location, `--config`, `PROTON_CONFIG` - and never by its path, which holds your home directory. It goes to stdout rather than straight to a file so that you can read it first.
 
 A crash is the same story with fewer words:
 
@@ -289,7 +291,7 @@ The exception is the `■` beside a label, folder, calendar or group. That hex i
 $ proton report
 ```
 
-Paste it into an [issue](https://github.com/roman-16/proton-cli/issues/new). Nothing to reproduce and nothing to redact by hand - see [Reporting a bug](#reporting-a-bug).
+Paste it into the [bug form](https://github.com/roman-16/proton-cli/issues/new?template=bug.yml). Nothing to reproduce and nothing to redact by hand - see [Reporting a bug](#reporting-a-bug).
 
 To watch a run as it happens instead, `--log-level debug` puts on the screen what the log is recording anyway. It is redacted the same way, so it is safe to paste too.
 

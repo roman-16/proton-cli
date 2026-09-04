@@ -130,6 +130,9 @@ type Options struct {
 	// Log is the run's diagnostic file, which receives every record at full
 	// detail whatever LogLevel says. Nil writes no file.
 	Log io.Writer
+	// Run names the invocation in every record that reaches the file, which is
+	// what lets a day be read back as the runs that made it up.
+	Run string
 	// Salt keys the handles that stand in for addresses and IDs in both the file
 	// and the commentary stream. Nil makes them stable for this process only.
 	Salt []byte
@@ -150,7 +153,7 @@ func New(opts Options) *UI {
 	if opts.Format == FormatText && !opts.NoColor {
 		style, errStyle = StyleFor(out), StyleFor(errw)
 	}
-	log, trace := newLoggers(errw, opts.LogLevel, opts.Salt, opts.Log)
+	log, trace := newLoggers(errw, opts.LogLevel, opts.Salt, opts.Log, opts.Run)
 	return &UI{
 		Log:      log,
 		Trace:    trace,

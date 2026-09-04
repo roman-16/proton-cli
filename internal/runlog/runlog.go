@@ -116,9 +116,14 @@ type Entry struct {
 	Started time.Time
 	// Command is the command path the run was, without its arguments.
 	Command string
-	// Exit is the code the run ended with, and Ended says whether it got as far
-	// as recording one - a run killed outright never does.
+	// Version is the build it ran on, which is not this build: somebody who
+	// updates before reporting is reporting a run from before they did.
+	Version string
+	// Exit is the code the run ended with, Took is how long it lasted, and Ended
+	// says whether it got as far as recording either - a run killed outright
+	// never does.
 	Exit  int
+	Took  time.Duration
 	Ended bool
 	// Lines are the records, as they were written.
 	Lines []string
@@ -146,23 +151,12 @@ func List(dir string) ([]Entry, error) {
 	return out, nil
 }
 
-// Latest is the run a report is about: the most recent one that failed, or the
+// Newest is the run a report is about: the most recent one that failed, or the
 // most recent one at all when none did.
-//
-// The run doing the reporting is not a candidate. It is excluded by ID rather
-// than by position, because "the last file" is whichever run happened to be
-// slowest to finish and that is not a thing to guess about.
-func Latest(dir, excluding string) (Entry, bool) {
-	entries, err := List(dir)
-	if err != nil {
-		return Entry{}, false
-	}
+func Newest(entries []Entry) (Entry, bool) {
 	var newest, newestFailed Entry
 	var haveAny, haveFailed bool
 	for _, e := range entries {
-		if e.ID == excluding {
-			continue
-		}
 		newest, haveAny = e, true
 		if e.Failed() {
 			newestFailed, haveFailed = e, true
@@ -196,10 +190,12 @@ func read(path string) []Entry {
 			continue
 		}
 		var record struct {
-			Time    time.Time `json:"time"`
-			Run     string    `json:"run"`
-			Command string    `json:"command"`
-			Exit    *int      `json:"exit"`
+			Time     time.Time `json:"time"`
+			Run      string    `json:"run"`
+			Command  string    `json:"command"`
+			Version  string    `json:"version"`
+			Exit     *int      `json:"exit"`
+			Duration *int64    `json:"duration"`
 		}
 		if json.Unmarshal([]byte(line), &record) != nil || record.Run == "" {
 			continue
@@ -213,6 +209,12 @@ func read(path string) []Entry {
 		e.Lines = append(e.Lines, line)
 		if record.Command != "" {
 			e.Command = record.Command
+		}
+		if record.Version != "" {
+			e.Version = record.Version
+		}
+		if record.Duration != nil {
+			e.Took = time.Duration(*record.Duration) * time.Millisecond
 		}
 		if record.Exit != nil {
 			e.Exit, e.Ended = *record.Exit, true

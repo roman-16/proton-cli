@@ -175,7 +175,13 @@ func (f fanout) WithGroup(name string) slog.Handler {
 // stack if it crashed. That goes to the file alone, because the screen has its
 // own way of saying all three and saying them twice is how a failure comes to
 // be reported to a person as two different-looking problems.
-func newLoggers(errw io.Writer, level slog.Level, salt []byte, file io.Writer) (log, trace *slog.Logger) {
+//
+// Every record the file receives names the run, because a day's file holds every
+// run of that day and is read back as the runs that made it up. The name is
+// attached here rather than passed at each call, so that a line written anywhere
+// - a service, a request, a skip - belongs to its run by construction. The
+// screen is left alone: there is only ever one run on it.
+func newLoggers(errw io.Writer, level slog.Level, salt []byte, file io.Writer, run string) (log, trace *slog.Logger) {
 	redactor := redact.New(salt)
 	screen := redacting{
 		redactor: redactor,
@@ -187,6 +193,6 @@ func newLoggers(errw io.Writer, level slog.Level, salt []byte, file io.Writer) (
 	recorded := redacting{
 		redactor: redactor,
 		inner:    slog.NewJSONHandler(file, &slog.HandlerOptions{Level: slog.LevelDebug}),
-	}
+	}.WithAttrs([]slog.Attr{slog.String("run", run)})
 	return slog.New(fanout{screen, recorded}), slog.New(recorded)
 }

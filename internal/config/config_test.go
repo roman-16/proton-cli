@@ -23,7 +23,7 @@ func write(t *testing.T, body string) string {
 
 func load(t *testing.T, body string) *File {
 	t.Helper()
-	f, err := Load(write(t, body), true)
+	f, _, err := Load(write(t, body), Source{Named: "--config"})
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -61,17 +61,45 @@ func resolve(t *testing.T, f *File, flags Flags) Resolved {
 // failure.
 func TestAMissingFileIsNoConfiguration(t *testing.T) {
 	path := filepath.Join(t.TempDir(), Name)
-	f, err := Load(path, false)
+	f, from, err := Load(path, Source{})
 	if f != nil || err != nil {
 		t.Errorf("Load = (%v, %v), want (nil, nil)", f, err)
+	}
+	if got := from.Describe(); got != "none" {
+		t.Errorf("a machine with no file reads as %q, want %q", got, "none")
 	}
 }
 
 // A file somebody named and that is not there is a mistake worth reporting: they
 // meant to configure something and nothing was configured.
 func TestANamedFileThatIsMissingIsAnError(t *testing.T) {
-	if _, err := Load(filepath.Join(t.TempDir(), "nope.yaml"), true); err == nil {
+	_, from, err := Load(filepath.Join(t.TempDir(), "nope.yaml"), Source{Named: "--config"})
+	if err == nil {
 		t.Error("a named file that does not exist should be reported")
+	}
+	if got := from.Describe(); got != "named by --config, ignored: not there" {
+		t.Errorf("it reads as %q", got)
+	}
+}
+
+// What a report says about the file is what went wrong with it and never where
+// it was: a configuration path holds a home directory, and a report is pasted in
+// public.
+func TestWhatIsSaidAboutTheFileNamesNoPath(t *testing.T) {
+	path := write(t, "outpu: json\n")
+	_, from, err := Load(path, Source{})
+	if err == nil {
+		t.Fatal("a file with a key that is not one should be refused")
+	}
+	if !strings.Contains(err.Error(), path) {
+		t.Errorf("the error %q does not name the file the reader has to fix", err)
+	}
+	got := from.Describe()
+	if strings.Contains(got, path) || strings.Contains(got, filepath.Dir(path)) {
+		t.Errorf("the report would carry the path: %q", got)
+	}
+	if !strings.Contains(got, `unknown field "outpu"`) {
+		t.Errorf("the report would not say what was wrong: %q", got)
 	}
 }
 
@@ -89,7 +117,7 @@ func TestAFileThatCannotBeReadStopsEverything(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			path := write(t, tc.body)
-			_, err := Load(path, true)
+			_, _, err := Load(path, Source{Named: "--config"})
 			if err == nil {
 				t.Fatal("want an error")
 			}
@@ -252,16 +280,16 @@ func TestWhichFileToReadIsChosenFirst(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	path, named, err := Path("")
-	if err != nil || named || path != filepath.Join(dir, Name) {
-		t.Errorf(`Path("") = (%q, %v, %v), want the default path, unnamed`, path, named, err)
+	path, from, err := Path("")
+	if err != nil || from.Named != "" || path != filepath.Join(dir, Name) {
+		t.Errorf(`Path("") = (%q, %v, %v), want the default path, unnamed`, path, from, err)
 	}
 	t.Setenv(PathVar, "/from/env.yaml")
-	if path, named, _ := Path(""); path != "/from/env.yaml" || !named {
-		t.Errorf("%s should be honoured: got %q", PathVar, path)
+	if path, from, _ := Path(""); path != "/from/env.yaml" || from.Named != PathVar {
+		t.Errorf("%s should be honoured: got %q from %q", PathVar, path, from.Named)
 	}
-	if path, named, _ := Path("/from/flag.yaml"); path != "/from/flag.yaml" || !named {
-		t.Errorf("--config should beat %s: got %q", PathVar, path)
+	if path, from, _ := Path("/from/flag.yaml"); path != "/from/flag.yaml" || from.Named != "--config" {
+		t.Errorf("--config should beat %s: got %q from %q", PathVar, path, from.Named)
 	}
 }
 
