@@ -59,6 +59,35 @@ func TestFirstAddrWithoutUnlockableAddresses(t *testing.T) {
 	}
 }
 
+// Writing goes under one key even on an account that holds several, because
+// sealing something new under a key the owner has retired is not a favour.
+func TestPrimaryUserKeyIsOneKeyAndTheFirst(t *testing.T) {
+	ring, err := pgp.NewKeyRing(nil)
+	if err != nil {
+		t.Fatalf("NewKeyRing: %v", err)
+	}
+	for _, name := range []string{"primary", "retired"} {
+		key, err := pgp.GenerateKey(name, name+"@example.invalid", "x25519", 0)
+		if err != nil {
+			t.Fatalf("GenerateKey: %v", err)
+		}
+		if err := ring.AddKey(key); err != nil {
+			t.Fatalf("AddKey: %v", err)
+		}
+	}
+
+	write, err := (&Unlocked{UserKR: ring}).PrimaryUserKey()
+	if err != nil {
+		t.Fatalf("PrimaryUserKey: %v", err)
+	}
+	if write.CountEntities() != 1 {
+		t.Fatalf("the write key holds %d keys, want 1", write.CountEntities())
+	}
+	if got, want := write.GetKeys()[0].GetFingerprint(), ring.GetKeys()[0].GetFingerprint(); got != want {
+		t.Errorf("wrote under %s, want the primary %s", got, want)
+	}
+}
+
 func TestPrimaryAddrPrefersProtonDomains(t *testing.T) {
 	tests := []struct {
 		name  string

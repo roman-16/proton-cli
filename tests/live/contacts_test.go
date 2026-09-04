@@ -305,6 +305,27 @@ func TestContactsUpdateKeepsWhatItDoesNotMention(t *testing.T) {
 	}
 }
 
+// An edit writes the whole contact out again, so anything stored twice
+// compounds: one rename leaving a second copy of the address means the next
+// leaves a third. The export is where a contact's stored cards are visible.
+func TestContactsUpdateDoesNotDuplicateWhatItRewrites(t *testing.T) {
+	name := testID() + "-once"
+	id := strings.TrimSpace(runOK(t, "contacts", "create",
+		"--name", name, "--email", testID()+"@example.com", "--note", "Likes tea"))
+	cleanupRun(t, fmt.Sprintf("Delete contact: proton contacts delete %s", id),
+		"contacts", "delete", "--", id)
+
+	runOK(t, "contacts", "update", "--name", name+"-a", "--", id)
+	runOK(t, "contacts", "update", "--name", name+"-b", "--", id)
+
+	out := runOK(t, "contacts", "export", "--dest", "-", "--", id)
+	for _, property := range []string{"EMAIL", "NOTE:", "FN:", "UID:"} {
+		if got := strings.Count(out, property); got != 1 {
+			t.Errorf("two renames left %d copies of %s:\n%s", got, property, out)
+		}
+	}
+}
+
 // A merge folds duplicates into the oldest, which keeps its identity so anything
 // referring to it still does.
 func TestContactsMergeFoldsDuplicatesIntoTheKeptOne(t *testing.T) {

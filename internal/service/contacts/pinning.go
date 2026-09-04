@@ -39,6 +39,11 @@ func (s *Service) PinnedKeysFor(ctx context.Context, email string) (*ContactCryp
 	}
 	ct, err := s.Get(ctx, id)
 	if err != nil {
+		// A pinned key is somebody's decision about who they trust, and this is
+		// answered on the way to encrypting a message. Reporting no pin for a
+		// contact that has one sends the message under Proton's key instead,
+		// which is a decision quietly reversed unless it is recorded.
+		skip.Record(ctx, skip.KindContact, id, skip.Unreadable, err)
 		return nil, nil
 	}
 	joined := strings.Join(ct.Cards, "\n")
@@ -181,11 +186,11 @@ func (s *Service) editableSignedCard(ctx context.Context, id string) (*vcard.Sig
 
 // putSignedCard re-signs the model and PUTs it alongside the preserved cards.
 func (s *Service) putSignedCard(ctx context.Context, id string, model vcard.Signed, others []map[string]any) error {
-	u, err := s.keys(ctx)
+	kr, err := s.writeKey(ctx)
 	if err != nil {
 		return err
 	}
-	signedCard, err := pgp.SignCard(vcard.BuildSigned(model), u.UserKR)
+	signedCard, err := pgp.SignCard(vcard.BuildSigned(model), kr)
 	if err != nil {
 		return err
 	}

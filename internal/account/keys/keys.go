@@ -446,6 +446,21 @@ func wrapAndPersist(ctx context.Context, c *proton.Client, skp string) {
 	c.Persist()
 }
 
+// PrimaryUserKey is the user key this account writes with.
+//
+// Reading goes under every user key and writing goes under one. UserKR holds all
+// of them because anything sealed years ago was sealed to whichever key was
+// primary then, and it still has to open; sealing something new to all of them
+// would put it under keys the owner has since retired, which is the same reason
+// Published hands back only the primary of somebody else's.
+//
+// Proton returns an account's keys primary first - its own clients rely on that
+// - so the first that opened is it. When the primary did not open, unlockKeyRing
+// has already recorded which key it was and why.
+func (u *Unlocked) PrimaryUserKey() (*pgp.KeyRing, error) {
+	return u.UserKR.FirstKey()
+}
+
 // PrimaryAddr returns the key ring and address record for the user's primary
 // proton.me/pm.me address, falling back to the first unlockable address.
 func (u *Unlocked) PrimaryAddr() (*pgp.KeyRing, Address, error) {

@@ -47,6 +47,7 @@ var Fields = map[string]Policy{
 	// ── counts, which describe a shape and never a person ──
 	"count":  Keep,
 	"opened": Keep,
+	"cards":  Keep, // which cards one write carried: signed, encrypted+signed
 
 	// ── the request ──
 	"method":      Keep,

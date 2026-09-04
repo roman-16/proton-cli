@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 Adding a version section here is what publishes a release, so this file is the one place a version is decided: see [Releases](CONTRIBUTING.md#releases). Versions that shipped before this file existed are on the [releases page](https://github.com/roman-16/proton-cli/releases).
 
+## [3.3.1] - 2026-09-04
+
+### Fixed
+
+- `contacts create`, `update`, `import` and `merge` were refused with `Invalid PGP packets` on an account holding more than one user key. A contact card is now sealed to your primary user key alone, which is what Proton's own clients send.
+- `contacts update` and `contacts merge` added a second copy of the address and of every pinned key each time they ran. `contacts export` and `contacts keys list` showed one copy per past edit; running `contacts update` on an affected contact once more clears it.
+- `mail settings autoreply enable` and `disable` take `--password-file`, `--password-stdin` and `--totp`. Proton guards the switch whichever way it goes, so both failed outside a terminal.
+
 ## [3.3.0] - 2026-09-04
 
 ### Added

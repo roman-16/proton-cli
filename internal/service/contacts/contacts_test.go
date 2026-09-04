@@ -91,19 +91,124 @@ func (d *contactDoer) Decode(_ context.Context, r proton.Request, out any) error
 	return json.Unmarshal(b, out)
 }
 
-// putSignedCardText returns the signed (Type-2) card's Data from the captured PUT.
-func putSignedCardText(t *testing.T, d *contactDoer) string {
+// putCard returns the card of one type out of the captured PUT, so a test asks
+// what a write sent rather than where in the list it landed.
+func putCard(t *testing.T, d *contactDoer, cardType int) *pgp.Card {
 	t.Helper()
 	cards, ok := d.putBody["Cards"].([]any)
 	if !ok || len(cards) == 0 {
 		t.Fatalf("no Cards in PUT body: %#v", d.putBody)
 	}
-	// The signed card is a *pgp.Card (first element).
-	if c, ok := cards[0].(*pgp.Card); ok && c.Type == pgp.CardSigned {
-		return c.Data
+	for _, raw := range cards {
+		if c, ok := raw.(*pgp.Card); ok && c.Type == cardType {
+			return c
+		}
 	}
-	t.Fatalf("first PUT card is not a signed *pgp.Card: %#v", cards[0])
-	return ""
+	t.Fatalf("the PUT carried no card of type %d: %#v", cardType, cards)
+	return nil
+}
+
+// putSignedCardText returns the signed card's Data from the captured PUT.
+func putSignedCardText(t *testing.T, d *contactDoer) string {
+	t.Helper()
+	return putCard(t, d, pgp.CardSigned).Data
+}
+
+// twoKeyRing is an account that has been rotating its user keys: both open what
+// they sealed, and the first is the one Proton would call primary.
+func twoKeyRing(t *testing.T) *gopenpgp.KeyRing {
+	t.Helper()
+	ring, err := gopenpgp.NewKeyRing(nil)
+	if err != nil {
+		t.Fatalf("NewKeyRing: %v", err)
+	}
+	for _, name := range []string{"primary", "retired"} {
+		key, err := gopenpgp.GenerateKey(name, name+"@example.invalid", "x25519", 0)
+		if err != nil {
+			t.Fatalf("GenerateKey: %v", err)
+		}
+		if err := ring.AddKey(key); err != nil {
+			t.Fatalf("AddKey: %v", err)
+		}
+	}
+	return ring
+}
+
+// oneKeyRing isolates one of a ring's keys, to ask which of them a card was
+// sealed to by trying to open it.
+func oneKeyRing(t *testing.T, ring *gopenpgp.KeyRing, i int) *gopenpgp.KeyRing {
+	t.Helper()
+	kr, err := gopenpgp.NewKeyRing(ring.GetKeys()[i])
+	if err != nil {
+		t.Fatalf("NewKeyRing: %v", err)
+	}
+	return kr
+}
+
+// A write seals the encrypted card to the primary user key and to nothing else.
+//
+// Every key that ever was primary has to open what it sealed, so reading uses
+// the whole ring - but sealing something new under all of them puts it under
+// keys the owner has retired, and is not what Proton's own client sends.
+func TestUpdateSealsTheEncryptedCardToThePrimaryUserKeyAlone(t *testing.T) {
+	ring := twoKeyRing(t)
+	base := vcard.BuildSigned(vcard.Signed{
+		Name: "Bob", UID: "u",
+		Emails: []vcard.SignedEmail{{Address: "bob@example.com"}},
+	})
+	d := &contactDoer{cards: []map[string]any{signedCard(t, ring, base)}}
+
+	svc := New(d, testKeys(&keys.Unlocked{UserKR: ring}))
+	if err := svc.Update(context.Background(), "c1", NewContact{Note: "Likes tea"}); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+
+	sealed := putCard(t, d, pgp.CardEncryptedSigned)
+	msg, err := gopenpgp.NewPGPMessageFromArmored(sealed.Data)
+	if err != nil {
+		t.Fatalf("the encrypted card is not armored PGP: %v", err)
+	}
+	if ids, ok := msg.GetHexEncryptionKeyIDs(); !ok || len(ids) != 1 {
+		t.Fatalf("the card is sealed to %v, want exactly one key", ids)
+	}
+	if _, err := oneKeyRing(t, ring, 0).Decrypt(msg, nil, gopenpgp.GetUnixTime()); err != nil {
+		t.Errorf("the primary user key cannot open the card it should have sealed: %v", err)
+	}
+	if _, err := oneKeyRing(t, ring, 1).Decrypt(msg, nil, gopenpgp.GetUnixTime()); err == nil {
+		t.Error("the card was sealed to a key that is no longer primary")
+	}
+}
+
+// An edit reads a contact off every card it is stored as and writes them out
+// again, so anything it claims twice is stored twice - one more copy of the
+// address and of every pinned key on every edit.
+func TestUpdateDoesNotDuplicateWhatTheSignedCardHolds(t *testing.T) {
+	ring := twoKeyRing(t)
+	_, keyValue := armoredPubKey(t)
+	base := vcard.BuildSigned(vcard.Signed{
+		Name: "Bob", UID: "u",
+		Emails: []vcard.SignedEmail{{
+			Address: "bob@example.com", KeyValues: []string{keyValue}, Encrypt: ptr(true),
+		}},
+	})
+	d := &contactDoer{cards: []map[string]any{signedCard(t, ring, base)}}
+
+	svc := New(d, testKeys(&keys.Unlocked{UserKR: ring}))
+	if err := svc.Update(context.Background(), "c1", NewContact{Name: "Bobby"}); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+
+	// A rename touches nothing encrypted, so there is no encrypted card to send.
+	if cards := d.putBody["Cards"].([]any); len(cards) != 1 {
+		t.Errorf("a rename sent %d cards, want only the signed one", len(cards))
+	}
+	signed := putSignedCardText(t, d)
+	if got := len(vcard.Values(signed, "EMAIL")); got != 1 {
+		t.Errorf("the contact now holds %d copies of its address:\n%s", got, signed)
+	}
+	if got := len(vcard.Values(signed, "KEY")); got != 1 {
+		t.Errorf("the contact now holds %d copies of its pinned key:\n%s", got, signed)
+	}
 }
 
 func TestPinnedKeysForReadsSignedCard(t *testing.T) {

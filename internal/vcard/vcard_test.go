@@ -173,11 +173,61 @@ func TestSplitForStoragePutsIdentityInTheSignedCard(t *testing.T) {
 	}
 }
 
-// A contact with nothing private needs no encrypted card at all.
-func TestSplitForStorageOmitsAnEmptyEncryptedCard(t *testing.T) {
+// A contact with nothing private has no encrypted card to store.
+func TestAContactWithNothingPrivateHasNoEncryptedCard(t *testing.T) {
 	_, encrypted := SplitForStorage("BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Jane\r\nUID:u1\r\nEND:VCARD")
-	if encrypted != "" {
+	if HasProperties(encrypted) {
 		t.Errorf("a contact with nothing private should have no encrypted card, got:\n%s", encrypted)
+	}
+}
+
+// The signed card's properties are the signed card's. An edit reads a contact
+// back off every card it is stored as, so a property this claimed as its own
+// would be written into the encrypted card as well - and into it again on the
+// next edit, and again on the one after that.
+func TestParseEncryptedClaimsNothingAnotherCardHolds(t *testing.T) {
+	signed := BuildSigned(Signed{
+		Name: "Jane Roe", UID: "u1",
+		Emails: []SignedEmail{{
+			Address:   "jane@example.com",
+			KeyValues: []string{"data:application/pgp-keys;base64,AAAA"},
+			Encrypt:   func() *bool { b := true; return &b }(),
+			Scheme:    "pgp-mime",
+		}},
+	})
+	if rest := ParseEncrypted(signed).Rest; len(rest) != 0 {
+		t.Errorf("the signed card's properties were claimed as the encrypted card's: %+v", rest)
+	}
+}
+
+// Editing a contact over and over leaves it the size it was.
+func TestRewritingAContactDoesNotGrowIt(t *testing.T) {
+	signed := BuildSigned(Signed{
+		Name: "Jane Roe", UID: "u1",
+		Emails: []SignedEmail{{
+			Address:   "jane@example.com",
+			KeyValues: []string{"data:application/pgp-keys;base64,AAAA"},
+		}},
+	})
+	encrypted := BuildEncrypted(Encrypted{Note: "Likes tea"})
+
+	for round := 1; round <= 3; round++ {
+		// What an edit does: read the contact off every card it is stored as,
+		// then write the cards out again.
+		joined := signed + "\n" + encrypted
+		signed = BuildSigned(ParseSigned(joined))
+		encrypted = BuildEncrypted(ParseEncrypted(joined))
+
+		doc := Document([]string{signed, encrypted})
+		if got := len(Values(doc, "EMAIL")); got != 1 {
+			t.Fatalf("after %d edits the contact holds %d copies of its address:\n%s", round, got, doc)
+		}
+		if got := len(Values(doc, "KEY")); got != 1 {
+			t.Fatalf("after %d edits the contact holds %d copies of its pinned key:\n%s", round, got, doc)
+		}
+		if got := len(Values(doc, "NOTE")); got != 1 {
+			t.Fatalf("after %d edits the contact holds %d copies of its note:\n%s", round, got, doc)
+		}
 	}
 }
 

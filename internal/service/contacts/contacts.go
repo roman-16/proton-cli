@@ -3,8 +3,10 @@ package contacts
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 
+	gopenpgp "github.com/ProtonMail/gopenpgp/v2/crypto"
 	"github.com/roman-16/proton-cli/internal/account/keys"
 	"github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/proton"
@@ -102,19 +104,39 @@ type NewContact struct {
 	LastName    string
 }
 
-func hasEncryptedFields(nc NewContact) bool {
-	if len(nc.Phones) > 0 || len(nc.Addresses) > 0 || len(nc.URLs) > 0 {
-		return true
+// writeKey is the key a contact's cards are written under, and the only one they
+// are written under - see keys.Unlocked.PrimaryUserKey.
+func (s *Service) writeKey(ctx context.Context) (*gopenpgp.KeyRing, error) {
+	u, err := s.keys(ctx)
+	if err != nil {
+		return nil, err
 	}
-	for _, v := range []string{
-		nc.Note, nc.Org, nc.Title, nc.Role, nc.Birthday, nc.Anniversary,
-		nc.Gender, nc.Language, nc.Timezone, nc.Nickname, nc.FirstName, nc.LastName,
-	} {
-		if v != "" {
-			return true
+	return u.PrimaryUserKey()
+}
+
+// storedCards are the cards one contact is stored as.
+//
+// Whether the encrypted one is sent is the same question for a contact being
+// created, one being edited and one being read out of a file, so it is asked
+// here and of the rendered card rather than of whatever went into it.
+func storedCards(ctx context.Context, kr *gopenpgp.KeyRing, signed, encrypted string) ([]any, error) {
+	signedCard, err := pgp.SignCard(signed, kr)
+	if err != nil {
+		return nil, err
+	}
+	out, kinds := []any{signedCard}, "signed"
+	if vcard.HasProperties(encrypted) {
+		ec, err := pgp.EncryptAndSignCard(encrypted, kr, kr)
+		if err != nil {
+			return nil, err
 		}
+		out, kinds = append(out, ec), "signed,encrypted+signed"
 	}
-	return false
+	// Which cards a write carried is what tells apart a request Proton refused
+	// for the encrypted card from one it refused for anything else, and it is
+	// not recoverable from the answer.
+	slog.DebugContext(ctx, "contacts: cards written", "cards", kinds)
+	return out, nil
 }
 
 // encryptedPart lays the new values over what the contact already had, so
@@ -280,10 +302,6 @@ func (s *Service) Resolve(ctx context.Context, r string) (string, error) {
 }
 
 func (s *Service) Create(ctx context.Context, nc NewContact) (string, error) {
-	u, err := s.keys(ctx)
-	if err != nil {
-		return "", err
-	}
 	if nc.Name == "" && len(nc.Emails) == 0 {
 		return "", fmt.Errorf("name or email is required")
 	}
@@ -291,22 +309,18 @@ func (s *Service) Create(ctx context.Context, nc NewContact) (string, error) {
 	if name == "" {
 		name = vcard.ParseTyped("EMAIL", nc.Emails[0]).Value
 	}
-	signed := vcard.BuildSigned(signedPart(name, vcard.UID(), nc.Emails, nil))
-	signedCard, err := pgp.SignCard(signed, u.UserKR)
+	kr, err := s.writeKey(ctx)
 	if err != nil {
 		return "", err
 	}
-	cards := []any{signedCard}
-	if hasEncryptedFields(nc) {
-		enc := vcard.BuildEncrypted(encryptedPart(nc, vcard.Encrypted{}))
-		ec, err := pgp.EncryptAndSignCard(enc, u.UserKR, u.UserKR)
-		if err != nil {
-			return "", err
-		}
-		cards = append(cards, ec)
+	stored, err := storedCards(ctx, kr,
+		vcard.BuildSigned(signedPart(name, vcard.UID(), nc.Emails, nil)),
+		vcard.BuildEncrypted(encryptedPart(nc, vcard.Encrypted{})))
+	if err != nil {
+		return "", err
 	}
 	body := map[string]any{
-		"Contacts":  []map[string]any{{"Cards": cards}},
+		"Contacts":  []map[string]any{{"Cards": stored}},
 		"Overwrite": 0,
 		"Labels":    0,
 	}
@@ -347,58 +361,27 @@ func (s *Service) Update(ctx context.Context, id string, patch NewContact) error
 	// this tool has no flag for - is read back off the stored card and written
 	// out again, so an edit cannot silently drop what it did not mention.
 	joined := strings.Join(existing.Cards, "\n")
-	before := vcard.ParseEncrypted(joined)
-	merged := NewContact{
-		Name:      firstNonEmpty(patch.Name, existing.Name),
-		Emails:    pickSlice(patch.Emails, existing.Emails),
-		Phones:    patch.Phones,
-		Addresses: patch.Addresses,
-		URLs:      patch.URLs,
-	}
 	old := vcard.ParseSigned(joined)
 	uid := old.UID
 	if uid == "" {
 		uid = vcard.UID()
 	}
-	name := merged.Name
-	if name == "" && len(merged.Emails) > 0 {
-		name = vcard.ParseTyped("EMAIL", merged.Emails[0]).Value
+	emails := pickSlice(patch.Emails, existing.Emails)
+	name := firstNonEmpty(patch.Name, existing.Name)
+	if name == "" && len(emails) > 0 {
+		name = vcard.ParseTyped("EMAIL", emails[0]).Value
 	}
-	u, err := s.keys(ctx)
+	kr, err := s.writeKey(ctx)
 	if err != nil {
 		return err
 	}
-	signedCard, err := pgp.SignCard(vcard.BuildSigned(signedPart(name, uid, merged.Emails, &old)), u.UserKR)
+	stored, err := storedCards(ctx, kr,
+		vcard.BuildSigned(signedPart(name, uid, emails, &old)),
+		vcard.BuildEncrypted(encryptedPart(patch, vcard.ParseEncrypted(joined))))
 	if err != nil {
 		return err
 	}
-	after := encryptedPart(patch, before)
-	cards := []any{signedCard}
-	if !isEmptyEncrypted(after) {
-		enc := vcard.BuildEncrypted(after)
-		ec, err := pgp.EncryptAndSignCard(enc, u.UserKR, u.UserKR)
-		if err != nil {
-			return err
-		}
-		cards = append(cards, ec)
-	}
-	return s.C.Decode(ctx, proton.Request{Method: "PUT", Path: "/contacts/v4/contacts/" + id, Body: map[string]any{"Cards": cards}}, nil)
-}
-
-// isEmptyEncrypted reports whether a contact has nothing worth an encrypted card.
-func isEmptyEncrypted(f vcard.Encrypted) bool {
-	if len(f.Phones) > 0 || len(f.Addresses) > 0 || len(f.URLs) > 0 || len(f.Rest) > 0 {
-		return false
-	}
-	for _, v := range []string{
-		f.Note, f.Org, f.Title, f.Role, f.Birthday, f.Anniversary, f.Gender,
-		f.Language, f.Timezone, f.Nickname, f.FirstName, f.LastName,
-	} {
-		if v != "" {
-			return false
-		}
-	}
-	return true
+	return s.C.Decode(ctx, proton.Request{Method: "PUT", Path: "/contacts/v4/contacts/" + id, Body: map[string]any{"Cards": stored}}, nil)
 }
 
 func (s *Service) Delete(ctx context.Context, ids []string) error {
@@ -489,8 +472,10 @@ func (s SkippedContact) String() string {
 // file's: the identity properties are signed so a recipient can verify them, and
 // the rest is encrypted. A card that says nothing Proton can identify is skipped
 // and named.
-func (s *Service) Import(ctx context.Context, cards []string) (*ImportResult, error) {
-	u, err := s.keys(ctx)
+func (s *Service) Import(ctx context.Context, documents []string) (*ImportResult, error) {
+	// Before anything is reported as skipped: a hierarchy that will not open is
+	// the run's failure, not a fault in every card in the file.
+	kr, err := s.writeKey(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -544,7 +529,7 @@ func (s *Service) Import(ctx context.Context, cards []string) (*ImportResult, er
 		return nil
 	}
 
-	for _, raw := range cards {
+	for _, raw := range documents {
 		card, ok := vcard.EnsureIdentity(raw)
 		if !ok {
 			res.Skipped = append(res.Skipped, SkippedContact{
@@ -553,25 +538,14 @@ func (s *Service) Import(ctx context.Context, cards []string) (*ImportResult, er
 			continue
 		}
 		signed, encrypted := vcard.SplitForStorage(card)
-		signedCard, err := pgp.SignCard(signed, u.UserKR)
+		stored, err := storedCards(ctx, kr, signed, encrypted)
 		if err != nil {
 			res.Skipped = append(res.Skipped, SkippedContact{
 				Name: vcard.Field(card, "FN"), Reason: err.Error(),
 			})
 			continue
 		}
-		out := []any{signedCard}
-		if encrypted != "" {
-			ec, err := pgp.EncryptAndSignCard(encrypted, u.UserKR, u.UserKR)
-			if err != nil {
-				res.Skipped = append(res.Skipped, SkippedContact{
-					Name: vcard.Field(card, "FN"), Reason: err.Error(),
-				})
-				continue
-			}
-			out = append(out, ec)
-		}
-		pending = append(pending, map[string]any{"Cards": out})
+		pending = append(pending, map[string]any{"Cards": stored})
 		names = append(names, vcard.Field(card, "FN"))
 		if len(pending) == batch {
 			if err := flush(); err != nil {
@@ -674,32 +648,24 @@ func (s *Service) Merge(ctx context.Context, group Duplicate) (string, error) {
 	keep := group.Contacts[0]
 	merged := mergeCards(group.Contacts)
 
-	u, err := s.keys(ctx)
-	if err != nil {
-		return "", err
-	}
 	old := vcard.ParseSigned(strings.Join(keep.Cards, "\n"))
 	uid := old.UID
 	if uid == "" {
 		uid = vcard.UID()
 	}
-	name := firstNonEmpty(keep.Name, merged.name)
-	signedCard, err := pgp.SignCard(
-		vcard.BuildSigned(signedPart(name, uid, merged.emails, &old)), u.UserKR)
+	kr, err := s.writeKey(ctx)
 	if err != nil {
 		return "", err
 	}
-	cards := []any{signedCard}
-	if !isEmptyEncrypted(merged.encrypted) {
-		ec, err := pgp.EncryptAndSignCard(vcard.BuildEncrypted(merged.encrypted), u.UserKR, u.UserKR)
-		if err != nil {
-			return "", err
-		}
-		cards = append(cards, ec)
+	stored, err := storedCards(ctx, kr,
+		vcard.BuildSigned(signedPart(firstNonEmpty(keep.Name, merged.name), uid, merged.emails, &old)),
+		vcard.BuildEncrypted(merged.encrypted))
+	if err != nil {
+		return "", err
 	}
 	if err := s.C.Decode(ctx, proton.Request{
 		Method: "PUT", Path: "/contacts/v4/contacts/" + keep.ID,
-		Body: map[string]any{"Cards": cards},
+		Body: map[string]any{"Cards": stored},
 	}, nil); err != nil {
 		return "", err
 	}

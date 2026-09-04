@@ -355,20 +355,14 @@ func BuildEncrypted(f Encrypted) string {
 	return contentline.Render(lines)
 }
 
-// known names every property BuildEncrypted writes itself, so ParseEncrypted can
-// tell what it understands from what it is merely carrying.
-var known = map[string]bool{
-	"TEL": true, "ADR": true, "URL": true, "N": true, "NOTE": true, "ORG": true,
-	"TITLE": true, "ROLE": true, "BDAY": true, "ANNIVERSARY": true, "GENDER": true,
-	"LANG": true, "TZ": true, "NICKNAME": true,
-	"BEGIN": true, "END": true, "VERSION": true, "UID": true, "FN": true,
-}
-
 // ParseEncrypted reads an encrypted card back, keeping what it does not
 // recognise so that editing one field cannot drop the rest.
 //
 // That is the point of Rest. An update rebuilds the card from this struct, so a
 // property left out here would be a property deleted by the next `--note`.
+//
+// Which properties it may carry is decided by the same table that splits a card
+// on the way in: the ones another card holds are not this one's to keep.
 func ParseEncrypted(card string) Encrypted {
 	var f Encrypted
 	for _, l := range contentline.ParseAll(card) {
@@ -410,7 +404,11 @@ func ParseEncrypted(card string) Encrypted {
 		case "NICKNAME":
 			f.Nickname = value
 		default:
-			if !known[l.Name] {
+			// A property belonging to another card is not this one's to carry.
+			// Carrying the address would make the next edit store a second copy
+			// of it, and the edit after that a third; carrying a VERSION would
+			// write two of them into a card that must have one.
+			if !signedFields[l.Name] && !clearFields[l.Name] {
 				f.Rest = append(f.Rest, l)
 			}
 		}
@@ -457,6 +455,22 @@ func Document(cards []string) string {
 var once = map[string]bool{
 	"UID": true, "VERSION": true, "FN": true, "N": true, "BDAY": true,
 	"ANNIVERSARY": true, "GENDER": true, "PRODID": true, "REV": true, "KIND": true,
+}
+
+// HasProperties reports whether a card says anything about a contact.
+//
+// Every card carries a VERSION of its own, so a card holding nothing else is an
+// empty one - and an empty card is not stored: it would be a blob to open on
+// every read that says nothing when it opens. This is the only thing that
+// decides that, for a card built from a contact's details and for one split out
+// of a file alike.
+func HasProperties(card string) bool {
+	for _, l := range contentline.ParseAll(card) {
+		if l.Name != "VERSION" {
+			return true
+		}
+	}
+	return false
 }
 
 // ParseDocuments splits a .vcf file into the vCards it holds.
@@ -558,6 +572,10 @@ func firstNonEmpty(vals ...string) string {
 // A property this tool has no opinion about lands in the encrypted card, which is
 // the safe default: an unrecognised property is more likely to be personal than
 // to be an identity somebody needs to verify.
+//
+// Both cards always come back rendered. Whether the encrypted one is worth
+// storing is HasProperties' to say, so that a card built from a file and a card
+// built from a contact's details are judged by the same thing.
 func SplitForStorage(card string) (signed, encrypted string) {
 	signedLines := []contentline.Line{
 		{Name: "BEGIN", Value: "VCARD"},
@@ -577,11 +595,8 @@ func SplitForStorage(card string) (signed, encrypted string) {
 		}
 	}
 	end := contentline.Line{Name: "END", Value: "VCARD"}
-	signed = contentline.Render(append(signedLines, end))
-	if len(encryptedLines) == 2 {
-		return signed, ""
-	}
-	return signed, contentline.Render(append(encryptedLines, end))
+	return contentline.Render(append(signedLines, end)),
+		contentline.Render(append(encryptedLines, end))
 }
 
 // group gives every address a group of its own.
@@ -628,8 +643,17 @@ func group(lines []contentline.Line) []contentline.Line {
 	return out
 }
 
-// signedFields and clearFields mirror SIGNED_FIELDS and CLEAR_FIELDS in Proton's
-// own client, which is what decides where a property is readable from.
+// Where a property lives is one question, asked here and nowhere else.
+//
+// SplitForStorage asks it of a card being stored and ParseEncrypted asks it of
+// one being read back, and they have to agree: a property the split sends to the
+// signed card and the read files as the encrypted card's own is a property that
+// ends up in both, one more copy of it on every edit.
+//
+// The answer is Proton's. signedFields and clearFields mirror SIGNED_FIELDS and
+// CLEAR_FIELDS in its own client, which is what decides where a property is
+// readable from; everything else is encrypted, and the Encrypted struct's own
+// switch says which of those this tool models rather than merely carries.
 var (
 	signedFields = map[string]bool{
 		"FN": true, "UID": true, "EMAIL": true,
