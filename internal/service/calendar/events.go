@@ -63,7 +63,10 @@ type Event struct {
 	Status string `json:"status"`
 	// Organizer is whoever called the meeting. It is empty for an event with no
 	// participants, which has nobody to organise.
-	Organizer string                 `json:"organizer,omitempty"`
+	Organizer string `json:"organizer,omitempty"`
+	// Color is the event's own accent colour, as the hex Proton stores. Empty
+	// means it has none of its own and is drawn in its calendar's.
+	Color     string                 `json:"color,omitempty"`
 	Signature pgphelper.VerifyResult `json:"signature,omitempty"`
 }
 
@@ -146,6 +149,16 @@ func (e rawEvent) triggers() []string {
 		out = append(out, ReminderText(n.Type, n.Trigger))
 	}
 	return out
+}
+
+// ownColor is the colour the event carries itself, empty for one that has none
+// and is drawn in its calendar's. It is named for what it answers because Color
+// is the field it reads.
+func (e rawEvent) ownColor() string {
+	if e.Color == nil {
+		return ""
+	}
+	return *e.Color
 }
 
 // stored is an event as Proton holds it, together with what its cards said.
@@ -436,6 +449,7 @@ func (e stored) row() Event {
 		Zone:       start.TZID,
 		Signature:  e.sig,
 		Reminders:  e.raw.triggers(),
+		Color:      e.raw.ownColor(),
 	}
 	if e.readErr != nil {
 		return ev
@@ -600,6 +614,9 @@ type EventInput struct {
 	// CANCELLED. Empty means it never said, which every client reads as
 	// confirmed.
 	Status string
+	// Color is the event's own accent colour, as the hex Proton stores. Empty
+	// gives it none, which is how an event comes to be drawn in its calendar's.
+	Color string
 }
 
 // EventResult is the outcome of a write. Mail is non-nil when participants have
@@ -646,7 +663,7 @@ func (s *Service) EventCreate(ctx context.Context, calendarID string, in EventIn
 		v.Organizer = ck.email
 	}
 
-	body := eventBody{model: v, notifications: notifs, isOrganizer: 1}
+	body := eventBody{model: v, notifications: notifs, isOrganizer: 1, color: optionalColor(in.Color)}
 	external, err := s.attachAttendees(ctx, &body, in.Attendees)
 	if err != nil {
 		return nil, err

@@ -318,6 +318,29 @@ func TestPatchRefusesContradictoryReminderFlags(t *testing.T) {
 	}
 }
 
+func TestPatchCarriesAColourForwardAndReplacesTheOneItGives(t *testing.T) {
+	had := "#EC3E7C"
+	raw := rawEvent{Color: &had}
+
+	kept := EventPatch{}.color(raw)
+	if kept == nil || *kept != had {
+		t.Errorf("an unmentioned colour was not preserved: %v", kept)
+	}
+
+	given := "#179FD9"
+	set := EventPatch{Color: &given}.color(raw)
+	if set == nil || *set != given {
+		t.Errorf("the colour given was not written: %v", set)
+	}
+
+	// An event that never had one keeps having none: Proton reads the field's
+	// absence as "no colour of its own", and the empty string is not a colour.
+	none := EventPatch{}.color(rawEvent{})
+	if none != nil {
+		t.Errorf("an event with no colour was given %v", *none)
+	}
+}
+
 // ── the chain ──
 
 func TestSeriesFindsAnOverrideAndTheOnesFromAnInstantOn(t *testing.T) {

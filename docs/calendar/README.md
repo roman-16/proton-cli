@@ -52,6 +52,25 @@ Say how long an event lasts **once**, with either `--end` or `--duration`. Both 
 
 `--status` says whether the event is going ahead: `confirmed`, `tentative` or `cancelled`. Cancelling this way keeps the event and its history, which `delete` does not.
 
+### Colors
+
+`--color` gives one event a color of its own, on `create` and on `update`.
+
+```bash
+proton calendar events create --title Dentist --start 2026-04-16T14:00 --duration 1h --color carrot
+proton calendar events update 4f2a1b9c --color pacific
+```
+
+An event with no color of its own is drawn in its calendar's.
+
+Name one of Proton's twenty accent colors, or give its hex value. Anything else is refused before the request goes out, and the error lists the palette.
+
+An edit that says nothing about the color leaves it alone.
+
+A color cannot be taken away once the event has one. Proton offers no value that means "none", so the color can only be changed. Its own clients cannot either.
+
+A color per event is a paid feature, and Proton enforces it when drawing rather than when storing. A free account's write is accepted and kept, and `events get` reports it. Proton's own clients ignore it and draw the calendar's color.
+
 ### Attendees
 
 Proton users are added directly. External addresses get an emailed invitation.

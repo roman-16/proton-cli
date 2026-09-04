@@ -27,6 +27,7 @@ proton calendar events create --title Renewal --start 2026-09-01T09:00 --remind 
 | `--all-day` | An event with no time of day |
 | `--attendee stringArray` | Invite someone, as EMAIL or EMAIL:optional; Proton users are added directly, others are emailed (repeatable) |
 | `--calendar string` | Which calendar, by name or ID (default: your first) |
+| `--color string` | Set its own accent color, by name (purple) or hex (#8080FF) |
 | `--description string` | Set the description |
 | `--duration string` | Set how long it lasts (e.g. 15m, 1h, 2h30m, 3d) |
 | `--end string` | Set the end (RFC 3339, or YYYY-MM-DDTHH:MM) |
@@ -181,6 +182,7 @@ proton calendar events update 4f2a1b9c@2026-04-22T09:00 --title Standup --onward
 | Flag | Description |
 | --- | --- |
 | `--all-day` | Turn it into an event with no time of day |
+| `--color string` | Replace its own accent color, by name (purple) or hex (#8080FF) |
 | `--description string` | Replace the description |
 | `--duration string` | Replace how long it lasts (e.g. 15m, 1h, 2h30m, 3d) |
 | `--end string` | Replace the end (RFC 3339, or YYYY-MM-DDTHH:MM) |

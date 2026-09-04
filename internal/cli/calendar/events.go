@@ -169,6 +169,7 @@ func eventsGetCmd() *cobra.Command {
 					{Label: "Series", Value: seriesLabel(*ev)},
 					{Label: "Zone", Value: ev.Zone},
 					{Label: "Reminders", Value: strings.Join(ev.Reminders, ", ")},
+					kit.ColorField(ev.Color),
 					{Label: "Status", Value: ev.Status, Always: true},
 					{Label: "Organizer", Value: ev.Organizer},
 					{Label: "Attendees", Value: strings.Join(ev.Attendees, ", ")},
@@ -213,6 +214,7 @@ type details struct {
 	start, duration, rrule       string
 	end                          string
 	status                       *kit.Enum
+	color                        *kit.Color
 	allDay                       bool
 	reminders                    []string
 	noReminders                  bool
@@ -224,6 +226,10 @@ func (d *details) register(c *cobra.Command, verb string) {
 		Values: calsvc.EventStatuses(),
 	}
 	d.status.Register(c)
+	d.color = &kit.Color{
+		Name: "color", Usage: verb + " its own accent color, by name (purple) or hex (#8080FF)",
+	}
+	d.color.Register(c)
 	f := c.Flags()
 	f.StringVar(&d.title, "title", "", verb+" the title")
 	f.StringVar(&d.start, "start", "", verb+" the start (RFC 3339, or YYYY-MM-DDTHH:MM)")
@@ -279,7 +285,7 @@ func eventsCreateCmd() *cobra.Command {
 					Title: d.title, Location: d.location, Description: d.description,
 					Start: start, End: start.Add(dur), AllDay: d.allDay, Zone: zone,
 					RRule: d.rrule, Reminders: d.reminders, Attendees: attendees,
-					Status: calsvc.ICalStatus(status),
+					Status: calsvc.ICalStatus(status), Color: d.color.Value(),
 				})
 				if err != nil {
 					return "", err
@@ -397,6 +403,10 @@ func (d *details) patch(c *kit.Invocation, reached *reach) (calsvc.EventPatch, e
 	if c.Changed("no-remind") {
 		none := []string{}
 		p.Reminders = &none
+	}
+	if c.Changed("color") {
+		color := d.color.Value()
+		p.Color = &color
 	}
 
 	if !c.Changed("start") {

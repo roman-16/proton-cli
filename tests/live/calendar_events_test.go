@@ -455,6 +455,52 @@ func TestCalendarUpdatingAnEventKeepsItsReminders(t *testing.T) {
 	}
 }
 
+// An event may carry an accent colour of its own. The colour lives outside the
+// encrypted cards, so it survives an edit that says nothing about it, and an
+// event given none has none rather than an empty one.
+func TestCalendarAnEventKeepsTheColourItWasGiven(t *testing.T) {
+	title := testID() + "-colour"
+	ref := strings.TrimSpace(runOK(t, "calendar", "events", "create",
+		"--calendar", "Default", "--title", title,
+		"--start", "2027-07-02T09:00", "--duration", "30m", "--color", "pacific"))
+	cleanupRun(t, fmt.Sprintf("Delete event: proton calendar events delete -- %s", ref),
+		"calendar", "events", "delete", "--", ref)
+
+	if got := colourOf(t, ref); got != "#179FD9" {
+		t.Fatalf("the event was created with colour %q, want pacific", got)
+	}
+	runOK(t, "calendar", "events", "update", "--title", title+"-renamed", "--", ref)
+	if got := colourOf(t, ref); got != "#179FD9" {
+		t.Errorf("renaming the event left it with colour %q, want pacific kept", got)
+	}
+
+	runOK(t, "calendar", "events", "update", "--color", "#EC3E7C", "--", ref)
+	if got := colourOf(t, ref); got != "#EC3E7C" {
+		t.Errorf("--color left the event with %q, want strawberry", got)
+	}
+
+	// An event given no colour has none of its own, which is how it comes to be
+	// drawn in its calendar's.
+	plain := strings.TrimSpace(runOK(t, "calendar", "events", "create",
+		"--calendar", "Default", "--title", title+"-plain",
+		"--start", "2027-07-02T11:00", "--duration", "30m"))
+	cleanupRun(t, fmt.Sprintf("Delete event: proton calendar events delete -- %s", plain),
+		"calendar", "events", "delete", "--", plain)
+	if got := colourOf(t, plain); got != "" {
+		t.Errorf("an event created with no colour has %q", got)
+	}
+}
+
+// colourOf reads an event's own colour straight from the API. It is empty for an
+// event that has none, which the API spells as a null.
+func colourOf(t *testing.T, ref string) string {
+	t.Helper()
+	data := runJSON(t, "api", "GET", eventPath(t, ref))
+	ev, _ := data["Event"].(map[string]interface{})
+	colour, _ := ev["Color"].(string)
+	return colour
+}
+
 // triggersOf reads an event's reminder triggers straight from the API, so the
 // assertion does not depend on how the CLI renders them.
 func triggersOf(t *testing.T, ref string) []string {
