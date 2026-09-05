@@ -124,6 +124,35 @@ export default defineConfig({
         },
         {
           items: [
+            { label: "Naming what to act on", slug: "using/naming" },
+            { label: "Filters and bulk changes", slug: "using/filters" },
+            { label: "Dry runs and confirmations", slug: "using/confirmations" },
+            { label: "Output and exit codes", slug: "using/output" },
+            { label: "Scripting", slug: "using/scripting" },
+            { label: "AI agents", slug: "using/agents" },
+            { label: "Settings, files and environment", slug: "using/settings" },
+          ],
+          label: "Everyday use",
+        },
+        {
+          items: [
+            { label: "Troubleshooting", slug: "help/troubleshooting" },
+            { label: "What it can't do", slug: "help/limits" },
+          ],
+          label: "When something goes wrong",
+        },
+        {
+          items: [
+            { label: "Guide", slug: "account" },
+            "account/account",
+            "account/sessions",
+            "account/profiles",
+            "account/settings",
+          ],
+          label: "Account",
+        },
+        {
+          items: [
             { label: "Guide", slug: "mail" },
             "mail/messages",
             "mail/conversations",
@@ -182,37 +211,8 @@ export default defineConfig({
           label: "Contacts",
         },
         {
-          items: [
-            { label: "Guide", slug: "account" },
-            "account/account",
-            "account/sessions",
-            "account/profiles",
-            "account/settings",
-          ],
-          label: "Account",
-        },
-        {
           items: [{ label: "Guide", slug: "api" }, "api/api"],
           label: "Raw API",
-        },
-        {
-          items: [
-            { label: "Naming what to act on", slug: "using/naming" },
-            { label: "Filters and bulk changes", slug: "using/filters" },
-            { label: "Dry runs and confirmations", slug: "using/confirmations" },
-            { label: "Output and exit codes", slug: "using/output" },
-            { label: "Scripting", slug: "using/scripting" },
-            { label: "AI agents", slug: "using/agents" },
-            { label: "Settings, files and environment", slug: "using/settings" },
-          ],
-          label: "Everyday use",
-        },
-        {
-          items: [
-            { label: "Troubleshooting", slug: "help/troubleshooting" },
-            { label: "What it can't do", slug: "help/limits" },
-          ],
-          label: "When something goes wrong",
         },
         {
           items: [
