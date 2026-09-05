@@ -243,7 +243,7 @@ To keep a policy from following you around, point the job at its own file:
 PROTON_CONFIG=/etc/proton/backup.yaml proton drive items upload ~/Documents /Backups
 ```
 
-The full syntax is in [Writing a policy](confirmations.md#writing-a-policy).
+The full syntax is in [Writing a policy](confirmations.md#writing-a-policy). When the thing running proton is an agent, [AI agents](agents.md) covers what it can be taught and what to fence off.
 
 ### Systemd timer
 

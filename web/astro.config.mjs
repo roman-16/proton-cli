@@ -202,6 +202,7 @@ export default defineConfig({
             { label: "Dry runs and confirmations", slug: "using/confirmations" },
             { label: "Output and exit codes", slug: "using/output" },
             { label: "Scripting", slug: "using/scripting" },
+            { label: "AI agents", slug: "using/agents" },
             { label: "Settings, files and environment", slug: "using/settings" },
           ],
           label: "Everyday use",

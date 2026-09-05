@@ -762,6 +762,11 @@ var examples = map[string][]string{
 		"proton report --all",
 		"proton report --dest bug.txt",
 	},
+	"proton skill": {
+		"proton skill",
+		"proton skill --body-only",
+		"proton skill > skills/proton-cli/SKILL.md",
+	},
 	"proton version": {
 		"proton version",
 		"proton version --output json",

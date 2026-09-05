@@ -51,6 +51,8 @@ Never edit a generated file. Change the command's `Short`, `Long`, flag usage or
 
 The two never share a file. A page that is half prose and half generated cannot be regenerated, which is how a generated section comes to be edited by hand and then silently overwritten.
 
+**What an AI agent reads is written both ways too.** `proton skill` prints it: the contract is `internal/cli/skill.md`, prose with the same standing as a command's `Long`, and the map of where every command lives comes off the tree. It is printed rather than committed, so it describes the build in front of the reader. `just golden` updates the bytes the test pins, and that diff is the review.
+
 ### How to write it
 
 **Write for the person running the command, not for the person reviewing the design.** A `Short` names the command. A `Long` says the thing that would otherwise surprise them: a constraint, a default, a value list, a way it can go wrong.

@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 Adding a version section here is what publishes a release, so this file is the one place a version is decided: see [Releases](CONTRIBUTING.md#releases). Versions that shipped before this file existed are on the [releases page](https://github.com/roman-16/proton-cli/releases).
 
+## [3.5.0] - 2026-09-05
+
+### Added
+
+- `proton skill` prints the instructions an AI agent reads before using proton: what it is for, how to name things, which filters a listing takes, and to preview a change and ask before making it. It is written from the installed build, so it names exactly the commands you have. `--body-only` leaves the frontmatter off, for an agent that reads it as it runs rather than from a saved file.
+
 ## [3.4.0] - 2026-09-05
 
 ### Added

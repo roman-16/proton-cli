@@ -268,7 +268,7 @@ func requestsIn(t *testing.T, path string) []string {
 		if method == "" || p == "" || p == unresolved || strings.Contains(method, unresolved) {
 			return true
 		}
-		out = append(out, method+" "+template(p))
+		out = append(out, method+" "+pathTemplate(p))
 		return true
 	})
 	return out
@@ -355,7 +355,7 @@ func render(e ast.Expr, consts map[string]string) string {
 // A number is its own placeholder, because the recording end can tell one from
 // an opaque ID by looking and does. %d is what says a segment is a number here,
 // since nothing else in these paths is formatted with it.
-func template(p string) string {
+func pathTemplate(p string) string {
 	p = strings.ReplaceAll(p, "%d", numeric)
 	for _, verb := range []string{"%s", "%v", "%q"} {
 		p = strings.ReplaceAll(p, verb, unresolved)

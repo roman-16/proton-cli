@@ -149,4 +149,4 @@ go build ./cmd/proton
 
 ## Every command that manages the install
 
-[`proton` itself](proton.md) has the full reference for `update`, `uninstall`, `completion`, `changelog` and `version`.
+[`proton` itself](proton.md) has the full reference for `update`, `uninstall`, `completion`, `changelog`, `report`, `skill` and `version`.

@@ -33,6 +33,7 @@ One guide each, task by task, with the reference for that app beside it.
 | [Dry runs and confirmations](using/confirmations.md) | Previewing a change, and what asks first |
 | [Output and exit codes](using/output.md) | The five response shapes, JSON, colour, exit codes |
 | [Scripting](using/scripting.md) | Pipelines, `jq`, cron and systemd |
+| [AI agents](using/agents.md) | The skill an agent reads, and fencing what it may do |
 | [Settings, files and environment](using/settings.md) | The config file, variables, global flags |
 
 ## When something goes wrong

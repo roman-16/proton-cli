@@ -121,6 +121,7 @@ var Verbs = map[string]string{
 	// The tool itself
 	"changelog":  "print what each release changed",
 	"report":     "collect what a bug report needs",
+	"skill":      "emit the instructions an AI agent reads before using " + Program,
 	"uninstall":  "remove " + Program,
 	"version":    "print the build",
 	"completion": "emit a shell completion script",

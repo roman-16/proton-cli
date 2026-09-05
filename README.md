@@ -76,6 +76,7 @@ Everything is at **[proton-cli.lerchster.dev](https://proton-cli.lerchster.dev)*
 | Get going | [Install](docs/install.md) · [First commands](docs/first-commands.md) |
 | Do something in one app | [Mail](docs/mail/README.md) · [Drive](docs/drive/README.md) · [Calendar](docs/calendar/README.md) · [Pass](docs/pass/README.md) · [Contacts](docs/contacts/README.md) |
 | Script it | [Scripting](docs/using/scripting.md) · [Output and exit codes](docs/using/output.md) |
+| Let an AI agent use it | [AI agents](docs/using/agents.md) - `proton skill` prints what it needs to know |
 | Look up a command | [All commands](docs/about/commands.md) |
 | Know whether this is the right tool | [FAQ](docs/about/faq.md) - including how it compares to Proton's own CLIs and to Bridge |
 | Understand the encryption | [Security and encryption](docs/about/security.md) |

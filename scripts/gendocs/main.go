@@ -149,7 +149,7 @@ func page(root *cobra.Command, slug string, commands []*cobra.Command) string {
 
 	if slug == kit.SelfPage {
 		fmt.Fprintf(&b, "# %s itself\n\n", kit.Program)
-		b.WriteString("Updating, uninstalling, shell completions, and what a release changed.\n\n")
+		b.WriteString("Updating, uninstalling, shell completions, the skill an AI agent reads, and what a release changed.\n\n")
 		b.WriteString("These act on this installation rather than on your account, so none of them needs you to be signed in.\n")
 		for _, c := range commands {
 			writeCommand(&b, c)

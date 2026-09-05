@@ -1,0 +1,216 @@
+---
+name: proton-cli
+description: Work with a Proton account through the proton command-line tool - read, search, send and organize Proton Mail; upload, download and share Drive files; read and create Calendar events; read Pass logins, TOTP codes and aliases; look up Contacts. Use when the user asks about their Proton mail, files, calendar, passwords or contacts, or mentions proton-cli or the proton command. Not for Proton VPN, Wallet, Docs, Meet or Lumo, which it does not cover.
+compatibility: Requires the proton binary on PATH and an account signed in with `proton account login`.
+license: MIT
+---
+
+# proton
+
+`proton` is one command for a Proton account: mail, files in Drive, calendar events, Pass logins and secrets, and contacts. Content is encrypted and decrypted here, with the user's own keys.
+
+This file is what to know before running it, not a reference. `proton <command> --help` is the reference: it lists every flag a command takes, the values each accepts, and examples, and it is right for whatever build is installed. Read it before using a command for the first time instead of guessing a flag.
+
+## Two things first
+
+1. `proton version`. If the command is missing, stop and point the user at https://proton-cli.lerchster.dev/install/. If it prints a version other than dev, this file came from a different build: run `proton skill --body-only` and follow what that prints instead.
+2. `proton account get --output json` says who is signed in. Exit `2` means nobody is: ask the user to run `proton account login` themselves, then stop. Signing in is theirs. Never ask for a password, never put one in a command, never read one out of a file.
+
+## The shape of a command
+
+```
+proton <app> <collection> <verb> [TARGET...] [--flags]
+```
+
+The last word is the verb and a group never acts, so `proton mail messages list` is the listing and `proton mail` only holds commands. A verb means the same thing in every app.
+
+`TARGET` is a full ID, the eight-character short ID a listing printed, or a handle a person would use: a subject, a name, a Drive path, an email address. Exit `4` means the handle matched several things - use the ID from the listing. Proton's search index lags a few seconds behind a change, so act on an ID a command just printed rather than searching for it again.
+
+## What to pass on every call
+
+- `--output json` for anything you are going to read. Text output is laid out for a person and may be shortened.
+- `--no-input` so a missing credential is an error instead of a wait for a terminal that is not there.
+- `--profile NAME` when the user names one of several accounts.
+
+## Reading
+
+A listing is one JSON object keyed by its plural name, always with `count`, and with `has_more` when Proton has more to give. Narrow it rather than paging through everything.
+
+These are the listings that can be narrowed, and what narrows them. The same flags choose what a bulk verb in that collection acts on, so work a selection out on `list` and then hand it to `trash`, `move`, `label` or `export`. Everything else a command takes is in its `--help`.
+
+- `proton calendar events list --calendar string --end string --start string`
+- `proton calendar reminders list --calendar string --end string --start string`
+- `proton contacts list --desc --keyword string --page int --page-size int --sort string`
+- `proton drive items list [PATH] --desc --larger-than string --newer-than string --older-than string --page int --page-size int --pattern string --recursive --smaller-than string --sort string`
+- `proton drive photos list --album string --tag string`
+- `proton drive trash list --desc --page int --page-size int --sort string`
+- `proton mail conversations attachments list REF --include-inline`
+- `proton mail conversations list --after string --before string --folder string --from string --keyword string --newer-than string --older-than string --page int --page-size int --starred --subject string --to string --unread`
+- `proton mail drafts list --page int --page-size int`
+- `proton mail messages attachments list REF --include-inline`
+- `proton mail messages list --after string --before string --folder string --from string --keyword string --newer-than string --older-than string --page int --page-size int --starred --subject string --to string --unread`
+- `proton pass aliases list --vault string`
+- `proton pass items list --desc --newer-than string --older-than string --page int --page-size int --sort string --type string --vault string`
+
+Mail looks in the inbox unless told otherwise, and `--folder all` is what a question about "my mail" usually means.
+
+A `watch` stays attached and reports things as they happen, so it ends only when something stops it. Start one only when the user asked to be told about arrivals, and never to read what is already there.
+
+```bash
+proton mail messages list --unread --output json
+proton mail messages list --keyword invoice --folder all --output json
+proton mail messages list --from billing@example.com --after 2026-01-01 --folder all --output json
+proton mail messages get 5bH2mQxK --output json
+proton drive items list /Documents --output json
+proton calendar events list --start 2026-04-16 --end 2026-04-23 --output json
+proton contacts get jane@example.com --output json
+proton pass items totp github.com
+```
+
+## Changing anything
+
+1. Run it with `--dry-run`. Every command that changes something takes it: references are resolved and filters applied, and it reports exactly what would change without touching it.
+2. Show the user what came back, and ask.
+3. Run it again with `--yes` once they have agreed to that change, and not before.
+
+```bash
+proton mail messages trash --from newsletter@example.com --older-than 90d --dry-run
+proton mail messages trash --from newsletter@example.com --older-than 90d --yes
+```
+
+`--yes` answers the questions proton asks before removing something permanently, and before acting on things a filter picked out rather than the user naming them. Without a terminal those questions are errors instead, so skipping step 3 fails rather than going ahead.
+
+Exit `6` is the user's own confirmation policy refusing the command. It is a decision they wrote down, not an obstacle: say so, and do not look for another way to the same effect.
+
+Nothing that changes something is ever retried. A send, an upload or a create that ends in exit `5` may or may not have happened: check with the `list` beside it before running it again.
+
+## Secrets
+
+`proton pass items get` and `proton pass items totp` print secrets that belong to the user. Show what was asked for and put it nowhere else: not in a file, a note, a log, a commit, or another command's arguments.
+
+Secrets go in the same way. `pass items create` and `pass items update` read them from `--secret-stdin NAME` or `--secret-file NAME=FILE`, never from a flag value, because a flag value is in the shell history.
+
+## Exit codes
+
+| Code | What happened | What to do |
+| --- | --- | --- |
+| `0` | It worked | |
+| `1` | The command line was wrong | Read that command's `--help` |
+| `2` | Nobody is signed in, or Proton refused | The user signs in, never you |
+| `3` | No such thing | |
+| `4` | The reference matched several things | Use the ID a listing printed |
+| `5` | Proton or the network is having trouble | Retry a read; never blindly retry a change |
+| `6` | The user's confirmation policy refuses it | Report it and stop |
+| `7` | A bug in proton | `proton report` collects what an issue needs |
+| `130` | Cancelled | |
+
+Exit `2` with a page and a token is Proton asking for a CAPTCHA. Only a person can answer one: give the user the page, and run the command again with `--verified TOKEN` once they have. It is always two runs.
+
+## Where the commands are
+
+One line per group, with the verbs under it. Arguments, flags and examples are in `proton <command> --help`.
+
+### calendar - Calendars and events
+
+- `proton calendar events` - Events in your calendars: create, delete, export, get, import, list, respond, update
+- `proton calendar invitations` - Calendars other people have offered you: accept, decline, list
+- `proton calendar reminders` - The notifications your events will raise: list, watch
+- `proton calendar settings` - How Calendar behaves: get, list, set
+- `proton calendar settings calendars` - The calendars you keep events in: create, delete, get, list, update
+- `proton calendar settings calendars share` - Who else can see a calendar: add, list, remove
+
+### contacts - Contacts, their groups and their pinned keys
+
+- `proton contacts` - create, delete, export, get, import, list, merge, update
+- `proton contacts groups` - Contact groups: add, create, delete, get, list, remove, update
+- `proton contacts keys` - Public keys pinned to a contact: list, pin, unpin
+
+### drive - Files and folders in Drive
+
+- `proton drive invitations` - Shares other people have offered you: accept, decline, list
+- `proton drive items` - Files and folders: copy, create, delete, download, get, list, move, trash, update, upload
+- `proton drive items revisions` - Earlier versions of a file: delete, download, list, restore
+- `proton drive items share` - Public links and the people you share with: add, get, link, remove, resend, unlink, update
+- `proton drive photos` - Your photo library: delete, download, favorite, list, trash, unfavorite, upload
+- `proton drive photos albums` - Photo albums: add, create, delete, list, remove, update
+- `proton drive settings` - How Drive behaves: get, list, set
+- `proton drive shared` - Files and folders other people have shared with you: list
+- `proton drive sharing` - What you have shared with other people: list
+- `proton drive trash` - Items you have removed but not yet deleted: empty, list, restore
+
+### mail - Read, write and organize mail
+
+- `proton mail conversations` - Whole threads: delete, export, forward, get, label, list, move, reply, snooze, star, trash, unlabel, unsnooze, unstar
+- `proton mail conversations attachments` - Files attached anywhere in a thread: download, list
+- `proton mail conversations mark` - Set whether threads count as read: read, unread
+- `proton mail drafts` - Messages not yet sent: create, delete, list, send, update
+- `proton mail messages` - Individual messages: delete, empty, expire, export, forward, get, label, list, move, reply, send, star, trash, unlabel, unschedule, unstar, unsubscribe, watch
+- `proton mail messages attachments` - Files attached to a message: download, list
+- `proton mail messages mark` - Set whether messages count as read: read, unread
+- `proton mail settings` - How Mail behaves: get, list, set
+- `proton mail settings addresses` - Your addresses, display names and signatures: get, list, update
+- `proton mail settings autoreply` - The automatic reply and its schedule: disable, enable, get, set
+- `proton mail settings filters` - Server-side Sieve filters: apply, create, delete, disable, enable, get, list, reorder, update
+- `proton mail settings folders` - Folders, which a message lives in: create, delete, list, update
+- `proton mail settings forwarding` - Mail forwarded to and from your addresses: create, delete, disable, enable, get, list, resend
+- `proton mail settings labels` - Labels, which a message carries: create, delete, list, update
+- `proton mail settings senders` - Who always reaches the inbox, and who never does: allow, block, forget, list, spam
+
+### pass - Vaults, logins and secrets
+
+- `proton pass` - export, generate, import
+- `proton pass aliases` - Hide-my-email addresses that forward to you: create, disable, enable, list, options
+- `proton pass aliases contacts` - Addresses an alias can write to: allow, block, create, delete, list
+- `proton pass breaches` - Addresses that have appeared in a data breach: get, list
+- `proton pass invitations` - What other people have offered you: accept, decline, list
+- `proton pass items` - Logins, notes, cards and the rest: create, delete, get, list, move, pin, totp, trash, unpin, update
+- `proton pass items revisions` - Earlier versions of an item: get, list
+- `proton pass items share` - Who else can open an item: add, get, remove, update
+- `proton pass links` - Links that show an item to somebody without an account: create, get, list, revoke
+- `proton pass settings domains` - The domains an alias can be made on: list
+- `proton pass settings mailboxes` - The addresses your aliases forward to: create, delete, list, resend, update, verify
+- `proton pass shared` - Items other people have shared with you: list
+- `proton pass sharing` - Items you have shared with other people: list
+- `proton pass trash` - Items you have removed but not yet deleted: empty, list, restore
+- `proton pass vaults` - The vaults your items live in: create, delete, get, list, transfer, update
+- `proton pass vaults share` - Who else can open a vault: add, get, remove, update
+
+### account - Your Proton account, its settings and your session
+
+- `proton account` - get, login, logout
+- `proton account profiles` - Accounts signed in on this machine: delete, list
+- `proton account sessions` - Sessions Proton holds for this account: list, revoke
+- `proton account settings` - Account-wide preferences: get, list, set
+
+### proton - the tool itself, and the raw API
+
+- `proton api` - Send a raw authenticated request to the Proton API
+- `proton changelog` - Print what each release changed
+- `proton completion` - Generate a shell completion script
+- `proton report` - Collect what a bug report needs
+- `proton skill` - Print the skill that teaches an AI agent to use proton
+- `proton uninstall` - Remove a curl/PowerShell-installed proton
+- `proton update` - Update proton to the latest release
+- `proton version` - Print the version and build information
+
+`proton api` sends a request to an endpoint no command covers, and answers with Proton's own shape rather than this one; a dry run of it can only repeat the request back. `proton update` and `proton uninstall` change this machine rather than the account. Run none of the three unless the user asked for that.
+
+## Flags that work on every command
+
+| Flag | What it does |
+| --- | --- |
+| `--config string` | Settings file to read (env: PROTON_CONFIG; default: config.yaml in the config directory) |
+| `--confirm string` | Which commands stop for a yes: default, deletions, mutations, reads, all (env: PROTON_CONFIRM) |
+| `-n, --dry-run` | Preview mutations without applying them |
+| `--force-color` | Force colored output, even when piped (env: FORCE_COLOR) |
+| `--full-ids` | Show full IDs in interactive output (default: shortened to 8 chars on TTY) |
+| `--log-level string` | Logging verbosity: debug, info, warn, error (env: PROTON_LOG_LEVEL) |
+| `--no-color` | Disable colored output (env: NO_COLOR) |
+| `--no-input` | Never prompt; a missing credential becomes an error (env: PROTON_NO_INPUT) |
+| `--no-log` | Write no diagnostic log for this run (env: PROTON_NO_LOG) |
+| `-o, --output string` | Output format: text, json, yaml (default "text") |
+| `-p, --profile string` | Profile to act as (env: PROTON_PROFILE; default: default) |
+| `-q, --quiet` | Suppress non-essential stderr output |
+| `--verified string` | A human verification already solved, as the refusal printed it (env: PROTON_VERIFIED) |
+| `-y, --yes` | Answer confirmation prompts with yes |
+| `--zone string` | IANA time zone to work in (env: TZ; default: your system zone) |

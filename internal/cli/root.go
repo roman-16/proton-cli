@@ -213,7 +213,7 @@ func newRoot() *cobra.Command {
 	add(kit.GroupApps, mailcmd.New(), drivecmd.New(), calendarcmd.New(), contactscmd.New(), passcmd.New())
 	add(kit.GroupAccount, accountcmd.New(), apicmd.New())
 	add(kit.GroupSelf, selfcmd.ChangelogCmd(), selfcmd.ReportCmd(version), selfcmd.UpdateCmd(version),
-		selfcmd.UninstallCmd(), selfcmd.VersionCmd(version), completionCmd(root))
+		selfcmd.UninstallCmd(), selfcmd.VersionCmd(version), completionCmd(root), skillCmd(root, version))
 
 	attachExamples(root)
 	installHelp(root)

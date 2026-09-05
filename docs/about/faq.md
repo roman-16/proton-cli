@@ -72,6 +72,17 @@ Yes, and it signs in for itself.
 
 Proton sometimes asks for a CAPTCHA at login. proton prints the verification page and waits while you solve it on whatever device is to hand, then carries on. There is nothing to install. [What that looks like](../help/troubleshooting.md#proton-asks-for-a-captcha).
 
+## Can an AI agent use it?
+
+Yes, and proton tells it how. `proton skill` prints a skill in the [Agent Skills](https://agentskills.io) format - what the tool is for, the grammar, and the rules it should hold to - which you save wherever your agent reads skills:
+
+```bash
+mkdir -p /path/to/skills/proton-cli
+proton skill > /path/to/skills/proton-cli/SKILL.md
+```
+
+There is no MCP server, and the [AI agents](../using/agents.md) page says why, along with how to fence what an agent may do.
+
 ## Can I use two Proton accounts at once?
 
 Yes. Each account gets a named profile with its own session file, and they never mix:

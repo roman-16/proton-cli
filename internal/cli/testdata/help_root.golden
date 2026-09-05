@@ -20,6 +20,7 @@ proton itself:
   changelog   Print what each release changed
   completion  Generate a shell completion script
   report      Collect what a bug report needs
+  skill       Print the skill that teaches an AI agent to use proton
   uninstall   Remove a curl/PowerShell-installed proton
   update      Update proton to the latest release
   version     Print the version and build information

@@ -1,6 +1,6 @@
 # proton itself
 
-Updating, uninstalling, shell completions, and what a release changed.
+Updating, uninstalling, shell completions, the skill an AI agent reads, and what a release changed.
 
 These act on this installation rather than on your account, so none of them needs you to be signed in.
 
@@ -72,6 +72,28 @@ proton report --dest bug.txt
 | `--all` | Act on everything in scope, rather than a subset |
 | `--dest string` | Write to this path, or - for stdout |
 | `--force` | Overwrite a file that already exists |
+
+## `skill`
+
+Print the skill that teaches an AI agent to use proton.
+
+A skill is a SKILL.md an agent reads before it acts (https://agentskills.io): what proton is for, how to check it is installed and signed in, the flags every call takes, what to do before changing anything, and where every command lives. It is written from this build, so it names exactly the commands this proton has, and it tells the agent to print it again when the installed proton is a different one.
+
+Save it as SKILL.md inside a directory named proton-cli, wherever your agent reads skills. An agent that reads it as it runs rather than from a saved file wants --body-only, which leaves the frontmatter out.
+
+```
+proton skill
+```
+
+```bash
+proton skill
+proton skill --body-only
+proton skill > skills/proton-cli/SKILL.md
+```
+
+| Flag | Description |
+| --- | --- |
+| `--body-only` | Emit only the body, with no frontmatter |
 
 ## `uninstall`
 
