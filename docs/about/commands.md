@@ -268,6 +268,7 @@ These are declared on the root, so any command takes them and they mean the same
 | `--config string` | Settings file to read (env: PROTON_CONFIG; default: config.yaml in the config directory) |
 | `--confirm string` | Which commands stop for a yes: default, deletions, mutations, reads, all (env: PROTON_CONFIRM) |
 | `-n, --dry-run` | Preview mutations without applying them |
+| `--force-color` | Force colored output, even when piped (env: FORCE_COLOR) |
 | `--full-ids` | Show full IDs in interactive output (default: shortened to 8 chars on TTY) |
 | `--log-level string` | Logging verbosity: debug, info, warn, error (env: PROTON_LOG_LEVEL) |
 | `--no-color` | Disable colored output (env: NO_COLOR) |

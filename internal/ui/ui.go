@@ -107,9 +107,10 @@ type UI struct {
 	// terminal.
 	Width int
 
-	// style paints Out, errStyle paints Err. Both are disabled unless that
-	// stream is a terminal and the format is text, so piped bytes never carry
-	// escape sequences.
+	// style paints Out, errStyle paints Err. A machine format is never painted,
+	// and a stream with no terminal behind it only when colour was asked for by
+	// name, so piped bytes carry an escape sequence only where somebody said they
+	// should.
 	style    Style
 	errStyle Style
 }
@@ -122,7 +123,7 @@ type Options struct {
 	In       io.Reader
 	LogLevel slog.Level
 	Quiet    bool
-	NoColor  bool
+	Color    Color
 	NoInput  bool
 	FullIDs  bool
 	Width    int
@@ -149,10 +150,13 @@ func New(opts Options) *UI {
 	if in == nil {
 		in = os.Stdin
 	}
-	var style, errStyle Style
-	if opts.Format == FormatText && !opts.NoColor {
-		style, errStyle = StyleFor(out), StyleFor(errw)
+	// A machine format carries data, and an escape sequence is not data - so JSON
+	// is plain however loudly colour was asked for.
+	want := opts.Color
+	if opts.Format.Machine() {
+		want = ColorNever
 	}
+	style, errStyle := StyleFor(out, want), StyleFor(errw, want)
 	log, trace := newLoggers(errw, opts.LogLevel, opts.Salt, opts.Log, opts.Run)
 	return &UI{
 		Log:      log,

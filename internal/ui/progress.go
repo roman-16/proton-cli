@@ -74,15 +74,21 @@ type sample struct {
 	n  int64
 }
 
-// NewProgress returns a sink drawing on the UI's stderr, or a no-op when output
-// is not an interactive terminal or --quiet was given. Callers can therefore
-// hand the result straight to a service without checking.
+// NewProgress returns a sink drawing on the UI's stderr, or a no-op when --quiet
+// was given, the answer is for a program, or stderr is not a terminal that can
+// take back what it has drawn. Callers can therefore hand the result straight to
+// a service without checking.
+//
+// A line that is redrawn is a line that has to be erased, and erasing is an
+// escape sequence like any other - so a terminal that renders none gets the
+// result and no bar, rather than one frame per update with the erase printed in
+// front of each.
 func NewProgress(u *UI) progress.Sink {
 	if u.Quiet || u.Format.Machine() {
 		return progress.Nop{}
 	}
 	f, ok := u.Err.(*os.File)
-	if !ok || !term.IsTerminal(int(f.Fd())) {
+	if !ok || !term.IsTerminal(int(f.Fd())) || !terminalDepth(f).escapes() {
 		return progress.Nop{}
 	}
 	return &Progress{w: u.Err, style: u.errStyle, active: true, interval: redrawEvery, width: func() int {

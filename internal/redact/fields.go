@@ -32,6 +32,7 @@ var Fields = map[string]Policy{
 	"panic":     Text,   // the value a panic carried
 	"stack":     Text,   // the goroutine's stack at the panic
 	"tty":       Keep,   // whether the answer was going to a terminal
+	"color":     Keep,   // whether the answer was painted
 	"term":      Keep,   // the terminfo name the terminal calls itself
 	"colorterm": Keep,   // what the terminal advertises about colour depth
 	"width":     Keep,   // the column budget the output was laid out against

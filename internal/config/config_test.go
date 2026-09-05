@@ -36,7 +36,7 @@ func clean(t *testing.T) {
 	t.Helper()
 	for _, key := range []string{
 		PathVar, ConfirmVar, "PROTON_PROFILE", "PROTON_LOG_LEVEL",
-		"NO_COLOR", "PROTON_NO_INPUT", "PROTON_NO_UPDATE_CHECK",
+		"FORCE_COLOR", "NO_COLOR", "PROTON_NO_INPUT", "PROTON_NO_UPDATE_CHECK",
 	} {
 		prev, had := os.LookupEnv(key)
 		if err := os.Unsetenv(key); err != nil {
@@ -190,17 +190,100 @@ func TestAFileBooleanIsOverridableForOneRun(t *testing.T) {
 	}
 }
 
+// Colour has three answers rather than two, because whether it is wanted and
+// whether the destination can show it are different questions - and only the
+// person running the command knows the first when the answer is going somewhere
+// this program cannot ask about.
+//
+// The nearest source that says anything decides, as everywhere else. Inside the
+// environment forcing outranks refusing: NO_COLOR is set once for everything a
+// person runs, FORCE_COLOR for one job by whoever knows what reads its output.
+func TestColourTakesTheNearestSourceThatSaysAnything(t *testing.T) {
+	no, yes := false, true
+	for _, tc := range []struct {
+		name  string
+		env   map[string]string
+		file  string
+		flags Flags
+		want  ui.Color
+	}{
+		{name: "nothing said", want: ui.ColorAuto},
+		{name: "the file", file: "no-color: true\n", want: ui.ColorNever},
+		{name: "NO_COLOR", env: map[string]string{"NO_COLOR": ""}, want: ui.ColorNever},
+		{name: "FORCE_COLOR", env: map[string]string{"FORCE_COLOR": ""}, want: ui.ColorAlways},
+		{
+			name: "forcing outranks refusing",
+			env:  map[string]string{"NO_COLOR": "1", "FORCE_COLOR": "1"},
+			want: ui.ColorAlways,
+		},
+		{
+			name:  "--force-color beats NO_COLOR",
+			env:   map[string]string{"NO_COLOR": "1"},
+			flags: Flags{ForceColor: &yes},
+			want:  ui.ColorAlways,
+		},
+		{
+			name:  "--no-color beats FORCE_COLOR",
+			env:   map[string]string{"FORCE_COLOR": "1"},
+			flags: Flags{NoColor: &yes},
+			want:  ui.ColorNever,
+		},
+		{
+			name:  "--no-color=false takes the file's answer back",
+			file:  "no-color: true\n",
+			flags: Flags{NoColor: &no},
+			want:  ui.ColorAuto,
+		},
+		{
+			name:  "--force-color=false forces nothing",
+			env:   map[string]string{"FORCE_COLOR": "1"},
+			flags: Flags{ForceColor: &no},
+			want:  ui.ColorAuto,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			clean(t)
+			for key, value := range tc.env {
+				t.Setenv(key, value)
+			}
+			var file *File
+			if tc.file != "" {
+				file = load(t, tc.file)
+			}
+			if got := resolve(t, file, tc.flags).Color; got != tc.want {
+				t.Errorf("got colour %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
+// Asking for both at once is a sentence that contradicts itself. Resolved either
+// way, half of what was typed would be passed over in silence.
+func TestPaintingAndNotPaintingIsRefused(t *testing.T) {
+	clean(t)
+	yes := true
+	_, err := Resolve(nil, Flags{ForceColor: &yes, NoColor: &yes})
+	if err == nil {
+		t.Fatal("--no-color with --force-color has to be refused")
+	}
+	for _, want := range []string{"--no-color", "--force-color"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("the refusal does not mention %s: %v", want, err)
+		}
+	}
+}
+
 // Presence is what counts for these, whatever the value - the convention
 // NO_COLOR set and PROTON_NO_INPUT follows.
 func TestPresenceIsWhatCountsForTheConventionalVariables(t *testing.T) {
-	for _, key := range []string{"NO_COLOR", "PROTON_NO_INPUT", "PROTON_NO_UPDATE_CHECK"} {
+	for _, key := range []string{"NO_COLOR", "FORCE_COLOR", "PROTON_NO_INPUT", "PROTON_NO_UPDATE_CHECK"} {
 		for _, value := range []string{"1", "0", "false", ""} {
 			clean(t)
 			t.Setenv(key, value)
 			got := resolve(t, nil, Flags{})
 			set := map[string]bool{
-				"NO_COLOR": got.NoColor, "PROTON_NO_INPUT": got.NoInput,
-				"PROTON_NO_UPDATE_CHECK": got.NoUpdateCheck,
+				"NO_COLOR": got.Color == ui.ColorNever, "FORCE_COLOR": got.Color == ui.ColorAlways,
+				"PROTON_NO_INPUT": got.NoInput, "PROTON_NO_UPDATE_CHECK": got.NoUpdateCheck,
 			}[key]
 			if !set {
 				t.Errorf("%s=%q is set, so it applies", key, value)
@@ -301,7 +384,7 @@ func TestNoConfigurationLeavesTheDefaults(t *testing.T) {
 	if got.Profile.String() != "default" || got.Output != ui.FormatText || got.LogLevel != slog.LevelWarn {
 		t.Errorf("got %s/%s/%v", got.Profile, got.Output, got.LogLevel)
 	}
-	if got.Quiet || got.FullIDs || got.NoColor || got.NoInput || got.NoUpdateCheck || len(got.Confirm) != 0 {
+	if got.Quiet || got.FullIDs || got.Color != ui.ColorAuto || got.NoInput || got.NoUpdateCheck || len(got.Confirm) != 0 {
 		t.Errorf("nothing should be switched on: %+v", got)
 	}
 }

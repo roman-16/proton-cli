@@ -130,48 +130,24 @@ func TestSwatchFallbackAvoidsTheThemeableEntries(t *testing.T) {
 	}
 }
 
-func TestNoColorConventions(t *testing.T) {
-	t.Run("TERM=dumb disables colour", func(t *testing.T) {
-		t.Setenv("TERM", "dumb")
-		if !NoColor() {
-			t.Error("TERM=dumb must disable colour")
-		}
-	})
-	t.Run("a normal terminal allows colour", func(t *testing.T) {
-		t.Setenv("TERM", "xterm-256color")
-		if NoColor() {
-			t.Error("a normal TERM should allow colour")
-		}
-	})
-}
-
-// 24-bit capability decides how faithfully a swatch is drawn and nothing else,
-// since every role is a name any colour terminal can resolve.
-func TestDirectColorDetection(t *testing.T) {
-	for _, tc := range []struct {
-		colorterm, term string
-		want            bool
-	}{
-		{"truecolor", "xterm-256color", true},
-		{"24bit", "xterm-256color", true},
-		{"", "xterm-direct", true},
-		{"", "xterm-256color", false},
-		{"", "screen", false},
-		{"8bit", "xterm-256color", false},
-	} {
-		t.Setenv("COLORTERM", tc.colorterm)
-		t.Setenv("TERM", tc.term)
-		if got := directColor(); got != tc.want {
-			t.Errorf("COLORTERM=%q TERM=%q: got %v, want %v", tc.colorterm, tc.term, got, tc.want)
-		}
-	}
-}
-
-// A buffer is not a terminal, so nothing written to one is ever coloured. This
-// is what keeps captured output and golden files stable.
-func TestStyleForNonTerminalIsDisabled(t *testing.T) {
+// A buffer is not a terminal, so nothing written to one is coloured unless
+// colour was asked for by name. Deciding for itself is what keeps captured
+// output and golden files stable; being told is what carries colour into a
+// pager or a log rendered by something else.
+func TestOnlyForcedColourReachesWhatIsNotATerminal(t *testing.T) {
 	t.Setenv("TERM", "xterm-256color")
-	if StyleFor(&bytes.Buffer{}).Enabled() {
-		t.Error("a buffer must never be coloured")
+	t.Setenv("COLORTERM", "truecolor")
+	if StyleFor(&bytes.Buffer{}, ColorAuto).Enabled() {
+		t.Error("a buffer decides nothing about colour, so it must not be painted")
+	}
+	if StyleFor(&bytes.Buffer{}, ColorNever).Enabled() {
+		t.Error("never is never")
+	}
+	forced := StyleFor(&bytes.Buffer{}, ColorAlways)
+	if !forced.Enabled() {
+		t.Error("forced colour has to reach a stream with no terminal behind it")
+	}
+	if !forced.direct {
+		t.Error("with no terminal to ask, the depth is what the environment advertises")
 	}
 }

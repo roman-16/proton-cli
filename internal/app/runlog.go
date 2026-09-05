@@ -74,6 +74,7 @@ func (a *App) Began(cmd *cobra.Command) {
 		"profile", a.Profile.String(),
 		"output", string(a.UI.Format),
 		"tty", a.UI.IsTTY(),
+		"color", a.UI.Style().Enabled(),
 		"term", os.Getenv("TERM"),
 		"colorterm", os.Getenv("COLORTERM"),
 		"width", a.UI.Columns(),

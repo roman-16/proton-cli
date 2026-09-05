@@ -16,9 +16,11 @@ package offline
 import (
 	"bytes"
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -56,19 +58,32 @@ func TestMain(m *testing.M) {
 }
 
 // run executes the CLI with nothing to act as and nowhere to connect to.
-//
-// The environment is built from scratch rather than inherited, for the same
-// reason the live suite does it: whatever a developer happens to have exported,
-// the binary under test sees a stated environment. Here that environment states
-// that there is no account and no API.
 func run(t *testing.T, args ...string) (stdout, stderr string, exitCode int) {
 	t.Helper()
-	return runWithStdin(t, "", args...)
+	return runIn(t, "", nil, args...)
 }
 
 // runWithStdin is run with something on standard input, for the answers that are
 // about the stream itself.
 func runWithStdin(t *testing.T, stdin string, args ...string) (stdout, stderr string, exitCode int) {
+	t.Helper()
+	return runIn(t, stdin, nil, args...)
+}
+
+// runWithEnv is run with more in the environment, for the answers that the
+// environment is what settles.
+func runWithEnv(t *testing.T, env map[string]string, args ...string) (stdout, stderr string, exitCode int) {
+	t.Helper()
+	return runIn(t, "", env, args...)
+}
+
+// runIn starts the binary, and is the only thing here that does.
+//
+// The environment is built from scratch rather than inherited, for the same
+// reason the live suite does it: whatever a developer happens to have exported,
+// the binary under test sees a stated environment. Here that environment states
+// that there is no account and no API, plus whatever the test is about.
+func runIn(t *testing.T, stdin string, env map[string]string, args ...string) (stdout, stderr string, exitCode int) {
 	t.Helper()
 	var outBuf, errBuf bytes.Buffer
 	cmd := exec.Command(binaryPath, args...)
@@ -84,6 +99,9 @@ func runWithStdin(t *testing.T, stdin string, args ...string) (stdout, stderr st
 		"PROTON_API_URL=http://127.0.0.1:1",
 		"PATH=" + os.Getenv("PATH"),
 		"HOME=" + configDir,
+	}
+	for _, name := range slices.Sorted(maps.Keys(env)) {
+		cmd.Env = append(cmd.Env, name+"="+env[name])
 	}
 	if err := cmd.Run(); err != nil {
 		exitErr, ok := err.(*exec.ExitError)

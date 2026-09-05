@@ -114,6 +114,7 @@ $ proton --quiet=false mail messages list
 | `PROTON_PROFILE` | Active profile (default: `default`) |
 | `PROTON_API_URL` | API base URL (default: `https://mail.proton.me/api`) |
 | `NO_COLOR` | Set to any value, even empty, to turn colour off ([no-color.org](https://no-color.org)) |
+| `FORCE_COLOR` | Set to any value, even empty, to paint even when the output is piped ([force-color.org](https://force-color.org)). Set beside `NO_COLOR`, this one wins |
 | `COLORTERM` | Set to `truecolor` or `24bit` if your terminal takes 24-bit colour and does not advertise it. Only affects how exactly a colour swatch is drawn ([why](../about/why.md#why-colour-is-asked-for-by-name)) |
 | `PROTON_NO_INPUT` | Set to any value, even empty, to never prompt. A missing credential becomes an error |
 | `PROTON_LOG_LEVEL` | `debug`, `info`, `warn` or `error` |
@@ -168,6 +169,7 @@ Every command takes these.
 | `--confirm POLICY` | Which commands stop for a yes (env: `PROTON_CONFIRM`) |
 | `--full-ids` | Do not shorten IDs in interactive output |
 | `--no-color` | Turn colour off (env: `NO_COLOR`) |
+| `--force-color` | Paint even when the output is piped or redirected (env: `FORCE_COLOR`) |
 | `--log-level debug\|info\|warn\|error` | Logging verbosity (env: `PROTON_LOG_LEVEL`) |
 | `--zone NAME` | IANA time zone to work in (env: `TZ`) |
 | `--no-input` | Never prompt. A missing credential becomes an error (env: `PROTON_NO_INPUT`) |

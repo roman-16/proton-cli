@@ -116,7 +116,7 @@ func New(opts Options) (*App, error) {
 		Format:   opts.Output,
 		LogLevel: opts.LogLevel,
 		Quiet:    opts.Quiet,
-		NoColor:  opts.NoColor,
+		Color:    opts.Color,
 		NoInput:  opts.NoInput,
 		FullIDs:  opts.FullIDs,
 		Log:      logFile,

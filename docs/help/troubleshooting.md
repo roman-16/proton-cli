@@ -285,7 +285,7 @@ proton asks your terminal for a colour by name, and your terminal decides what i
 
 The exception is the `■` beside a label, folder, calendar or group. That hex is the value stored on Proton's side, and drawing it faithfully needs 24-bit colour. If your terminal takes it but does not advertise it, set `COLORTERM=truecolor`.
 
-`--no-color` or `NO_COLOR` turns colour off entirely. ([Why it works this way](../about/why.md#why-colour-is-asked-for-by-name).)
+`--no-color` or `NO_COLOR` turns colour off entirely, and `--force-color` or `FORCE_COLOR` keeps it through a pipe - a pager, a multiplexer, a CI log that renders the escapes itself. ([Why it works this way](../about/why.md#why-colour-is-asked-for-by-name).)
 
 ## Still stuck
 

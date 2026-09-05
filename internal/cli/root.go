@@ -46,6 +46,7 @@ type globalFlags struct {
 	confirm    string
 	dryRun     bool
 	yes        bool
+	forceColor bool
 	fullIDs    bool
 	noColor    bool
 	noInput    bool
@@ -68,17 +69,18 @@ func (g *globalFlags) settings(pf *pflag.FlagSet) config.Flags {
 		return &value
 	}
 	return config.Flags{
-		Config:   g.configPath,
-		Profile:  g.profile,
-		Output:   g.output,
-		LogLevel: g.logLevel,
-		Confirm:  g.confirm,
-		Zone:     g.zone,
-		Quiet:    said("quiet", g.quiet),
-		FullIDs:  said("full-ids", g.fullIDs),
-		NoColor:  said("no-color", g.noColor),
-		NoInput:  said("no-input", g.noInput),
-		NoLog:    said("no-log", g.noLog),
+		Config:     g.configPath,
+		Profile:    g.profile,
+		Output:     g.output,
+		LogLevel:   g.logLevel,
+		Confirm:    g.confirm,
+		Zone:       g.zone,
+		Quiet:      said("quiet", g.quiet),
+		FullIDs:    said("full-ids", g.fullIDs),
+		ForceColor: said("force-color", g.forceColor),
+		NoColor:    said("no-color", g.noColor),
+		NoInput:    said("no-input", g.noInput),
+		NoLog:      said("no-log", g.noLog),
 	}
 }
 
@@ -122,6 +124,7 @@ func newRoot() *cobra.Command {
 		"Logging verbosity: "+strings.Join(ui.LogLevels, ", ")+" (env: PROTON_LOG_LEVEL)")
 	pf.BoolVarP(&g.dryRun, "dry-run", "n", false, "Preview mutations without applying them")
 	pf.BoolVarP(&g.yes, "yes", "y", false, "Answer confirmation prompts with yes")
+	pf.BoolVar(&g.forceColor, "force-color", false, "Force colored output, even when piped (env: FORCE_COLOR)")
 	pf.BoolVar(&g.fullIDs, "full-ids", false, "Show full IDs in interactive output (default: shortened to 8 chars on TTY)")
 	pf.BoolVar(&g.noColor, "no-color", false, "Disable colored output (env: NO_COLOR)")
 	pf.BoolVar(&g.noInput, "no-input", false, "Never prompt; a missing credential becomes an error (env: PROTON_NO_INPUT)")
@@ -235,7 +238,7 @@ func Execute() {
 	// Probed on a tree of its own, because Find and ParseFlags leave state
 	// behind and the tree that answers the command has to start clean.
 	if err := unknownSubcommand(newRoot(), os.Args[1:]); err != nil {
-		ui.WriteError(os.Stderr, err, ui.StyleFor(os.Stderr), false)
+		ui.WriteError(os.Stderr, err, ui.StyleFor(os.Stderr, config.EnvColor()), false)
 		os.Exit(exitCode(err))
 	}
 
@@ -382,12 +385,13 @@ func unknownSubcommand(root *cobra.Command, args []string) error {
 
 // errorStyle is how the final error is painted. The app owns one, but a failure
 // during flag parsing happens before there is an app, so fall back to asking the
-// stream directly.
+// stream and the environment - which is all a run whose flags never parsed has
+// to go on.
 func errorStyle(root *cobra.Command) ui.Style {
 	if a := app.FromOrNil(root.Context()); a != nil {
 		return a.UI.ErrStyle()
 	}
-	return ui.StyleFor(os.Stderr)
+	return ui.StyleFor(os.Stderr, config.EnvColor())
 }
 
 // shortIDs answers the way every other screen answers it, from the app the

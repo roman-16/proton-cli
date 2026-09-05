@@ -274,6 +274,26 @@ func TestQuietSilencesEverySeverity(t *testing.T) {
 	}
 }
 
+// Colour asked for by name reaches a stream that would never have been painted
+// on its own. Both of them: the answer and the commentary are one screen, and a
+// run painted on one and plain on the other is a run that looks broken.
+func TestForcedColourPaintsBothStreams(t *testing.T) {
+	u, _, _ := fixture(t, Options{Color: ColorAlways})
+	if !u.Style().Enabled() || !u.ErrStyle().Enabled() {
+		t.Error("forced colour has to reach the answer and the commentary alike")
+	}
+}
+
+// A machine format carries data, and an escape sequence is not data. There is no
+// screen in front of JSON to be asked about, so forcing colour says nothing
+// there and is not obeyed.
+func TestAMachineFormatIsNeverPainted(t *testing.T) {
+	u, _, _ := fixture(t, Options{Format: FormatJSON, Color: ColorAlways})
+	if u.Style().Enabled() || u.ErrStyle().Enabled() {
+		t.Error("json must stay plain however loudly colour was asked for")
+	}
+}
+
 // An instruction is part of the question rather than commentary on it, so it is
 // the one thing --quiet does not take away: a run waiting for a finger on a
 // security key, having said nothing about why, cannot be told from a hang.

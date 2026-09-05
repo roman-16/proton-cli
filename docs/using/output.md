@@ -170,6 +170,13 @@ Shades come from your terminal's theme, not from proton ([why](../about/why.md#w
 
 Colour is off whenever output is piped or redirected, under `--output json` or `yaml`, and with `--no-color` or `NO_COLOR`. It never changes the layout, and it never carries meaning on its own: every verdict is spelled out in words.
 
+`--force-color` or `FORCE_COLOR` paints anyway, for the cases proton cannot see: a pager, a multiplexer, a CI log that renders the escapes itself.
+
+```bash
+proton mail messages list --force-color | less -R
+FORCE_COLOR=1 proton mail messages list | tee run.log
+```
+
 ## Width
 
 On a terminal, a table too wide to fit gives up room from its widest flexible column, never from a date or an ID. Piped output is never truncated.

@@ -10,6 +10,42 @@ import (
 	"golang.org/x/term"
 )
 
+// Color is what the person running the command asked for, which is a different
+// question from what their terminal can do with an escape sequence. This half is
+// settled by flags, variables and the settings file in package config; the other
+// half is asked of the destination here.
+type Color uint8
+
+const (
+	// ColorAuto paints a terminal that can render an escape, and nothing else.
+	ColorAuto Color = iota
+	// ColorAlways paints whatever the answer is going to, a pipe included, which
+	// is what carries colour into a pager or a log something else renders later.
+	ColorAlways
+	// ColorNever paints nothing.
+	ColorNever
+)
+
+// depth is what the terminal behind a stream does with an escape sequence, which
+// is the whole of what this package needs to know about it: whether one is acted
+// on at all, and whether an exact colour survives.
+type depth uint8
+
+const (
+	// depthNone prints an escape instead of acting on it.
+	depthNone depth = iota
+	// depthNamed resolves ECMA-48's colour names and the 256-colour cube.
+	depthNamed
+	// depthDirect takes 24-bit colour.
+	depthDirect
+)
+
+// escapes reports whether a sequence written to such a terminal is acted on.
+//
+// Colour is not the only thing that asks. A transfer bar erases its line with an
+// escape, and a terminal that acts on none cannot take back what it has drawn.
+func (d depth) escapes() bool { return d != depthNone }
+
 // Role is what a piece of output means, and the only vocabulary the CLI has for
 // colour.
 //
@@ -81,20 +117,6 @@ type Style struct {
 	direct bool
 }
 
-// NoColor reports whether the terminal itself cannot carry colour.
-//
-// This is a question about the destination, not about what anybody wants: a
-// TERM of dumb or nothing has no way to render an escape. Whether colour is
-// wanted on a terminal that could show it is a preference, and preferences are
-// settled in package config before the renderer is built.
-func NoColor() bool {
-	switch os.Getenv("TERM") {
-	case "dumb", "":
-		return true
-	}
-	return false
-}
-
 // IsTerminal reports whether w is a real terminal, which is what separates
 // someone reading the output from a file, a pipe or a scheduler collecting it.
 func IsTerminal(w io.Writer) bool {
@@ -102,27 +124,44 @@ func IsTerminal(w io.Writer) bool {
 	return ok && term.IsTerminal(int(f.Fd()))
 }
 
-// StyleFor returns the styling to use when writing to w. Colour is enabled only
-// for a real terminal; PROTON_CLI_FORCE_TTY deliberately does not apply, so
-// captured output stays plain.
-func StyleFor(w io.Writer) Style {
-	if NoColor() || !IsTerminal(w) {
+// StyleFor returns the styling to use when writing to w.
+//
+// Auto asks the destination and paints only a terminal that acts on an escape,
+// so a redirect or a pipe receives the same bytes without them.
+// PROTON_CLI_FORCE_TTY deliberately does not apply, which keeps captured output
+// plain unless colour was asked for by name.
+func StyleFor(w io.Writer, want Color) Style {
+	if want == ColorNever {
 		return Style{}
 	}
-	return Style{enabled: true, direct: directColor()}
+	d := depthNone
+	if f, ok := w.(*os.File); ok && term.IsTerminal(int(f.Fd())) {
+		d = terminalDepth(f)
+	}
+	if want == ColorAlways && d == depthNone {
+		d = advertised()
+	}
+	if !d.escapes() {
+		return Style{}
+	}
+	return Style{enabled: true, direct: d == depthDirect}
 }
 
-// directColor reports whether the terminal takes 24-bit colour, which decides
-// how faithfully a swatch can be drawn and nothing else.
+// advertised is the depth the environment claims, for a destination there is no
+// terminal to ask.
 //
 // COLORTERM is the convention terminals actually advertise with; a TERM ending
-// in -direct is terminfo's own spelling of the same capability.
-func directColor() bool {
+// in -direct is terminfo's own spelling of the same capability. Neither says
+// anything about names, which anything with colour at all resolves.
+func advertised() depth {
 	switch os.Getenv("COLORTERM") {
 	case "truecolor", "24bit":
-		return true
+		return depthDirect
 	}
-	return strings.HasSuffix(os.Getenv("TERM"), "-direct")
+	if strings.HasSuffix(os.Getenv("TERM"), "-direct") {
+		return depthDirect
+	}
+	return depthNamed
 }
 
 // Enabled reports whether this styling emits escape sequences.
@@ -167,17 +206,17 @@ func (s Style) paintMarks(m Marks) string {
 	return b.String()
 }
 
-type color struct{ r, g, b uint8 }
+type rgb struct{ r, g, b uint8 }
 
 // parseHex reads the "#RRGGBB" Proton stores a label, folder, calendar or group
 // colour as. Anything else reports false, so an unrecognised value is printed
 // plainly rather than painted from nonsense.
-func parseHex(s string) (color, bool) {
-	rgb, err := hex.DecodeString(strings.TrimPrefix(strings.TrimSpace(s), "#"))
-	if err != nil || len(rgb) != 3 {
-		return color{}, false
+func parseHex(s string) (rgb, bool) {
+	b, err := hex.DecodeString(strings.TrimPrefix(strings.TrimSpace(s), "#"))
+	if err != nil || len(b) != 3 {
+		return rgb{}, false
 	}
-	return color{rgb[0], rgb[1], rgb[2]}, true
+	return rgb{b[0], b[1], b[2]}, true
 }
 
 // x256 is the nearest index in the xterm-256 palette, computed from the 6×6×6
@@ -185,7 +224,7 @@ func parseHex(s string) (color, bool) {
 // on purpose, for the same reason every role is one of them: a terminal is free
 // to redefine them, so a swatch matched against them would come out as whatever
 // the reader's theme says rather than as the colour Proton stores.
-func (c color) x256() uint8 {
+func (c rgb) x256() uint8 {
 	best, bestDist := uint8(0), 1<<31-1
 	consider := func(idx uint8, r, g, b int) {
 		d := sq(int(c.r)-r) + sq(int(c.g)-g) + sq(int(c.b)-b)

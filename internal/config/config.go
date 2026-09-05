@@ -174,30 +174,33 @@ func Load(path string, from Source) (*File, Source, error) {
 
 // Flags is what the command line said. A nil boolean is a flag left alone.
 type Flags struct {
-	Config   string
-	Profile  string
-	Output   string
-	LogLevel string
-	Confirm  string
-	Zone     string
-	Quiet    *bool
-	FullIDs  *bool
-	NoColor  *bool
-	NoInput  *bool
-	NoLog    *bool
+	Config     string
+	Profile    string
+	Output     string
+	LogLevel   string
+	Confirm    string
+	Zone       string
+	Quiet      *bool
+	FullIDs    *bool
+	ForceColor *bool
+	NoColor    *bool
+	NoInput    *bool
+	NoLog      *bool
 }
 
 // Resolved is the settled answer for one invocation.
 type Resolved struct {
 	Profile profile.Name
 	Output  ui.Format
+	// Color is what was asked for about painting the answer, before the stream it
+	// is going to is asked what it can render.
+	Color ui.Color
 	// Zone is the IANA zone this invocation works in, or "" when nothing on this
 	// machine names one.
 	Zone          string
 	LogLevel      slog.Level
 	Quiet         bool
 	FullIDs       bool
-	NoColor       bool
 	NoInput       bool
 	NoLog         bool
 	NoUpdateCheck bool
@@ -271,15 +274,19 @@ func Resolve(f *File, flags Flags) (Resolved, error) {
 	if err != nil {
 		return Resolved{}, err
 	}
+	color, err := resolveColor(global, scoped, flags)
+	if err != nil {
+		return Resolved{}, err
+	}
 
 	return Resolved{
 		Profile:       profileName,
 		Output:        format,
+		Color:         color,
 		Zone:          zone,
 		LogLevel:      level,
 		Quiet:         firstSet(flags.Quiet, nil, scoped.Quiet, global.Quiet),
 		FullIDs:       firstSet(flags.FullIDs, nil, scoped.FullIDs, global.FullIDs),
-		NoColor:       firstSet(flags.NoColor, present("NO_COLOR"), scoped.NoColor, global.NoColor),
 		NoInput:       firstSet(flags.NoInput, present("PROTON_NO_INPUT"), scoped.NoInput, global.NoInput),
 		NoLog:         firstSet(flags.NoLog, present(NoLogVar), scoped.NoLog, global.NoLog),
 		NoUpdateCheck: firstSet(nil, present("PROTON_NO_UPDATE_CHECK"), scoped.NoUpdateCheck, global.NoUpdateCheck),
@@ -310,6 +317,71 @@ func resolveZone(global, scoped Settings, flag string) (string, error) {
 	}
 	return firstNonEmpty(flag, envZone(), scoped.Zone, global.Zone, hostZone()), nil
 }
+
+// EnvColor is what the environment alone says about painting the answer:
+// FORCE_COLOR to paint whatever it is going to, NO_COLOR not to paint at all.
+//
+// It stands apart from Resolve for the two failures reported before a command
+// line has parsed - an unknown flag, a word naming no subcommand. Neither has
+// flags to read, and --config is one of the flags, so neither has a file
+// either. The variables are the whole of what can be honoured there, and they
+// are honoured from here so that they are read in one place.
+//
+// Forcing outranks refusing. NO_COLOR is set once, in a shell profile, for
+// everything a person runs; FORCE_COLOR is set for one job by whoever knows what
+// reads its output - a pager, a log rendered later - and the narrower statement
+// is the one that means something.
+func EnvColor() ui.Color {
+	switch {
+	case isSet("FORCE_COLOR"):
+		return ui.ColorAlways
+	case isSet("NO_COLOR"):
+		return ui.ColorNever
+	}
+	return ui.ColorAuto
+}
+
+// resolveColor settles painting the way every other setting is settled - the
+// nearest source that says anything - over three answers rather than two.
+//
+// The third one exists because whether colour is wanted and whether the
+// destination can show it are different questions, and only the person running
+// the command knows the first when the answer is going somewhere this program
+// cannot ask about.
+//
+// Both flags at once is a sentence that contradicts itself, so it is refused
+// rather than ranked: resolved either way, half of what was typed would be
+// passed over in silence.
+func resolveColor(global, scoped Settings, flags Flags) (ui.Color, error) {
+	switch {
+	case said(flags.NoColor) && said(flags.ForceColor):
+		return ui.ColorAuto, errs.Problemf("--no-color and --force-color contradict each other.")
+	case said(flags.NoColor):
+		return ui.ColorNever, nil
+	case said(flags.ForceColor):
+		return ui.ColorAlways, nil
+	// Written with a false value, which is how a setting in the file is turned
+	// off for one run: the command line has answered.
+	case flags.NoColor != nil || flags.ForceColor != nil:
+		return ui.ColorAuto, nil
+	}
+	if want := EnvColor(); want != ui.ColorAuto {
+		return want, nil
+	}
+	for _, file := range []*bool{scoped.NoColor, global.NoColor} {
+		if file == nil {
+			continue
+		}
+		if *file {
+			return ui.ColorNever, nil
+		}
+		return ui.ColorAuto, nil
+	}
+	return ui.ColorAuto, nil
+}
+
+// said reports a boolean flag written with a true value.
+func said(v *bool) bool { return v != nil && *v }
 
 // ConfirmVar carries the one-line form of the policy.
 const ConfirmVar = "PROTON_CONFIRM"
@@ -364,11 +436,17 @@ func resolveConfirm(global, scoped Settings, flag string) (confirm.Policy, error
 // switches a behaviour off should not need a second mental model for its value,
 // and `NO_COLOR=` in a CI environment file reads as intent either way.
 func present(name string) *bool {
-	if _, ok := os.LookupEnv(name); !ok {
+	if !isSet(name) {
 		return nil
 	}
 	yes := true
 	return &yes
+}
+
+// isSet reports an environment variable set to anything at all, even nothing.
+func isSet(name string) bool {
+	_, ok := os.LookupEnv(name)
+	return ok
 }
 
 // firstSet takes the nearest source that said anything, and false when none did.
