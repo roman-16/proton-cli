@@ -410,6 +410,31 @@ func TestPatchRefusesContradictoryReminderFlags(t *testing.T) {
 	}
 }
 
+// The colour lives beside the cards rather than in them, so every write sends it
+// again: one that did not mention it would take it away.
+func TestPatchCarriesAColourForwardAndWritesTheOneItIsGiven(t *testing.T) {
+	had := "#EC3E7C"
+	raw := rawEvent{Color: &had}
+
+	kept := EventPatch{}.color(raw)
+	if kept == nil || *kept != had {
+		t.Errorf("an unmentioned colour became %v, want the one the event had", kept)
+	}
+
+	given := "#179FD9"
+	set := EventPatch{Color: &given}.color(raw)
+	if set == nil || *set != given {
+		t.Errorf("the colour given was written as %v, want %s", set, given)
+	}
+
+	// An event that never had one keeps having none: Proton reads the field's
+	// absence as "drawn in the calendar's colour", and no empty string means that.
+	none := EventPatch{}.color(rawEvent{})
+	if none != nil {
+		t.Errorf("an event with no colour was given %v", *none)
+	}
+}
+
 // ── the chain ──
 
 func TestSeriesFindsAnOverrideAndTheOnesFromAnInstantOn(t *testing.T) {

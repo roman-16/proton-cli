@@ -68,6 +68,7 @@ var examples = map[string][]string{
 		"proton calendar events create --title Holiday --start 2026-07-01 --all-day --calendar Personal",
 		"proton calendar events create --title 'Design review' --start 2026-04-20T10:00 --end 2026-04-20T10:45 --attendee jane@example.com --location 'Room 3'",
 		"proton calendar events create --title Renewal --start 2026-09-01T09:00 --remind 1d:email",
+		"proton calendar events create --title Deadline --start 2026-04-30T17:00 --duration 1h --color strawberry",
 	},
 	"proton calendar events export": {
 		"proton calendar events export --start 2026-01-01 --end 2026-12-31 --dest year.ics",
@@ -103,6 +104,7 @@ var examples = map[string][]string{
 		"proton calendar events update 4f2a1b9c@2026-04-22T09:00 --title Standup --onwards",
 		"proton calendar events update Offsite --all-day",
 		"proton calendar events update Offsite --all-day=false --start 2026-07-01T09:00 --end 2026-07-01T17:00",
+		"proton calendar events update Dentist --color pacific",
 	},
 	"proton calendar events delete": {
 		"proton calendar events delete Dentist",

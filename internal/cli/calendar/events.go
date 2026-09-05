@@ -172,6 +172,7 @@ func eventsGetCmd() *cobra.Command {
 					{Label: "Status", Value: ev.Status, Always: true},
 					{Label: "Organizer", Value: ev.Organizer},
 					{Label: "Attendees", Value: strings.Join(ev.Attendees, ", ")},
+					kit.ColorField(ev.Color),
 					{Label: "Calendar", Value: name},
 					kit.SignatureField(string(ev.Signature)),
 					{Label: "ID", Value: eventRef(*ev), ID: true},
@@ -206,6 +207,13 @@ func seriesLabel(e calsvc.Event) string {
 	return kit.JoinPair(e.CalendarID, e.ID)
 }
 
+// colorParagraph is what both commands say about --color, since an event's
+// colour behaves the same whether it is being given one or given another.
+const colorParagraph = "--color gives an event a color of its own; without one it is drawn in its\n" +
+	"calendar's. Once it has one there is no way back, in Proton's apps or here.\n" +
+	"A color of its own is a paid feature: Proton stores one for a free account,\n" +
+	"but its apps draw the calendar's."
+
 // details are the fields an event carries. create and update share them, so the
 // two commands cannot disagree about what an event is.
 type details struct {
@@ -213,6 +221,7 @@ type details struct {
 	start, duration, rrule       string
 	end                          string
 	status                       *kit.Enum
+	color                        *kit.Color
 	allDay                       bool
 	reminders                    []string
 	noReminders                  bool
@@ -224,6 +233,10 @@ func (d *details) register(c *cobra.Command, verb string) {
 		Values: calsvc.EventStatuses(),
 	}
 	d.status.Register(c)
+	d.color = &kit.Color{
+		Name: "color", Usage: verb + " the color, by name (purple) or hex (#8080FF)",
+	}
+	d.color.Register(c)
 	f := c.Flags()
 	f.StringVar(&d.title, "title", "", verb+" the title")
 	f.StringVar(&d.start, "start", "", verb+" the start: a day, or a day and a time "+
@@ -249,7 +262,7 @@ func eventsCreateCmd() *cobra.Command {
 			"with no time of day, which --all-day has to say as well.\n\n" +
 			"Without --end or --duration an event lasts as long as the calendar it is made\n" +
 			"in says a new event lasts, which `settings calendars get` shows; an all-day\n" +
-			"event lasts a day.",
+			"event lasts a day.\n\n" + colorParagraph,
 		Args: cobra.NoArgs,
 		RunE: kit.Run([]kit.Step{d.check(true)}, func(c *kit.Invocation) error {
 			if d.title == "" || d.start == "" {
@@ -287,7 +300,7 @@ func eventsCreateCmd() *cobra.Command {
 					Title: d.title, Location: d.location, Description: d.description,
 					Start: start, Duration: dur,
 					RRule: d.rrule, Reminders: d.reminders, Attendees: attendees,
-					Status: calsvc.ICalStatus(status),
+					Status: calsvc.ICalStatus(status), Color: d.color.Value(),
 				})
 				if err != nil {
 					return "", err
@@ -325,7 +338,7 @@ func eventsUpdateCmd() *cobra.Command {
 			"A reference that names one occurrence of a recurring event changes only that\n" +
 			"occurrence. Add --onwards to change it and every later one, or drop the @ part\n" +
 			"of the reference to change the whole series, which --dry-run will show you\n" +
-			"before you do.",
+			"before you do.\n\n" + colorParagraph,
 		Args: cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{d.check(false), kit.StepExpand}, func(c *kit.Invocation) error {
 			calID, eventID, occurrence, err := resolveEvent(c, c.Args[0])
@@ -411,6 +424,10 @@ func (d *details) patch(c *kit.Invocation, calendarID string, reached *reach) (c
 	if c.Changed("no-remind") {
 		none := []string{}
 		p.Reminders = &none
+	}
+	if d.color.Set() {
+		color := d.color.Value()
+		p.Color = &color
 	}
 
 	if !c.Changed("start") {
@@ -996,7 +1013,9 @@ func eventsImportCmd() *cobra.Command {
 			"An event is addressed by its UID, so reading a file back changes that event\n" +
 			"rather than making a second one.\n\n" +
 			"Participants are left out. An imported event is a record; no invitations\n" +
-			"are sent.",
+			"are sent.\n\n" +
+			"A color in the file becomes the nearest of Proton's twenty accent colors,\n" +
+			"since those are the only ones it stores.",
 		Args: cobra.ExactArgs(1),
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			text, err := kit.ReadTextArg(c, c.Args[0], "PATH")

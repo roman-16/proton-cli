@@ -308,6 +308,34 @@ func TestAlarmsRenderAsValarmComponents(t *testing.T) {
 	}
 }
 
+// An event's colour travels in the file and never in a card: it is Proton's own
+// cleartext field, and writing it into the content would encrypt something the
+// API reads for itself.
+func TestColourTravelsInTheFileAndNotInTheCards(t *testing.T) {
+	v := VEvent{UID: "a", Summary: "Deadline", Color: "#EC3E7C"}
+	for _, card := range []string{v.SharedSigned(), v.SharedEncrypted()} {
+		if strings.Contains(card, "COLOR") {
+			t.Errorf("a card carries the colour:\n%s", card)
+		}
+	}
+
+	file := Calendar([]VEvent{v})
+	if !strings.Contains(file, "COLOR:#EC3E7C") {
+		t.Errorf("the file does not carry the colour:\n%s", file)
+	}
+	back, err := ParseCalendar(file)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if len(back) != 1 || back[0].Color != "#EC3E7C" {
+		t.Errorf("the colour came back as %+v", back)
+	}
+
+	if got := Calendar([]VEvent{{UID: "b", Summary: "Plain"}}); strings.Contains(got, "COLOR") {
+		t.Errorf("an event with no colour wrote one:\n%s", got)
+	}
+}
+
 // An event's own status round-trips, so exporting a cancelled event and reading
 // it back does not quietly revive it.
 func TestStatusSurvivesTheRoundTrip(t *testing.T) {

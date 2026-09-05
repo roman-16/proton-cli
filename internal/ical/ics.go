@@ -93,6 +93,9 @@ func (v VEvent) component() []contentline.Line {
 	if v.Status != "" {
 		lines = append(lines, contentline.Line{Name: "STATUS", Value: v.Status})
 	}
+	if v.Color != "" {
+		lines = append(lines, contentline.Line{Name: "COLOR", Value: v.Color})
+	}
 	lines = append(lines, contentline.Line{Name: "SEQUENCE", Value: strconv.Itoa(v.Sequence)})
 	for _, a := range v.Alarms {
 		lines = append(lines, a.lines()...)

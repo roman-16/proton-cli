@@ -39,6 +39,12 @@ type EventPatch struct {
 	// CANCELLED. Cancelling this way keeps the event and its history, which is
 	// what the web client does and what `delete` does not.
 	Status *string
+	// Color is the event's own accent colour, as the hex Proton stores.
+	//
+	// There is no value here that takes a colour away: Proton offers no colour
+	// meaning "none", so an event that has been given one can only be given
+	// another. Its own clients cannot do it either.
+	Color *string
 }
 
 // TouchesTimes reports whether the patch puts the event somewhere else or gives
@@ -148,6 +154,15 @@ func (p EventPatch) reminders(raw rawEvent) ([]map[string]any, error) {
 		return raw.notifications(), nil
 	}
 	return buildReminders(*p.Reminders)
+}
+
+// color resolves the colour a write sends: the patched one, or the one the event
+// already had.
+func (p EventPatch) color(raw rawEvent) *string {
+	if p.Color == nil {
+		return raw.Color
+	}
+	return optionalColor(*p.Color)
 }
 
 // ── the chain ──
@@ -331,7 +346,7 @@ func (s *Service) EventUpdate(ctx context.Context, calendarID, eventID string, p
 	op, err := ck.updateOp(eventID, eventBody{
 		model:         updated,
 		notifications: notifs,
-		color:         old.raw.Color,
+		color:         p.color(old.raw),
 		isOrganizer:   old.raw.IsOrganizer,
 		keyPacket:     old.raw.SharedKeyPacket,
 		attendeeList:  attendeeList(old.raw),
@@ -378,7 +393,7 @@ func (s *Service) OccurrenceUpdate(ctx context.Context, calendarID, eventID, occ
 	body := eventBody{
 		model:         updated,
 		notifications: notifs,
-		color:         overrideRaw(target, master).Color,
+		color:         p.color(overrideRaw(target, master)),
 		isOrganizer:   master.raw.IsOrganizer,
 	}
 
@@ -475,7 +490,7 @@ func (s *Service) SeriesSplit(ctx context.Context, calendarID, eventID, occurren
 	tailBody := eventBody{
 		model:         remainder,
 		notifications: notifs,
-		color:         master.raw.Color,
+		color:         p.color(master.raw),
 		isOrganizer:   master.raw.IsOrganizer,
 	}
 	external, err := s.attachAttendees(ctx, &tailBody, emailsOf(remainder))

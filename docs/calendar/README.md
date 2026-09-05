@@ -60,6 +60,23 @@ proton calendar events update Offsite --all-day=false --start 2026-07-01T09:00 -
 
 `--status` says whether the event is going ahead: `confirmed`, `tentative` or `cancelled`. Cancelling this way keeps the event and its history, which `delete` does not.
 
+### Colour
+
+`--color` gives one event a colour of its own, on `create` and on `update`. An event without one is drawn in its calendar's colour.
+
+```bash
+proton calendar events create --title Deadline --start 2026-04-30T17:00 --duration 1h --color strawberry
+proton calendar events update Dentist --color pacific
+```
+
+Name one of Proton's twenty accent colours or give its hex value. Anything else is refused before the request goes out, and the refusal prints the palette.
+
+An edit that says nothing about the colour leaves it alone, and a colour reaches exactly what the reference names: one occurrence takes its own, `--onwards` colours that one and every later one, and the series' own reference colours all of it.
+
+A colour cannot be taken away once an event has one - it can only be changed. Proton has no value meaning "none", and its own apps offer no way back either.
+
+A colour per event is a paid feature, and Proton enforces it when drawing rather than when storing. A free account's colour is stored, and `events get` reports it, but Proton's own apps draw the calendar's.
+
 ### Attendees
 
 Proton users are added directly. External addresses get an emailed invitation.
@@ -183,6 +200,8 @@ curl -s https://example.com/team.ics | proton calendar events import -
 ```
 
 A recurring series is exported **once** with its rule rather than expanded, so another client reads it back as the same series. Reminders travel as `VALARM` components. An event that cannot be decrypted is left out rather than written as a stub.
+
+An event's own colour travels as a `COLOR` property, so a round trip keeps it. On the way in, a colour the file names in CSS - `tomato`, `#FF6347` - becomes the nearest of Proton's twenty accents, since those are the only colours it stores.
 
 **An import is addressed by UID.** An event carries the UID of the event it is, so reading a file back changes that event rather than making a second one. Export, edit, import, and the calendar says what the file says.
 

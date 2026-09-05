@@ -153,7 +153,7 @@ proton calendar settings calendars update Personal --busy off
 | Flag | Description |
 | --- | --- |
 | `--busy string` | Whether events here make you look busy to others: on, off |
-| `--color string` | New accent color, as a hex value |
+| `--color string` | New accent color, by name (purple) or hex (#8080FF) |
 | `--default-duration string` | How long a new event lasts unless it says otherwise (e.g. 30m, 1h) |
 | `--name string` | New name |
 | `--no-remind` | Give new events no reminder by default |

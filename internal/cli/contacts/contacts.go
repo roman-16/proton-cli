@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/roman-16/proton-cli/internal/accent"
 	"github.com/roman-16/proton-cli/internal/cli/kit"
 	"github.com/roman-16/proton-cli/internal/crypto/pgp"
 	ctsvc "github.com/roman-16/proton-cli/internal/service/contacts"
@@ -441,7 +442,7 @@ func importCmd() *cobra.Command {
 				Preview: kit.Preview("contacts", offeredColumns(), offered(cards, !noGroups)),
 			}, func() ([]ctsvc.SkippedContact, error) {
 				res, err = c.App.Contacts.Import(c.Ctx, cards, ctsvc.ImportOptions{
-					Groups: !noGroups, GroupColor: kit.DefaultAccentColor,
+					Groups: !noGroups, GroupColor: accent.Default,
 				})
 				if err != nil {
 					return nil, err

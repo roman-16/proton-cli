@@ -4,6 +4,7 @@ import (
 	"context"
 	"strconv"
 
+	"github.com/roman-16/proton-cli/internal/accent"
 	"github.com/roman-16/proton-cli/internal/cli/kit"
 	ctsvc "github.com/roman-16/proton-cli/internal/service/contacts"
 	"github.com/roman-16/proton-cli/internal/ui"
@@ -62,7 +63,7 @@ func groupsGetCmd() *cobra.Command {
 			}{group, members}
 			fields := []ui.Field{
 				{Label: "Name", Value: group.Name, Handle: true},
-				{Label: "Color", Value: group.Color},
+				kit.ColorField(group.Color),
 				{Label: "Addresses", Value: strconv.Itoa(len(members)), Always: true},
 			}
 			for _, m := range members {
@@ -96,7 +97,7 @@ func groupsListCmd() *cobra.Command {
 
 func groupsCreateCmd() *cobra.Command {
 	var name string
-	color := &kit.Color{Name: "color", Default: kit.DefaultAccentColor}
+	color := &kit.Color{Name: "color", Default: accent.Default}
 	c := &cobra.Command{
 		Use:   "create",
 		Short: "Create a contact group",
@@ -119,7 +120,7 @@ func groupsCreateCmd() *cobra.Command {
 
 func groupsUpdateCmd() *cobra.Command {
 	var name string
-	color := &kit.Color{Name: "color", Usage: "New accent color, as a hex value"}
+	color := &kit.Color{Name: "color", Usage: "New accent color, by name (purple) or hex (#8080FF)"}
 	c := &cobra.Command{
 		Use:   "update REF",
 		Short: "Rename or recolor a contact group",

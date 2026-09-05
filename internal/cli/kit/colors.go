@@ -2,69 +2,38 @@ package kit
 
 import (
 	"fmt"
-	"strings"
 
+	"github.com/roman-16/proton-cli/internal/accent"
 	"github.com/roman-16/proton-cli/internal/ui"
 	"github.com/spf13/cobra"
 )
 
-// AccentColors is Proton's fixed label/calendar color palette, mirroring
-// ACCENT_COLORS in WebClients (packages/shared/lib/colors.ts). The API rejects
-// colors outside this set, so the CLI validates client-side for a clear error.
-var AccentColors = []struct{ name, hex string }{
-	{"purple", "#8080FF"}, {"pink", "#DB60D6"}, {"strawberry", "#EC3E7C"},
-	{"carrot", "#F78400"}, {"sahara", "#936D58"}, {"enzian", "#5252CC"},
-	{"plum", "#A839A4"}, {"cerise", "#BA1E55"}, {"copper", "#C44800"},
-	{"soil", "#54473F"}, {"slateblue", "#415DF0"}, {"pacific", "#179FD9"},
-	{"reef", "#1DA583"}, {"fern", "#3CBB3A"}, {"olive", "#B4A40E"},
-	{"cobalt", "#273EB2"}, {"ocean", "#0A77A6"}, {"pine", "#0F735A"},
-	{"forest", "#258723"}, {"pickle", "#807304"},
-}
-
-// AccentColor resolves a colour the user typed to the hex Proton stores.
+// AccentColor resolves a colour the user typed to the hex Proton stores, and
+// refuses anything off Proton's palette by naming the whole of it.
 //
-// Both spellings are accepted, because both are spellings of the same thing: the
-// palette has twenty entries and every one of them has a name. A list that shows
-// "purple" and a flag that only takes "#8080FF" would be the CLI printing
-// something it will not read back, which is the one thing its references are
-// meant never to do.
+// The refusal is local because the API's own says only that the colour was
+// invalid, which leaves the user no better off than before.
 //
 // Empty resolves to empty, so a caller can supply its own default.
 func AccentColor(color string) (string, error) {
 	if color == "" {
 		return "", nil
 	}
-	for _, c := range AccentColors {
-		if strings.EqualFold(c.hex, color) || strings.EqualFold(c.name, color) {
-			return c.hex, nil
-		}
+	if hex := accent.Resolve(color); hex != "" {
+		return hex, nil
 	}
 	lines := []string{"use a name or a hex value:"}
-	for _, c := range AccentColors {
-		lines = append(lines, fmt.Sprintf("  %-11s %s", c.name, c.hex))
+	for _, c := range accent.Palette {
+		lines = append(lines, fmt.Sprintf("  %-11s %s", c.Name, c.Hex))
 	}
 	return "", Fail("%q is not a Proton accent color.", color).Hint(lines...)
 }
 
 // ValidateAccentColor rejects anything outside Proton's palette, naming the whole
 // palette when it does.
-//
-// The check is local because the API's own refusal says only that the colour was
-// invalid, which leaves the user no better off than before.
 func ValidateAccentColor(color string) error {
 	_, err := AccentColor(color)
 	return err
-}
-
-// AccentName is Proton's own name for a colour, or "" for a hex outside the
-// palette. It mirrors getColorName in WebClients (packages/shared/lib/colors.ts).
-func AccentName(hex string) string {
-	for _, c := range AccentColors {
-		if strings.EqualFold(c.hex, hex) {
-			return c.name
-		}
-	}
-	return ""
 }
 
 // ColorColumn is the COLOR column, wherever a collection has one.
@@ -81,7 +50,7 @@ func ColorColumn[T any](hex func(T) string) ui.Column[T] {
 		Swatch: hex,
 		Cell: func(row T) string {
 			v := hex(row)
-			if name := AccentName(v); name != "" {
+			if name := accent.Name(v); name != "" {
 				return name
 			}
 			return v
@@ -92,15 +61,11 @@ func ColorColumn[T any](hex func(T) string) ui.Column[T] {
 // ColorField is ColorColumn's counterpart for a record.
 func ColorField(hex string) ui.Field {
 	value := hex
-	if name := AccentName(hex); name != "" {
+	if name := accent.Name(hex); name != "" {
 		value = name
 	}
 	return ui.Field{Label: "Color", Value: value, Swatch: hex}
 }
-
-// DefaultAccentColor is the purple Proton offers first, used wherever a colour is
-// optional.
-const DefaultAccentColor = "#8080FF"
 
 // Color is a flag holding one of Proton's accent colours.
 //
@@ -132,9 +97,9 @@ func (c *Color) Register(cmd *cobra.Command) {
 		func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 			// Completing the names rather than the hexes offers the spelling a
 			// person can recognise; the hex trails as the description.
-			out := make([]string, 0, len(AccentColors))
-			for _, a := range AccentColors {
-				out = append(out, a.name+"\t"+a.hex)
+			out := make([]string, 0, len(accent.Palette))
+			for _, c := range accent.Palette {
+				out = append(out, c.Name+"\t"+c.Hex)
 			}
 			return out, cobra.ShellCompDirectiveNoFileComp
 		})

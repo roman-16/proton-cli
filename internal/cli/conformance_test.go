@@ -1372,9 +1372,13 @@ var layers = map[string][]string{
 	"ref":         {"errs"},
 	"changelog":   {},
 	"contentline": {},
-	"ical":        {"contentline"},
-	"vcard":       {"contentline"},
-	"profile":     {},
+	// accent is Proton's palette, which a flag and an import both need: one to
+	// refuse what a person typed, one to snap what a file said. It is a table and
+	// the arithmetic over it, so it reaches for nothing.
+	"accent":  {},
+	"ical":    {"contentline"},
+	"vcard":   {"contentline"},
+	"profile": {},
 }
 
 func TestPackagesImportDownwardOnly(t *testing.T) {

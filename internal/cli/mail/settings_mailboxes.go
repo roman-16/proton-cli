@@ -3,6 +3,7 @@ package mail
 import (
 	"context"
 
+	"github.com/roman-16/proton-cli/internal/accent"
 	"github.com/roman-16/proton-cli/internal/cli/kit"
 	mailsvc "github.com/roman-16/proton-cli/internal/service/mail"
 	"github.com/roman-16/proton-cli/internal/ui"
@@ -111,7 +112,7 @@ func mailboxListCmd(noun string, folder bool) *cobra.Command {
 func mailboxCreateCmd(noun string, folder bool) *cobra.Command {
 	var name, parent string
 	var notify bool
-	color := &kit.Color{Name: "color", Default: kit.DefaultAccentColor}
+	color := &kit.Color{Name: "color", Default: accent.Default}
 	c := &cobra.Command{
 		Use:   "create",
 		Short: "Create a " + ui.Singular(noun),
@@ -143,7 +144,7 @@ func mailboxCreateCmd(noun string, folder bool) *cobra.Command {
 func mailboxUpdateCmd(noun string, folder bool) *cobra.Command {
 	var name, parent string
 	var notify bool
-	color := &kit.Color{Name: "color", Usage: "New accent color, as a hex value"}
+	color := &kit.Color{Name: "color", Usage: "New accent color, by name (purple) or hex (#8080FF)"}
 	c := &cobra.Command{
 		Use:   "update REF",
 		Short: "Rename or recolor a " + ui.Singular(noun),

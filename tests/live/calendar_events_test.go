@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -531,6 +532,113 @@ func TestCalendarUpdatingAnEventKeepsItsReminders(t *testing.T) {
 	}
 }
 
+// An event may carry an accent colour of its own. It lives beside the encrypted
+// cards, so it survives an edit that says nothing about it, and an event given
+// none has none rather than an empty one.
+func TestCalendarAnEventKeepsTheColourItWasGiven(t *testing.T) {
+	title := testID() + "-colour"
+	ref := strings.TrimSpace(runOK(t, "calendar", "events", "create",
+		"--calendar", "Default", "--title", title,
+		"--start", "2027-07-02T09:00", "--duration", "30m", "--color", "pacific"))
+	cleanupRun(t, fmt.Sprintf("Delete event: proton calendar events delete -- %s", ref),
+		"calendar", "events", "delete", "--", ref)
+
+	if got := colourOf(t, ref); got != "#179FD9" {
+		t.Fatalf("the event was created with colour %q, want pacific", got)
+	}
+	// The name is what a person reads, and the hex is what a machine gets.
+	assertContains(t, runOK(t, "calendar", "events", "get", "--", ref), "pacific")
+	if got := runJSON(t, "calendar", "events", "get", "--", ref)["color"]; got != "#179FD9" {
+		t.Errorf("machine output reports the colour as %v, want #179FD9", got)
+	}
+
+	runOK(t, "calendar", "events", "update", "--title", title+"-renamed", "--", ref)
+	if got := colourOf(t, ref); got != "#179FD9" {
+		t.Errorf("renaming the event left it with colour %q, want pacific kept", got)
+	}
+
+	runOK(t, "calendar", "events", "update", "--color", "strawberry", "--", ref)
+	if got := colourOf(t, ref); got != "#EC3E7C" {
+		t.Errorf("--color left the event with %q, want strawberry", got)
+	}
+
+	// An event given no colour has none of its own, which is how it comes to be
+	// drawn in its calendar's.
+	plain := strings.TrimSpace(runOK(t, "calendar", "events", "create",
+		"--calendar", "Default", "--title", title+"-plain",
+		"--start", "2027-07-02T11:00", "--duration", "30m"))
+	cleanupRun(t, fmt.Sprintf("Delete event: proton calendar events delete -- %s", plain),
+		"calendar", "events", "delete", "--", plain)
+	if got := colourOf(t, plain); got != "" {
+		t.Errorf("an event created with no colour has %q", got)
+	}
+}
+
+// A colour follows the scope its reference names: one occurrence takes its own
+// and leaves the series alone, and --onwards colours the remainder only.
+func TestCalendarAColourReachesWhatTheReferenceNames(t *testing.T) {
+	const pacific, strawberry, carrot = "#179FD9", "#EC3E7C", "#F78400"
+	last := "2027-03-29"
+	title := testID() + "-colour-series"
+	createSeries(t, title, seriesAnchor+"T11:00", "FREQ=WEEKLY;COUNT=4", "--color", "pacific")
+
+	refs := occurrenceRefs(t, title, seriesAnchor, last)
+	if len(refs) != 4 {
+		t.Fatalf("the series listed %d occurrences, want 4", len(refs))
+	}
+
+	runOK(t, "calendar", "events", "update", "--color", "strawberry", "--", refs[1])
+	if got := colours(t, title, seriesAnchor, last); !slices.Equal(got,
+		[]string{pacific, strawberry, pacific, pacific}) {
+		t.Errorf("colouring one occurrence left the series %v", got)
+	}
+
+	runOK(t, "calendar", "events", "update", "--color", "carrot", "--onwards", "--", refs[2])
+	cleanupSplitRemainder(t, title, seriesAnchor, last, carrot)
+	if got := colours(t, title, seriesAnchor, last); !slices.Equal(got,
+		[]string{pacific, strawberry, carrot, carrot}) {
+		t.Errorf("colouring from an occurrence on left the series %v", got)
+	}
+}
+
+// colours is the colour each occurrence of a series is drawn in, in the order a
+// listing prints them.
+func colours(t *testing.T, title, from, to string) []string {
+	t.Helper()
+	var out []string
+	for _, row := range occurrencesOf(t, title, from, to) {
+		colour, _ := row["color"].(string)
+		out = append(out, colour)
+	}
+	return out
+}
+
+// cleanupSplitRemainder registers the second series a split produced, which has
+// an identity of its own and so outlives the one the test created.
+func cleanupSplitRemainder(t *testing.T, title, from, to, colour string) {
+	t.Helper()
+	for _, row := range occurrencesOf(t, title, from, to) {
+		if got, _ := row["color"].(string); got != colour {
+			continue
+		}
+		cal, _ := row["calendar_id"].(string)
+		id, _ := row["id"].(string)
+		cleanupRun(t, fmt.Sprintf("Delete split remainder: proton calendar events delete -- %s/%s", cal, id),
+			"calendar", "events", "delete", "--yes", "--", cal+"/"+id)
+		return
+	}
+}
+
+// colourOf reads an event's own colour straight from the API. It is empty for an
+// event that has none, which the API spells as a null.
+func colourOf(t *testing.T, ref string) string {
+	t.Helper()
+	data := runJSON(t, "api", "GET", eventPath(t, ref))
+	ev, _ := data["Event"].(map[string]interface{})
+	colour, _ := ev["Color"].(string)
+	return colour
+}
+
 // triggersOf reads an event's reminder triggers straight from the API, so the
 // assertion does not depend on how the CLI renders them.
 func triggersOf(t *testing.T, ref string) []string {
@@ -931,12 +1039,16 @@ func editEventNamed(t *testing.T, ics, title, line string) string {
 
 // Export and import are each other's inverse, so a file written here reads back
 // as the same events - which is the only thing that makes an export a backup.
+//
+// The colour is part of that. It travels as a COLOR property, and a colour the
+// file names in CSS comes back as the nearest of Proton's twenty.
 func TestCalendarEventsImportRoundTripsAnExport(t *testing.T) {
 	title := testID() + "-roundtrip"
 	day := "2027-10-04"
 	runOK(t, "calendar", "events", "create",
 		"--calendar", "Default", "--title", title,
-		"--start", day+"T09:00", "--duration", "45m", "--remind", "20m")
+		"--start", day+"T09:00", "--duration", "45m", "--remind", "20m",
+		"--color", "pacific")
 	// Overwriting by UID replaces the event, and the replacement has an ID of its
 	// own, so cleanup goes looking by name rather than holding the first one.
 	cleanup(t, "Delete event: proton calendar events list, then delete the one called "+title, func() error {
@@ -961,9 +1073,13 @@ func TestCalendarEventsImportRoundTripsAnExport(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read the export: %v", err)
 	}
-	// The file may hold other events from the same window, so the location goes
-	// on the one this test made rather than on whichever came first.
+	if !strings.Contains(string(written), "COLOR:#179FD9") {
+		t.Error("the export does not carry the event's colour, so a round trip loses it")
+	}
+	// The file may hold other events from the same window, so the edits go on the
+	// one this test made rather than on whichever came first.
 	edited := editEventNamed(t, string(written), title, "LOCATION:Room 12")
+	edited = strings.Replace(edited, "COLOR:#179FD9", "COLOR:tomato", 1)
 	if err := os.WriteFile(file, []byte(edited), 0o600); err != nil {
 		t.Fatalf("write: %v", err)
 	}
@@ -974,6 +1090,10 @@ func TestCalendarEventsImportRoundTripsAnExport(t *testing.T) {
 		t.Fatalf("re-importing an export made %d events out of one", len(copies))
 	}
 	assertContains(t, runOK(t, "calendar", "events", "get", "--", copies[0]), "Room 12")
+	// tomato is not a colour Proton has, so it arrives as the accent nearest it.
+	if got := colourOf(t, copies[0]); got != "#EC3E7C" {
+		t.Errorf("the imported colour is %q, want the accent nearest tomato", got)
+	}
 }
 
 // eventsTitled returns the references of every event on one day with that title.

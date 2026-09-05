@@ -205,6 +205,29 @@ func TestRowPlacesAnEventItCannotRead(t *testing.T) {
 	}
 }
 
+// An event's colour is Proton's own cleartext field, so a row reports it whether
+// or not the content behind it could be read.
+func TestRowReportsTheColourTheEventCarries(t *testing.T) {
+	hex := "#179FD9"
+	day := time.Date(2026, 8, 14, 0, 0, 0, 0, time.UTC)
+
+	coloured := allDayStored("holiday", day)
+	coloured.raw.Color = &hex
+	if got := coloured.row().Color; got != hex {
+		t.Errorf("the row reports the colour %q, want %s", got, hex)
+	}
+
+	unreadable := unreadableStored(atVienna(t, 4, 16, 9))
+	unreadable.raw.Color = &hex
+	if got := unreadable.row().Color; got != hex {
+		t.Errorf("an unreadable event reports the colour %q, want %s", got, hex)
+	}
+
+	if got := allDayStored("plain", day).row().Color; got != "" {
+		t.Errorf("an event with no colour of its own reports %q", got)
+	}
+}
+
 func contains(ss []string, want string) bool {
 	for _, s := range ss {
 		if s == want {

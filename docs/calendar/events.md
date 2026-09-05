@@ -14,6 +14,8 @@ Create an event.
 
 Without --end or --duration an event lasts as long as the calendar it is made in says a new event lasts, which `settings calendars get` shows; an all-day event lasts a day.
 
+--color gives an event a color of its own; without one it is drawn in its calendar's. Once it has one there is no way back, in Proton's apps or here. A color of its own is a paid feature: Proton stores one for a free account, but its apps draw the calendar's.
+
 ```
 proton calendar events create
 ```
@@ -24,6 +26,7 @@ proton calendar events create --title Standup --start 2026-04-16T09:00 --duratio
 proton calendar events create --title Holiday --start 2026-07-01 --all-day --calendar Personal
 proton calendar events create --title 'Design review' --start 2026-04-20T10:00 --end 2026-04-20T10:45 --attendee jane@example.com --location 'Room 3'
 proton calendar events create --title Renewal --start 2026-09-01T09:00 --remind 1d:email
+proton calendar events create --title Deadline --start 2026-04-30T17:00 --duration 1h --color strawberry
 ```
 
 | Flag | Description |
@@ -31,6 +34,7 @@ proton calendar events create --title Renewal --start 2026-09-01T09:00 --remind 
 | `--all-day` | An event with no time of day |
 | `--attendee stringArray` | Invite someone, as EMAIL or EMAIL:optional; Proton users are added directly, others are emailed (repeatable) |
 | `--calendar string` | Which calendar, by name or ID (default: your first) |
+| `--color string` | Set the color, by name (purple) or hex (#8080FF) |
 | `--description string` | Set the description |
 | `--duration string` | Set how long it lasts (e.g. 15m, 1h, 2h30m, 3d) |
 | `--end string` | Set the end: the last day it runs through, or a day and a time |
@@ -107,6 +111,8 @@ An event is addressed by its UID, so reading a file back changes that event rath
 
 Participants are left out. An imported event is a record; no invitations are sent.
 
+A color in the file becomes the nearest of Proton's twenty accent colors, since those are the only ones it stores.
+
 ```
 proton calendar events import PATH
 ```
@@ -174,6 +180,8 @@ Anything you do not mention is left alone, including the reminders and the recur
 
 A reference that names one occurrence of a recurring event changes only that occurrence. Add --onwards to change it and every later one, or drop the @ part of the reference to change the whole series, which --dry-run will show you before you do.
 
+--color gives an event a color of its own; without one it is drawn in its calendar's. Once it has one there is no way back, in Proton's apps or here. A color of its own is a paid feature: Proton stores one for a free account, but its apps draw the calendar's.
+
 ```
 proton calendar events update REF
 ```
@@ -184,11 +192,13 @@ proton calendar events update 4f2a1b9c@2026-04-22T09:00 --location 'Room 3'
 proton calendar events update 4f2a1b9c@2026-04-22T09:00 --title Standup --onwards
 proton calendar events update Offsite --all-day
 proton calendar events update Offsite --all-day=false --start 2026-07-01T09:00 --end 2026-07-01T17:00
+proton calendar events update Dentist --color pacific
 ```
 
 | Flag | Description |
 | --- | --- |
 | `--all-day` | Turn it into an event with no time of day |
+| `--color string` | Replace the color, by name (purple) or hex (#8080FF) |
 | `--description string` | Replace the description |
 | `--duration string` | Replace how long it lasts (e.g. 15m, 1h, 2h30m, 3d) |
 | `--end string` | Replace the end: the last day it runs through, or a day and a time |

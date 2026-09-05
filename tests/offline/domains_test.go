@@ -76,13 +76,17 @@ func TestPhotoTagIsRefusedAsANumber(t *testing.T) {
 	refuses(t, 1, []string{"drive", "photos", "list", "--tag", "2"}, "--tag accepts:")
 }
 
-// Proton allows only its own accent colours for a label, folder, calendar or
-// contact group, so anything else is refused here rather than by the server.
+// Proton allows only its own accent colours for a label, folder, calendar,
+// contact group or event, so anything else is refused here rather than by the
+// server.
 func TestColourOffProtonsPaletteIsRefused(t *testing.T) {
 	for _, args := range [][]string{
 		{"mail", "settings", "labels", "create", "--name", "x", "--color", "#FFF000"},
 		{"mail", "settings", "folders", "create", "--name", "x", "--color", "not-a-colour"},
 		{"calendar", "settings", "calendars", "create", "--name", "x", "--color", "#123456"},
+		{"calendar", "events", "create", "--title", "x", "--start", "2027-07-03T09:00",
+			"--color", "#123456"},
+		{"calendar", "events", "update", "x", "--color", "tomato"},
 	} {
 		refuses(t, 1, args, "not a Proton accent color")
 	}

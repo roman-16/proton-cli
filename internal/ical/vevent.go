@@ -74,6 +74,10 @@ type VEvent struct {
 	// inside its cards, so they are only set where they matter: a file somebody
 	// else's client will open.
 	Alarms []Alarm
+	// Color is the event's own colour, for the same reason and in the same place
+	// as the reminders: Proton keeps it beside the cards, and a file is where it
+	// has to be written down for another client to see it.
+	Color string
 }
 
 // Alarm is a reminder, as iCalendar writes one.
@@ -227,6 +231,8 @@ func (v *VEvent) set(l contentline.Line) error {
 		v.Description = contentline.UnescapeText(l.Value)
 	case "STATUS":
 		v.Status = strings.ToUpper(l.Value)
+	case "COLOR":
+		v.Color = strings.TrimSpace(l.Value)
 	}
 	return nil
 }

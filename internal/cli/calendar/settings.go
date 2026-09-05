@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/roman-16/proton-cli/internal/accent"
 	"github.com/roman-16/proton-cli/internal/app"
 	"github.com/roman-16/proton-cli/internal/cli/kit"
 	"github.com/roman-16/proton-cli/internal/proton"
@@ -176,7 +177,7 @@ func calendarsListCmd() *cobra.Command {
 
 func calendarsCreateCmd() *cobra.Command {
 	var name, url string
-	color := &kit.Color{Name: "color", Default: kit.DefaultAccentColor}
+	color := &kit.Color{Name: "color", Default: accent.Default}
 	c := &cobra.Command{
 		Use:   "create",
 		Short: "Create a calendar, or subscribe to one published elsewhere",
@@ -227,7 +228,7 @@ func calendarsGetCmd() *cobra.Command {
 				Object: view,
 				Fields: []ui.Field{
 					{Label: "Name", Value: cal.Name, Handle: true},
-					{Label: "Color", Value: cal.Color},
+					kit.ColorField(cal.Color),
 					{Label: "Kind", Value: cal.Kind},
 					{Label: "Description", Value: cal.Description},
 					{Label: "Members", Value: strconv.Itoa(cal.MemberCount)},
@@ -254,7 +255,7 @@ func calendarsUpdateCmd() *cobra.Command {
 	var name, duration string
 	var reminders, allDayReminders []string
 	var noRemind bool
-	color := &kit.Color{Name: "color", Usage: "New accent color, as a hex value"}
+	color := &kit.Color{Name: "color", Usage: "New accent color, by name (purple) or hex (#8080FF)"}
 	busy := &kit.Enum{
 		Name: "busy", Usage: "Whether events here make you look busy to others",
 		Values: []string{"on", "off"},

@@ -364,7 +364,7 @@ proton mail settings folders update Receipts --notify
 
 | Flag | Description |
 | --- | --- |
-| `--color string` | New accent color, as a hex value |
+| `--color string` | New accent color, by name (purple) or hex (#8080FF) |
 | `--name string` | New name |
 | `--notify` | Tell you when mail arrives here (default `true`) |
 | `--parent string` | Move it inside this folder, by ID |
@@ -542,7 +542,7 @@ proton mail settings labels update Work --color enzian
 
 | Flag | Description |
 | --- | --- |
-| `--color string` | New accent color, as a hex value |
+| `--color string` | New accent color, by name (purple) or hex (#8080FF) |
 | `--name string` | New name |
 
 ## `list`

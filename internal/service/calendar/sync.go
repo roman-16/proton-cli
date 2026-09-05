@@ -51,6 +51,19 @@ type eventBody struct {
 	attendeeKeys []protonAttendee
 }
 
+// optionalColor is a colour as the API takes it: the value, or null for an event
+// that has none of its own.
+//
+// The empty string is how the rest of this package spells "no colour", and
+// Proton refuses it as an invalid one, so the two meet here rather than at each
+// caller.
+func optionalColor(color string) *string {
+	if color == "" {
+		return nil
+	}
+	return &color
+}
+
 // protonAttendee is a participant with a Proton account, and the key their copy of
 // the event has to be readable with.
 type protonAttendee struct {

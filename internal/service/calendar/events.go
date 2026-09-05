@@ -11,6 +11,7 @@ import (
 	"time"
 
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	"github.com/roman-16/proton-cli/internal/accent"
 	"github.com/roman-16/proton-cli/internal/account/keys"
 	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
@@ -63,7 +64,10 @@ type Event struct {
 	Status string `json:"status"`
 	// Organizer is whoever called the meeting. It is empty for an event with no
 	// participants, which has nobody to organise.
-	Organizer string                 `json:"organizer,omitempty"`
+	Organizer string `json:"organizer,omitempty"`
+	// Color is the event's own accent colour, as the hex Proton stores. Empty
+	// means it has none of its own and is drawn in its calendar's.
+	Color     string                 `json:"color,omitempty"`
 	Signature pgphelper.VerifyResult `json:"signature,omitempty"`
 }
 
@@ -136,6 +140,15 @@ func (e rawEvent) notifications() []map[string]any {
 		out = append(out, map[string]any{"Type": n.Type, "Trigger": n.Trigger})
 	}
 	return out
+}
+
+// ownColor is the colour the event carries itself, empty for one that has none
+// and is drawn in its calendar's.
+func (e rawEvent) ownColor() string {
+	if e.Color == nil {
+		return ""
+	}
+	return *e.Color
 }
 
 // triggers renders an event's reminders the way --remind spells them, so what a
@@ -436,6 +449,7 @@ func (e stored) row() Event {
 		Zone:       start.TZID,
 		Signature:  e.sig,
 		Reminders:  e.raw.triggers(),
+		Color:      e.raw.ownColor(),
 	}
 	if e.readErr != nil {
 		return ev
@@ -602,6 +616,9 @@ type EventInput struct {
 	// CANCELLED. Empty means it never said, which every client reads as
 	// confirmed.
 	Status string
+	// Color is the event's own accent colour, as the hex Proton stores. Empty
+	// gives it none, which is how an event comes to be drawn in its calendar's.
+	Color string
 }
 
 // EventResult is the outcome of a write. Mail is non-nil when participants have
@@ -644,7 +661,9 @@ func (s *Service) EventCreate(ctx context.Context, calendarID string, in EventIn
 		v.Organizer = ck.email
 	}
 
-	body := eventBody{model: v, notifications: notifs, isOrganizer: 1}
+	body := eventBody{
+		model: v, notifications: notifs, color: optionalColor(in.Color), isOrganizer: 1,
+	}
 	external, err := s.attachAttendees(ctx, &body, in.Attendees)
 	if err != nil {
 		return nil, err
@@ -1015,6 +1034,7 @@ func (s *Service) calendarExport(ctx context.Context, calendarID string, w ical.
 		}
 		v := e.model
 		v.Alarms = alarmsOf(raw)
+		v.Color = e.raw.ownColor()
 		out = append(out, v)
 	}
 	return out, nil
@@ -1075,6 +1095,10 @@ func (s SkippedEvent) String() string {
 // account the organiser of a meeting it did not call - which, for an event with
 // external addresses, means email going out.
 //
+// A colour is snapped onto Proton's palette, which is the only set of colours it
+// stores: a file may name any colour CSS has, and the event is worth more than
+// the exactness of its decoration.
+//
 // An event that cannot be written is reported and the rest continue: a file of a
 // thousand events should not be lost to one of them.
 func (s *Service) EventsImport(ctx context.Context, calendarID string, events []ical.VEvent) (*ImportResult, error) {
@@ -1090,9 +1114,17 @@ func (s *Service) EventsImport(ctx context.Context, calendarID string, events []
 			})
 			continue
 		}
+		color := accent.Nearest(v.Color)
+		if v.Color != "" && color == "" {
+			// The event still lands and nothing is missing from the import, so this
+			// is recorded and not counted.
+			slog.DebugContext(ctx, "calendar: an imported event named a colour that is not one",
+				"reason", "unreadable color")
+		}
 		body := eventBody{
 			model:         importable(v),
 			notifications: notificationsOf(v.Alarms),
+			color:         optionalColor(color),
 			// The participants and the organiser are stripped on the way in, so
 			// what is written is this account's own event rather than a meeting
 			// somebody else called - and Proton refuses to store an event in your

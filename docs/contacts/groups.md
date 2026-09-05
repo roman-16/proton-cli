@@ -111,7 +111,7 @@ proton contacts groups update Team --color reef
 
 | Flag | Description |
 | --- | --- |
-| `--color string` | New accent color, as a hex value |
+| `--color string` | New accent color, by name (purple) or hex (#8080FF) |
 | `--name string` | New group name |
 
 ---
