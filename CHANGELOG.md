@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 Adding a version section here is what publishes a release, so this file is the one place a version is decided: see [Releases](CONTRIBUTING.md#releases). Versions that shipped before this file existed are on the [releases page](https://github.com/roman-16/proton-cli/releases).
 
+## [3.4.0] - 2026-09-05
+
+### Added
+
+- `calendar events create` and `update` take `--color`, giving one event a colour of its own by accent name or hex; `events get` reports it. It colours what the reference names: one occurrence, `--onwards` for that one and every later one, or the whole series. A colour can only be changed, never taken off, and Proton's own apps draw a per-event colour only on a paid plan.
+- `calendar events export` carries an event's own colour as a `COLOR` property, and `import` reads one back as the nearest of Proton's twenty accents, so a round trip keeps it.
+- `contacts export` writes each address's groups as `CATEGORIES`, and `contacts import` files addresses into the groups a card names, creating any you do not have. `--no-groups` leaves them out.
+- `--force-color`, or `FORCE_COLOR`, paints even when the output is piped: a pager, a multiplexer, a CI log that renders the escapes itself.
+
+### Changed
+
+- **Breaking.** What you write decides whether a calendar event has a time of day. `events create --start 2026-07-01` needs `--all-day` to agree, and `--all-day` beside a time of day or a duration under a day is refused. `events update --start` with a bare day moves the event and keeps its time of day instead of dropping it to midnight; `--all-day=false` gives one back, with a `--start` saying which time.
+- **Breaking.** `--end` on an all-day event is the last day it runs through, not the midnight after it. A script that added a day to compensate now books one day too many.
+- **Breaking.** `calendar events create` with neither `--end` nor `--duration` lasts as long as its calendar says a new event lasts, rather than a fixed hour. `calendar settings calendars get` shows that length.
+- Sending stops when a recipient's contact cannot be read, instead of encrypting to whatever key Proton hands back. A contact that will not open cannot say whether it pins a key. Affects `mail messages send`, `reply`, `forward` and `mail drafts send`.
+- Every change says when the run could not read part of what it acted on - in the confirmation, the dry run, the result, and as `skipped` under `--output json` - the way a listing already does.
+- `contacts update`, `merge`, `keys pin` and `unpin` save over a card whose signature does not verify and say so. `update` refused outright and the others said nothing; a detached signature cannot tell tampering from a retired key.
+- `calendar settings calendars get` and `contacts groups get` show a colour as its swatch and name, which their listings already did.
+
+### Fixed
+
+- An all-day calendar event could not be given a time of day back: a `--start` naming one was accepted, discarded, and reported as a success.
+- Colour in a Windows console. Nothing there sets `TERM`, so every screen was drawn plain.
+- `pass invitations accept` took the server's word for who sent an offer. The key an offer carries is now checked against the keys Proton publishes for the address it names as sender, and one nobody signed is refused; `pass invitations list` leaves a vault's name blank rather than reading it from such a key.
+- A vault key written here is sealed to your primary user key alone, as Proton's own client seals it. Every key the account ever had could open one created or accepted before, retired ones included.
+
 ## [3.3.1] - 2026-09-04
 
 ### Fixed
