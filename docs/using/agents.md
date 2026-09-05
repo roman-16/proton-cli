@@ -21,7 +21,7 @@ name: proton-cli
 description: (the description proton skill prints)
 ---
 
-Before using proton, run proton skill --body-only and follow what it prints.
+Before using proton, run `proton skill --body-only` and follow what it prints.
 ```
 
 ## What the agent is taught
