@@ -21,7 +21,7 @@ MSG=$(proton mail messages send --to me@proton.me --subject Deploy --body "Done.
 proton mail messages list --unread --output json | jq -r '.messages[].subject'
 
 # senders of everything older than a week, deduplicated
-proton mail messages list --before 2026-04-08 --folder all --page-size 200 --output json | jq -r '.messages[].from_address' | sort -u
+proton mail messages list --before 2026-04-08 --folder all --page-size 0 --output json | jq -r '.messages[].from_address' | sort -u
 
 # total size of a Drive folder
 proton drive items list /Backup --output json | jq '[.items[].size] | add'

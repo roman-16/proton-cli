@@ -55,9 +55,11 @@ var SenderDestinations = map[string]int{
 	"inbox": senderInbox, "spam": senderSpam, "blocked": senderBlocked,
 }
 
+// sendersPageSize is how many rules one request asks for.
+const sendersPageSize = 100
+
 func (s *Service) SendersList(ctx context.Context) ([]SenderRule, error) {
-	var out []SenderRule
-	for page := 0; ; page++ {
+	return proton.All(ctx, func(ctx context.Context, page int) ([]SenderRule, bool, error) {
 		var r struct {
 			IncomingDefaults []struct {
 				ID, Email, Domain string
@@ -67,26 +69,21 @@ func (s *Service) SendersList(ctx context.Context) ([]SenderRule, error) {
 		}
 		q := url.Values{}
 		q.Set("Page", fmt.Sprintf("%d", page))
-		q.Set("PageSize", "100")
+		q.Set("PageSize", fmt.Sprintf("%d", sendersPageSize))
 		if err := s.C.Decode(ctx, proton.Request{
 			Method: "GET", Path: "/mail/v4/incomingdefaults", Query: q,
 		}, &r); err != nil {
-			return nil, err
+			return nil, false, err
 		}
-		if len(r.IncomingDefaults) == 0 {
-			break
-		}
+		out := make([]SenderRule, 0, len(r.IncomingDefaults))
 		for _, d := range r.IncomingDefaults {
 			out = append(out, SenderRule{
 				ID: d.ID, Email: d.Email, Domain: d.Domain,
 				Goes: senderDestination(d.Location), Time: d.Time,
 			})
 		}
-		if len(r.IncomingDefaults) < 100 {
-			break
-		}
-	}
-	return out, nil
+		return out, proton.Full(out, sendersPageSize), nil
+	})
 }
 
 // SenderSet files a sender or a domain to a destination.

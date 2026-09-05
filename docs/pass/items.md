@@ -140,7 +140,7 @@ proton pass items list --type login
 | `--newer-than string` | Match items newer than DURATION |
 | `--older-than string` | Match items older than DURATION (e.g. 30d, 2w, 1h) |
 | `--page int` | Which page of results, counting from zero |
-| `--page-size int` | How many items per page (default `50`) |
+| `--page-size int` | How many items per page; 0 for all of them (default `50`) |
 | `--sort string` | Order by: name, type, modified, created (default `name`) |
 | `--type string` | Match only this kind of item: login, note, credit-card, wifi, ssh-key, identity, alias, custom |
 | `--vault string` | Match only this vault, by name or ID |

@@ -47,9 +47,42 @@ func TestMailMessagesListUnreadFlag(t *testing.T) {
 	runOK(t, "mail", "messages", "list", "--unread")
 }
 
+// A page size of zero is the whole folder in one answer, whatever it costs
+// underneath. Nothing is left to page towards, so there is no page to report.
+func TestMailMessagesListWholeCollection(t *testing.T) {
+	data := runJSON(t, "mail", "messages", "list", "--folder", "all", "--page-size", "0")
+	msgs := data["messages"].([]interface{})
+	if total, ok := data["total"].(float64); !ok || int(total) != len(msgs) {
+		t.Errorf("total = %v with %d messages shown; the whole collection was asked for",
+			data["total"], len(msgs))
+	}
+	for _, key := range []string{"page", "page_size", "has_more"} {
+		if _, has := data[key]; has {
+			t.Errorf("an unpaged listing reports %q", key)
+		}
+	}
+}
+
+// A page wider than Proton serves at once is composed from as many of its pages
+// as it takes and cut to the number that was asked for, so --page-size is the
+// reader's number rather than the endpoint's.
+func TestMailMessagesListWiderThanAPage(t *testing.T) {
+	const want = 160 // one row past Proton's own page
+	data := runJSON(t, "mail", "messages", "list", "--folder", "all", "--page-size", "160")
+	msgs := data["messages"].([]interface{})
+	total, ok := data["total"].(float64)
+	if !ok {
+		t.Fatalf("no total in the answer: %v", keysOf(data))
+	}
+	if expected := min(want, int(total)); len(msgs) != expected {
+		t.Errorf("got %d messages of %d in the folder, want %d", len(msgs), int(total), expected)
+	}
+	if int(total) <= 150 {
+		t.Logf("the folder holds %d messages, so no page boundary was crossed", int(total))
+	}
+}
+
 func TestMailMessagesListFooterSinglePage(t *testing.T) {
-	// Use 150 (Proton's documented max for messages list); 500 is
-	// rejected as "Invalid page size parameter".
 	_, stderr := runOKStderr(t, "mail", "messages", "list", "--page-size", "150")
 	last := lastNonEmpty(stderr)
 	// One page holds everything, so the footer is a plain count: no "of", no
@@ -316,6 +349,39 @@ func TestMailBatchTrashDryRunUnread(t *testing.T) {
 func TestMailBatchTrashDryRunOlderThan(t *testing.T) {
 	_, stderr := runOKStderr(t, "--dry-run", "mail", "messages", "trash", "--older-than", "365d", "--from", "noreply", "--limit", "5")
 	assertContains(t, stderr, "Dry run")
+}
+
+// A selection that fills its cap says so, and --limit 0 lifts the cap: the
+// preview then holds everything the filter matched rather than one page of it.
+//
+// Nothing is acted on - the point is what a selection reports about its own
+// completeness, which only a dry run can be asked without consequences.
+func TestMailMessagesTrashLimitZeroWalks(t *testing.T) {
+	capped := runJSON(t, "--dry-run", "mail", "messages", "trash",
+		"--folder", "all", "--limit", "2", "--output", "json")
+	uncapped := runJSON(t, "--dry-run", "mail", "messages", "trash",
+		"--folder", "all", "--limit", "0", "--output", "json")
+
+	few, all := countOf(t, capped), countOf(t, uncapped)
+	if few > 2 {
+		t.Errorf("--limit 2 selected %d messages", few)
+	}
+	if all < few {
+		t.Errorf("--limit 0 selected %d messages, fewer than the %d a cap of 2 found", all, few)
+	}
+	if all <= 2 {
+		t.Logf("the account holds %d messages, so no cap was reached", all)
+	}
+}
+
+// countOf reads the count out of a mutation's own answer.
+func countOf(t *testing.T, data map[string]interface{}) int {
+	t.Helper()
+	count, ok := data["count"].(float64)
+	if !ok {
+		t.Fatalf("no count in the answer: %v", keysOf(data))
+	}
+	return int(count)
 }
 
 func TestMailMessagesReadConvIDRedirects(t *testing.T) {

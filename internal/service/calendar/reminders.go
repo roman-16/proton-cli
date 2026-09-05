@@ -2,6 +2,7 @@ package calendar
 
 import (
 	"context"
+	"log/slog"
 	"sort"
 	"strconv"
 	"strings"
@@ -140,8 +141,10 @@ func (s *Service) alarms(ctx context.Context, calendarIDs []string, from, until 
 	seen := map[string]bool{}
 	var out []calendarAlarm
 	for _, calendarID := range calendarIDs {
+		// The endpoint takes the moment to resume from rather than a page
+		// number, so each answer says where the next request starts.
 		start := from.Unix()
-		for page := 0; page < alarmMaxPages; page++ {
+		err := proton.Pages(ctx, func(ctx context.Context, page int) (bool, error) {
 			var r struct {
 				Alarms []struct {
 					ID              string
@@ -159,10 +162,7 @@ func (s *Service) alarms(ctx context.Context, calendarIDs []string, from, until 
 					"PageSize", strconv.Itoa(alarmPageSize),
 				),
 			}, &r); err != nil {
-				return nil, err
-			}
-			if len(r.Alarms) == 0 {
-				break
+				return false, err
 			}
 			for _, a := range r.Alarms {
 				fire := time.Unix(a.Occurrence, 0)
@@ -180,10 +180,23 @@ func (s *Service) alarms(ctx context.Context, calendarIDs []string, from, until 
 					Trigger: a.Trigger,
 				})
 			}
-			if len(r.Alarms) < alarmPageSize {
-				break
+			if !proton.Full(r.Alarms, alarmPageSize) {
+				return false, nil
 			}
 			start = r.Alarms[len(r.Alarms)-1].Occurrence + 1
+			if page+1 >= alarmMaxPages {
+				// Recorded and not counted: what is missing is the rest of a
+				// walk this CLI chose to stop, not a thing that could not be
+				// read, so there is no ref to name and no number to add to a
+				// warning. The log says which calendar and how far it got.
+				slog.DebugContext(ctx, "calendar: stopped walking alarms at the page cap",
+					"calendar", calendarID, "count", page+1, "reason", "page cap")
+				return false, nil
+			}
+			return true, nil
+		})
+		if err != nil {
+			return nil, err
 		}
 	}
 	return out, nil

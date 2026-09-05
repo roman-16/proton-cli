@@ -38,6 +38,10 @@ type Selector[T any] struct {
 	// Scope names what --all would cover when nothing narrows it, for the warning
 	// that precedes an unbounded change.
 	Scope string
+	// Limit is the cap the filters were read under, so a selection that fills it
+	// says more may exist rather than presenting a truncated set as the whole
+	// match. Zero when nothing was capped.
+	Limit int
 }
 
 // Selection is a resolved set of things to act on.
@@ -47,6 +51,7 @@ type Selection[T any] struct {
 	noun  string
 	cols  []ui.Column[T]
 	idsOf func(T) string
+	limit int
 }
 
 // Len is how many things were selected.
@@ -55,7 +60,9 @@ func (s Selection[T]) Len() int { return len(s.IDs) }
 // Preview renders the selection as the table its list command would show. A dry
 // run and a confirmation both use it, so approving a bulk change means looking
 // at the things themselves rather than at a count.
-func (s Selection[T]) Preview() func(*ui.UI) error { return Preview(s.noun, s.cols, s.Rows) }
+func (s Selection[T]) Preview() func(*ui.UI) error {
+	return preview(s.noun, s.cols, s.Rows, s.limit)
+}
 
 // Sole returns the one row's own name when exactly one thing was selected, and
 // "" otherwise.
@@ -74,13 +81,17 @@ func Sole[T any](rows []T, name func(T) string) string {
 // whose subject was never selected: `empty` acts on a whole collection rather
 // than on things a user picked out, and still has to show what it would take.
 func Preview[T any](noun string, cols []ui.Column[T], rows []T) func(*ui.UI) error {
+	return preview(noun, cols, rows, 0)
+}
+
+func preview[T any](noun string, cols []ui.Column[T], rows []T, limit int) func(*ui.UI) error {
 	if len(rows) == 0 {
 		return nil
 	}
 	return func(u *ui.UI) error {
 		return ui.Table(u, ui.TableSpec[T]{
 			Noun: noun, Columns: cols,
-			Total: ui.Unknown, Page: ui.Unpaged,
+			Total: ui.Unknown, Page: ui.Unpaged, Limit: limit,
 		}, rows)
 	}
 }
@@ -92,7 +103,7 @@ func Preview[T any](noun string, cols []ui.Column[T], rows []T) func(*ui.UI) err
 // interpreted: "everything" is too consequential to be the default reading of an
 // empty command line.
 func Select[T any](c *Invocation, s Selector[T]) (Selection[T], error) {
-	sel := Selection[T]{noun: s.Noun, cols: s.Columns, idsOf: s.IDOf}
+	sel := Selection[T]{noun: s.Noun, cols: s.Columns, idsOf: s.IDOf, limit: s.Limit}
 
 	refs := s.Refs
 	if refs == nil {

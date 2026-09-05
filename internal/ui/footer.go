@@ -40,7 +40,7 @@ const (
 //	12 messages.
 //	25 of 312 messages. Next page: --page 1
 //	25 of 312 messages. (last page)
-//	25 messages. More may exist; raise --limit.
+//	25 messages. More may exist; raise --limit, or pass 0 for no cap.
 func Footer(s FooterSpec) string {
 	if s.Count == 0 {
 		if s.Filtered {
@@ -55,7 +55,7 @@ func Footer(s FooterSpec) string {
 	case paged:
 		return fmt.Sprintf("%d of %d %s. (last page)", s.Count, s.Total, s.Noun)
 	case s.Limit > 0 && s.Count >= s.Limit:
-		return fmt.Sprintf("%s. More may exist; raise --limit.", Quantity(s.Count, s.Noun))
+		return fmt.Sprintf("%s. More may exist; raise --limit, or pass 0 for no cap.", Quantity(s.Count, s.Noun))
 	}
 	return Quantity(s.Count, s.Noun) + "."
 }

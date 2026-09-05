@@ -57,13 +57,13 @@ func convListCmd() *cobra.Command {
 			}
 			return kit.List(c, ui.TableSpec[mailsvc.Conversation]{
 				Noun: "conversations", Columns: conversationColumns(),
-				Total: total, Page: opts.Page, PageSize: opts.PageSize,
+				Total: f.total(total, len(convs)), Page: opts.Page, PageSize: opts.PageSize,
 				Filtered: f.narrowed(),
 			}, convs)
 		}),
 	}
 	f.registerNarrowing(c, "inbox")
-	registerPaging(c, &f.page, &f.pageSize, "threads")
+	f.registerPaging(c, "threads")
 	return c
 }
 

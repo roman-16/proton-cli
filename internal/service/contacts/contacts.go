@@ -222,27 +222,27 @@ func signedPart(name, uid string, emails []string, previous *vcard.Signed) vcard
 	return model
 }
 
+// contactsPageSize is how many contacts one export request asks for.
+const contactsPageSize = 50
+
 func (s *Service) List(ctx context.Context) ([]Contact, error) {
-	var out []Contact
-	for page := 0; ; page++ {
+	return proton.All(ctx, func(ctx context.Context, page int) ([]Contact, bool, error) {
 		var r struct {
 			Contacts []struct {
 				ID    string
 				Cards []map[string]any
 			}
 		}
-		q := proton.Query("Page", fmt.Sprintf("%d", page), "PageSize", "50")
+		q := proton.Query("Page", fmt.Sprintf("%d", page), "PageSize", fmt.Sprintf("%d", contactsPageSize))
 		// The first page and the keys are asked for together; every page after it
 		// finds them already there.
 		u, err := s.keys.Alongside(ctx, func(ctx context.Context) error {
 			return s.C.Decode(ctx, proton.Request{Method: "GET", Path: "/contacts/v4/contacts/export", Query: q}, &r)
 		})
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
-		if len(r.Contacts) == 0 {
-			break
-		}
+		out := make([]Contact, 0, len(r.Contacts))
 		for _, c := range r.Contacts {
 			ct, err := openContact(c.ID, c.Cards, u)
 			if err != nil {
@@ -251,11 +251,8 @@ func (s *Service) List(ctx context.Context) ([]Contact, error) {
 			}
 			out = append(out, ct)
 		}
-		if len(r.Contacts) < 50 {
-			break
-		}
-	}
-	return out, nil
+		return out, proton.Full(r.Contacts, contactsPageSize), nil
+	})
 }
 
 func (s *Service) Get(ctx context.Context, id string) (*Contact, error) {

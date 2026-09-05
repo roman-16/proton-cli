@@ -23,24 +23,26 @@ func draftsCmd() *cobra.Command {
 }
 
 func draftsListCmd() *cobra.Command {
-	var page, pageSize int
+	page := kit.Page{Default: defaultPageSize}
 	c := &cobra.Command{
 		Use:   "list",
 		Short: "List drafts",
 		Args:  cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
-			msgs, total, err := c.App.Mail.DraftsList(c.Ctx, page, pageSize)
+			msgs, total, err := c.App.Mail.DraftsList(c.Ctx, page.Number, page.Size)
 			if err != nil {
 				return err
 			}
+			if page.Size == 0 {
+				total = len(msgs)
+			}
 			return kit.List(c, ui.TableSpec[mailsvc.Message]{
 				Noun: "drafts", Columns: draftColumns(),
-				Total: total, Page: page, PageSize: pageSize,
+				Total: total, Page: page.Number, PageSize: page.Size,
 			}, msgs)
 		}),
 	}
-	c.Flags().IntVar(&page, "page", 0, "Which page of results, counting from zero")
-	c.Flags().IntVar(&pageSize, "page-size", 25, "How many drafts per page")
+	page.Register(c, "drafts")
 	return c
 }
 

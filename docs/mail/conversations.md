@@ -67,7 +67,7 @@ proton mail conversations delete 5bH2mQxK
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text anywhere, including display names and bodies |
-| `--limit int` | Most messages to affect (Proton pages at 150) (default `150`) |
+| `--limit int` | Most messages to affect; 0 for no cap (default `150`) |
 | `--newer-than string` | Match messages newer than DURATION |
 | `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |
 | `--starred` | Match starred messages |
@@ -169,7 +169,7 @@ proton mail conversations label 'Quarterly numbers' --label Accounting
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text anywhere, including display names and bodies |
 | `--label string` | The label to attach or detach, by name or ID |
-| `--limit int` | Most messages to affect (Proton pages at 150) (default `150`) |
+| `--limit int` | Most messages to affect; 0 for no cap (default `150`) |
 | `--newer-than string` | Match messages newer than DURATION |
 | `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |
 | `--starred` | Match starred messages |
@@ -205,7 +205,7 @@ proton mail conversations list --from jane@example.com --folder all
 | `--newer-than string` | Match messages newer than DURATION |
 | `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |
 | `--page int` | Which page of results, counting from zero |
-| `--page-size int` | How many threads per page (default `25`) |
+| `--page-size int` | How many threads per page; 0 for all of them (default `25`) |
 | `--starred` | Match starred messages |
 | `--subject string` | Match text in the subject |
 | `--to string` | Match a recipient's address |
@@ -238,7 +238,7 @@ proton mail conversations mark read --folder inbox --all
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text anywhere, including display names and bodies |
-| `--limit int` | Most messages to affect (Proton pages at 150) (default `150`) |
+| `--limit int` | Most messages to affect; 0 for no cap (default `150`) |
 | `--newer-than string` | Match messages newer than DURATION |
 | `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |
 | `--starred` | Match starred messages |
@@ -266,7 +266,7 @@ proton mail conversations mark unread 'Quarterly numbers'
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text anywhere, including display names and bodies |
-| `--limit int` | Most messages to affect (Proton pages at 150) (default `150`) |
+| `--limit int` | Most messages to affect; 0 for no cap (default `150`) |
 | `--newer-than string` | Match messages newer than DURATION |
 | `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |
 | `--starred` | Match starred messages |
@@ -296,7 +296,7 @@ proton mail conversations move --older-than 90d --folder inbox --into archive
 | `--from string` | Match the sender's address |
 | `--into string` | Destination folder, by name or ID |
 | `--keyword string` | Match text anywhere, including display names and bodies |
-| `--limit int` | Most messages to affect (Proton pages at 150) (default `150`) |
+| `--limit int` | Most messages to affect; 0 for no cap (default `150`) |
 | `--newer-than string` | Match messages newer than DURATION |
 | `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |
 | `--starred` | Match starred messages |
@@ -360,7 +360,7 @@ proton mail conversations snooze --unread --until 2026-04-17T09:00
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text anywhere, including display names and bodies |
-| `--limit int` | Most messages to affect (Proton pages at 150) (default `150`) |
+| `--limit int` | Most messages to affect; 0 for no cap (default `150`) |
 | `--newer-than string` | Match messages newer than DURATION |
 | `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |
 | `--starred` | Match starred messages |
@@ -389,7 +389,7 @@ proton mail conversations star 'Quarterly numbers'
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text anywhere, including display names and bodies |
-| `--limit int` | Most messages to affect (Proton pages at 150) (default `150`) |
+| `--limit int` | Most messages to affect; 0 for no cap (default `150`) |
 | `--newer-than string` | Match messages newer than DURATION |
 | `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |
 | `--starred` | Match starred messages |
@@ -418,7 +418,7 @@ proton mail conversations trash --from newsletter@example.com --older-than 90d
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text anywhere, including display names and bodies |
-| `--limit int` | Most messages to affect (Proton pages at 150) (default `150`) |
+| `--limit int` | Most messages to affect; 0 for no cap (default `150`) |
 | `--newer-than string` | Match messages newer than DURATION |
 | `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |
 | `--starred` | Match starred messages |
@@ -447,7 +447,7 @@ proton mail conversations unlabel 'Quarterly numbers' --label Accounting
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text anywhere, including display names and bodies |
 | `--label string` | The label to attach or detach, by name or ID |
-| `--limit int` | Most messages to affect (Proton pages at 150) (default `150`) |
+| `--limit int` | Most messages to affect; 0 for no cap (default `150`) |
 | `--newer-than string` | Match messages newer than DURATION |
 | `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |
 | `--starred` | Match starred messages |
@@ -475,7 +475,7 @@ proton mail conversations unsnooze 5bH2mQxK
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text anywhere, including display names and bodies |
-| `--limit int` | Most messages to affect (Proton pages at 150) (default `150`) |
+| `--limit int` | Most messages to affect; 0 for no cap (default `150`) |
 | `--newer-than string` | Match messages newer than DURATION |
 | `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |
 | `--starred` | Match starred messages |
@@ -503,7 +503,7 @@ proton mail conversations unstar 'Quarterly numbers'
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text anywhere, including display names and bodies |
-| `--limit int` | Most messages to affect (Proton pages at 150) (default `150`) |
+| `--limit int` | Most messages to affect; 0 for no cap (default `150`) |
 | `--newer-than string` | Match messages newer than DURATION |
 | `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |
 | `--starred` | Match starred messages |

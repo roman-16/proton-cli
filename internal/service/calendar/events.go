@@ -309,8 +309,7 @@ func fetchBounds(w ical.Window) (from, to time.Time) {
 }
 
 func (s *Service) rawEventsOfType(ctx context.Context, calendarID string, from, to time.Time, typ string) ([]rawEvent, error) {
-	var out []rawEvent
-	for page := 0; ; page++ {
+	return proton.All(ctx, func(ctx context.Context, page int) ([]rawEvent, bool, error) {
 		q := url.Values{}
 		q.Set("Start", fmt.Sprintf("%d", max(from.Unix(), 0)))
 		q.Set("End", fmt.Sprintf("%d", max(to.Unix(), 0)))
@@ -328,13 +327,10 @@ func (s *Service) rawEventsOfType(ctx context.Context, calendarID string, from, 
 		if err := s.C.Decode(ctx, proton.Request{
 			Method: "GET", Path: "/calendar/v1/" + calendarID + "/events", Query: q,
 		}, &r); err != nil {
-			return nil, err
+			return nil, false, err
 		}
-		out = append(out, r.Events...)
-		if r.More != 1 || len(r.Events) == 0 {
-			return out, nil
-		}
-	}
+		return r.Events, r.More == 1 && len(r.Events) > 0, nil
+	})
 }
 
 // expand turns stored events into the rows a person sees: a one-off is itself, a

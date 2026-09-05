@@ -3,6 +3,7 @@ package mail
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/roman-16/proton-cli/internal/account/keys"
 	"strings"
 	"testing"
@@ -107,8 +108,9 @@ func TestListQueryDefaults(t *testing.T) {
 	if q.Get("Sort") != "Time" || q.Get("Desc") != "1" {
 		t.Errorf("expected Sort=Time Desc=1, got Sort=%q Desc=%q", q.Get("Sort"), q.Get("Desc"))
 	}
-	if q.Get("Page") != "0" || q.Get("PageSize") != "25" {
-		t.Errorf("Page/PageSize = %q/%q, want 0/25", q.Get("Page"), q.Get("PageSize"))
+	// Which page to read is set per request, since one listing may span several.
+	if q.Has("Page") || q.Has("PageSize") {
+		t.Errorf("the predicates carry a page: %q/%q", q.Get("Page"), q.Get("PageSize"))
 	}
 }
 
@@ -302,6 +304,110 @@ func TestResolveFolderPassesUnknownThrough(t *testing.T) {
 	if got := ResolveFolder("ARCHIVE"); got != labelArchive {
 		t.Errorf("ResolveFolder is case-insensitive: got %q", got)
 	}
+}
+
+// server stands in for a folder of that many rows, answering a page the way
+// Proton does: never more than pageMax rows, and the total whatever the page
+// holds.
+type server struct {
+	rows  int
+	asked [][2]int
+}
+
+func (s *server) fetch(_ context.Context, page, size int) ([]int, int, error) {
+	s.asked = append(s.asked, [2]int{page, size})
+	size = min(size, pageMax)
+	start := min(page*size, s.rows)
+	out := make([]int, 0, min(size, s.rows-start))
+	for i := start; i < min(start+size, s.rows); i++ {
+		out = append(out, i)
+	}
+	return out, s.rows, nil
+}
+
+func TestWindowReadsTheReadersPageNotProtons(t *testing.T) {
+	for _, c := range []struct {
+		name       string
+		rows       int
+		page, size int
+		want       []int
+		requests   int
+	}{
+		// An ordinary page is one page Proton can cut itself, so it stays one
+		// request however many rows are behind it.
+		{"a page Proton serves", 4812, 0, 25, seq(0, 25), 1},
+		{"a later page Proton serves", 4812, 3, 25, seq(75, 100), 1},
+		{"exactly Proton's width", 4812, 1, pageMax, seq(150, 300), 1},
+		// Wider than Proton serves: composed from its pages and cut down, so
+		// the reader gets the number they asked for.
+		{"wider than Proton serves", 4812, 0, 500, seq(0, 500), 4},
+		{"a later wide page", 4812, 1, 200, seq(200, 400), 2},
+		// The whole collection, which is what a size of zero means.
+		{"everything", 380, 0, 0, seq(0, 380), 3},
+		{"everything, exactly filling Proton's pages", 300, 0, 0, seq(0, 300), 3},
+		{"everything of nothing", 0, 0, 0, nil, 1},
+		// A page past the end is empty rather than short of what came before.
+		{"past the end", 380, 2, 500, nil, 1},
+		{"a short last page", 380, 1, 200, seq(200, 380), 2},
+	} {
+		srv := &server{rows: c.rows}
+		got, total, err := window(context.Background(), c.page, c.size, srv.fetch)
+		if err != nil {
+			t.Errorf("%s: %v", c.name, err)
+			continue
+		}
+		if total != c.rows {
+			t.Errorf("%s: total = %d, want %d", c.name, total, c.rows)
+		}
+		if !sameInts(got, c.want) {
+			t.Errorf("%s: rows = %v, want %v", c.name, brief(got), brief(c.want))
+		}
+		if len(srv.asked) != c.requests {
+			t.Errorf("%s: %d requests %v, want %d", c.name, len(srv.asked), srv.asked, c.requests)
+		}
+	}
+}
+
+// Half a listing presented as a whole one is a wrong answer, so a page that
+// fails fails the call.
+func TestWindowFailsWholeWhenAPageFails(t *testing.T) {
+	boom := errors.New("boom")
+	_, _, err := window(context.Background(), 0, 0, func(_ context.Context, page, _ int) ([]int, int, error) {
+		if page == 1 {
+			return nil, 0, boom
+		}
+		return seq(0, pageMax), 400, nil
+	})
+	if !errors.Is(err, boom) {
+		t.Fatalf("err = %v, want boom", err)
+	}
+}
+
+func seq(from, to int) []int {
+	out := make([]int, 0, to-from)
+	for i := from; i < to; i++ {
+		out = append(out, i)
+	}
+	return out
+}
+
+func sameInts(a, b []int) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func brief(rows []int) string {
+	if len(rows) == 0 {
+		return "nothing"
+	}
+	return fmt.Sprintf("%d rows %d..%d", len(rows), rows[0], rows[len(rows)-1])
 }
 
 // testKeys hands a service the key hierarchy a test wants it to decrypt with.

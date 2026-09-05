@@ -27,9 +27,9 @@ type Invitation struct {
 // ListInvitations fetches per-invitation details because the listing endpoint
 // returns only IDs (no inviter/role/timestamp).
 func (s *Service) ListInvitations(ctx context.Context) ([]Invitation, error) {
-	var out []Invitation
+	// The endpoint hands back the anchor its next answer starts from.
 	anchor := ""
-	for {
+	return proton.All(ctx, func(ctx context.Context, _ int) ([]Invitation, bool, error) {
 		var r struct {
 			Invitations []struct{ VolumeID, ShareID, InvitationID string }
 			AnchorID    string
@@ -40,8 +40,9 @@ func (s *Service) ListInvitations(ctx context.Context) ([]Invitation, error) {
 			req.Query = proton.Query("AnchorID", anchor)
 		}
 		if err := s.C.Decode(ctx, req, &r); err != nil {
-			return nil, err
+			return nil, false, err
 		}
+		out := make([]Invitation, 0, len(r.Invitations))
 		for _, inv := range r.Invitations {
 			d, err := s.invitationDetails(ctx, inv.InvitationID)
 			if err != nil {
@@ -50,12 +51,9 @@ func (s *Service) ListInvitations(ctx context.Context) ([]Invitation, error) {
 			}
 			out = append(out, d)
 		}
-		if !r.More || r.AnchorID == "" {
-			break
-		}
 		anchor = r.AnchorID
-	}
-	return out, nil
+		return out, r.More && r.AnchorID != "", nil
+	})
 }
 
 func (s *Service) invitationDetails(ctx context.Context, id string) (Invitation, error) {

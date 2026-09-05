@@ -381,27 +381,22 @@ func (s *Service) getLink(ctx context.Context, shareID, linkID string) (*Link, e
 	return &r.Link, nil
 }
 
+// childrenPageSize is how many links one listing of a folder asks for.
+const childrenPageSize = 150
+
 func (s *Service) listRawChildren(ctx context.Context, shareID, linkID string) ([]Link, error) {
-	var all []Link
-	for page := 0; ; page++ {
+	return proton.All(ctx, func(ctx context.Context, page int) ([]Link, bool, error) {
 		q := url.Values{}
 		q.Set("Page", fmt.Sprintf("%d", page))
-		q.Set("PageSize", "150")
+		q.Set("PageSize", fmt.Sprintf("%d", childrenPageSize))
 		var r struct{ Links []Link }
 		if err := s.C.Decode(ctx, proton.Request{
 			Method: "GET", Path: fmt.Sprintf("/drive/shares/%s/folders/%s/children", shareID, linkID), Query: q,
 		}, &r); err != nil {
-			return nil, err
+			return nil, false, err
 		}
-		if len(r.Links) == 0 {
-			break
-		}
-		all = append(all, r.Links...)
-		if len(r.Links) < 150 {
-			break
-		}
-	}
-	return all, nil
+		return r.Links, proton.Full(r.Links, childrenPageSize), nil
+	})
 }
 
 func dirOf(path string) string {

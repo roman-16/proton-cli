@@ -39,27 +39,29 @@ func (s *Service) List(ctx context.Context, opts ListOptions) ([]Message, int, e
 	if err != nil {
 		return nil, 0, err
 	}
-	var r struct {
-		Total    int
-		Messages []rawListMessage
-	}
-	if err := s.C.Decode(ctx, proton.Request{Method: "GET", Path: "/mail/v4/messages", Query: q}, &r); err != nil {
-		return nil, 0, err
-	}
-	out := make([]Message, 0, len(r.Messages))
-	for _, m := range r.Messages {
-		out = append(out, toMessage(m))
-	}
-	return out, r.Total, nil
+	return window(ctx, opts.Page, opts.PageSize, func(ctx context.Context, page, size int) ([]Message, int, error) {
+		q.Set("Page", fmt.Sprintf("%d", page))
+		q.Set("PageSize", fmt.Sprintf("%d", size))
+		var r struct {
+			Total    int
+			Messages []rawListMessage
+		}
+		if err := s.C.Decode(ctx, proton.Request{Method: "GET", Path: "/mail/v4/messages", Query: q}, &r); err != nil {
+			return nil, 0, err
+		}
+		out := make([]Message, 0, len(r.Messages))
+		for _, m := range r.Messages {
+			out = append(out, toMessage(m))
+		}
+		return out, r.Total, nil
+	})
 }
 
-// listQuery builds the one request both a listing and a filtered selection make.
+// listQuery builds the predicates both a listing and a filtered selection send.
+// Which page of them to read is set per request, since one call may span several.
 // Its recipients flag renames the To field to "Recipients", as the conversations
 // endpoint expects.
 func listQuery(opts ListOptions, recipients bool) (url.Values, error) {
-	if opts.PageSize <= 0 {
-		opts.PageSize = 25
-	}
 	folder := opts.Folder
 	if folder == "" {
 		folder = "inbox"
@@ -71,8 +73,6 @@ func listQuery(opts ListOptions, recipients bool) (url.Values, error) {
 	}
 	q.Set("Sort", "Time")
 	q.Set("Desc", "1")
-	q.Set("Page", fmt.Sprintf("%d", opts.Page))
-	q.Set("PageSize", fmt.Sprintf("%d", opts.PageSize))
 	if opts.Unread {
 		q.Set("Unread", "1")
 	}

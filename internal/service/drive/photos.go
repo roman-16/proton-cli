@@ -107,9 +107,10 @@ func (s *Service) photosRoot(ctx context.Context, dc *Context) (*Link, *pgp.KeyR
 // PhotosList returns all photos on the photos volume (paginated server-side).
 // When filter is set, the server filters to the single PhotoTag id in tag.
 func (s *Service) PhotosList(ctx context.Context, dc *Context, tag int, filter bool) ([]Photo, error) {
-	var out []Photo
+	// The endpoint resumes from the last photo of the previous answer rather
+	// than from a page number.
 	lastID := ""
-	for {
+	return proton.All(ctx, func(ctx context.Context, _ int) ([]Photo, bool, error) {
 		q := proton.Request{Method: "GET", Path: fmt.Sprintf("/drive/volumes/%s/photos", dc.VolumeID)}
 		q.Query = map[string][]string{"PageSize": {fmt.Sprintf("%d", photosPageSize)}}
 		if filter {
@@ -128,17 +129,18 @@ func (s *Service) PhotosList(ctx context.Context, dc *Context, tag int, filter b
 			}
 		}
 		if err := s.C.Decode(ctx, q, &r); err != nil {
-			return nil, err
+			return nil, false, err
 		}
+		out := make([]Photo, 0, len(r.Photos))
 		for _, p := range r.Photos {
 			out = append(out, Photo{LinkID: p.LinkID, CaptureTime: p.CaptureTime, Hash: p.Hash, ContentHash: p.ContentHash, Tags: tagNames(p.Tags)})
 		}
-		if len(r.Photos) < photosPageSize {
-			break
+		if !proton.Full(out, photosPageSize) {
+			return out, false, nil
 		}
-		lastID = r.Photos[len(r.Photos)-1].LinkID
-	}
-	return out, nil
+		lastID = out[len(out)-1].LinkID
+		return out, true, nil
+	})
 }
 
 // AlbumsList returns the photo albums. The list endpoint omits the (encrypted)
@@ -173,9 +175,9 @@ func (s *Service) AlbumsList(ctx context.Context, dc *Context) ([]Album, error) 
 
 // AlbumItems lists the photos in an album.
 func (s *Service) AlbumItems(ctx context.Context, dc *Context, albumLinkID string) ([]Photo, error) {
-	var out []Photo
+	// The endpoint hands back the anchor its next answer starts from.
 	anchor := ""
-	for {
+	return proton.All(ctx, func(ctx context.Context, _ int) ([]Photo, bool, error) {
 		q := proton.Request{Method: "GET", Path: fmt.Sprintf("/drive/photos/volumes/%s/albums/%s/children", dc.VolumeID, albumLinkID)}
 		if anchor != "" {
 			q.Query = map[string][]string{"AnchorID": {anchor}}
@@ -191,17 +193,15 @@ func (s *Service) AlbumItems(ctx context.Context, dc *Context, albumLinkID strin
 			More     bool
 		}
 		if err := s.C.Decode(ctx, q, &r); err != nil {
-			return nil, err
+			return nil, false, err
 		}
+		out := make([]Photo, 0, len(r.Photos))
 		for _, p := range r.Photos {
 			out = append(out, Photo{LinkID: p.LinkID, CaptureTime: p.CaptureTime, Hash: p.Hash, Tags: tagNames(p.Tags)})
 		}
-		if !r.More || r.AnchorID == "" {
-			break
-		}
 		anchor = r.AnchorID
-	}
-	return out, nil
+		return out, r.More && r.AnchorID != "", nil
+	})
 }
 
 // PhotoDownload streams and decrypts a photo by its link ID.

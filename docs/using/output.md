@@ -21,7 +21,7 @@ ID        FROM              SUBJECT                DATE              FLAGS
 
 An empty collection prints nothing on stdout, so a redirect yields an empty file rather than a stray header. On stderr it says `No messages.`, or `No messages match.` when a filter was applied.
 
-Every `list` takes `--page` and `--page-size`. Everything except mail also takes `--sort` and `--desc`. Each listing offers only the sort keys it has, and says so when given another. Mail comes back newest first, in Proton's own order.
+Every `list` takes `--page` and `--page-size`. `--page-size 0` is the whole collection in one answer, however many requests that costs - mail is read from Proton page by page until it runs out, and `count` then equals `total`. Everything except mail also takes `--sort` and `--desc`. Each listing offers only the sort keys it has, and says so when given another. Mail comes back newest first, in Proton's own order.
 
 ### Records
 

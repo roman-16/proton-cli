@@ -801,9 +801,9 @@ func (s *Service) itemRevision(ctx context.Context, shareID, itemID string) (int
 }
 
 func (s *Service) fetchItems(ctx context.Context, shareID string, sk *shareKeys) ([]FullItem, error) {
-	var out []FullItem
+	// Proton pages this by the token the previous answer ended with.
 	var since string
-	for {
+	return proton.All(ctx, func(ctx context.Context, _ int) ([]FullItem, bool, error) {
 		qv := proton.Query()
 		if since != "" {
 			qv.Set("Since", since)
@@ -815,8 +815,9 @@ func (s *Service) fetchItems(ctx context.Context, shareID string, sk *shareKeys)
 			}
 		}
 		if err := s.C.Decode(ctx, proton.Request{Method: "GET", Path: "/pass/v1/share/" + shareID + "/item", Query: qv}, &r); err != nil {
-			return nil, err
+			return nil, false, err
 		}
+		out := make([]FullItem, 0, len(r.Items.RevisionsData))
 		for _, raw := range r.Items.RevisionsData {
 			var enc struct {
 				ItemID           string
@@ -880,12 +881,9 @@ func (s *Service) fetchItems(ctx context.Context, shareID string, sk *shareKeys)
 			item.Shares = enc.ShareCount
 			out = append(out, *item)
 		}
-		if r.Items.LastToken == "" || len(r.Items.RevisionsData) == 0 {
-			break
-		}
 		since = r.Items.LastToken
-	}
-	return out, nil
+		return out, r.Items.LastToken != "" && len(r.Items.RevisionsData) > 0, nil
+	})
 }
 
 func itemFromProto(it *pb.Item) *FullItem {
@@ -1036,59 +1034,77 @@ type fullRevision struct {
 	Item       *FullItem
 }
 
+// revisionsPageSize is how many earlier states one request asks for.
+const revisionsPageSize = 50
+
 func (s *Service) itemHistory(ctx context.Context, shareID, itemID string) ([]fullRevision, error) {
 	sk, err := s.decryptShareKeys(ctx, shareID)
 	if err != nil {
 		return nil, err
 	}
-	var r struct {
-		Revisions struct {
-			RevisionsData []struct {
-				ItemID           string
-				Revision         int
-				State            int
-				Flags            int
-				Content, ItemKey string
-				KeyRotation      int
-				CreateTime       int64
-				ModifyTime       int64
-				AliasEmail       string
+	// Proton pages this by the token the previous answer ended with, so an item
+	// edited more often than a page holds still has its whole history read.
+	var since string
+	out, err := proton.All(ctx, func(ctx context.Context, _ int) ([]fullRevision, bool, error) {
+		var r struct {
+			Revisions struct {
+				RevisionsData []struct {
+					ItemID           string
+					Revision         int
+					State            int
+					Flags            int
+					Content, ItemKey string
+					KeyRotation      int
+					CreateTime       int64
+					ModifyTime       int64
+					AliasEmail       string
+				}
+				LastToken string
 			}
 		}
-	}
-	q := proton.Query("PageSize", "50")
-	if err := s.C.Decode(ctx, proton.Request{
-		Method: "GET",
-		Path:   fmt.Sprintf("/pass/v1/share/%s/item/%s/revision", shareID, itemID),
-		Query:  q,
-	}, &r); err != nil {
-		return nil, err
-	}
-	out := make([]fullRevision, 0, len(r.Revisions.RevisionsData))
-	for _, rev := range r.Revisions.RevisionsData {
-		shareKey, ok := sk.keys[rev.KeyRotation]
-		if !ok {
-			continue
+		q := proton.Query("PageSize", fmt.Sprintf("%d", revisionsPageSize))
+		if since != "" {
+			q.Set("Since", since)
 		}
-		item, err := decodeItem(shareKey, rev.Content, rev.ItemKey)
-		if err != nil {
-			// A revision written under a key this account no longer holds is
-			// still part of the history, so it is reported by its number rather
-			// than dropped.
-			out = append(out, fullRevision{
-				Revision: rev.Revision, CreateTime: rev.CreateTime, ModifyTime: rev.ModifyTime,
+		if err := s.C.Decode(ctx, proton.Request{
+			Method: "GET",
+			Path:   fmt.Sprintf("/pass/v1/share/%s/item/%s/revision", shareID, itemID),
+			Query:  q,
+		}, &r); err != nil {
+			return nil, false, err
+		}
+		page := make([]fullRevision, 0, len(r.Revisions.RevisionsData))
+		for _, rev := range r.Revisions.RevisionsData {
+			shareKey, ok := sk.keys[rev.KeyRotation]
+			if !ok {
+				skip.Record(ctx, skip.KindItem, itemID, skip.NoKey, nil)
+				continue
+			}
+			item, err := decodeItem(shareKey, rev.Content, rev.ItemKey)
+			if err != nil {
+				// A revision written under a key this account no longer holds is
+				// still part of the history, so it is reported by its number rather
+				// than dropped.
+				page = append(page, fullRevision{
+					Revision: rev.Revision, CreateTime: rev.CreateTime, ModifyTime: rev.ModifyTime,
+				})
+				continue
+			}
+			item.ShareID, item.ItemID = shareID, rev.ItemID
+			item.Revision, item.State = rev.Revision, rev.State
+			item.CreateTime, item.ModifyTime = rev.CreateTime, rev.ModifyTime
+			item.Alias = rev.AliasEmail
+			item.AliasStatus = aliasStatus(item.Type, rev.Flags)
+			page = append(page, fullRevision{
+				Revision: rev.Revision, CreateTime: rev.CreateTime,
+				ModifyTime: rev.ModifyTime, Item: item,
 			})
-			continue
 		}
-		item.ShareID, item.ItemID = shareID, rev.ItemID
-		item.Revision, item.State = rev.Revision, rev.State
-		item.CreateTime, item.ModifyTime = rev.CreateTime, rev.ModifyTime
-		item.Alias = rev.AliasEmail
-		item.AliasStatus = aliasStatus(item.Type, rev.Flags)
-		out = append(out, fullRevision{
-			Revision: rev.Revision, CreateTime: rev.CreateTime,
-			ModifyTime: rev.ModifyTime, Item: item,
-		})
+		since = r.Revisions.LastToken
+		return page, r.Revisions.LastToken != "" && len(r.Revisions.RevisionsData) > 0, nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	// Newest first, which is the order somebody looking for "what did it used to
 	// be" reads in. Sorted rather than reversed, so the answer does not depend on

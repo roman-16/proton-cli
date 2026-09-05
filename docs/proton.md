@@ -77,7 +77,7 @@ proton report --dest bug.txt
 
 Print the skill that teaches an AI agent to use proton.
 
-A skill is a SKILL.md an agent reads before it acts (https://agentskills.io): what proton is for, how to check it is installed and signed in, the flags every call takes, what to do before changing anything, and where every command lives. It is written from this build, so it names exactly the commands this proton has, and it tells the agent to print it again when the installed proton is a different one.
+A skill is a SKILL.md an agent reads before it acts (https://agentskills.io): what proton is for, how a command is shaped, what an answer looks like, the flags every call takes, and where every command lives. It describes the tool and nothing else - how the agent should behave with an account is yours to say, in your own instructions. It is written from this build, so it names exactly the commands this proton has, and it tells the agent to print it again when the installed proton is a different one.
 
 Save it as SKILL.md inside a directory named proton-cli, wherever your agent reads skills. An agent that reads it as it runs rather than from a saved file wants --body-only, which leaves the frontmatter out.
 

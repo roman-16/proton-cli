@@ -58,13 +58,13 @@ func listCmd() *cobra.Command {
 			}
 			return kit.List(c, ui.TableSpec[mailsvc.Message]{
 				Noun: "messages", Columns: messageColumns(),
-				Total: total, Page: opts.Page, PageSize: opts.PageSize,
+				Total: f.total(total, len(msgs)), Page: opts.Page, PageSize: opts.PageSize,
 				Filtered: f.narrowed(),
 			}, msgs)
 		}),
 	}
 	f.registerNarrowing(c, "inbox")
-	registerPaging(c, &f.page, &f.pageSize, "messages")
+	f.registerPaging(c, "messages")
 	return c
 }
 
@@ -407,7 +407,7 @@ func scheduled(c *kit.Invocation, all bool) ([]string, []mailsvc.Message, error)
 		rows = append(rows, mailsvc.Message{ID: id})
 	}
 	if all {
-		msgs, _, err := c.App.Mail.List(c.Ctx, mailsvc.ListOptions{Folder: "scheduled", PageSize: 150})
+		msgs, _, err := c.App.Mail.List(c.Ctx, mailsvc.ListOptions{Folder: "scheduled"})
 		if err != nil {
 			return nil, nil, err
 		}
@@ -456,12 +456,6 @@ func registerFolderCompletion(c *cobra.Command, flag string) {
 		func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 			return mailsvc.SystemFolderNames(), cobra.ShellCompDirectiveNoFileComp
 		})
-}
-
-// registerPaging adds the two flags that walk a result the server counts.
-func registerPaging(c *cobra.Command, page, pageSize *int, noun string) {
-	c.Flags().IntVar(page, "page", 0, "Which page of results, counting from zero")
-	c.Flags().IntVar(pageSize, "page-size", 25, "How many "+noun+" per page")
 }
 
 // addressOnlyHint explains an empty result that a different flag would have

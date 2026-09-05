@@ -32,11 +32,10 @@ type AliasContact struct {
 
 // AliasContacts lists the correspondents an alias can write to.
 func (s *Service) AliasContacts(ctx context.Context, shareID, itemID string) ([]AliasContact, error) {
-	var out []AliasContact
 	// Proton pages this by the last ID seen rather than by page number, and says
 	// it has finished by answering with a zero.
 	since := ""
-	for {
+	return proton.All(ctx, func(ctx context.Context, _ int) ([]AliasContact, bool, error) {
 		var r struct {
 			Contacts []struct {
 				ID                             int
@@ -55,8 +54,9 @@ func (s *Service) AliasContacts(ctx context.Context, shareID, itemID string) ([]
 			req.Query = proton.Query("Since", since)
 		}
 		if err := s.C.Decode(ctx, req, &r); err != nil {
-			return nil, err
+			return nil, false, err
 		}
+		out := make([]AliasContact, 0, len(r.Contacts))
 		for _, c := range r.Contacts {
 			out = append(out, AliasContact{
 				ID: c.ID, Name: c.Name, Email: c.Email, ReverseAlias: c.ReverseAlias,
@@ -64,11 +64,9 @@ func (s *Service) AliasContacts(ctx context.Context, shareID, itemID string) ([]
 				BlockedIn: c.BlockedEmails, Created: c.CreateTime,
 			})
 		}
-		if r.LastID == 0 || len(r.Contacts) == 0 {
-			return out, nil
-		}
 		since = fmt.Sprint(r.LastID)
-	}
+		return out, r.LastID != 0 && len(r.Contacts) > 0, nil
+	})
 }
 
 // AliasContactCreate mints the address that writes to somebody as the alias.

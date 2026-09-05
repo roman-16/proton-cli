@@ -106,25 +106,29 @@ func findSelfAttendee(tokenToEmail map[string]string, attendees []rawAttendee) (
 // already in the event's AttendeesInfo) when an event has more attendees than
 // the inline list carried.
 func (s *Service) findSelfAttendeePaged(ctx context.Context, calendarID, eventID string, tokenToEmail map[string]string) (attendeeID, selfEmail string, ok bool, err error) {
-	for page := 1; ; page++ {
+	err = proton.Pages(ctx, func(ctx context.Context, page int) (bool, error) {
 		var r struct {
 			Attendees     []rawAttendee
 			MoreAttendees int
 		}
 		q := url.Values{}
-		q.Set("Page", fmt.Sprintf("%d", page))
+		// Page zero arrived with the event itself, so the walk starts after it.
+		q.Set("Page", fmt.Sprintf("%d", page+1))
 		if err := s.C.Decode(ctx, proton.Request{
 			Method: "GET", Path: fmt.Sprintf("/calendar/v1/%s/events/%s/attendees", calendarID, eventID), Query: q,
 		}, &r); err != nil {
-			return "", "", false, err
+			return false, err
 		}
 		if id, email, found := findSelfAttendee(tokenToEmail, r.Attendees); found {
-			return id, email, true, nil
+			attendeeID, selfEmail, ok = id, email, true
+			return false, nil
 		}
-		if r.MoreAttendees != 1 || len(r.Attendees) == 0 {
-			return "", "", false, nil
-		}
+		return r.MoreAttendees == 1 && len(r.Attendees) > 0, nil
+	})
+	if err != nil {
+		return "", "", false, err
 	}
+	return attendeeID, selfEmail, ok, nil
 }
 
 // Reply is a ready-to-send METHOD:REPLY invitation answer for the organizer.

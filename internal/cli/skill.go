@@ -15,18 +15,24 @@ import (
 // The instructions an agent reads before it drives this CLI.
 //
 // An agent arrives knowing shells and knowing nothing about this tool, and the
-// two things it does with that gap are expensive: it guesses a flag, and it
-// changes something before asking. So what it is handed is a contract - check
-// the install and the session, ask for JSON, preview before changing, whose
-// secrets these are - plus a map of where every command lives, and then it is
-// sent to `--help` for the syntax.
+// expensive thing it does with that gap is guess: a flag that does not exist, a
+// listing it reads one page of, an envelope field it invents. So what it is
+// handed is what this build is - the shape of a command, how an answer is
+// shaped, what every call should carry, where every command lives - and then it
+// is sent to `--help` for the syntax.
 //
-// The contract is prose beside this file, with the same standing as a command's
-// Long. The map is read off the tree, because that is the half that rots: a
-// renamed collection would leave a hand-written list telling an agent to run
-// something that is gone. And it is emitted rather than committed, so it
-// describes the build that printed it and there is no second copy to keep in
-// step.
+// It says nothing about how to behave. Whether to ask before changing something,
+// what may be done unattended, where a secret may be written: those belong to
+// whoever runs the agent, they differ between deployments, and a tool that
+// shipped its own answers would be arguing with its operator's. What this file
+// owes is that the facts are complete, so any policy can be written on top of
+// them.
+//
+// The prose is beside this file, with the same standing as a command's Long. The
+// map is read off the tree, because that is the half that rots: a renamed
+// collection would leave a hand-written list telling an agent to run something
+// that is gone. And it is emitted rather than committed, so it describes the
+// build that printed it and there is no second copy to keep in step.
 //
 // The format is Agent Skills (https://agentskills.io), which is what every agent
 // that reads a skill at all reads. Where a given agent keeps its skills is that
@@ -107,11 +113,12 @@ func skillCmd(root *cobra.Command, version string) *cobra.Command {
 		Long: `Print the skill that teaches an AI agent to use ` + kit.Program + `.
 
 A skill is a SKILL.md an agent reads before it acts (https://agentskills.io):
-what ` + kit.Program + ` is for, how to check it is installed and signed in, the flags
-every call takes, what to do before changing anything, and where every command
-lives. It is written from this build, so it names exactly the commands this
-` + kit.Program + ` has, and it tells the agent to print it again when the installed
-` + kit.Program + ` is a different one.
+what ` + kit.Program + ` is for, how a command is shaped, what an answer looks like,
+the flags every call takes, and where every command lives. It describes the
+tool and nothing else - how the agent should behave with an account is yours to
+say, in your own instructions. It is written from this build, so it names
+exactly the commands this ` + kit.Program + ` has, and it tells the agent to print it
+again when the installed ` + kit.Program + ` is a different one.
 
 Save it as SKILL.md inside a directory named ` + kit.Alias + `, wherever your agent
 reads skills. An agent that reads it as it runs rather than from a saved file

@@ -61,6 +61,34 @@ func TestContradictoryFlagsAreRefused(t *testing.T) {
 	refuses(t, 1, []string{"account", "sessions", "revoke", "--others", "some-uid"}, "--others")
 }
 
+// A page nobody could serve is wrong wherever it is typed, and every listing
+// judges it the same way - the flags are one declaration rather than a habit
+// each command picked up.
+func TestAPageThatCannotExistIsRefused(t *testing.T) {
+	for _, listing := range [][]string{
+		{"contacts", "list"},
+		{"drive", "items", "list"},
+		{"mail", "messages", "list"},
+		{"mail", "conversations", "list"},
+		{"mail", "drafts", "list"},
+		{"pass", "items", "list"},
+	} {
+		refuses(t, 1, append(listing, "--page", "-1"), "--page counts from zero")
+		refuses(t, 1, append(listing, "--page-size", "-5"), "--page-size is a count")
+		// Zero is the whole collection, so there is no second page of it, and an
+		// empty answer would read as the end rather than as a wrong question.
+		refuses(t, 1, append(listing, "--page", "2", "--page-size", "0"),
+			"--page 2 asks for a page of a listing --page-size 0 does not cut into")
+	}
+}
+
+// A cap is a page under the name a bulk verb gives it, and it is judged the same
+// way - before anything is selected, let alone acted on.
+func TestACapThatCannotExistIsRefused(t *testing.T) {
+	refuses(t, 1, []string{"mail", "messages", "trash", "--unread", "--limit", "-1"},
+		"--limit is a count; 0 lifts the cap")
+}
+
 // The raw escape hatch judges what it was handed before it sends it.
 func TestTheRawAPICommandJudgesItsOwnArguments(t *testing.T) {
 	refuses(t, 1, []string{"api", "POST", "/core/v4/labels", "--body", "{not json}"},

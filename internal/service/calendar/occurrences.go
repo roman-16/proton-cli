@@ -209,30 +209,33 @@ func (c series) allOverrideIDs() []string {
 // need in order to know which occurrences have been edited - so the separately
 // edited ones are looked up rather than guessed at from a date window.
 func (s *Service) loadSeries(ctx context.Context, ck *calKeys, calendarID string, master stored) (series, error) {
-	out := series{master: master}
-	for page := 0; ; page++ {
-		q := url.Values{}
-		q.Set("UID", master.raw.UID)
+	q := url.Values{}
+	q.Set("UID", master.raw.UID)
+	q.Set("PageSize", fmt.Sprintf("%d", eventsPageSize))
+	raws, err := proton.All(ctx, func(ctx context.Context, page int) ([]rawEvent, bool, error) {
 		q.Set("Page", fmt.Sprintf("%d", page))
-		q.Set("PageSize", fmt.Sprintf("%d", eventsPageSize))
 		var r struct{ Events []rawEvent }
 		if err := s.C.Decode(ctx, proton.Request{Method: "GET", Path: "/calendar/v1/events", Query: q}, &r); err != nil {
-			return series{}, err
+			return nil, false, err
 		}
-		for _, raw := range r.Events {
-			if raw.ID == master.raw.ID || raw.CalendarID != calendarID {
-				continue
-			}
-			e := s.decrypt(ctx, ck, raw)
-			if e.readErr != nil || !e.model.IsOverride() {
-				continue
-			}
-			out.overrides = append(out.overrides, e)
-		}
-		if len(r.Events) < eventsPageSize {
-			return out, nil
-		}
+		return r.Events, proton.Full(r.Events, eventsPageSize), nil
+	})
+	if err != nil {
+		return series{}, err
 	}
+
+	out := series{master: master}
+	for _, raw := range raws {
+		if raw.ID == master.raw.ID || raw.CalendarID != calendarID {
+			continue
+		}
+		e := s.decrypt(ctx, ck, raw)
+		if e.readErr != nil || !e.model.IsOverride() {
+			continue
+		}
+		out.overrides = append(out.overrides, e)
+	}
+	return out, nil
 }
 
 // ── resolving an occurrence ──

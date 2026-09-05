@@ -7,30 +7,84 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Walking a collection the CLI already holds.
+// Asking for part of a collection, and ordering one held whole.
 //
-// Proton pages and orders mail itself, so `mail messages list` hands --page and
-// --sort straight to the server. Nothing else it stores can be asked for in
-// pieces: contacts arrive as one encrypted export, Pass items as one batch per
-// vault, a Drive folder as its whole listing. Those collections are decrypted
-// locally and therefore ordered and paged locally too.
+// Every listing takes the same two flags, and they mean the same thing wherever
+// they are typed: --page-size is how many rows an answer holds and --page is
+// which of those answers to give, counting from zero. A size of zero is the
+// whole collection in one answer. Whether that costs the server one request or
+// twenty is the service's problem and never appears here - a page a user asks
+// for is a page, not however much Proton happens to serve at once.
 //
-// That distinction is the whole reason this is a separate thing from the flags:
-// paging a result the server ordered is a different act from paging one this
-// process is holding, and only the second can also sort. Offering --sort on a
-// collection whose pages arrive pre-cut would sort one page and call it the
-// answer.
+// Ordering is the part that cannot be asked of every collection. Proton orders
+// mail itself, so `mail messages list` hands --sort to the server. Nothing else
+// it stores can be asked for in pieces: contacts arrive as one encrypted export,
+// Pass items as one batch per vault, a Drive folder as its whole listing. Those
+// are decrypted locally, so Slice cuts the page out here - and only they can also
+// sort, because sorting one pre-cut page and calling it the answer would be a
+// lie.
+
+// defaultSize is how wide a page is when the collection does not say, which is
+// most of them: a listing of things a person reads down.
+const defaultSize = 50
 
 // Page is the position in a collection this invocation asked for.
+//
+// Default is how many rows a page holds when nothing was said, which differs per
+// collection: a screenful of mail is not a screenful of contacts.
 type Page struct {
 	Number int
 	Size   int
+
+	Default int
+
+	// capped records that the size was asked for as a cap, which is the only
+	// thing that differs between the two spellings and all a refusal needs to
+	// name the flag the user actually typed.
+	capped bool
 }
 
 // Register adds --page and --page-size.
+//
+// The pair validates together and locally: a negative page or size, and a page
+// of a listing that was asked for whole, are wrong whoever is signed in, so Run
+// refuses them before the first request.
 func (p *Page) Register(c *cobra.Command, noun string) {
+	if p.Default == 0 {
+		p.Default = defaultSize
+	}
 	c.Flags().IntVar(&p.Number, "page", 0, "Which page of results, counting from zero")
-	c.Flags().IntVar(&p.Size, "page-size", 50, "How many "+noun+" per page")
+	c.Flags().IntVar(&p.Size, "page-size", p.Default, "How many "+noun+" per page; 0 for all of them")
+	registerCheck(c, "page", nil, p)
+}
+
+// RegisterCap adds --limit, the most rows a bulk verb will act on.
+//
+// A cap is a page: "at most 150 of them" and "the first 150 of them" are the
+// same ask, so they are the same field, and a command offers one spelling or the
+// other rather than both. Zero lifts the cap for the same reason it lists
+// everything.
+func (p *Page) RegisterCap(c *cobra.Command, noun string) {
+	if p.Default == 0 {
+		p.Default = defaultSize
+	}
+	p.capped = true
+	c.Flags().IntVar(&p.Size, "limit", p.Default, "Most "+noun+" to affect; 0 for no cap")
+	registerCheck(c, "limit", nil, p)
+}
+
+func (p *Page) validate() error {
+	switch {
+	case p.Number < 0:
+		return Fail("--page counts from zero.")
+	case p.Size < 0 && p.capped:
+		return Fail("--limit is a count; 0 lifts the cap.")
+	case p.Size < 0:
+		return Fail("--page-size is a count; 0 lists all of them.")
+	case p.Number > 0 && p.Size == 0:
+		return Fail("--page %d asks for a page of a listing --page-size 0 does not cut into.", p.Number)
+	}
+	return nil
 }
 
 // Slice cuts rows down to the page that was asked for and reports how many there

@@ -177,13 +177,58 @@ type ListOptions struct {
 	After, Before string
 	Unread        bool
 
-	// Page and PageSize walk the result. A bulk selection asks for one page the
+	// Page and PageSize are the caller's page of the result, counting from zero.
+	// A size of zero is the whole result. A bulk selection asks for page zero the
 	// size of its own cap, which is what --limit sets.
 	Page, PageSize int
 
 	// ID narrows the query to one message or thread, which is how a reference
 	// that is already an ID is turned back into a row.
 	ID string
+}
+
+// pageMax is how many rows Proton returns for one listing request, whatever
+// larger number is asked for.
+const pageMax = 150
+
+// window reads the page a caller asked for out of however many of Proton's it
+// spans, and reports how many rows the whole result has.
+//
+// A page no wider than Proton's own is one request, which is every ordinary
+// listing. A wider one, and the whole result asked for with a size of zero, are
+// read at Proton's width and cut down to what was asked for. That is what keeps
+// --page-size the reader's number: how many requests it costs is this layer's
+// business, and 150 never reaches a screen.
+func window[T any](ctx context.Context, page, size int, fetch func(ctx context.Context, page, size int) ([]T, int, error)) ([]T, int, error) {
+	if size > 0 && size <= pageMax {
+		return fetch(ctx, page, size)
+	}
+
+	from := page * size
+	start := from - from%pageMax
+	var rows []T
+	total := 0
+	err := proton.Pages(ctx, func(ctx context.Context, i int) (bool, error) {
+		got, count, err := fetch(ctx, start/pageMax+i, pageMax)
+		if err != nil {
+			return false, err
+		}
+		rows = append(rows, got...)
+		total = count
+		if !proton.Full(got, pageMax) {
+			return false, nil
+		}
+		return size == 0 || start+len(rows) < from+size, nil
+	})
+	if err != nil {
+		return nil, 0, err
+	}
+
+	rows = rows[min(from-start, len(rows)):]
+	if size > 0 {
+		rows = rows[:min(size, len(rows))]
+	}
+	return rows, total, nil
 }
 
 // Narrowed reports whether anything but the folder and the page was asked for,

@@ -48,7 +48,7 @@ func (s *Service) TrashRefs(ctx context.Context, dc *Context) ([]TrashRef, error
 	}
 	var refs []TrashRef
 	for _, volumeID := range volumes {
-		for page := 0; ; page++ {
+		onVolume, err := proton.All(ctx, func(ctx context.Context, page int) ([]TrashRef, bool, error) {
 			var r struct {
 				Trash []struct {
 					ShareID string
@@ -59,22 +59,22 @@ func (s *Service) TrashRefs(ctx context.Context, dc *Context) ([]TrashRef, error
 				Method: "GET", Path: "/drive/volumes/" + volumeID + "/trash",
 				Query: proton.Query("Page", fmt.Sprintf("%d", page), "PageSize", fmt.Sprintf("%d", trashPageSize)),
 			}, &r); err != nil {
-				return nil, err
+				return nil, false, err
 			}
-			found := 0
+			// The page holds links grouped by share, so what fills it is the
+			// links rather than the groups.
+			var found []TrashRef
 			for _, group := range r.Trash {
 				for _, id := range group.LinkIDs {
-					refs = append(refs, TrashRef{VolumeID: volumeID, ShareID: group.ShareID, LinkID: id})
-					found++
+					found = append(found, TrashRef{VolumeID: volumeID, ShareID: group.ShareID, LinkID: id})
 				}
 			}
-			// A page short of full is the last one. Proton says nothing else about
-			// how much is there, and stopping early would be a listing that
-			// silently misses what `empty` would destroy.
-			if found < trashPageSize {
-				break
-			}
+			return found, proton.Full(found, trashPageSize), nil
+		})
+		if err != nil {
+			return nil, err
 		}
+		refs = append(refs, onVolume...)
 	}
 	return refs, nil
 }

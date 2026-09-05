@@ -23,7 +23,7 @@ func TestFooter(t *testing.T) {
 		{"search under the cap", FooterSpec{Noun: "messages", Count: 12, Total: Unknown, Page: Unpaged, Limit: 25},
 			"12 messages."},
 		{"search at the cap", FooterSpec{Noun: "messages", Count: 25, Total: Unknown, Page: Unpaged, Limit: 25},
-			"25 messages. More may exist; raise --limit."},
+			"25 messages. More may exist; raise --limit, or pass 0 for no cap."},
 		{"irregular plural", FooterSpec{Noun: "addresses", Count: 1, Total: Unknown, Page: Unpaged},
 			"1 address."},
 	} {

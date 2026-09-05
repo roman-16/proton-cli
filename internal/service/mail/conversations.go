@@ -2,6 +2,7 @@ package mail
 
 import (
 	"context"
+	"fmt"
 	"sort"
 
 	"github.com/roman-16/proton-cli/internal/proton"
@@ -34,18 +35,22 @@ func (s *Service) ConversationsList(ctx context.Context, opts ListOptions) ([]Co
 	if err != nil {
 		return nil, 0, err
 	}
-	var r struct {
-		Total         int
-		Conversations []rawConversation
-	}
-	if err := s.C.Decode(ctx, proton.Request{Method: "GET", Path: "/mail/v4/conversations", Query: q}, &r); err != nil {
-		return nil, 0, err
-	}
-	out := make([]Conversation, 0, len(r.Conversations))
-	for _, c := range r.Conversations {
-		out = append(out, toConversation(c))
-	}
-	return out, r.Total, nil
+	return window(ctx, opts.Page, opts.PageSize, func(ctx context.Context, page, size int) ([]Conversation, int, error) {
+		q.Set("Page", fmt.Sprintf("%d", page))
+		q.Set("PageSize", fmt.Sprintf("%d", size))
+		var r struct {
+			Total         int
+			Conversations []rawConversation
+		}
+		if err := s.C.Decode(ctx, proton.Request{Method: "GET", Path: "/mail/v4/conversations", Query: q}, &r); err != nil {
+			return nil, 0, err
+		}
+		out := make([]Conversation, 0, len(r.Conversations))
+		for _, c := range r.Conversations {
+			out = append(out, toConversation(c))
+		}
+		return out, r.Total, nil
+	})
 }
 
 func (s *Service) ConversationRead(ctx context.Context, id string) (*ConversationFull, error) {

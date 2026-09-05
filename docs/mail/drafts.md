@@ -60,7 +60,7 @@ proton mail drafts list
 | Flag | Description |
 | --- | --- |
 | `--page int` | Which page of results, counting from zero |
-| `--page-size int` | How many drafts per page (default `25`) |
+| `--page-size int` | How many drafts per page; 0 for all of them (default `25`) |
 
 ## `send`
 

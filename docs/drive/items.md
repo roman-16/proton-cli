@@ -120,7 +120,7 @@ proton drive items list /Documents
 | `--newer-than string` | Match files newer than DURATION |
 | `--older-than string` | Match files older than DURATION (e.g. 30d, 2w, 1h) |
 | `--page int` | Which page of results, counting from zero |
-| `--page-size int` | How many items per page (default `50`) |
+| `--page-size int` | How many items per page; 0 for all of them (default `50`) |
 | `--pattern string` | Match names against a shell glob, e.g. *.tmp |
 | `--recursive` | Descend into subfolders when filtering |
 | `--smaller-than string` | Match files below SIZE |

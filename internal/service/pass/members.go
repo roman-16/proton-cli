@@ -36,9 +36,9 @@ func (s *Service) Members(ctx context.Context, shareID, itemID string) ([]Member
 	if itemID != "" {
 		path += "/item/" + itemID
 	}
-	var out []Member
+	// Proton pages this by the token the previous answer ended with.
 	var since string
-	for {
+	out, err := proton.All(ctx, func(ctx context.Context, _ int) ([]Member, bool, error) {
 		q := proton.Query()
 		if since != "" {
 			q.Set("Since", since)
@@ -54,8 +54,9 @@ func (s *Service) Members(ctx context.Context, shareID, itemID string) ([]Member
 			LastToken string
 		}
 		if err := s.C.Decode(ctx, proton.Request{Method: "GET", Path: path, Query: q}, &r); err != nil {
-			return nil, err
+			return nil, false, err
 		}
+		page := make([]Member, 0, len(r.Shares))
 		for _, m := range r.Shares {
 			access := roleWord(m.ShareRoleID)
 			// Proton records the owner with whatever role the share was made
@@ -63,15 +64,16 @@ func (s *Service) Members(ctx context.Context, shareID, itemID string) ([]Member
 			if m.Owner {
 				access = roleWords[roleManager]
 			}
-			out = append(out, Member{
+			page = append(page, Member{
 				ShareID: m.ShareID, Email: m.UserEmail, Name: m.UserName,
 				Access: access, Owner: m.Owner,
 			})
 		}
-		if r.LastToken == "" || len(r.Shares) == 0 {
-			break
-		}
 		since = r.LastToken
+		return page, r.LastToken != "" && len(r.Shares) > 0, nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	sort.SliceStable(out, func(i, j int) bool {
 		if out[i].Owner != out[j].Owner {

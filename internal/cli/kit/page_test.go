@@ -39,6 +39,32 @@ func TestSliceCutsThePageAndReportsTheWhole(t *testing.T) {
 	}
 }
 
+func TestPageRefusesWhatNoSessionCouldMakeRight(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		page Page
+		want string
+	}{
+		{"a page before the first", Page{Number: -1, Size: 50}, "--page counts from zero."},
+		{"a negative size", Page{Size: -5}, "--page-size is a count; 0 lists all of them."},
+		// Zero is the whole collection, so there is no second page of it to
+		// ask for and answering with an empty one would look like the end.
+		{"a page of an unpaged listing", Page{Number: 2}, "--page 2 asks for a page of a listing --page-size 0 does not cut into."},
+		{"the first page whole", Page{}, ""},
+		{"an ordinary page", Page{Number: 3, Size: 25}, ""},
+	} {
+		err := c.page.validate()
+		switch {
+		case c.want == "" && err != nil:
+			t.Errorf("%s: %v, want no complaint", c.name, err)
+		case c.want != "" && err == nil:
+			t.Errorf("%s: allowed, want %q", c.name, c.want)
+		case c.want != "" && err != nil && err.Error() != c.want:
+			t.Errorf("%s: %q, want %q", c.name, err, c.want)
+		}
+	}
+}
+
 func TestSliceLeavesAnEmptyCollectionAlone(t *testing.T) {
 	got, total := Slice(Page{Number: 0, Size: 10}, []int(nil))
 	if len(got) != 0 || total != 0 {

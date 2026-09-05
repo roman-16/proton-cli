@@ -72,7 +72,7 @@ proton mail messages delete --folder spam --all --yes
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text anywhere, including display names and bodies |
-| `--limit int` | Most messages to affect (Proton pages at 150) (default `150`) |
+| `--limit int` | Most messages to affect; 0 for no cap (default `150`) |
 | `--newer-than string` | Match messages newer than DURATION |
 | `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |
 | `--starred` | Match starred messages |
@@ -124,7 +124,7 @@ proton mail messages expire 5bH2mQxK --never
 | `--from string` | Match the sender's address |
 | `--in string` | Delete them after DURATION (e.g. 7d, 24h) |
 | `--keyword string` | Match text anywhere, including display names and bodies |
-| `--limit int` | Most messages to affect (Proton pages at 150) (default `150`) |
+| `--limit int` | Most messages to affect; 0 for no cap (default `150`) |
 | `--never` | Stop them expiring |
 | `--newer-than string` | Match messages newer than DURATION |
 | `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |
@@ -166,7 +166,7 @@ proton mail messages export --folder archive --older-than 1y --format mbox --des
 | `--format string` | How to lay the messages down: eml, mbox (default `eml`) |
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text anywhere, including display names and bodies |
-| `--limit int` | Most messages to affect (Proton pages at 150) (default `150`) |
+| `--limit int` | Most messages to affect; 0 for no cap (default `150`) |
 | `--newer-than string` | Match messages newer than DURATION |
 | `--no-attachments` | Skip attachments, which is much faster |
 | `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |
@@ -253,7 +253,7 @@ proton mail messages label --from billing@example.com --label Accounting
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text anywhere, including display names and bodies |
 | `--label string` | The label to attach or detach, by name or ID |
-| `--limit int` | Most messages to affect (Proton pages at 150) (default `150`) |
+| `--limit int` | Most messages to affect; 0 for no cap (default `150`) |
 | `--newer-than string` | Match messages newer than DURATION |
 | `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |
 | `--starred` | Match starred messages |
@@ -292,7 +292,7 @@ proton mail messages list --keyword invoice --after 2026-01-01 --folder all
 | `--newer-than string` | Match messages newer than DURATION |
 | `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |
 | `--page int` | Which page of results, counting from zero |
-| `--page-size int` | How many messages per page (default `25`) |
+| `--page-size int` | How many messages per page; 0 for all of them (default `25`) |
 | `--starred` | Match starred messages |
 | `--subject string` | Match text in the subject |
 | `--to string` | Match a recipient's address |
@@ -325,7 +325,7 @@ proton mail messages mark read --folder inbox --all
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text anywhere, including display names and bodies |
-| `--limit int` | Most messages to affect (Proton pages at 150) (default `150`) |
+| `--limit int` | Most messages to affect; 0 for no cap (default `150`) |
 | `--newer-than string` | Match messages newer than DURATION |
 | `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |
 | `--starred` | Match starred messages |
@@ -353,7 +353,7 @@ proton mail messages mark unread 'Invoice #2291'
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text anywhere, including display names and bodies |
-| `--limit int` | Most messages to affect (Proton pages at 150) (default `150`) |
+| `--limit int` | Most messages to affect; 0 for no cap (default `150`) |
 | `--newer-than string` | Match messages newer than DURATION |
 | `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |
 | `--starred` | Match starred messages |
@@ -385,7 +385,7 @@ proton mail messages move --from newsletter@example.com --older-than 90d --into 
 | `--from string` | Match the sender's address |
 | `--into string` | Destination folder, by name or ID |
 | `--keyword string` | Match text anywhere, including display names and bodies |
-| `--limit int` | Most messages to affect (Proton pages at 150) (default `150`) |
+| `--limit int` | Most messages to affect; 0 for no cap (default `150`) |
 | `--newer-than string` | Match messages newer than DURATION |
 | `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |
 | `--starred` | Match starred messages |
@@ -486,7 +486,7 @@ proton mail messages star 'Invoice #2291'
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text anywhere, including display names and bodies |
-| `--limit int` | Most messages to affect (Proton pages at 150) (default `150`) |
+| `--limit int` | Most messages to affect; 0 for no cap (default `150`) |
 | `--newer-than string` | Match messages newer than DURATION |
 | `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |
 | `--starred` | Match starred messages |
@@ -516,7 +516,7 @@ proton mail messages trash --from newsletter@example.com --older-than 90d --dry-
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text anywhere, including display names and bodies |
-| `--limit int` | Most messages to affect (Proton pages at 150) (default `150`) |
+| `--limit int` | Most messages to affect; 0 for no cap (default `150`) |
 | `--newer-than string` | Match messages newer than DURATION |
 | `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |
 | `--starred` | Match starred messages |
@@ -545,7 +545,7 @@ proton mail messages unlabel 'Invoice #2291' --label Accounting
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text anywhere, including display names and bodies |
 | `--label string` | The label to attach or detach, by name or ID |
-| `--limit int` | Most messages to affect (Proton pages at 150) (default `150`) |
+| `--limit int` | Most messages to affect; 0 for no cap (default `150`) |
 | `--newer-than string` | Match messages newer than DURATION |
 | `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |
 | `--starred` | Match starred messages |
@@ -592,7 +592,7 @@ proton mail messages unstar 'Invoice #2291'
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text anywhere, including display names and bodies |
-| `--limit int` | Most messages to affect (Proton pages at 150) (default `150`) |
+| `--limit int` | Most messages to affect; 0 for no cap (default `150`) |
 | `--newer-than string` | Match messages newer than DURATION |
 | `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |
 | `--starred` | Match starred messages |

@@ -267,8 +267,7 @@ func (s *Service) GroupMembers(ctx context.Context, groupID string) ([]ContactEm
 // every answer built on this.
 func (s *Service) contactEmails(ctx context.Context, q url.Values) ([]ContactEmail, error) {
 	const pageSize = 150
-	var out []ContactEmail
-	for page := 0; ; page++ {
+	return proton.All(ctx, func(ctx context.Context, page int) ([]ContactEmail, bool, error) {
 		q.Set("Page", strconv.Itoa(page))
 		q.Set("PageSize", strconv.Itoa(pageSize))
 		var r struct {
@@ -280,17 +279,16 @@ func (s *Service) contactEmails(ctx context.Context, q url.Values) ([]ContactEma
 		if err := s.C.Decode(ctx, proton.Request{
 			Method: "GET", Path: "/contacts/v4/contacts/emails", Query: q,
 		}, &r); err != nil {
-			return nil, err
+			return nil, false, err
 		}
+		out := make([]ContactEmail, 0, len(r.ContactEmails))
 		for _, e := range r.ContactEmails {
 			out = append(out, ContactEmail{
 				ID: e.ID, ContactID: e.ContactID, Email: e.Email, Name: e.Name, Groups: e.LabelIDs,
 			})
 		}
-		if len(r.ContactEmails) < pageSize {
-			return out, nil
-		}
-	}
+		return out, proton.Full(out, pageSize), nil
+	})
 }
 
 // ResolveContactEmails maps the addresses a user named onto the IDs a group is

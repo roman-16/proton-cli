@@ -95,6 +95,16 @@ It is why a filter that matches a folder and the files inside it selects the fol
 
 And it is why a bulk verb acts on the IDs its selection resolved, in batches of fifty, reading the answer Proton gives per item. A path resolved a second time can mean something else by then, and a batch that half-succeeded and reported the number it hoped for would be the count lying at the last moment. What was refused is named instead, and the count says what landed.
 
+## Why a page size is yours and not Proton's
+
+`--page-size` is how many rows you want in one answer, and `--limit` is how many things a bulk verb may touch. Neither is a page of Proton's.
+
+Proton serves mail 150 rows at a time. When you ask for more than that, the answer is built from as many of its pages as it takes and cut to the number you asked for; when you ask for `0`, they are read until they run out. So `--page-size 500` gives you five hundred, and a folder listed whole is listed whole.
+
+The alternative was letting the cap show: refuse `--page-size 500`, and give `--page-size 0` a second meaning in Mail alone. That would have made one number mean "all of them" in four collections and "the first 25" in three, and taught you a limit that belongs to an endpoint rather than to your question.
+
+`--limit` follows from the same reading. It is the first page of a selection, so a cap of any size is honoured, `0` lifts it, and a selection that fills it says more may exist rather than presenting what it stopped at as the whole match.
+
 ## Why an occurrence count is a number or nothing
 
 A recurring rule that says neither how many times it repeats nor when it stops repeats for ever. Such a series has no number of occurrences - not a very large one - which is why the rule is read rather than the occurrences counted.
