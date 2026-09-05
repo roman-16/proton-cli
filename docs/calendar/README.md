@@ -39,16 +39,24 @@ proton calendar events create --calendar Work --title "Quarterly sync" \
   --start 2026-04-16T14:00 --duration 90m --location "Vienna HQ" --description "Numbers and roadmap"
 ```
 
-Say how long an event lasts **once**, with either `--end` or `--duration`. Both together is refused, and so is either without `--start`.
+Say how long an event lasts **once**, with either `--end` or `--duration`. Both together is refused, and so is either without `--start`. Say neither and a new event lasts as long as its calendar says a new event lasts - `settings calendars get` shows that, `settings calendars update --default-duration` sets it - while an all-day event lasts a day.
 
 | Flag | Accepts |
 | --- | --- |
 | `--start` | `2026-04-16T14:00`, `2026-04-16 14:00`, `2026-04-16`, or full RFC 3339 |
+| `--end` | the last day it runs through (`2026-04-22`), or a day and a time |
 | `--duration` | `15m`, `90m`, `1h`, `2h30m`, or `3d` for an all-day event |
 | `--remind` | `15m`, `1h`, `1d`, repeatable; add `:email` for an emailed one |
 | `--start` / `--end` on `list` | `YYYY-MM-DD`, both days included |
 
 `--all-day` makes an event with no time of day, measured in days. It ends at the midnight after its last day, which is how every other calendar client writes it.
+
+Whether an event has a time of day is what a written time says it is. A bare day on `create` needs `--all-day` to agree; a day and a time on `update` gives an all-day event a time of day, and a bare day moves an event and leaves its time of day alone. `--all-day` takes one away, and `--all-day=false` gives one back - it needs a `--start` saying which time, since nothing else could.
+
+```bash
+proton calendar events update Offsite --all-day
+proton calendar events update Offsite --all-day=false --start 2026-07-01T09:00 --end 2026-07-01T17:00
+```
 
 `--status` says whether the event is going ahead: `confirmed`, `tentative` or `cancelled`. Cancelling this way keeps the event and its history, which `delete` does not.
 

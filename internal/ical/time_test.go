@@ -98,11 +98,66 @@ func TestParseTimeReadsBareValuesInTheGivenZone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := time.Date(2026, 4, 16, 9, 0, 0, 0, loc); !got.Equal(want) {
-		t.Errorf("ParseTime = %v, want %v", got, want)
+	if want := time.Date(2026, 4, 16, 9, 0, 0, 0, loc); !got.Time.Equal(want) {
+		t.Errorf("ParseTime = %v, want %v", got.Time, want)
 	}
 	if _, err := ParseTime("not a time", loc); err == nil {
 		t.Error("ParseTime accepted a value that is not a time")
+	}
+}
+
+// A day and a time of day are different things to have written, and the
+// difference is the whole difference between an all-day event and one that
+// begins at midnight. A reader that only kept the instant could not tell them
+// apart, since both name the same one.
+func TestParseTimeKeepsWhetherATimeOfDayWasWritten(t *testing.T) {
+	loc := vienna(t)
+	for _, tc := range []struct {
+		in     string
+		allDay bool
+	}{
+		{"2026-04-16", true},
+		{"2026-04-16T00:00", false},
+		{"2026-04-16T09:00", false},
+		{"2026-04-16 09:00", false},
+		{"2026-04-16T09:00:00+02:00", false},
+	} {
+		got, err := ParseTime(tc.in, loc)
+		if err != nil {
+			t.Fatalf("%s: %v", tc.in, err)
+		}
+		if got.AllDay != tc.allDay {
+			t.Errorf("%s reads as all-day=%v, want %v", tc.in, got.AllDay, tc.allDay)
+		}
+	}
+	// A day names the day it was written as, in whatever zone reads it back.
+	day, err := ParseTime("2026-04-16", loc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := day.In(time.UTC).Format("2006-01-02"); got != "2026-04-16" {
+		t.Errorf("a day read in UTC is %s", got)
+	}
+}
+
+// Which zone a written time is anchored to is the caller's to say: the same
+// reading means a different instant in each, and the frame an event is stored
+// against is the account's, not the parser's.
+func TestAnchoredGivesAZoneToWhatHasATimeOfDay(t *testing.T) {
+	loc := vienna(t)
+	timed, err := ParseTime("2026-04-16T09:00", loc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := timed.Anchored("Europe/Vienna"); got.TZID != "Europe/Vienna" {
+		t.Errorf("Anchored left the value written against %q", got.TZID)
+	}
+	day, err := ParseTime("2026-04-16", loc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := day.Anchored("Europe/Vienna"); got.TZID != "" {
+		t.Errorf("a day was anchored to %q, and a day has no time of day to anchor", got.TZID)
 	}
 }
 
@@ -176,7 +231,7 @@ func TestAnOffsetSettlesAnAmbiguousReading(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %v", tc.in, err)
 		}
-		if utc := got.UTC().Format(time.RFC3339); utc != tc.want {
+		if utc := got.Time.UTC().Format(time.RFC3339); utc != tc.want {
 			t.Errorf("%s = %s, want %s", tc.in, utc, tc.want)
 		}
 	}

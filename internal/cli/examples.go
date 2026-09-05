@@ -101,6 +101,8 @@ var examples = map[string][]string{
 		"proton calendar events update Dentist --start 2026-04-16T15:30",
 		"proton calendar events update 4f2a1b9c@2026-04-22T09:00 --location 'Room 3'",
 		"proton calendar events update 4f2a1b9c@2026-04-22T09:00 --title Standup --onwards",
+		"proton calendar events update Offsite --all-day",
+		"proton calendar events update Offsite --all-day=false --start 2026-07-01T09:00 --end 2026-07-01T17:00",
 	},
 	"proton calendar events delete": {
 		"proton calendar events delete Dentist",

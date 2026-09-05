@@ -536,11 +536,12 @@ func snoozeMoment(until string) (int64, error) {
 	if d, err := units.ParseDuration(until); err == nil {
 		return time.Now().Add(d).Unix(), nil
 	}
-	at, err := ical.ParseTime(until, time.Local)
+	when, err := ical.ParseTime(until, time.Local)
 	if err != nil {
 		return 0, kit.Fail("--until: %v", err).
 			Hint("a duration such as 3d, or a moment such as 2026-04-17T09:00")
 	}
+	at := when.In(time.Local)
 	if !at.After(time.Now()) {
 		return 0, kit.Fail("--until is in the past.")
 	}

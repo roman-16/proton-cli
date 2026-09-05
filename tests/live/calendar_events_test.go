@@ -384,6 +384,82 @@ func TestCalendarAllDayEventLastsAWholeDay(t *testing.T) {
 	assertField(t, runOK(t, "calendar", "events", "get", "--", ref), "Duration:", "1d")
 }
 
+// An all-day event is the one state a calendar cannot be talked out of by
+// accident: every way of giving it a time of day back has to work, or the event
+// is stuck. Writing a time is that way, and taking the time of day away again is
+// how it goes back.
+func TestCalendarAllDayEventGainsAndLosesItsTimeOfDay(t *testing.T) {
+	title := testID() + "-allday-toggle"
+	ref := strings.TrimSpace(runOK(t, "calendar", "events", "create",
+		"--calendar", "Default", "--title", title,
+		"--start", "2027-08-02", "--all-day"))
+	cleanupRun(t, fmt.Sprintf("Delete all-day event: proton calendar events delete -- %s", ref),
+		"calendar", "events", "delete", "--", ref)
+
+	runOK(t, "calendar", "events", "update",
+		"--start", "2027-08-02T13:00", "--duration", "45m", "--", ref)
+	timed := runOK(t, "calendar", "events", "get", "--", ref)
+	assertField(t, timed, "Start:", "2027-08-02 13:00")
+	assertField(t, timed, "Duration:", "45m")
+
+	runOK(t, "calendar", "events", "update", "--all-day", "--", ref)
+	wholeDay := runOK(t, "calendar", "events", "get", "--", ref)
+	assertField(t, wholeDay, "Start:", "2027-08-02 (all day)")
+	assertField(t, wholeDay, "Duration:", "1d")
+
+	rows := occurrencesOf(t, title, "2027-08-02", "2027-08-02")
+	if len(rows) != 1 {
+		t.Fatalf("the event listed %d rows on its own day, want 1", len(rows))
+	}
+	if allDay, _ := rows[0]["all_day"].(bool); !allDay {
+		t.Error("the row does not report itself as all-day again")
+	}
+}
+
+// An end date on a calendar is the last day the event is on. iCalendar stores the
+// midnight after it, and that convention is storage's business rather than
+// something to make anybody count around.
+func TestCalendarAllDayEventEndsOnTheDayNamed(t *testing.T) {
+	title := testID() + "-allday-through"
+	ref := strings.TrimSpace(runOK(t, "calendar", "events", "create",
+		"--calendar", "Default", "--title", title,
+		"--start", "2027-08-09", "--end", "2027-08-11", "--all-day"))
+	cleanupRun(t, fmt.Sprintf("Delete all-day event: proton calendar events delete -- %s", ref),
+		"calendar", "events", "delete", "--", ref)
+
+	assertField(t, runOK(t, "calendar", "events", "get", "--", ref), "Duration:", "3d")
+	if rows := occurrencesOf(t, title, "2027-08-11", "2027-08-11"); len(rows) != 1 {
+		t.Errorf("the last day named listed %d rows, want the event on it", len(rows))
+	}
+	if rows := occurrencesOf(t, title, "2027-08-12", "2027-08-12"); len(rows) != 0 {
+		t.Errorf("the day after the last one named listed %d rows", len(rows))
+	}
+}
+
+// A new event that says nothing about how long it lasts lasts as long as its
+// calendar says, which is the setting `settings calendars update` writes and the
+// one Proton's own composer opens with.
+func TestCalendarEventWithNoLengthTakesTheCalendarsDefault(t *testing.T) {
+	before := runJSON(t, "calendar", "settings", "calendars", "get", "Default")
+	defaults, _ := before["defaults"].(map[string]interface{})
+	restore, _ := defaults["default_duration_minutes"].(float64)
+	if restore <= 0 {
+		t.Fatalf("the calendar reports a default duration of %v minutes", restore)
+	}
+	runOK(t, "calendar", "settings", "calendars", "update", "Default", "--default-duration", "45m")
+	cleanupRun(t, fmt.Sprintf("Restore the calendar's default duration: %d minutes", int(restore)),
+		"calendar", "settings", "calendars", "update", "Default",
+		"--default-duration", fmt.Sprintf("%dm", int(restore)))
+
+	title := testID() + "-default-length"
+	ref := strings.TrimSpace(runOK(t, "calendar", "events", "create",
+		"--calendar", "Default", "--title", title, "--start", "2027-08-16T09:00"))
+	cleanupRun(t, fmt.Sprintf("Delete event: proton calendar events delete -- %s", ref),
+		"calendar", "events", "delete", "--", ref)
+
+	assertField(t, runOK(t, "calendar", "events", "get", "--", ref), "Duration:", "45m")
+}
+
 // The day after the last one named is not reported, by either route into a listing:
 // an all-day event begins at the instant that day begins, and an all-day row carries
 // no time of day to give it away. Recurring and one-off events are filtered by the

@@ -24,32 +24,78 @@ type EventPatch struct {
 	Title       *string
 	Location    *string
 	Description *string
-	Start       *time.Time
-	End         *time.Time
-	AllDay      *bool
-	Zone        *string
-	RRule       *string
-	Reminders   *[]string
+	// Start is where the event is put: a day, or a moment anchored to the zone the
+	// change is written against.
+	Start *ical.DateTime
+	// Duration is how long it lasts. Absent keeps the length it had, which is what
+	// makes moving an event a move rather than a rewrite.
+	Duration *time.Duration
+	// AllDay takes an event's time of day away. Giving one back is a Start that
+	// names one, since a time of day is a time somebody has to choose.
+	AllDay    *bool
+	RRule     *string
+	Reminders *[]string
 	// Status is whether the event is going ahead: CONFIRMED, TENTATIVE or
 	// CANCELLED. Cancelling this way keeps the event and its history, which is
 	// what the web client does and what `delete` does not.
 	Status *string
 }
 
-// touchesTimes reports whether the patch moves the event, which is what decides
+// TouchesTimes reports whether the patch puts the event somewhere else or gives
+// it another length, which is what decides both what a result says about it and
 // whether the exclusions and the separately edited occurrences still mean
 // anything.
-func (p EventPatch) touchesTimes() bool {
-	return p.Start != nil || p.End != nil || p.AllDay != nil || p.Zone != nil
+func (p EventPatch) TouchesTimes() bool {
+	return p.Start != nil || p.Duration != nil || p.AllDay != nil
 }
 
 // breaks reports whether the patch changes something participants have to be told
 // about, and something that invalidates instants recorded against the series.
-func (p EventPatch) breaks() bool { return p.touchesTimes() || p.RRule != nil }
+func (p EventPatch) breaks() bool { return p.TouchesTimes() || p.RRule != nil }
 
-// apply merges the patch into an event. anchor is the zone the result is written
-// against.
-func (p EventPatch) apply(v ical.VEvent, anchor string) ical.VEvent {
+// Lands is where the patch puts an event that begins at start, in the form it
+// then has: a day for one with no time of day, a moment for one with.
+//
+// A start that names a time of day gives an all-day event one, because naming a
+// time is what asking for a time of day looks like. A start that names only a
+// day moves an event and leaves the time of day it had, because that is what
+// moving a meeting to Monday means.
+//
+// A result and a dry run say where a change lands before it is made, so the rule
+// is here rather than beside either of them.
+func (p EventPatch) Lands(start ical.DateTime) ical.DateTime {
+	allDay := start.AllDay
+	if p.Start != nil {
+		allDay = allDay && p.Start.AllDay
+	}
+	if p.AllDay != nil {
+		allDay = *p.AllDay
+	}
+	switch {
+	case p.Start == nil && !allDay:
+		return start
+	case p.Start == nil:
+		return ical.Day(start.Wall())
+	case allDay:
+		return ical.Day(p.Start.Wall())
+	case p.Start.AllDay:
+		return onDay(start, *p.Start)
+	default:
+		return *p.Start
+	}
+}
+
+// onDay is an event's own time of day, on another day, in the zone it is
+// anchored to.
+func onDay(current, day ical.DateTime) ical.DateTime {
+	wall := current.Wall()
+	y, m, d := day.Time.Date()
+	moved := time.Date(y, m, d, wall.Hour(), wall.Minute(), wall.Second(), 0, current.Location())
+	return ical.Timed(moved, current.TZID)
+}
+
+// apply merges the patch into an event.
+func (p EventPatch) apply(v ical.VEvent) ical.VEvent {
 	if p.Title != nil {
 		v.Summary = *p.Title
 	}
@@ -65,55 +111,33 @@ func (p EventPatch) apply(v ical.VEvent, anchor string) ical.VEvent {
 	if p.RRule != nil {
 		v.RRule = *p.RRule
 	}
-	if !p.touchesTimes() {
+	if !p.TouchesTimes() {
 		return v
 	}
-	spanStart, spanEnd := v.Span()
-	start, end := spanStart.Time, spanEnd.Time
-	if p.Start != nil {
-		start = *p.Start
+	start, end := v.Span()
+	dur := end.Time.Sub(start.Time)
+	if p.Duration != nil {
+		dur = *p.Duration
 	}
-	if p.End != nil {
-		end = *p.End
-	} else if p.Start != nil {
-		// A start that moves without a new length keeps the length it had.
-		end = start.Add(v.Duration())
-	}
-	allDay := v.Start.AllDay
-	if p.AllDay != nil {
-		allDay = *p.AllDay
-	}
-	return withTimes(v, start, end, allDay, anchor)
+	return withTimes(v, p.Lands(start), dur)
 }
 
-// withTimes anchors an event's start and end to a zone.
+// withTimes puts an event at a moment, for a length.
 //
 // An all-day event's end is exclusive in iCalendar, so a single day runs to the
-// next one. Rounding both ends to the same day would store an event that lasts no
-// time at all.
-func withTimes(v ical.VEvent, start, end time.Time, allDay bool, tzid string) ical.VEvent {
-	if allDay {
-		loc := ical.DateTime{TZID: tzid}.Location()
-		first := ical.Day(start.In(loc))
-		last := ical.Day(end.In(loc))
-		if end.IsZero() || !last.Time.After(first.Time) {
-			last = ical.Day(first.Time.AddDate(0, 0, 1))
+// next one, and a length too short to reach the next day still has to end there:
+// an event that lasts no time at all is not what a whole day means.
+func withTimes(v ical.VEvent, start ical.DateTime, dur time.Duration) ical.VEvent {
+	if start.AllDay {
+		last := ical.Day(start.Time.Add(dur))
+		if !last.Time.After(start.Time) {
+			last = ical.Day(start.Time.AddDate(0, 0, 1))
 		}
-		v.Start, v.End = first, last
+		v.Start, v.End = start, last
 		return v
 	}
-	v.Start = ical.Timed(start, tzid)
-	v.End = ical.Timed(end, tzid)
+	v.Start, v.End = start, ical.Timed(start.Time.Add(dur), start.TZID)
 	return v
-}
-
-// anchorFor is the zone a patched event is written against: the one the change
-// names, or the one the event already has.
-func anchorFor(v ical.VEvent, p EventPatch) string {
-	if p.Zone == nil {
-		return v.Start.TZID
-	}
-	return *p.Zone
 }
 
 // reminders resolves the notification list a write sends: the patched one, or the
@@ -283,7 +307,7 @@ func (s *Service) EventUpdate(ctx context.Context, calendarID, eventID string, p
 	if old.readErr != nil {
 		return nil, fmt.Errorf("read the event before updating it: %w", old.readErr)
 	}
-	updated := p.apply(old.model, anchorFor(old.model, p))
+	updated := p.apply(old.model)
 
 	var ops []syncOp
 	if old.model.Recurring() && p.breaks() {
@@ -342,7 +366,7 @@ func (s *Service) OccurrenceUpdate(ctx context.Context, calendarID, eventID, occ
 	}
 
 	current := target.currentVEvent()
-	updated := p.apply(current, anchorFor(current, p)).AsOverride(master.model, target.at)
+	updated := p.apply(current).AsOverride(master.model, target.at)
 	// A replacement may never claim to be older than the series it belongs to, and
 	// Proton refuses a sequence that goes backwards.
 	updated.Sequence = max(ical.NextSequence(current, updated), master.model.Sequence)
@@ -426,7 +450,7 @@ func (s *Service) SeriesSplit(ctx context.Context, calendarID, eventID, occurren
 	truncated.Sequence = master.model.Sequence + 1
 
 	current := target.currentVEvent()
-	remainder := p.apply(current, anchorFor(current, p))
+	remainder := p.apply(current)
 	remainder.RRule = master.model.RRule
 	if p.RRule != nil {
 		remainder.RRule = *p.RRule

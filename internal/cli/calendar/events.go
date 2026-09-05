@@ -226,8 +226,9 @@ func (d *details) register(c *cobra.Command, verb string) {
 	d.status.Register(c)
 	f := c.Flags()
 	f.StringVar(&d.title, "title", "", verb+" the title")
-	f.StringVar(&d.start, "start", "", verb+" the start (RFC 3339, or YYYY-MM-DDTHH:MM)")
-	f.StringVar(&d.end, "end", "", verb+" the end (RFC 3339, or YYYY-MM-DDTHH:MM)")
+	f.StringVar(&d.start, "start", "", verb+" the start: a day, or a day and a time "+
+		"(2026-04-16, 2026-04-16T14:00, or full RFC 3339)")
+	f.StringVar(&d.end, "end", "", verb+" the end: the last day it runs through, or a day and a time")
 	f.StringVar(&d.duration, "duration", "", verb+" how long it lasts (e.g. 15m, 1h, 2h30m, 3d)")
 	f.StringVar(&d.location, "location", "", verb+" where it is")
 	f.StringVar(&d.description, "description", "", verb+" the description")
@@ -243,7 +244,13 @@ func eventsCreateCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "create",
 		Short: "Create an event",
-		Args:  cobra.NoArgs,
+		Long: "Create an event.\n\n" +
+			"--start takes a day and a time, as 2026-04-16T14:00. A bare day is an event\n" +
+			"with no time of day, which --all-day has to say as well.\n\n" +
+			"Without --end or --duration an event lasts as long as the calendar it is made\n" +
+			"in says a new event lasts, which `settings calendars get` shows; an all-day\n" +
+			"event lasts a day.",
+		Args: cobra.NoArgs,
 		RunE: kit.Run([]kit.Step{d.check(true)}, func(c *kit.Invocation) error {
 			if d.title == "" || d.start == "" {
 				return kit.Fail("An event needs a title and a start.").
@@ -257,11 +264,12 @@ func eventsCreateCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			start, err := ical.ParseTime(d.start, loc)
+			written, err := ical.ParseTime(d.start, loc)
 			if err != nil {
 				return kit.Fail("--start: %v", err)
 			}
-			dur, err := d.span(start, loc)
+			start := written.Anchored(zone)
+			dur, fromCalendar, err := d.length(c, calID, start, loc)
 			if err != nil {
 				return err
 			}
@@ -272,12 +280,12 @@ func eventsCreateCmd() *cobra.Command {
 			var res *calsvc.EventResult
 			if err := kit.Create(c, ui.ResultSpec{
 				Action: ui.Created, Kind: "events", Name: d.title,
-				Detail: "for " + timeLabel(start, d.allDay, zone),
+				Detail: clauses("for "+timeLabel(start), lengthClause(dur, fromCalendar)),
 			}, func() (string, error) {
 				var err error
 				res, err = c.App.Calendar.EventCreate(c.Ctx, calID, calsvc.EventInput{
 					Title: d.title, Location: d.location, Description: d.description,
-					Start: start, End: start.Add(dur), AllDay: d.allDay, Zone: zone,
+					Start: start, Duration: dur,
 					RRule: d.rrule, Reminders: d.reminders, Attendees: attendees,
 					Status: calsvc.ICalStatus(status),
 				})
@@ -309,6 +317,11 @@ func eventsUpdateCmd() *cobra.Command {
 		Long: "Change an event.\n\n" +
 			"Anything you do not mention is left alone, including the reminders and the\n" +
 			"recurrence.\n\n" +
+			"--start takes a day, which moves the event and leaves its time of day alone,\n" +
+			"or a day and a time, which gives an all-day event a time of day and makes it\n" +
+			"last what the calendar says a new event lasts. --all-day takes the time of day\n" +
+			"away again; --all-day=false is the other direction and needs a --start saying\n" +
+			"which time.\n\n" +
 			"A reference that names one occurrence of a recurring event changes only that\n" +
 			"occurrence. Add --onwards to change it and every later one, or drop the @ part\n" +
 			"of the reference to change the whole series, which --dry-run will show you\n" +
@@ -327,7 +340,7 @@ func eventsUpdateCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			patch, err := d.patch(c, reached)
+			patch, length, err := d.patch(c, calID, reached)
 			if err != nil {
 				return err
 			}
@@ -335,7 +348,7 @@ func eventsUpdateCmd() *cobra.Command {
 			if err := kit.Mutate(c, ui.ResultSpec{
 				Action: ui.Updated, Kind: "events", Count: 1, Name: reached.name(d.title),
 				IDs: []string{c.Args[0]}, Preview: reached.preview(), Extra: reached.extra(),
-				Detail: clauses(reached.clause(occurrence, onwards), reached.moved(patch)),
+				Detail: clauses(reached.clause(occurrence, onwards), reached.moved(patch), length),
 			}, func() error {
 				var err error
 				switch {
@@ -360,10 +373,11 @@ func eventsUpdateCmd() *cobra.Command {
 	return c
 }
 
-// patch turns the flags the user actually set into the change to make. A flag left
-// alone is absent rather than empty, which is what lets --description "" clear a
+// patch turns the flags the user actually set into the change to make, and the
+// clause a result needs when the length was not one of them. A flag left alone is
+// absent rather than empty, which is what lets --description "" clear a
 // description instead of meaning "leave it".
-func (d *details) patch(c *kit.Invocation, reached *reach) (calsvc.EventPatch, error) {
+func (d *details) patch(c *kit.Invocation, calendarID string, reached *reach) (calsvc.EventPatch, string, error) {
 	var p calsvc.EventPatch
 	if c.Changed("title") {
 		p.Title = &d.title
@@ -381,12 +395,12 @@ func (d *details) patch(c *kit.Invocation, reached *reach) (calsvc.EventPatch, e
 		p.AllDay = &d.allDay
 	}
 	if c.Changed("remind") && c.Changed("no-remind") {
-		return p, kit.Fail("--remind and --no-remind contradict each other.")
+		return p, "", kit.Fail("--remind and --no-remind contradict each other.")
 	}
 	if c.Changed("status") {
 		word, err := d.status.Value()
 		if err != nil {
-			return p, err
+			return p, "", err
 		}
 		status := calsvc.ICalStatus(word)
 		p.Status = &status
@@ -400,30 +414,35 @@ func (d *details) patch(c *kit.Invocation, reached *reach) (calsvc.EventPatch, e
 	}
 
 	if !c.Changed("start") {
-		return p, nil
+		return p, "", nil
 	}
 	// A time is written against the zone the invocation works in, so re-timing an
 	// event re-anchors it. That is only true when a time is being written: an
 	// event whose location changed keeps the zone it was made in, wherever the
-	// person changing it happens to be.
+	// person changing it happens to be, and so does one moved by a bare day.
 	zone, loc, err := workingZone(c)
 	if err != nil {
-		return p, err
+		return p, "", err
 	}
-	start, err := ical.ParseTime(d.start, loc)
+	written, err := ical.ParseTime(d.start, loc)
 	if err != nil {
-		return p, kit.Fail("--start: %v", err)
+		return p, "", kit.Fail("--start: %v", err)
 	}
-	p.Start, p.Zone = &start, &zone
-	if c.Changed("duration") || c.Changed("end") {
-		dur, err := d.span(start, loc)
-		if err != nil {
-			return p, err
-		}
-		end := start.Add(dur)
-		p.End = &end
+	start := written.Anchored(zone)
+	p.Start = &start
+
+	// An event that had no time of day and is being given one needs a length to go
+	// with it: the day it lasted is not one.
+	gainsATimeOfDay := reached.allDay && !start.AllDay
+	if !c.Changed("duration") && !c.Changed("end") && !gainsATimeOfDay {
+		return p, "", nil
 	}
-	return p, nil
+	dur, fromCalendar, err := d.length(c, calendarID, start, loc)
+	if err != nil {
+		return p, "", err
+	}
+	p.Duration = &dur
+	return p, lengthClause(dur, fromCalendar), nil
 }
 
 // ── the zone, and what a change reaches ──
@@ -442,16 +461,31 @@ func workingZone(c *kit.Invocation) (string, *time.Location, error) {
 	return zone, loc, nil
 }
 
-// timeLabel is when an event sits, said in the zone it is anchored to.
+// timeLabel is when an event sits, said in the frame it is anchored to.
 //
 // The zone is on screen because it is the one part of a written time that the
 // command line does not state and that nothing else would reveal until the event
-// turned up an hour out in somebody else's calendar.
-func timeLabel(t time.Time, allDay bool, zone string) string {
-	if allDay {
-		return t.Format("2006-01-02") + " (all day)"
+// turned up an hour out in somebody else's calendar. A day has none to state: it
+// has no time of day for a zone to move.
+func timeLabel(d ical.DateTime) string {
+	if d.AllDay {
+		return d.Time.Format("2006-01-02") + " (all day)"
 	}
-	return t.Format("2006-01-02 15:04") + " " + zone
+	zone := d.TZID
+	if zone == "" {
+		zone = "UTC"
+	}
+	return d.Wall().Format("2006-01-02 15:04") + " " + zone
+}
+
+// lengthClause says how long an event lasts when the command line did not: the
+// length is then the calendar's, which is the one part of the write that nothing
+// on screen would otherwise reveal.
+func lengthClause(dur time.Duration, fromCalendar bool) string {
+	if !fromCalendar {
+		return ""
+	}
+	return units.Duration(dur) + " long"
 }
 
 // previewSample is how many of a series' occurrences a preview draws.
@@ -526,20 +560,27 @@ func (r *reach) clause(occurrence string, onwards bool) string {
 	return ""
 }
 
-// moved says where a change puts the event, when it moves it at all.
+// at is where the event sits now, in the frame it is anchored to, which is what
+// a change moves it from.
+func (r *reach) at() (ical.DateTime, bool) {
+	if len(r.rows) == 0 {
+		return ical.DateTime{}, false
+	}
+	first := r.rows[0]
+	if r.allDay {
+		return ical.Day(first.Start), true
+	}
+	return ical.Timed(first.Start, first.Zone), true
+}
+
+// moved says where a change puts the event, whenever it puts it anywhere - a
+// time of day taken away moves it as surely as a new date does.
 func (r *reach) moved(p calsvc.EventPatch) string {
-	if p.Start == nil {
+	at, ok := r.at()
+	if !p.TouchesTimes() || !ok {
 		return ""
 	}
-	allDay := r.allDay
-	if p.AllDay != nil {
-		allDay = *p.AllDay
-	}
-	zone := ""
-	if p.Zone != nil {
-		zone = *p.Zone
-	}
-	return "now " + timeLabel(*p.Start, allDay, zone)
+	return "now " + timeLabel(p.Lands(at))
 }
 
 func (r *reach) preview() func(*ui.UI) error {
@@ -569,60 +610,139 @@ func clauses(parts ...string) string {
 }
 
 // check judges what the command line alone decides, before anything is asked of
-// Proton: whether an event's length was stated twice, and whether a length was
-// stated with no beginning to hang off.
+// Proton: whether an event's length was stated twice, whether a length was stated
+// with no beginning to hang off, and whether what was written agrees with itself
+// about the one thing an event either has or has not - a time of day.
 //
 // It is a step so that it runs before the calendar is resolved. Without it a
 // contradiction costs a sign-in and two requests to discover, which is the one
-// thing local validation exists to prevent.
+// thing local validation exists to prevent. The zone the account works in is one
+// of those requests, so what is judged here is the form of what was written and
+// never the instant it names: the same values are read again in that zone, which
+// is where a reading that no clock ever shows is refused.
 func (d *details) check(needsStart bool) kit.Step {
 	return func(c *kit.Invocation) error {
 		if d.end != "" && d.duration != "" {
 			return kit.Fail("--end and --duration both say when it ends.").
 				Hint("pass one of them.")
 		}
-		if needsStart || c.Changed("start") {
+		if !needsStart && !c.Changed("start") {
+			for _, flag := range []string{"duration", "end"} {
+				if c.Changed(flag) {
+					return kit.Fail("--%s needs --start, since a length has to hang off a beginning.", flag)
+				}
+			}
+			if c.Changed("all-day") && !d.allDay {
+				return wantsATimeOfDay("2026-04-16")
+			}
 			return nil
 		}
-		for _, flag := range []string{"duration", "end"} {
-			if c.Changed(flag) {
-				return kit.Fail("--%s needs --start, since a length has to hang off a beginning.", flag)
+		if d.start == "" {
+			return nil
+		}
+		start, err := ical.ParseTime(d.start, time.UTC)
+		if err != nil {
+			return kit.Fail("--start: %v", err)
+		}
+		day := start.Time.Format("2006-01-02")
+		switch {
+		case d.allDay && !start.AllDay:
+			return kit.Fail("--all-day and a time of day in --start contradict each other.").
+				Hint("--start " + day + " for the day alone.")
+		case c.Changed("all-day") && !d.allDay && start.AllDay:
+			return wantsATimeOfDay(day)
+		case needsStart && start.AllDay && !d.allDay:
+			return kit.Fail("--start names a day but not a time of day.").
+				Hint("--start " + day + " --all-day for a whole day, or --start " + day + "T09:00.")
+		}
+		if d.end != "" {
+			end, err := ical.ParseTime(d.end, time.UTC)
+			if err != nil {
+				return kit.Fail("--end: %v", err)
+			}
+			if end.AllDay != start.AllDay {
+				return kit.Fail("--start and --end disagree on whether the event has a time of day.").
+					Hint("write both as days, or both with a time.")
+			}
+		}
+		if d.duration != "" && start.AllDay {
+			dur, err := units.ParseDuration(d.duration)
+			if err != nil {
+				return kit.Fail("--duration: %v", err)
+			}
+			if dur%(24*time.Hour) != 0 {
+				return kit.Fail("--duration for an all-day event is measured in days.").
+					Hint("--duration 3d")
 			}
 		}
 		return nil
 	}
 }
 
-// span is how long an event lasts, said either way.
+// wantsATimeOfDay is what --all-day=false asks for and cannot supply itself.
+func wantsATimeOfDay(day string) error {
+	return kit.Fail("--all-day=false gives the event a time of day, so --start has to say which.").
+		Hint("--all-day=false --start " + day + "T13:00")
+}
+
+// length is how long an event lasts, said either way, and settled in one place
+// for both commands.
 //
 // Proton's own composer takes an end time, and a duration is what a terminal
 // reaches for, so both are accepted and neither is derived from the other's
 // spelling. Which of them was given is settled by check, before this runs.
 //
-// Absent either, an event lasts an hour - a whole day for one with no time of
-// day, which is measured in days.
-func (d *details) span(start time.Time, loc *time.Location) (time.Duration, error) {
+// An end that names a day is the last day the event is on, because that is what
+// an end date means on a calendar - iCalendar's exclusive end is a storage
+// convention and not something to make anybody count around.
+//
+// Absent either, an event with no time of day lasts a day, and one with a time of
+// day lasts whatever the calendar it is in says a new event lasts, which is the
+// answer Proton's own clients take. That the length came from there rather than
+// from the command line is the second answer, for a result to say.
+func (d *details) length(c *kit.Invocation, calendarID string, start ical.DateTime,
+	loc *time.Location) (dur time.Duration, fromCalendar bool, err error) {
+	const day = 24 * time.Hour
 	switch {
 	case d.end != "":
 		end, err := ical.ParseTime(d.end, loc)
 		if err != nil {
-			return 0, kit.Fail("--end: %v", err)
+			return 0, false, kit.Fail("--end: %v", err)
 		}
-		if !end.After(start) {
-			return 0, kit.Fail("--end is not after --start.")
+		if start.AllDay {
+			days := end.Time.Sub(start.Time)/day + 1
+			if days < 1 {
+				return 0, false, kit.Fail("--end is before --start.")
+			}
+			return days * day, false, nil
 		}
-		return end.Sub(start), nil
+		if !end.Time.After(start.Time) {
+			return 0, false, kit.Fail("--end is not after --start.")
+		}
+		return end.Time.Sub(start.Time), false, nil
 	case d.duration != "":
 		dur, err := units.ParseDuration(d.duration)
 		if err != nil {
-			return 0, kit.Fail("--duration: %v", err)
+			return 0, false, kit.Fail("--duration: %v", err)
 		}
-		return dur, nil
-	case d.allDay:
-		return 24 * time.Hour, nil
+		return dur, false, nil
+	case start.AllDay:
+		return day, false, nil
 	}
-	return time.Hour, nil
+	defaults, err := c.App.Calendar.CalendarDefaults(c.Ctx, calendarID)
+	if err != nil {
+		return 0, false, err
+	}
+	minutes := defaults.Duration
+	if minutes <= 0 {
+		minutes = composerDefaultMinutes
+	}
+	return time.Duration(minutes) * time.Minute, true, nil
 }
+
+// composerDefaultMinutes is how long a new event lasts when its calendar has
+// never been asked, which is the length Proton's own composer opens with.
+const composerDefaultMinutes = 30
 
 func eventsRespondCmd() *cobra.Command {
 	// The word is "answer", not "status", because an event has a status of its

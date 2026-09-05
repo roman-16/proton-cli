@@ -18,18 +18,6 @@ import (
 	"github.com/roman-16/proton-cli/internal/skip"
 )
 
-// zoneOf resolves an IANA zone name, defaulting to the host's.
-func zoneOf(name string) (*time.Location, error) {
-	if name == "" {
-		return time.Local, nil
-	}
-	loc, err := time.LoadLocation(name)
-	if err != nil {
-		return nil, fmt.Errorf("unknown time zone %q", name)
-	}
-	return loc, nil
-}
-
 // PrimaryZone is the zone the account's calendar is drawn in, which is the zone
 // Proton's own clients write new events against.
 //

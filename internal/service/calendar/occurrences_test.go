@@ -232,7 +232,7 @@ func TestPatchLeavesUnmentionedFieldsAlone(t *testing.T) {
 		},
 	}
 	title := "Renamed"
-	out := EventPatch{Title: &title}.apply(v, v.Start.TZID)
+	out := EventPatch{Title: &title}.apply(v)
 
 	if out.Summary != "Renamed" {
 		t.Errorf("title = %q", out.Summary)
@@ -252,31 +252,21 @@ func TestPatchLeavesUnmentionedFieldsAlone(t *testing.T) {
 }
 
 func TestPatchKeepsTheLengthWhenOnlyTheStartMoves(t *testing.T) {
-	start := atVienna(t, 4, 6, 9)
-	v := ical.VEvent{
-		UID:   "u",
-		Start: ical.Timed(start, "Europe/Vienna"),
-		End:   ical.Timed(start.Add(30*time.Minute), "Europe/Vienna"),
-	}
-	moved := start.Add(3 * time.Hour)
-	out := EventPatch{Start: &moved}.apply(v, v.Start.TZID)
+	v := timedEvent(t, 30*time.Minute)
+	moved := ical.Timed(atVienna(t, 4, 6, 12), "Europe/Vienna")
+	out := EventPatch{Start: &moved}.apply(v)
 	if out.Duration() != 30*time.Minute {
 		t.Errorf("duration = %v, want the length it had", out.Duration())
 	}
-	if !out.Start.Time.Equal(moved) {
+	if !out.Start.Time.Equal(moved.Time) {
 		t.Errorf("start = %v", out.Start.Time)
 	}
 }
 
 func TestPatchTurningAnEventAllDayGivesItAWholeDay(t *testing.T) {
-	start := atVienna(t, 4, 6, 9)
-	v := ical.VEvent{
-		UID:   "u",
-		Start: ical.Timed(start, "Europe/Vienna"),
-		End:   ical.Timed(start.Add(30*time.Minute), "Europe/Vienna"),
-	}
+	v := timedEvent(t, 30*time.Minute)
 	yes := true
-	out := EventPatch{AllDay: &yes}.apply(v, "Europe/Vienna")
+	out := EventPatch{AllDay: &yes}.apply(v)
 	if !out.Start.AllDay || !out.End.AllDay {
 		t.Fatalf("out = %+v", out)
 	}
@@ -285,17 +275,119 @@ func TestPatchTurningAnEventAllDayGivesItAWholeDay(t *testing.T) {
 	}
 }
 
+// A time of day is what an all-day event lacks, so writing one is what asks for
+// it back: the day it named is replaced by the moment, and the length comes with
+// the change, since a whole day is not a length a meeting can have.
+func TestPatchGivingAnAllDayEventATimeOfDayMakesItATimedOne(t *testing.T) {
+	v := allDayEvent(t, 4, 6, 1)
+	start := ical.Timed(atVienna(t, 4, 6, 13), "Europe/Vienna")
+	hour := time.Hour
+	out := EventPatch{Start: &start, Duration: &hour}.apply(v)
+	if out.Start.AllDay || out.End.AllDay {
+		t.Fatalf("the event is still all-day: %+v", out)
+	}
+	if !out.Start.Time.Equal(start.Time) || out.Duration() != time.Hour {
+		t.Errorf("the event runs %v for %v, want 13:00 for an hour", out.Start.Wall(), out.Duration())
+	}
+	if out.Start.TZID != "Europe/Vienna" {
+		t.Errorf("the event is written against %q", out.Start.TZID)
+	}
+}
+
+// A day names which day, not which time of day. Moving a meeting to Monday moves
+// it to Monday morning, and moving a holiday to Monday keeps it a whole day.
+func TestPatchMovingByADayLeavesTheKindAndTheClockAlone(t *testing.T) {
+	day := ical.Day(atVienna(t, 4, 20, 0))
+
+	timed := EventPatch{Start: &day}.apply(timedEvent(t, 30*time.Minute))
+	if timed.Start.AllDay {
+		t.Fatalf("a bare day made a meeting all-day: %+v", timed)
+	}
+	if got := timed.Start.Wall().Format("2006-01-02 15:04"); got != "2026-04-20 09:00" {
+		t.Errorf("the meeting moved to %s, want its own time of day on the new day", got)
+	}
+	if timed.Start.TZID != "Europe/Vienna" || timed.Duration() != 30*time.Minute {
+		t.Errorf("a move changed the zone or the length: %+v", timed)
+	}
+
+	whole := EventPatch{Start: &day}.apply(allDayEvent(t, 4, 6, 3))
+	if !whole.Start.AllDay {
+		t.Fatalf("a bare day gave a whole-day event a time of day: %+v", whole)
+	}
+	if whole.Start.String() != "2026-04-20" || whole.End.String() != "2026-04-23" {
+		t.Errorf("the three-day event moved to %s..%s", whole.Start, whole.End)
+	}
+}
+
+// The zone an event is written against follows the time that was written: a new
+// time of day is read in the zone the person is working in, and a day carries no
+// reading to move, so the event keeps the frame it already had.
+func TestPatchAnchorsToTheZoneTheNewTimeWasWrittenIn(t *testing.T) {
+	amsterdam, err := time.LoadLocation("Europe/Amsterdam")
+	if err != nil {
+		t.Skipf("Europe/Amsterdam is not available: %v", err)
+	}
+	v := timedEvent(t, 30*time.Minute)
+
+	elsewhere := ical.Timed(time.Date(2026, 4, 20, 13, 0, 0, 0, amsterdam), "Europe/Amsterdam")
+	if out := (EventPatch{Start: &elsewhere}).apply(v); out.Start.TZID != "Europe/Amsterdam" {
+		t.Errorf("a time written elsewhere left the event on %q", out.Start.TZID)
+	}
+	day := ical.Day(time.Date(2026, 4, 20, 0, 0, 0, 0, amsterdam))
+	if out := (EventPatch{Start: &day}).apply(v); out.Start.TZID != "Europe/Vienna" {
+		t.Errorf("a day moved the event to %q, want the zone it was written against", out.Start.TZID)
+	}
+}
+
+// An all-day event's stored end is the midnight after its last day, and its
+// length is measured in whole days from there.
+func TestPatchGivingAnAllDayEventMoreDaysEndsItAfterTheLastOne(t *testing.T) {
+	threeDays := 3 * 24 * time.Hour
+	out := EventPatch{Duration: &threeDays}.apply(allDayEvent(t, 4, 20, 1))
+	if out.Start.String() != "2026-04-20" || out.End.String() != "2026-04-23" {
+		t.Errorf("a three-day event runs %s to %s", out.Start, out.End)
+	}
+}
+
 func TestPatchBreaksOnlyWhenItMovesOrRepatterns(t *testing.T) {
-	title, zone := "x", "Europe/Vienna"
+	title := "x"
 	if (EventPatch{Title: &title}).breaks() {
 		t.Error("a rename counts as a breaking change")
 	}
-	if !(EventPatch{Zone: &zone}).breaks() {
-		t.Error("re-anchoring does not count as a breaking change")
+	moved := ical.Timed(atVienna(t, 4, 6, 12), "Europe/Vienna")
+	if !(EventPatch{Start: &moved}).breaks() {
+		t.Error("moving the event does not count as a breaking change")
+	}
+	hour := time.Hour
+	if !(EventPatch{Duration: &hour}).breaks() {
+		t.Error("changing how long it lasts does not count as a breaking change")
 	}
 	rule := "FREQ=DAILY"
 	if !(EventPatch{RRule: &rule}).breaks() {
 		t.Error("changing the pattern does not count as a breaking change")
+	}
+}
+
+// timedEvent is a meeting at 09:00 Vienna on 6 April.
+func timedEvent(t *testing.T, dur time.Duration) ical.VEvent {
+	t.Helper()
+	start := atVienna(t, 4, 6, 9)
+	return ical.VEvent{
+		UID:   "u",
+		Start: ical.Timed(start, "Europe/Vienna"),
+		End:   ical.Timed(start.Add(dur), "Europe/Vienna"),
+	}
+}
+
+// allDayEvent is a whole-day event of the given length, stored the way
+// iCalendar wants it: ending the midnight after its last day.
+func allDayEvent(t *testing.T, month, day, days int) ical.VEvent {
+	t.Helper()
+	first := ical.Day(atVienna(t, month, day, 0))
+	return ical.VEvent{
+		UID:   "u",
+		Start: first,
+		End:   ical.Day(first.Time.AddDate(0, 0, days)),
 	}
 }
 

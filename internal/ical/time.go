@@ -100,6 +100,18 @@ func (d DateTime) In(loc *time.Location) time.Time {
 	return time.Date(y, m, day, 0, 0, 0, 0, loc)
 }
 
+// Anchored returns the value written against an IANA zone.
+//
+// A day has no time of day, and so no zone for one to be read in; only a value
+// naming a clock reading has one.
+func (d DateTime) Anchored(tzid string) DateTime {
+	if d.AllDay {
+		return d
+	}
+	d.TZID = tzid
+	return d
+}
+
 // At returns the same anchor and all-day-ness carrying a different instant, so
 // a derived value cannot accidentally lose the series' zone.
 func (d DateTime) At(t time.Time) DateTime {
@@ -197,7 +209,12 @@ func parseValue(raw, tzid string, allDay bool) (DateTime, error) {
 	return DateTime{Time: t, TZID: tzid}, nil
 }
 
-// ParseTime reads a time somebody wrote, in the zone they are working in.
+// ParseTime reads a moment somebody wrote, in the zone they are working in.
+//
+// What comes back carries the form it was written in. A bare date names a day
+// and no time of day, which is the whole difference between an all-day event and
+// one that happens to begin at midnight. The value is unanchored: which zone it
+// is written against is the caller's to say, with Anchored.
 //
 // A wall-clock reading is not always one instant. For two hours a year it is
 // none, because the clocks went forward over it, and for two hours a year it is
@@ -208,18 +225,21 @@ func parseValue(raw, tzid string, allDay bool) (DateTime, error) {
 // Neither can be settled from a zone name, which is why an offset is accepted
 // alongside: it is the only form that names one instant in the four hours where
 // the wall clock cannot.
-func ParseTime(s string, loc *time.Location) (time.Time, error) {
+func ParseTime(s string, loc *time.Location) (DateTime, error) {
 	t, form, err := parseTime(s, loc)
 	if err != nil {
-		return time.Time{}, err
+		return DateTime{}, err
 	}
 	// An offset names an instant outright, and a bare date names a day, which has
 	// no reading of a clock to be uncertain about. Only a wall-clock time read in
 	// a zone can be two instants or none.
-	if form.offset || !strings.Contains(form.layout, "15") {
-		return t, nil
+	if !strings.Contains(form.layout, "15") {
+		return Day(t), nil
 	}
-	return t, checkWallClock(s, t, form.layout, loc)
+	if form.offset {
+		return Timed(t, ""), nil
+	}
+	return Timed(t, ""), checkWallClock(s, t, form.layout, loc)
 }
 
 // ParseWallTime reads a time the CLI itself printed, without judging whether the

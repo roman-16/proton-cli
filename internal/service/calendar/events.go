@@ -588,11 +588,13 @@ type EventInput struct {
 	Title       string
 	Location    string
 	Description string
-	Start, End  time.Time
-	AllDay      bool
-	// Zone anchors the event, so a recurring series keeps its wall-clock time
+	// Start is when it begins: a day for an event with no time of day, otherwise a
+	// moment anchored to a zone, so a recurring series keeps its wall-clock time
 	// across a daylight-saving change instead of drifting by an hour.
-	Zone      string
+	Start ical.DateTime
+	// Duration is how long it lasts, measured in whole days for an event with no
+	// time of day.
+	Duration  time.Duration
 	RRule     string
 	Reminders []string
 	Attendees []string
@@ -637,11 +639,7 @@ func (s *Service) EventCreate(ctx context.Context, calendarID string, in EventIn
 		Status:      in.Status,
 		RRule:       in.RRule,
 	}
-	loc, err := zoneOf(in.Zone)
-	if err != nil {
-		return nil, err
-	}
-	v = withTimes(v, in.Start, in.End, in.AllDay, loc.String())
+	v = withTimes(v, in.Start, in.Duration)
 	if len(in.Attendees) > 0 {
 		v.Organizer = ck.email
 	}

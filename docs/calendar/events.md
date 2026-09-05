@@ -10,6 +10,10 @@ Holds `create`, `delete`, `export`, `get`, `import`, `list`, `respond` and `upda
 
 Create an event.
 
+--start takes a day and a time, as 2026-04-16T14:00. A bare day is an event with no time of day, which --all-day has to say as well.
+
+Without --end or --duration an event lasts as long as the calendar it is made in says a new event lasts, which `settings calendars get` shows; an all-day event lasts a day.
+
 ```
 proton calendar events create
 ```
@@ -29,11 +33,11 @@ proton calendar events create --title Renewal --start 2026-09-01T09:00 --remind 
 | `--calendar string` | Which calendar, by name or ID (default: your first) |
 | `--description string` | Set the description |
 | `--duration string` | Set how long it lasts (e.g. 15m, 1h, 2h30m, 3d) |
-| `--end string` | Set the end (RFC 3339, or YYYY-MM-DDTHH:MM) |
+| `--end string` | Set the end: the last day it runs through, or a day and a time |
 | `--location string` | Set where it is |
 | `--remind stringArray` | Remind this long before the start, as DURATION or DURATION:email (repeatable) |
 | `--rrule string` | Set the recurrence rule, e.g. FREQ=WEEKLY;COUNT=10 |
-| `--start string` | Set the start (RFC 3339, or YYYY-MM-DDTHH:MM) |
+| `--start string` | Set the start: a day, or a day and a time (2026-04-16, 2026-04-16T14:00, or full RFC 3339) |
 | `--status string` | Set whether it is going ahead: confirmed, tentative, cancelled |
 | `--title string` | Set the title |
 
@@ -166,6 +170,8 @@ Change an event.
 
 Anything you do not mention is left alone, including the reminders and the recurrence.
 
+--start takes a day, which moves the event and leaves its time of day alone, or a day and a time, which gives an all-day event a time of day and makes it last what the calendar says a new event lasts. --all-day takes the time of day away again; --all-day=false is the other direction and needs a --start saying which time.
+
 A reference that names one occurrence of a recurring event changes only that occurrence. Add --onwards to change it and every later one, or drop the @ part of the reference to change the whole series, which --dry-run will show you before you do.
 
 ```
@@ -176,6 +182,8 @@ proton calendar events update REF
 proton calendar events update Dentist --start 2026-04-16T15:30
 proton calendar events update 4f2a1b9c@2026-04-22T09:00 --location 'Room 3'
 proton calendar events update 4f2a1b9c@2026-04-22T09:00 --title Standup --onwards
+proton calendar events update Offsite --all-day
+proton calendar events update Offsite --all-day=false --start 2026-07-01T09:00 --end 2026-07-01T17:00
 ```
 
 | Flag | Description |
@@ -183,13 +191,13 @@ proton calendar events update 4f2a1b9c@2026-04-22T09:00 --title Standup --onward
 | `--all-day` | Turn it into an event with no time of day |
 | `--description string` | Replace the description |
 | `--duration string` | Replace how long it lasts (e.g. 15m, 1h, 2h30m, 3d) |
-| `--end string` | Replace the end (RFC 3339, or YYYY-MM-DDTHH:MM) |
+| `--end string` | Replace the end: the last day it runs through, or a day and a time |
 | `--location string` | Replace where it is |
 | `--no-remind` | Remove the reminders |
 | `--onwards` | Also change every later occurrence of the series |
 | `--remind stringArray` | Remind this long before the start, as DURATION or DURATION:email (repeatable) |
 | `--rrule string` | Replace the recurrence rule, e.g. FREQ=WEEKLY;COUNT=10 |
-| `--start string` | Replace the start (RFC 3339, or YYYY-MM-DDTHH:MM) |
+| `--start string` | Replace the start: a day, or a day and a time (2026-04-16, 2026-04-16T14:00, or full RFC 3339) |
 | `--status string` | Replace whether it is going ahead: confirmed, tentative, cancelled |
 | `--title string` | Replace the title |
 
