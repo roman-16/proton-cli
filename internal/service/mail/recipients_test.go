@@ -2,9 +2,12 @@ package mail
 
 import (
 	"context"
+	"errors"
+	"strings"
 	"testing"
 
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	"github.com/roman-16/proton-cli/internal/errs"
 )
 
 func TestClassifyRecipient(t *testing.T) {
@@ -177,6 +180,29 @@ func TestPlanPinnedRecipient(t *testing.T) {
 			t.Error("expected an error when no pinned key is valid for sending")
 		}
 	})
+}
+
+// A pin that cannot be seen is not the same as no pin. The send stops before it
+// asks Proton for a key, since a message it will not send has no use for one -
+// and says so in a sentence the sender can act on, not one that asks for a
+// report.
+func TestAPinThatCannotBeSeenStopsTheSend(t *testing.T) {
+	d := &fakeDoer{}
+	svc := &Service{C: d}
+	_, err := svc.planRecipient(context.Background(), "bob@example.com", "", &PinnedRecipient{Unknown: true})
+	if err == nil {
+		t.Fatal("a recipient whose pins could not be read was planned for sending")
+	}
+	if d.last.Path != "" {
+		t.Errorf("a stopped send still asked Proton for keys at %s", d.last.Path)
+	}
+	var coder errs.ExitCoder
+	if !errors.As(err, &coder) || coder.ExitCode() != 1 {
+		t.Errorf("the refusal is not a plain user error: %v", err)
+	}
+	if !strings.Contains(err.Error(), "Nothing was sent.") {
+		t.Errorf("the refusal does not say nothing went out: %v", err)
+	}
 }
 
 func TestMailCapable(t *testing.T) {

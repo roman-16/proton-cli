@@ -31,8 +31,9 @@ type Invocation struct {
 	// fact along - the same reason --dry-run needs nothing from a handler.
 	computed bool
 
-	// tally counts what the services could not decrypt. List reads it, so an
-	// incomplete listing says so without any command having to check.
+	// tally counts what the services could not decrypt. List, Mutate, Create and
+	// Attempt read it, so an incomplete answer says so without any command having
+	// to check - whether the answer is a listing or a change made on one.
 	tally *skip.Tally
 }
 
@@ -288,9 +289,9 @@ func Mutate(c *Invocation, spec ui.ResultSpec, apply func() error) error {
 		if err := c.preview(&spec); err != nil {
 			return err
 		}
-		return ui.Result(c.UI(), spec)
+		return c.result(spec)
 	}
-	if err := consent(c, spec); err != nil {
+	if err := consent(c, c.unread(spec)); err != nil {
 		return err
 	}
 	// A change that affects nothing is not made. A selection that matched nothing
@@ -298,12 +299,29 @@ func Mutate(c *Invocation, spec ui.ResultSpec, apply func() error) error {
 	// by complaining about the request rather than saying the one true thing:
 	// there was nothing to do.
 	if spec.Count == 0 {
-		return ui.Result(c.UI(), spec)
+		return c.result(spec)
 	}
 	if err := apply(); err != nil {
 		return err
 	}
-	return ui.Result(c.UI(), spec)
+	return c.result(spec)
+}
+
+// unread attaches what the run has so far failed to read to the account of a
+// change, so the preview, the question and the confirmation all carry it.
+//
+// It is read again for each of them rather than once, because the reading goes
+// on while the change is made: a send consults a contact for every recipient
+// inside apply, and a contact that would not open then is part of what the
+// confirmation has to admit.
+func (c *Invocation) unread(spec ui.ResultSpec) ui.ResultSpec {
+	spec.Skipped = c.Incomplete()
+	return spec
+}
+
+// result renders a change with what the run could not read attached.
+func (c *Invocation) result(spec ui.ResultSpec) error {
+	return ui.Result(c.UI(), c.unread(spec))
 }
 
 // confirm stops for a yes before a change that cannot be taken back, that would
@@ -355,7 +373,7 @@ func Create(c *Invocation, spec ui.ResultSpec, apply func() (string, error)) err
 		if err := c.preview(&spec); err != nil {
 			return err
 		}
-		return ui.Result(c.UI(), spec)
+		return c.result(spec)
 	}
 	id, err := apply()
 	if err != nil {
@@ -363,7 +381,7 @@ func Create(c *Invocation, spec ui.ResultSpec, apply func() (string, error)) err
 	}
 	spec.IDs = []string{id}
 	spec.EmitID = true
-	return ui.Result(c.UI(), spec)
+	return c.result(spec)
 }
 
 // ── references ──
@@ -497,20 +515,20 @@ func Attempt[T any](c *Invocation, spec ui.ResultSpec, apply func() ([]T, error)
 		if err := c.preview(&spec); err != nil {
 			return err
 		}
-		return ui.Result(c.UI(), spec)
+		return c.result(spec)
 	}
-	if err := consent(c, spec); err != nil {
+	if err := consent(c, c.unread(spec)); err != nil {
 		return err
 	}
 	if spec.Count == 0 {
-		return ui.Result(c.UI(), spec)
+		return c.result(spec)
 	}
 	skipped, err := apply()
 	if err != nil {
 		return err
 	}
 	spec.Count -= len(skipped)
-	if err := ui.Result(c.UI(), spec); err != nil {
+	if err := c.result(spec); err != nil {
 		return err
 	}
 	// Landing part of what was asked for is the common failure, so what did not

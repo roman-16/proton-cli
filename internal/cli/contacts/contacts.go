@@ -10,10 +10,12 @@ package contacts
 import (
 	"context"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/roman-16/proton-cli/internal/cli/kit"
+	"github.com/roman-16/proton-cli/internal/crypto/pgp"
 	ctsvc "github.com/roman-16/proton-cli/internal/service/contacts"
 	"github.com/roman-16/proton-cli/internal/ui"
 	"github.com/roman-16/proton-cli/internal/vcard"
@@ -226,16 +228,49 @@ func updateCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return kit.Mutate(c, ui.ResultSpec{
+			var rewrote rewritten
+			if err := kit.Mutate(c, ui.ResultSpec{
 				Action: ui.Updated, Kind: "contacts", Count: 1,
 				Name: d.nc.Name, IDs: []string{id},
 			}, func() error {
-				return c.App.Contacts.Update(c.Ctx, id, d.nc)
-			})
+				verdict, err := c.App.Contacts.Update(c.Ctx, id, d.nc)
+				rewrote.card(verdict)
+				return err
+			}); err != nil {
+				return err
+			}
+			rewrote.report(c)
+			return nil
 		}),
 	}
 	d.register(c, "Replace")
 	return c
+}
+
+// rewritten is what a write learned about the signed cards it re-signed.
+//
+// A card that did not verify is far more often one signed by a key this account
+// has since retired than one somebody altered - the two cannot be told apart -
+// and Proton's own client saves over either. So the write goes ahead, and this
+// is what makes going ahead honest: the person is told that what the card held
+// was not checked before their key went on it. It is filled in from inside the
+// change and said after it, so a dry run, which rewrites nothing, says nothing.
+type rewritten struct{ unverified int }
+
+func (r *rewritten) card(verdict pgp.VerifyResult) {
+	if verdict == pgp.Unverified || verdict == pgp.Invalid {
+		r.unverified++
+	}
+}
+
+func (r *rewritten) report(c *kit.Invocation) {
+	switch r.unverified {
+	case 0:
+	case 1:
+		c.Warn("The card this rewrote arrived unverified, so what it held was not checked before your key signed it.")
+	default:
+		c.Warn("%d of the cards this rewrote arrived unverified, so what they held was not checked before your key signed them.", r.unverified)
+	}
 }
 
 func deleteCmd() *cobra.Command {
@@ -291,7 +326,8 @@ func exportCmd() *cobra.Command {
 			"Naming contacts writes those; naming none writes the whole address book,\n" +
 			"narrowed by --keyword.\n\n" +
 			"The stored card goes out whole, so properties this tool has no flag for are\n" +
-			"exported too.",
+			"exported too. Each address's groups go out as CATEGORIES beside it, which is\n" +
+			"what `import` reads them back from.",
 		Args: cobra.ArbitraryArgs,
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			all, err := c.App.Contacts.List(c.Ctx)
@@ -310,12 +346,18 @@ func exportCmd() *cobra.Command {
 				Detail: "to " + dest.Describe(), AnswerFollows: dest.Stdout(),
 				Preview: kit.Preview("contacts", columns(), chosen),
 			}, func() error {
+				// Membership is read from the labels, where it lives, rather than
+				// from the copy in the stored card, which no client keeps current.
+				groups, err := c.App.Contacts.Membership(c.Ctx)
+				if err != nil {
+					return err
+				}
 				// One stream carries every card one after another, which is what a
 				// .vcf file is; separate files get one contact each.
 				if dest.Stdout() {
 					var doc strings.Builder
 					for _, ct := range chosen {
-						doc.WriteString(vcard.Document(ct.Cards))
+						doc.WriteString(vcard.Document(ct.Cards, groups[ct.ID]))
 						doc.WriteString("\r\n")
 					}
 					_, err := dest.Write(c, "", []byte(doc.String()))
@@ -326,7 +368,7 @@ func exportCmd() *cobra.Command {
 					if name == "" {
 						name = ct.ID
 					}
-					if _, err := dest.Write(c, name+".vcf", []byte(vcard.Document(ct.Cards))); err != nil {
+					if _, err := dest.Write(c, name+".vcf", []byte(vcard.Document(ct.Cards, groups[ct.ID]))); err != nil {
 						return err
 					}
 				}
@@ -367,15 +409,21 @@ func chooseContacts(c *kit.Invocation, all []ctsvc.Contact, keyword string) ([]c
 // Import reads vCards in. It is export's inverse and the other half of what
 // Proton's own Contacts offers.
 func importCmd() *cobra.Command {
-	return &cobra.Command{
+	var noGroups bool
+	c := &cobra.Command{
 		Use:   "import PATH",
 		Short: "Read contacts in from a .vcf file",
 		Long: "Read contacts in from a .vcf file, or from stdin with -.\n\n" +
 			"Each card goes in whole, so a property this tool has no flag for survives\n" +
 			"the trip. A card with no name and no address is skipped and reported: there\n" +
 			"would be nothing to file it under.\n\n" +
-			"Nothing is merged. Importing the same file twice creates duplicates. Use\n" +
-			"`merge` afterwards to fold them together.",
+			"The groups a card names in CATEGORIES are applied: an address goes into a\n" +
+			"group of that name, and a group you do not have is created. --no-groups\n" +
+			"leaves them out, and --dry-run shows what the file would put where.\n\n" +
+			"A card that carries a UID replaces the contact with that UID, which is what\n" +
+			"makes a file from `export` a backup. A card without one is a new contact, so\n" +
+			"importing such a file twice creates duplicates; use `merge` afterwards to\n" +
+			"fold them together.",
 		Args: cobra.ExactArgs(1),
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			text, err := readWholeArg(c, c.Args[0])
@@ -386,18 +434,84 @@ func importCmd() *cobra.Command {
 			if len(cards) == 0 {
 				return kit.Fail("%s holds no contacts.", c.Args[0])
 			}
-			return kit.Attempt(c, ui.ResultSpec{
+			var res *ctsvc.ImportResult
+			if err := kit.Attempt(c, ui.ResultSpec{
 				Action: ui.Imported, Kind: "contacts", Count: len(cards),
-				Detail: "from " + c.Args[0],
+				Detail:  "from " + c.Args[0],
+				Preview: kit.Preview("contacts", offeredColumns(), offered(cards, !noGroups)),
 			}, func() ([]ctsvc.SkippedContact, error) {
-				res, err := c.App.Contacts.Import(c.Ctx, cards)
+				res, err = c.App.Contacts.Import(c.Ctx, cards, ctsvc.ImportOptions{
+					Groups: !noGroups, GroupColor: kit.DefaultAccentColor,
+				})
 				if err != nil {
 					return nil, err
 				}
 				return res.Skipped, nil
-			})
+			}); err != nil || res == nil {
+				return err
+			}
+			if res.Grouped > 0 {
+				c.Note("%s", groupedNote(res))
+			}
+			for _, f := range res.GroupsFailed {
+				c.Warn("%v", f)
+			}
+			return nil
 		}),
 	}
+	c.Flags().BoolVar(&noGroups, "no-groups", false, "Leave the groups the file names out")
+	return c
+}
+
+// offeredContact is one card as the file offers it, for the preview that shows
+// what an import would take and where it would put it.
+type offeredContact struct {
+	Name      string
+	Addresses []string
+	Groups    []string
+}
+
+func offered(cards []string, withGroups bool) []offeredContact {
+	out := make([]offeredContact, 0, len(cards))
+	for _, raw := range cards {
+		card, _ := vcard.EnsureIdentity(raw)
+		o := offeredContact{Name: vcard.Field(card, "FN"), Addresses: vcard.Values(card, "EMAIL")}
+		if withGroups {
+			seen := map[string]bool{}
+			for _, cat := range vcard.Categories(card) {
+				if !seen[cat.Name] {
+					seen[cat.Name] = true
+					o.Groups = append(o.Groups, cat.Name)
+				}
+			}
+			sort.Strings(o.Groups)
+		}
+		out = append(out, o)
+	}
+	return out
+}
+
+func offeredColumns() []ui.Column[offeredContact] {
+	return []ui.Column[offeredContact]{
+		{Header: "NAME", Flex: true, Cell: func(o offeredContact) string { return o.Name }},
+		{Header: "ADDRESSES", Flex: true, Cell: func(o offeredContact) string { return strings.Join(o.Addresses, ", ") }},
+		{Header: "GROUPS", Flex: true, Cell: func(o offeredContact) string { return strings.Join(o.Groups, ", ") }},
+	}
+}
+
+// groupedNote says where an import put the addresses, naming what it created
+// because a group that did not exist a moment ago is the one thing about the
+// result worth a second look.
+func groupedNote(res *ctsvc.ImportResult) string {
+	note := "Put " + ui.Quantity(res.Grouped, "addresses") + " in " + ui.Quantity(len(res.GroupsUsed), "groups")
+	if len(res.GroupsCreated) > 0 {
+		quoted := make([]string, len(res.GroupsCreated))
+		for i, name := range res.GroupsCreated {
+			quoted[i] = strconv.Quote(name)
+		}
+		note += "; created " + strings.Join(quoted, ", ")
+	}
+	return note + "."
 }
 
 // readWholeArg reads a path, or standard input when it is "-".
@@ -437,7 +551,8 @@ func mergeCmd() *cobra.Command {
 			for _, g := range groups {
 				folded += len(g.Contacts) - 1
 			}
-			return kit.Mutate(c, ui.ResultSpec{
+			var rewrote rewritten
+			if err := kit.Mutate(c, ui.ResultSpec{
 				Action: ui.Merged, Kind: "contacts", Count: folded,
 				Detail:  duplicateDetail(groups),
 				Preview: kit.Preview("duplicates", duplicateColumns(), groups),
@@ -446,9 +561,14 @@ func mergeCmd() *cobra.Command {
 					if _, err := c.App.Contacts.Merge(c.Ctx, g); err != nil {
 						return err
 					}
+					rewrote.card(g.Contacts[0].Signature)
 				}
 				return nil
-			})
+			}); err != nil {
+				return err
+			}
+			rewrote.report(c)
+			return nil
 		}),
 	}
 }

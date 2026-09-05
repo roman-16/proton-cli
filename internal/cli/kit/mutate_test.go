@@ -11,6 +11,7 @@ import (
 	"github.com/roman-16/proton-cli/internal/app"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
+	"github.com/roman-16/proton-cli/internal/skip"
 	"github.com/roman-16/proton-cli/internal/ui"
 )
 
@@ -183,4 +184,91 @@ func TestDryRunWithoutAnAccountIsRefused(t *testing.T) {
 	if !errors.As(err, &coder) || coder.ExitCode() != 2 {
 		t.Errorf("err = %v, want one that exits 2 for a missing session", err)
 	}
+}
+
+// What the run could not read is part of the account of the change, wherever
+// the change is described: the confirmation, the preview, and the question a
+// removal stops for. It is read off the tally by the guard, not declared by the
+// command, so a change made on a short reading says so without anybody having
+// to remember - and it is read again after the work, because a send consults a
+// contact for every recipient while it runs.
+func TestAChangeSaysWhatTheRunCouldNotRead(t *testing.T) {
+	run := func(t *testing.T, a *app.App, answer string, spec ui.ResultSpec, during func(context.Context)) (string, error) {
+		t.Helper()
+		prev, had := os.LookupEnv("PROTON_NO_INPUT")
+		if err := os.Unsetenv("PROTON_NO_INPUT"); err != nil {
+			t.Fatalf("unset PROTON_NO_INPUT: %v", err)
+		}
+		t.Cleanup(func() {
+			if had {
+				_ = os.Setenv("PROTON_NO_INPUT", prev)
+			}
+		})
+		var out, errb bytes.Buffer
+		a.UI = ui.New(ui.Options{Format: ui.FormatText, Out: &out, Err: &errb, In: strings.NewReader(answer), NoInput: answer == noTerminal})
+		ctx, tally := skip.With(context.Background())
+		c := &Invocation{Ctx: ctx, App: a, tally: tally}
+		err := Mutate(c, spec, func() error {
+			if during != nil {
+				during(ctx)
+			}
+			return nil
+		})
+		return errb.String(), err
+	}
+	before := func(ctx context.Context) { skip.Record(ctx, skip.KindFolder, "f1", skip.Unlockable, nil) }
+	caveat := "1 folder could not be opened, so nothing inside it was included."
+
+	t.Run("the confirmation carries it", func(t *testing.T) {
+		spec := ui.ResultSpec{Action: ui.Trashed, Kind: "items", Count: 12}
+		got, err := run(t, signedIn(&app.App{}), "y\n", spec, before)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(got, "✓ Moved 12 items.\n! "+caveat) {
+			t.Errorf("the confirmation does not carry the caveat:\n%s", got)
+		}
+	})
+	t.Run("a skip during the work is said afterwards", func(t *testing.T) {
+		spec := ui.ResultSpec{Action: ui.Sent, Kind: "messages", Count: 1}
+		got, err := run(t, signedIn(&app.App{}), "y\n", spec, func(ctx context.Context) {
+			skip.Record(ctx, skip.KindContact, "c1", skip.Unreadable, nil)
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(got, "1 contact could not be read and was not included.") {
+			t.Errorf("a skip during apply is not said:\n%s", got)
+		}
+	})
+	t.Run("the question carries it", func(t *testing.T) {
+		spec := ui.ResultSpec{Action: ui.Deleted, Kind: "items", Count: 12}
+		ctx, tally := skip.With(context.Background())
+		before(ctx)
+		var errb bytes.Buffer
+		a := signedIn(&app.App{})
+		a.UI = ui.New(ui.Options{Format: ui.FormatText, Out: &bytes.Buffer{}, Err: &errb, In: strings.NewReader("n\n")})
+		c := &Invocation{Ctx: ctx, App: a, tally: tally}
+		if err := Mutate(c, spec, func() error { t.Fatal("no was not taken as no"); return nil }); err == nil {
+			t.Fatal("a refused change should fail")
+		}
+		if i, j := strings.Index(errb.String(), caveat), strings.Index(errb.String(), "Continue?"); i < 0 || j < i {
+			t.Errorf("the caveat should come before the question:\n%s", errb.String())
+		}
+	})
+	t.Run("the preview carries it", func(t *testing.T) {
+		spec := ui.ResultSpec{Action: ui.Trashed, Kind: "items", Count: 12}
+		ctx, tally := skip.With(context.Background())
+		before(ctx)
+		var errb bytes.Buffer
+		a := signedIn(&app.App{DryRun: true})
+		a.UI = ui.New(ui.Options{Format: ui.FormatText, Out: &bytes.Buffer{}, Err: &errb})
+		c := &Invocation{Ctx: ctx, App: a, tally: tally}
+		if err := Mutate(c, spec, func() error { t.Fatal("a dry run applied the change"); return nil }); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(errb.String(), "Dry run - would move 12 items.\n! "+caveat) {
+			t.Errorf("the preview does not carry the caveat:\n%s", errb.String())
+		}
+	})
 }

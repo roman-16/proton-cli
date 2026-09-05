@@ -261,6 +261,91 @@ func TestResultDryRunShowsTheSelection(t *testing.T) {
 	check(t, "result_dry_run", out, errb)
 }
 
+// ── a change made on a short reading ──
+//
+// A selection is a listing the command acted on instead of printing. When part
+// of it could not be read, the change was made on less than it claims, and the
+// person approving it is owed the sentence a listing would have carried - at
+// every moment the change is described, and in the machine object under the
+// key the table envelope already uses.
+
+func shortReading() IncompleteSpec {
+	return IncompleteSpec{
+		Count: 1, Kind: "folder", Hides: true,
+		Remedy: "This is a bug or damaged data - `proton report` has the details.",
+	}
+}
+
+func TestResultSaysWhatTheRunCouldNotRead(t *testing.T) {
+	u, out, errb := fixture(t, Options{})
+	spec := ResultSpec{
+		Action: Trashed, Kind: "items", Count: 12, Detail: "to trash",
+		Skipped: shortReading(),
+	}
+	if err := Result(u, spec); err != nil {
+		t.Fatal(err)
+	}
+	check(t, "result_unread", out, errb)
+}
+
+func TestResultDryRunSaysWhatTheRunCouldNotRead(t *testing.T) {
+	u, out, errb := fixture(t, Options{})
+	spec := ResultSpec{
+		Action: Trashed, Kind: "messages", Count: 3, Detail: "to trash",
+		DryRun: true, Skipped: shortReading(),
+		Preview: func(p *UI) error {
+			return Table(p, TableSpec[message]{
+				Noun: "messages", Columns: messageColumns()[:4],
+				Total: Unknown, Page: Unpaged,
+			}, messages())
+		},
+	}
+	if err := Result(u, spec); err != nil {
+		t.Fatal(err)
+	}
+	check(t, "result_dry_run_unread", out, errb)
+}
+
+func TestConfirmSaysWhatTheRunCouldNotReadBeforeAsking(t *testing.T) {
+	u, out, errb := fixture(t, Options{In: strings.NewReader("y\n")})
+	spec := ResultSpec{
+		Action: Deleted, Kind: "messages", Count: 3, Skipped: shortReading(),
+		Preview: func(p *UI) error {
+			return Table(p, TableSpec[message]{
+				Noun: "messages", Columns: messageColumns()[:4],
+				Total: Unknown, Page: Unpaged,
+			}, messages())
+		},
+	}
+	if _, err := Confirm(u, spec); err != nil {
+		t.Fatal(err)
+	}
+	check(t, "confirm_unread", out, errb)
+}
+
+func TestResultObjectSaysHowManyItCouldNotRead(t *testing.T) {
+	u, out, errb := fixture(t, Options{Format: FormatJSON})
+	spec := ResultSpec{Action: Trashed, Kind: "items", Count: 12, Skipped: shortReading()}
+	if err := Result(u, spec); err != nil {
+		t.Fatal(err)
+	}
+	if errb.Len() != 0 {
+		t.Errorf("machine mode should write nothing to stderr, got %q", errb.String())
+	}
+	if !strings.Contains(out.String(), `"skipped": 1`) {
+		t.Errorf("the object does not carry the count: %s", out.String())
+	}
+	// And says nothing when nothing was skipped, so a whole reading has exactly
+	// the shape it always had.
+	u, out, _ = fixture(t, Options{Format: FormatJSON})
+	if err := Result(u, ResultSpec{Action: Trashed, Kind: "items", Count: 12}); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out.String(), "skipped") {
+		t.Errorf("a whole reading reports a skip: %s", out.String())
+	}
+}
+
 func TestResultDryRunWithoutPreviewEndsInAPeriod(t *testing.T) {
 	u, _, errb := fixture(t, Options{})
 	spec := ResultSpec{Action: Emptied, Kind: "items", Count: 12, Detail: "from the trash", DryRun: true}

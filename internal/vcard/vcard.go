@@ -1,11 +1,13 @@
 // Package vcard models the contact cards Proton Contacts stores.
 //
 // Proton splits a contact across a signed card, which holds the name and the
-// email addresses so the server can index them, and an encrypted card holding
-// everything else. Per-email settings - a pinned key, whether to encrypt or sign
-// to that address - hang off the signed card under a vCard group, which is why
-// reading and rebuilding a contact has to preserve groups rather than flatten
-// them.
+// email addresses so the server can index them, an encrypted card holding
+// everything else, and a clear card holding the one thing the server has to
+// read as well as index: which groups each address is in, as CATEGORIES.
+// Per-email settings - a pinned key, whether to encrypt or sign to that address,
+// its groups - hang off the card under the same vCard group as the address,
+// which is why reading and rebuilding a contact has to preserve groups rather
+// than flatten them.
 package vcard
 
 import (
@@ -416,18 +418,153 @@ func ParseEncrypted(card string) Encrypted {
 	return f
 }
 
+// ── groups ──
+
+// Category is one group an address is in, as a CATEGORIES property says it.
+type Category struct {
+	// Group is the vCard group the property sits under, which is the address it
+	// is about; "" is a property about every address the card has.
+	Group string
+	// Name is the group's name.
+	Name string
+}
+
+// Categories reads the groups a card puts its addresses in.
+//
+// CATEGORIES carries several names in one value, and Proton's own client writes
+// one property per address under that address's group, so both shapes come
+// back as one Category per name.
+func Categories(card string) []Category {
+	var out []Category
+	for _, l := range contentline.ParseAll(card) {
+		if l.Name != "CATEGORIES" {
+			continue
+		}
+		for _, raw := range contentline.SplitList(l.Value) {
+			name := strings.TrimSpace(contentline.UnescapeText(raw))
+			if name == "" {
+				continue
+			}
+			out = append(out, Category{Group: l.Group, Name: name})
+		}
+	}
+	return out
+}
+
+// Membership is which groups each of a contact's addresses is in, by address.
+type Membership map[string][]string
+
+// StoredMembership reads which groups a contact's cards put each address in.
+//
+// It is keyed by address rather than by vCard group because the group is a
+// name for a position: BuildSigned numbers addresses item1..itemN in the order
+// it is given them, so a CATEGORIES property left under item1 through an edit
+// that reordered the addresses would be about a different person's address. The
+// address is what the membership is about, and it survives the renumbering.
+//
+// A CATEGORIES property under no group is about every address the cards have,
+// which is how a file from another address book usually writes it.
+func StoredMembership(cards ...string) Membership {
+	joined := strings.Join(cards, "\n")
+	byGroup := map[string]string{}
+	var all []string
+	for _, l := range contentline.ParseAll(joined) {
+		if l.Name != "EMAIL" {
+			continue
+		}
+		addr := canonical(l.Value)
+		all = append(all, addr)
+		if l.Group != "" {
+			byGroup[l.Group] = addr
+		}
+	}
+	out := Membership{}
+	add := func(addr, name string) {
+		for _, have := range out[addr] {
+			if have == name {
+				return
+			}
+		}
+		out[addr] = append(out[addr], name)
+	}
+	for _, c := range Categories(joined) {
+		if c.Group == "" {
+			for _, addr := range all {
+				add(addr, c.Name)
+			}
+			continue
+		}
+		if addr, ok := byGroup[c.Group]; ok {
+			add(addr, c.Name)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// BuildClear renders the clear card for a signed card: one CATEGORIES property
+// under each address's group, for the addresses that are in any.
+//
+// It takes the signed card rather than a list of addresses because the groups
+// it writes under have to be the ones the signed card gave the addresses, and
+// only the rendered card knows those.
+func BuildClear(signed string, groups Membership) string {
+	lines := []contentline.Line{
+		{Name: "BEGIN", Value: "VCARD"},
+		{Name: "VERSION", Value: "4.0"},
+	}
+	for _, l := range contentline.ParseAll(signed) {
+		if line, ok := categoriesFor(l, groups); ok {
+			lines = append(lines, line)
+		}
+	}
+	lines = append(lines, contentline.Line{Name: "END", Value: "VCARD"})
+	return contentline.Render(lines)
+}
+
+// categoriesFor is the CATEGORIES property that belongs beside an EMAIL line,
+// when the address is in any group. The names are written in a fixed order so
+// that two renderings of one contact are the same bytes.
+func categoriesFor(l contentline.Line, groups Membership) (contentline.Line, bool) {
+	if l.Name != "EMAIL" || l.Group == "" {
+		return contentline.Line{}, false
+	}
+	names := groups[canonical(l.Value)]
+	if len(names) == 0 {
+		return contentline.Line{}, false
+	}
+	sorted := append([]string(nil), names...)
+	sort.Strings(sorted)
+	escaped := make([]string, len(sorted))
+	for i, n := range sorted {
+		escaped[i] = contentline.EscapeText(n)
+	}
+	return contentline.Line{Group: l.Group, Name: "CATEGORIES", Value: strings.Join(escaped, ",")}, true
+}
+
 // ── whole documents ──
 
-// Document renders a contact's cards as one vCard.
+// Document renders a contact's cards as one vCard, with each address's groups
+// written beside it.
 //
-// Proton stores a contact as several cards - a signed one, an encrypted one -
-// each a complete vCard carrying a disjoint slice of the properties. A file for
-// another address book has to be one card with all of them, so the bodies are
-// merged and wrapped once.
+// Proton stores a contact as several cards - a signed one, an encrypted one, a
+// clear one - each a complete vCard carrying a disjoint slice of the
+// properties. A file for another address book has to be one card with all of
+// them, so the bodies are merged and wrapped once.
+//
+// Group membership is written from what the caller knows, not from the clear
+// card. The clear card is a copy of a fact whose home is the label, and no
+// client rewrites it when an address is put in a group or taken out, so it is
+// what the contact said when it was last edited rather than what is true. It is
+// dropped here and CATEGORIES is written fresh under each address's group, which
+// is how Proton's own client writes it and what makes a file read back put the
+// address in the same groups.
 //
 // UID and VERSION appear in every card and must appear once here, so the first
 // of each wins and the rest are dropped.
-func Document(cards []string) string {
+func Document(cards []string, groups Membership) string {
 	lines := []contentline.Line{
 		{Name: "BEGIN", Value: "VCARD"},
 		{Name: "VERSION", Value: "4.0"},
@@ -435,6 +572,9 @@ func Document(cards []string) string {
 	seen := map[string]bool{"VERSION": true}
 	for _, card := range cards {
 		for _, l := range contentline.ParseAll(card) {
+			if l.Name == "CATEGORIES" {
+				continue
+			}
 			// A property that may only appear once is taken from the first card
 			// that has it; everything else may repeat.
 			if once[l.Name] {
@@ -444,6 +584,9 @@ func Document(cards []string) string {
 				seen[l.Name] = true
 			}
 			lines = append(lines, l)
+			if line, ok := categoriesFor(l, groups); ok {
+				lines = append(lines, line)
+			}
 		}
 	}
 	lines = append(lines, contentline.Line{Name: "END", Value: "VCARD"})
@@ -560,33 +703,38 @@ func firstNonEmpty(vals ...string) string {
 	return ""
 }
 
-// SplitForStorage divides a whole vCard into the two cards Proton stores it as.
+// SplitForStorage divides a whole vCard into the three cards Proton stores it
+// as.
 //
 // The split is Proton's and not the file's. The identity properties - the
 // display name, the identifier, the addresses and their key settings - are
 // **signed** so that anyone reading the contact can check they were not altered;
-// everything else is **encrypted**, because a phone number and a note are
-// nobody's business. CLEAR_FIELDS in Proton's own client names the third group,
-// which belongs to neither card and is written fresh by each.
+// the groups each address is in are **clear**, because the server has to read
+// them; everything else is **encrypted**, because a phone number and a note are
+// nobody's business. A card's own VERSION belongs to no card and is written
+// fresh by each.
 //
 // A property this tool has no opinion about lands in the encrypted card, which is
 // the safe default: an unrecognised property is more likely to be personal than
 // to be an identity somebody needs to verify.
 //
-// Both cards always come back rendered. Whether the encrypted one is worth
-// storing is HasProperties' to say, so that a card built from a file and a card
-// built from a contact's details are judged by the same thing.
-func SplitForStorage(card string) (signed, encrypted string) {
+// All three cards always come back rendered. Whether one is worth storing is
+// HasProperties' to say, so that a card built from a file and a card built from
+// a contact's details are judged by the same thing.
+func SplitForStorage(card string) (signed, encrypted, clear string) {
 	signedLines := []contentline.Line{
 		{Name: "BEGIN", Value: "VCARD"},
 		{Name: "VERSION", Value: "4.0"},
 	}
 	encryptedLines := append([]contentline.Line(nil), signedLines...)
+	clearLines := append([]contentline.Line(nil), signedLines...)
 
 	for _, l := range group(contentline.ParseAll(card)) {
 		switch {
+		case l.Name == "CATEGORIES":
+			clearLines = append(clearLines, l)
 		case clearFields[l.Name]:
-			// Written fresh by each card, so carried by neither.
+			// Written fresh by each card, so carried by none.
 			continue
 		case signedFields[l.Name]:
 			signedLines = append(signedLines, l)
@@ -596,7 +744,8 @@ func SplitForStorage(card string) (signed, encrypted string) {
 	}
 	end := contentline.Line{Name: "END", Value: "VCARD"}
 	return contentline.Render(append(signedLines, end)),
-		contentline.Render(append(encryptedLines, end))
+		contentline.Render(append(encryptedLines, end)),
+		contentline.Render(append(clearLines, end))
 }
 
 // group gives every address a group of its own.
@@ -654,6 +803,8 @@ func group(lines []contentline.Line) []contentline.Line {
 // CLEAR_FIELDS in its own client, which is what decides where a property is
 // readable from; everything else is encrypted, and the Encrypted struct's own
 // switch says which of those this tool models rather than merely carries.
+// CATEGORIES is the one clear field with something to say, and the one the clear
+// card is stored for.
 var (
 	signedFields = map[string]bool{
 		"FN": true, "UID": true, "EMAIL": true,

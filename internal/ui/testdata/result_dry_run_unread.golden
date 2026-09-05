@@ -1,0 +1,12 @@
+== stdout ==
+== stderr ==
+Dry run - would move 3 messages to trash:
+
+ID                                                    FROM              SUBJECT                        DATE
+────────────────────────────────────────────────────  ────────────────  ─────────────────────────────  ────────────────
+5bH2mQxKT9wLpN4vRs8kZc1yXd7fGh3jAe6bUi0oQm2nWr5tYv==  Fastmail Billing  Invoice #2291 is ready         2026-04-15 14:32
+9xL4pQrTz2mKd8vBn6cXs1wYf5hJ3gAe7bUi0oQm4nWr2tYv==    Trailhead Weekly  The north trail is open again  2026-04-15 09:02
+2mNp7RsVx8kLd4vZn1cQs6wYf9hJ5gAe3bUi0oQm7nWr4tYv==    Jane Roe          Re: Quarterly numbers          2026-04-14 17:48
+
+! 1 folder could not be opened, so nothing inside it was included.
+  This is a bug or damaged data - `proton report` has the details.

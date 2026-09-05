@@ -463,8 +463,8 @@ func TestUnlockSaysNoneOfTheAddressKeysOpenedAndWhy(t *testing.T) {
 	// The log says which of the four causes it was, per key and per address.
 	log := records.String()
 	for _, want := range []string{
-		`msg="not shown" kind=key reason="token not decryptable by user key"`,
-		`msg="not shown" kind=address reason="token not decryptable by user key"`,
+		`msg="keys: a key did not open" kind=key reason="token not decryptable by user key"`,
+		`msg="keys: an address did not open" kind=address reason="token not decryptable by user key"`,
 		"addresses=1", "addresses_active=1", "user_keys=1", "address_keys=1", "opened=0",
 		"two_password=false",
 	} {
@@ -472,8 +472,62 @@ func TestUnlockSaysNoneOfTheAddressKeysOpenedAndWhy(t *testing.T) {
 			t.Errorf("the log does not say %q:\n%s", want, log)
 		}
 	}
-	if tally.Count() == 0 {
-		t.Error("nothing was counted as unshowable")
+	// The failure is on the screen, so there is no short answer to warn about.
+	if tally.Count() != 0 {
+		t.Errorf("%d things were counted as unshowable under a failure that says everything", tally.Count())
+	}
+}
+
+// A key that stays shut is the ordinary shape of an account that changed its
+// password or retired a key. The ring opens on the others, nothing is missing
+// from any listing for it, and so nothing is counted - only logged, so a report
+// can still say which key it was.
+func TestUnlockDoesNotCountAKeyThatStayedShut(t *testing.T) {
+	ctx, tally := skip.With(context.Background())
+	var records bytes.Buffer
+	restore := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&records, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { slog.SetDefault(restore) })
+
+	kr, err := unlockKeyRing(ctx, []Key{
+		{ID: "retired", PrivateKey: lockedKey(t, "retired", "an old passphrase"), Active: 0},
+		{ID: "current", PrivateKey: lockedKey(t, "current", "the passphrase"), Active: 1, Primary: 1},
+	}, []byte("the passphrase"), nil)
+	if err != nil {
+		t.Fatalf("unlockKeyRing: %v", err)
+	}
+	if kr.CountEntities() != 1 {
+		t.Errorf("the ring holds %d keys, want the one that opened", kr.CountEntities())
+	}
+	if tally.Count() != 0 {
+		t.Errorf("%d things were counted as unshowable, want none: the ring opened", tally.Count())
+	}
+	if !strings.Contains(records.String(), `msg="keys: a key did not open" kind=key reason=inactive`) {
+		t.Errorf("the log does not say which key stayed shut:\n%s", records.String())
+	}
+}
+
+// The same holds one level up: an address whose keys will not open leaves the
+// other addresses' listings whole, so it is logged and not counted.
+func TestUnlockDoesNotCountAnAddressThatStayedShut(t *testing.T) {
+	ctx, tally := skip.With(context.Background())
+	user := &User{Keys: []Key{{ID: "user", PrivateKey: lockedKey(t, "user", "the passphrase"), Active: 1}}}
+	addrs := []Address{
+		{ID: "dead", Email: "old@proton.me", Keys: []Key{{ID: "dead-key", PrivateKey: lockedKey(t, "dead", "another passphrase"), Active: 1}}},
+		{ID: "live", Email: "me@proton.me", Keys: []Key{{ID: "live-key", PrivateKey: lockedKey(t, "live", "the passphrase"), Active: 1}}},
+	}
+	u, err := open(ctx, user, addrs, "the passphrase")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	if _, ok := u.AddrKRs["live"]; !ok {
+		t.Error("the live address did not open")
+	}
+	if _, ok := u.AddrKRs["dead"]; ok {
+		t.Error("the dead address opened")
+	}
+	if tally.Count() != 0 {
+		t.Errorf("%d things were counted as unshowable, want none", tally.Count())
 	}
 }
 
@@ -659,6 +713,78 @@ func postQuantumKey(t *testing.T, name, passphrase string) string {
 	armored, err := locked.Armor()
 	if err != nil {
 		t.Fatalf("armor %s: %v", name, err)
+	}
+	return armored
+}
+
+// A signature may be by a key its owner has since retired, so the ring a
+// signature is checked against holds every key Proton publishes for the
+// address, where the ring a secret is sealed to holds the primary alone.
+func TestSigningReturnsEveryPublishedKey(t *testing.T) {
+	current, retired := publishedKey(t, "postquantum-public.asc"), armoredPublicKey(t, "retired")
+	c := client(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"Code": 1000,
+			"Address": map[string]any{"Keys": []map[string]any{
+				{"PublicKey": current, "Primary": 1},
+				{"PublicKey": retired, "Primary": 0},
+			}},
+		})
+	})
+	signing, err := Signing(context.Background(), c, "them@proton.me")
+	if err != nil {
+		t.Fatalf("Signing: %v", err)
+	}
+	if got := len(signing.GetKeys()); got != 2 {
+		t.Errorf("Signing holds %d keys, want both", got)
+	}
+	sealing, err := Published(context.Background(), c, "them@proton.me")
+	if err != nil {
+		t.Fatalf("Published: %v", err)
+	}
+	if got := len(sealing.GetKeys()); got != 1 {
+		t.Errorf("Published holds %d keys, want the primary alone", got)
+	}
+}
+
+func TestSigningAnswersLikePublishedWhenThereIsNothingToRead(t *testing.T) {
+	for name, c := range map[string]*proton.Client{
+		"an empty key list": publishing(t),
+		"Proton's refusal":  refusing(t),
+	} {
+		t.Run(name, func(t *testing.T) {
+			kr, err := Signing(context.Background(), c, "them@example.com")
+			if err != nil || kr != nil {
+				t.Errorf("Signing = (%v, %v), want (nil, nil) for an address outside Proton", kr, err)
+			}
+		})
+	}
+	unreadable := "-----BEGIN PGP PUBLIC KEY BLOCK-----\n\nnope\n-----END PGP PUBLIC KEY BLOCK-----\n"
+	if kr, err := Signing(context.Background(), publishing(t, unreadable), "them@proton.me"); err == nil {
+		t.Errorf("a key nobody can read came back as a ring: %v", kr)
+	}
+	// One unreadable key beside a readable one is left out, not fatal: the
+	// signature may be by the other.
+	kr, err := Signing(context.Background(), publishing(t, unreadable, armoredPublicKey(t, "readable")), "them@proton.me")
+	if err != nil {
+		t.Fatalf("Signing: %v", err)
+	}
+	if got := len(kr.GetKeys()); got != 1 {
+		t.Errorf("Signing holds %d keys, want the one that parsed", got)
+	}
+}
+
+// armoredPublicKey is a fresh public key, for a test that needs a second one.
+func armoredPublicKey(t *testing.T, name string) string {
+	t.Helper()
+	key, err := pgp.GenerateKey(name, name+"@example.invalid", "x25519", 0)
+	if err != nil {
+		t.Fatalf("generate %s key: %v", name, err)
+	}
+	armored, err := key.GetArmoredPublicKey()
+	if err != nil {
+		t.Fatalf("armor %s key: %v", name, err)
 	}
 	return armored
 }

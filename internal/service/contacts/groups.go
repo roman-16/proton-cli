@@ -10,6 +10,7 @@ import (
 
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
+	"github.com/roman-16/proton-cli/internal/vcard"
 )
 
 // Group is a contact group (a Type-2 label).
@@ -94,6 +95,78 @@ func (s *Service) groupByID(ctx context.Context, id string) (rawGroup, error) {
 
 func (s *Service) GroupDelete(ctx context.Context, id string) error {
 	return s.C.Decode(ctx, proton.Request{Method: "DELETE", Path: "/core/v4/labels/" + id}, nil)
+}
+
+// Membership reads which groups every address in the book is in, by contact.
+//
+// Proton keeps membership on the address, as label IDs, and the names on the
+// labels, so the book is read once and the groups once and the two are joined
+// here. An account with no groups is answered without reading the book, which is
+// the common case and the cheap one.
+func (s *Service) Membership(ctx context.Context) (map[string]vcard.Membership, error) {
+	groups, err := s.GroupsList(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]vcard.Membership{}
+	if len(groups) == 0 {
+		return out, nil
+	}
+	names := make(map[string]string, len(groups))
+	for _, g := range groups {
+		names[g.ID] = g.Name
+	}
+	all, err := s.contactEmails(ctx, url.Values{})
+	if err != nil {
+		return nil, err
+	}
+	for _, e := range all {
+		if len(e.Groups) == 0 {
+			continue
+		}
+		m := out[e.ContactID]
+		if m == nil {
+			m = vcard.Membership{}
+			out[e.ContactID] = m
+		}
+		addr := canonicalEmail(e.Email)
+		for _, id := range e.Groups {
+			if name, ok := names[id]; ok {
+				m[addr] = append(m[addr], name)
+			}
+		}
+	}
+	return out, nil
+}
+
+// groupsNamed resolves group names to IDs, creating the ones the account does
+// not have.
+//
+// A name is matched exactly, which is what Proton's own importer does before it
+// offers to create the rest. Which were created is reported, because a group
+// that did not exist a moment ago is the one thing about an import worth a
+// second look.
+func (s *Service) groupsNamed(ctx context.Context, names []string, color string) (ids map[string]string, created []string, err error) {
+	existing, err := s.GroupsList(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	ids = make(map[string]string, len(names))
+	for _, g := range existing {
+		ids[g.Name] = g.ID
+	}
+	for _, name := range names {
+		if _, ok := ids[name]; ok {
+			continue
+		}
+		id, err := s.GroupCreate(ctx, name, color)
+		if err != nil {
+			return nil, created, err
+		}
+		ids[name] = id
+		created = append(created, name)
+	}
+	return ids, created, nil
 }
 
 // AddressesOf are every address the named contacts hold.

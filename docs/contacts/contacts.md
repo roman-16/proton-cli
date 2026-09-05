@@ -58,7 +58,7 @@ Write contacts out as .vcf files, or as one stream with --dest -.
 
 Naming contacts writes those; naming none writes the whole address book, narrowed by --keyword.
 
-The stored card goes out whole, so properties this tool has no flag for are exported too.
+The stored card goes out whole, so properties this tool has no flag for are exported too. Each address's groups go out as CATEGORIES beside it, which is what `import` reads them back from.
 
 ```
 proton contacts export [REF...]
@@ -96,7 +96,9 @@ Read contacts in from a .vcf file, or from stdin with -.
 
 Each card goes in whole, so a property this tool has no flag for survives the trip. A card with no name and no address is skipped and reported: there would be nothing to file it under.
 
-Nothing is merged. Importing the same file twice creates duplicates. Use `merge` afterwards to fold them together.
+The groups a card names in CATEGORIES are applied: an address goes into a group of that name, and a group you do not have is created. --no-groups leaves them out, and --dry-run shows what the file would put where.
+
+A card that carries a UID replaces the contact with that UID, which is what makes a file from `export` a backup. A card without one is a new contact, so importing such a file twice creates duplicates; use `merge` afterwards to fold them together.
 
 ```
 proton contacts import PATH
@@ -104,8 +106,14 @@ proton contacts import PATH
 
 ```bash
 proton contacts import contacts.vcf
+proton contacts import contacts.vcf --dry-run
+proton contacts import google.vcf --no-groups
 proton contacts import - < exported.vcf
 ```
+
+| Flag | Description |
+| --- | --- |
+| `--no-groups` | Leave the groups the file names out |
 
 ## `list`
 

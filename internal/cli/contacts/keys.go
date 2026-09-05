@@ -6,6 +6,7 @@ import (
 
 	"github.com/roman-16/proton-cli/internal/cli/kit"
 	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
+	ctsvc "github.com/roman-16/proton-cli/internal/service/contacts"
 	"github.com/roman-16/proton-cli/internal/ui"
 	"github.com/spf13/cobra"
 )
@@ -51,10 +52,9 @@ func keysListCmd() *cobra.Command {
 			}
 			var rows []pinnedKey
 			for _, email := range ct.EmailAddresses() {
-				crypto, err := c.App.Contacts.PinnedKeysFor(c.Ctx, email)
-				if err != nil {
-					return err
-				}
+				// A key that would not decode is counted where it is skipped, so the
+				// listing says it is short; what did decode is shown.
+				crypto := ctsvc.PinnedKeys(c.Ctx, ct, email)
 				if crypto == nil {
 					continue
 				}
@@ -120,12 +120,19 @@ func keysPinCmd() *cobra.Command {
 				off := false
 				encrypt = &off
 			}
-			return kit.Mutate(c, ui.ResultSpec{
+			var rewrote rewritten
+			if err := kit.Mutate(c, ui.ResultSpec{
 				Action: ui.Pinned, Kind: "keys", Count: 1,
 				Detail: "for " + target,
 			}, func() error {
-				return c.App.Contacts.PinKey(c.Ctx, id, target, armored, encrypt, nil, pgpScheme)
-			})
+				verdict, err := c.App.Contacts.PinKey(c.Ctx, id, target, armored, encrypt, nil, pgpScheme)
+				rewrote.card(verdict)
+				return err
+			}); err != nil {
+				return err
+			}
+			rewrote.report(c)
+			return nil
 		}),
 	}
 	c.Flags().StringVar(&keyPath, "key", "", "Armoured public key file (- for stdin)")
@@ -150,12 +157,19 @@ func keysUnpinCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return kit.Mutate(c, ui.ResultSpec{
+			var rewrote rewritten
+			if err := kit.Mutate(c, ui.ResultSpec{
 				Action: ui.Unpinned, Kind: "keys", Count: 1,
 				Detail: "for " + target,
 			}, func() error {
-				return c.App.Contacts.UnpinKey(c.Ctx, id, target)
-			})
+				verdict, err := c.App.Contacts.UnpinKey(c.Ctx, id, target)
+				rewrote.card(verdict)
+				return err
+			}); err != nil {
+				return err
+			}
+			rewrote.report(c)
+			return nil
 		}),
 	}
 	c.Flags().StringVar(&email, "email", "", "Which of the contact's addresses to unpin")

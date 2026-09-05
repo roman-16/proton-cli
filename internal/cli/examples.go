@@ -164,6 +164,8 @@ var examples = map[string][]string{
 	},
 	"proton contacts import": {
 		"proton contacts import contacts.vcf",
+		"proton contacts import contacts.vcf --dry-run",
+		"proton contacts import google.vcf --no-groups",
 		"proton contacts import - < exported.vcf",
 	},
 	"proton contacts merge": {

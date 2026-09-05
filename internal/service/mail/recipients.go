@@ -62,6 +62,8 @@ type PinnedRecipient struct {
 	Sign              *bool
 	Scheme            string
 	SignatureVerified bool
+	// Unknown says the contact exists and what it pins could not be read.
+	Unknown bool
 }
 
 type apiPublicKey struct {
@@ -112,6 +114,18 @@ func classifyRecipient(resp keysAllResponse, eoPassword string) (sendScheme, str
 }
 
 func (s *Service) planRecipient(ctx context.Context, email, eoPassword string, pin *PinnedRecipient) (plannedRecipient, error) {
+	// A pin that cannot be seen is not the same as no pin. The person pinned a
+	// key so that mail to this address goes to it and nothing else; sending under
+	// whatever Proton hands back because their contact would not open is that
+	// decision reversed without a word. Proton's own composer does send here;
+	// this one stops, since a sent message cannot be taken back and a stopped
+	// one can be sent again. Judged before the keys request, which a stopped
+	// send has no use for.
+	if pin != nil && pin.Unknown {
+		return plannedRecipient{}, errs.Problemf(
+			"The contact for %s could not be read, so whether it pins a key is unknown. Nothing was sent.", email).
+			Hint("proton contacts get " + email + " says what is wrong with it")
+	}
 	var resp keysAllResponse
 	if err := s.C.Decode(ctx, proton.Request{
 		Method: "GET", Path: "/core/v4/keys/all",

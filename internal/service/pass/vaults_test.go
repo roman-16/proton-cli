@@ -1,10 +1,16 @@
 package pass
 
 import (
+	"context"
 	"encoding/base64"
+	"encoding/json"
 	"testing"
 
+	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+
+	"github.com/roman-16/proton-cli/internal/account/keys"
 	"github.com/roman-16/proton-cli/internal/crypto/aead"
+	"github.com/roman-16/proton-cli/internal/proton"
 	pb "github.com/roman-16/proton-cli/internal/service/pass/proto"
 	"google.golang.org/protobuf/proto"
 )
@@ -137,4 +143,70 @@ func TestShareKeysLatestPicksTheHighestRotation(t *testing.T) {
 	if key, rotation := empty.latest(); key != nil || rotation != -1 {
 		t.Errorf("latest on no keys = %v, %d", key, rotation)
 	}
+}
+
+// A new vault's key is sealed to the primary user key and to nothing else.
+//
+// Every key the account ever had has to open what it sealed, so reading uses the
+// whole ring - but sealing something new under all of them puts it under keys
+// the owner has retired, and is not what Proton's own client sends.
+func TestVaultCreateSealsTheKeyToThePrimaryUserKeyAlone(t *testing.T) {
+	users, err := pgp.NewKeyRing(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"primary", "retired"} {
+		key, err := pgp.GenerateKey(name, name+"@example.invalid", "x25519", 0)
+		if err != nil {
+			t.Fatalf("GenerateKey: %v", err)
+		}
+		if err := users.AddKey(key); err != nil {
+			t.Fatalf("AddKey: %v", err)
+		}
+	}
+	u := &keys.Unlocked{
+		UserKR:    users,
+		Addresses: []keys.Address{{ID: "addr", Email: "me@proton.me"}},
+		AddrKRs:   map[string]*pgp.KeyRing{"addr": ring(t, "me")},
+	}
+	d := &capturingDoer{}
+	if _, err := New(d, testKeys(u)).VaultCreate(context.Background(), "Work"); err != nil {
+		t.Fatalf("VaultCreate: %v", err)
+	}
+	raw, err := base64.StdEncoding.DecodeString(d.body["EncryptedVaultKey"].(string))
+	if err != nil {
+		t.Fatal(err)
+	}
+	msg := pgp.NewPGPMessage(raw)
+	if ids, ok := msg.GetHexEncryptionKeyIDs(); !ok || len(ids) != 1 {
+		t.Fatalf("the vault key is sealed to %v, want exactly one key", ids)
+	}
+	one := func(i int) *pgp.KeyRing {
+		kr, err := pgp.NewKeyRing(users.GetKeys()[i])
+		if err != nil {
+			t.Fatal(err)
+		}
+		return kr
+	}
+	if _, err := one(0).Decrypt(msg, nil, pgp.GetUnixTime()); err != nil {
+		t.Errorf("the primary user key cannot open the vault key it should have sealed: %v", err)
+	}
+	if _, err := one(1).Decrypt(msg, nil, pgp.GetUnixTime()); err == nil {
+		t.Error("the vault key was sealed to a key that is no longer primary")
+	}
+}
+
+// capturingDoer answers every request with success and keeps the last body.
+type capturingDoer struct{ body map[string]any }
+
+func (d *capturingDoer) Do(_ context.Context, _ proton.Request) (*proton.Response, error) {
+	return &proton.Response{Status: 200, Body: []byte(`{"Code":1000}`)}, nil
+}
+
+func (d *capturingDoer) Decode(_ context.Context, r proton.Request, out any) error {
+	d.body, _ = r.Body.(map[string]any)
+	if out != nil {
+		return json.Unmarshal([]byte(`{"Share":{"ShareID":"share"}}`), out)
+	}
+	return nil
 }

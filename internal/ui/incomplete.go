@@ -7,6 +7,12 @@ package ui
 // a wrong answer presented as a right one: the count agrees with the rows, the
 // exit code says success, and nothing on the screen suggests that the thing
 // somebody is looking for was there all along and could not be read.
+//
+// The same holds for a change. A selection is a listing the command acted on
+// instead of printing, and a write that read a contact or a folder on the way
+// stands on that reading; when part of it could not be read, the change was made
+// on less than it claims, and the person approving it is owed the same sentence
+// a listing would have carried.
 type IncompleteSpec struct {
 	// Count is how many things could not be shown.
 	Count int
@@ -27,18 +33,28 @@ type IncompleteSpec struct {
 // open would otherwise bury the answer it was attached to under five hundred
 // identical warnings.
 func (u *UI) Incomplete(spec IncompleteSpec) {
+	u.incomplete(spec, spec.Sentence())
+}
+
+// Unread says that a change was made without part of what it read, and how to
+// find out why. It is Incomplete for a write.
+func (u *UI) Unread(spec IncompleteSpec) {
+	u.incomplete(spec, spec.Caveat())
+}
+
+func (u *UI) incomplete(spec IncompleteSpec, sentence string) {
 	if spec.Count == 0 || spec.Kind == "" {
 		return
 	}
-	msg := spec.Sentence()
+	msg := sentence
 	if spec.Remedy != "" {
 		msg += "\n" + spec.Remedy
 	}
 	u.Warn(msg)
 }
 
-// Sentence is the wording, which depends on whether what went missing took
-// anything with it.
+// Sentence is the wording for a listing, which depends on whether what went
+// missing took anything with it.
 func (spec IncompleteSpec) Sentence() string {
 	subject := Quantity(spec.Count, spec.Kind+"s")
 	switch {
@@ -50,4 +66,19 @@ func (spec IncompleteSpec) Sentence() string {
 		return subject + " could not be decrypted and is not listed."
 	}
 	return subject + " could not be decrypted and are not listed."
+}
+
+// Caveat is the wording for a change: what the run could not read was left out
+// of what it did.
+func (spec IncompleteSpec) Caveat() string {
+	subject := Quantity(spec.Count, spec.Kind+"s")
+	switch {
+	case spec.Hides && spec.Count == 1:
+		return subject + " could not be opened, so nothing inside it was included."
+	case spec.Hides:
+		return subject + " could not be opened, so nothing inside them was included."
+	case spec.Count == 1:
+		return subject + " could not be read and was not included."
+	}
+	return subject + " could not be read and were not included."
 }

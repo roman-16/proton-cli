@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sort"
 	"strings"
 
 	gopenpgp "github.com/ProtonMail/gopenpgp/v2/crypto"
@@ -51,6 +52,12 @@ type Contact struct {
 	Cards []string `json:"cards"`
 
 	Signature pgp.VerifyResult `json:"signature,omitempty"`
+
+	// signed and clear are the two cards a reader or writer treats apart from the
+	// rest. Pins are read off the signed card alone, because a key anywhere else
+	// was vouched for by nobody; the clear card is handed back as it came,
+	// because it holds a copy of group membership whose home is the label.
+	signed, clear string
 }
 
 // EmailAddresses are the contact's email addresses with any kind stripped off.
@@ -114,28 +121,35 @@ func (s *Service) writeKey(ctx context.Context) (*gopenpgp.KeyRing, error) {
 	return u.PrimaryUserKey()
 }
 
-// storedCards are the cards one contact is stored as.
+// storedCards are the cards one contact is stored as: the signed card always,
+// the encrypted card when it says anything, and the clear card when it does.
 //
-// Whether the encrypted one is sent is the same question for a contact being
+// Whether a card is worth storing is the same question for a contact being
 // created, one being edited and one being read out of a file, so it is asked
-// here and of the rendered card rather than of whatever went into it.
-func storedCards(ctx context.Context, kr *gopenpgp.KeyRing, signed, encrypted string) ([]any, error) {
+// here and of the rendered card rather than of whatever went into it. The clear
+// card is the one Proton stores in the open - group membership, as CATEGORIES -
+// and goes in as it was handed over, unsigned, which is how Proton's own client
+// writes it.
+func storedCards(ctx context.Context, kr *gopenpgp.KeyRing, signed, encrypted, clear string) ([]any, error) {
 	signedCard, err := pgp.SignCard(signed, kr)
 	if err != nil {
 		return nil, err
 	}
-	out, kinds := []any{signedCard}, "signed"
+	out, kinds := []any{signedCard}, []string{"signed"}
 	if vcard.HasProperties(encrypted) {
 		ec, err := pgp.EncryptAndSignCard(encrypted, kr, kr)
 		if err != nil {
 			return nil, err
 		}
-		out, kinds = append(out, ec), "signed,encrypted+signed"
+		out, kinds = append(out, ec), append(kinds, "encrypted+signed")
+	}
+	if vcard.HasProperties(clear) {
+		out, kinds = append(out, &pgp.Card{Type: pgp.CardClear, Data: clear}), append(kinds, "clear")
 	}
 	// Which cards a write carried is what tells apart a request Proton refused
-	// for the encrypted card from one it refused for anything else, and it is
-	// not recoverable from the answer.
-	slog.DebugContext(ctx, "contacts: cards written", "cards", kinds)
+	// for one card from one it refused for another, and it is not recoverable
+	// from the answer.
+	slog.DebugContext(ctx, "contacts: cards written", "cards", strings.Join(kinds, ","))
 	return out, nil
 }
 
@@ -230,14 +244,11 @@ func (s *Service) List(ctx context.Context) ([]Contact, error) {
 			break
 		}
 		for _, c := range r.Contacts {
-			cards, verdicts, err := pgp.DecryptCardsRaw(c.Cards, u.UserKR, u.UserKR, nil)
+			ct, err := openContact(c.ID, c.Cards, u)
 			if err != nil {
 				skip.Record(ctx, skip.KindContact, c.ID, skip.Undecryptable, err)
 				continue
 			}
-			ct := contactFromCards(c.ID, cards)
-			ct.Cards = cards
-			ct.Signature = pgp.Aggregate(verdicts...)
 			out = append(out, ct)
 		}
 		if len(r.Contacts) < 50 {
@@ -260,14 +271,39 @@ func (s *Service) Get(ctx context.Context, id string) (*Contact, error) {
 	if err != nil {
 		return nil, err
 	}
-	cards, verdicts, err := pgp.DecryptCardsRaw(r.Contact.Cards, u.UserKR, u.UserKR, nil)
+	c, err := openContact(r.Contact.ID, r.Contact.Cards, u)
 	if err != nil {
 		return nil, err
 	}
-	c := contactFromCards(r.Contact.ID, cards)
+	return &c, nil
+}
+
+// openContact decrypts a contact's cards and reads the contact out of them.
+//
+// The cards come back in the order Proton sent them, so which text was the
+// signed card and which the clear one is known here and nowhere later; both are
+// kept apart for the readers and writers that need them by type.
+func openContact(id string, raw []map[string]any, u *keys.Unlocked) (Contact, error) {
+	cards, verdicts, err := pgp.DecryptCardsRaw(raw, u.UserKR, u.UserKR, nil)
+	if err != nil {
+		return Contact{}, err
+	}
+	c := contactFromCards(id, cards)
 	c.Cards = cards
 	c.Signature = pgp.Aggregate(verdicts...)
-	return &c, nil
+	for i, m := range raw {
+		switch t, _ := m["Type"].(float64); int(t) {
+		case pgp.CardSigned:
+			if c.signed == "" {
+				c.signed = cards[i]
+			}
+		case pgp.CardClear:
+			if c.clear == "" {
+				c.clear = cards[i]
+			}
+		}
+	}
+	return c, nil
 }
 
 func (s *Service) Resolve(ctx context.Context, r string) (string, error) {
@@ -315,7 +351,7 @@ func (s *Service) Create(ctx context.Context, nc NewContact) (string, error) {
 	}
 	stored, err := storedCards(ctx, kr,
 		vcard.BuildSigned(signedPart(name, vcard.UID(), nc.Emails, nil)),
-		vcard.BuildEncrypted(encryptedPart(nc, vcard.Encrypted{})))
+		vcard.BuildEncrypted(encryptedPart(nc, vcard.Encrypted{})), "")
 	if err != nil {
 		return "", err
 	}
@@ -352,10 +388,12 @@ func (s *Service) Create(ctx context.Context, nc NewContact) (string, error) {
 	return res.Contact.ID, nil
 }
 
-func (s *Service) Update(ctx context.Context, id string, patch NewContact) error {
+// Update lays a patch over a contact and writes it back, returning the verdict
+// on the card it rewrote for the caller to say.
+func (s *Service) Update(ctx context.Context, id string, patch NewContact) (pgp.VerifyResult, error) {
 	existing, err := s.Get(ctx, id)
 	if err != nil {
-		return err
+		return "", err
 	}
 	// The patch names only what changes; everything else - including properties
 	// this tool has no flag for - is read back off the stored card and written
@@ -373,15 +411,19 @@ func (s *Service) Update(ctx context.Context, id string, patch NewContact) error
 	}
 	kr, err := s.writeKey(ctx)
 	if err != nil {
-		return err
+		return "", err
 	}
-	stored, err := storedCards(ctx, kr,
-		vcard.BuildSigned(signedPart(name, uid, emails, &old)),
-		vcard.BuildEncrypted(encryptedPart(patch, vcard.ParseEncrypted(joined))))
+	// The clear card is rebuilt by address rather than carried over: the signed
+	// card numbers its addresses afresh, and a CATEGORIES left under the old
+	// number would be about whichever address holds it now.
+	signed := vcard.BuildSigned(signedPart(name, uid, emails, &old))
+	stored, err := storedCards(ctx, kr, signed,
+		vcard.BuildEncrypted(encryptedPart(patch, vcard.ParseEncrypted(joined))),
+		vcard.BuildClear(signed, vcard.StoredMembership(existing.signed, existing.clear)))
 	if err != nil {
-		return err
+		return "", err
 	}
-	return s.C.Decode(ctx, proton.Request{Method: "PUT", Path: "/contacts/v4/contacts/" + id, Body: map[string]any{"Cards": stored}}, nil)
+	return existing.Signature, s.C.Decode(ctx, proton.Request{Method: "PUT", Path: "/contacts/v4/contacts/" + id, Body: map[string]any{"Cards": stored}}, nil)
 }
 
 func (s *Service) Delete(ctx context.Context, ids []string) error {
@@ -440,11 +482,39 @@ func pickSlice(a, b []string) []string {
 
 // ── import ──
 
+// ImportOptions is what an import is told beyond the file.
+type ImportOptions struct {
+	// Groups says whether the groups the file puts addresses in are applied,
+	// creating the ones the account does not have.
+	Groups bool
+	// GroupColor is the accent colour a group created on the way gets.
+	GroupColor string
+}
+
 // ImportResult says what an import did, per contact, so a partial success names
 // what did not land rather than reporting one number that hides it.
 type ImportResult struct {
 	Imported []string         `json:"imported"`
 	Skipped  []SkippedContact `json:"skipped"`
+	// Grouped is how many addresses were put in a group, GroupsUsed the groups
+	// they went into, and GroupsCreated the ones among those that did not exist
+	// before - the one thing about an import worth a second look.
+	Grouped       int      `json:"grouped"`
+	GroupsUsed    []string `json:"groups_used"`
+	GroupsCreated []string `json:"groups_created"`
+	// GroupsFailed names the groups whose addresses could not be put in them,
+	// and why. The contacts are in the book either way.
+	GroupsFailed []GroupFailure `json:"groups_failed"`
+}
+
+// GroupFailure is one group an import could not apply, and why.
+type GroupFailure struct {
+	Name   string `json:"name"`
+	Reason string `json:"reason"`
+}
+
+func (f GroupFailure) String() string {
+	return fmt.Sprintf("The addresses meant for %q were not put in it: %s.", f.Name, f.Reason)
 }
 
 // SkippedContact is one card an import could not take, and why.
@@ -468,11 +538,18 @@ func (s SkippedContact) String() string {
 // property this tool has no flag for - an anniversary, a photo, a second postal
 // address - survives the trip instead of being quietly dropped on the way in.
 //
-// The split between what is signed and what is encrypted is Proton's, not the
-// file's: the identity properties are signed so a recipient can verify them, and
-// the rest is encrypted. A card that says nothing Proton can identify is skipped
+// The split between what is signed, what is encrypted and what is clear is
+// Proton's, not the file's: the identity properties are signed so a recipient
+// can verify them, the groups are clear so the server can read them, and the
+// rest is encrypted. A card that says nothing Proton can identify is skipped
 // and named.
-func (s *Service) Import(ctx context.Context, documents []string) (*ImportResult, error) {
+//
+// The groups a file names are applied the way Proton's own importer applies
+// them: a contact is written, the addresses it came back with are put in the
+// groups the file gave them, and a group the account does not have is created.
+// Membership lives on the label; the CATEGORIES in the clear card is a copy of
+// it, so both are written.
+func (s *Service) Import(ctx context.Context, documents []string, opts ImportOptions) (*ImportResult, error) {
 	// Before anything is reported as skipped: a hierarchy that will not open is
 	// the run's failure, not a fault in every card in the file.
 	kr, err := s.writeKey(ctx)
@@ -483,8 +560,16 @@ func (s *Service) Import(ctx context.Context, documents []string) (*ImportResult
 	// Proton takes contacts in batches, and its own client caps them well below
 	// the request limit because each one is encrypted before it is sent.
 	const batch = 10
+	type offered struct {
+		name   string
+		groups vcard.Membership
+	}
 	pending := make([]map[string]any, 0, batch)
-	names := make([]string, 0, batch)
+	offers := make([]offered, 0, batch)
+	// wanted is which addresses each group is to hold, gathered across every
+	// batch so the labelling is one request per group rather than one per
+	// contact.
+	wanted := map[string][]string{}
 
 	flush := func() error {
 		if len(pending) == 0 {
@@ -495,7 +580,10 @@ func (s *Service) Import(ctx context.Context, documents []string) (*ImportResult
 				Response struct {
 					Code    int
 					Error   string
-					Contact struct{ ID string }
+					Contact struct {
+						ID            string
+						ContactEmails []struct{ ID, Email string }
+					}
 				}
 			}
 		}
@@ -503,7 +591,7 @@ func (s *Service) Import(ctx context.Context, documents []string) (*ImportResult
 		// file being read back is the same contact rather than a second one with
 		// the same name. This is what makes an export a backup: edit the file,
 		// import it, and the address book says what the file says. Proton's own
-		// importer sends exactly this.
+		// importer sends exactly this, and labels afterwards as this does.
 		body := map[string]any{"Contacts": pending, "Overwrite": 1, "Import": 1, "Labels": 0}
 		if err := s.C.Decode(ctx, proton.Request{
 			Method: "POST", Path: "/contacts/v4/contacts", Body: body,
@@ -511,21 +599,27 @@ func (s *Service) Import(ctx context.Context, documents []string) (*ImportResult
 			return err
 		}
 		for i, resp := range r.Responses {
-			name := ""
-			if i < len(names) {
-				name = names[i]
+			var offer offered
+			if i < len(offers) {
+				offer = offers[i]
 			}
-			if id := resp.Response.Contact.ID; id != "" {
-				res.Imported = append(res.Imported, id)
+			ct := resp.Response.Contact
+			if ct.ID == "" {
+				reason := resp.Response.Error
+				if reason == "" {
+					reason = "Proton did not accept it"
+				}
+				res.Skipped = append(res.Skipped, SkippedContact{Name: offer.name, Reason: reason})
 				continue
 			}
-			reason := resp.Response.Error
-			if reason == "" {
-				reason = "Proton did not accept it"
+			res.Imported = append(res.Imported, ct.ID)
+			for _, e := range ct.ContactEmails {
+				for _, name := range offer.groups[canonicalEmail(e.Email)] {
+					wanted[name] = append(wanted[name], e.ID)
+				}
 			}
-			res.Skipped = append(res.Skipped, SkippedContact{Name: name, Reason: reason})
 		}
-		pending, names = pending[:0], names[:0]
+		pending, offers = pending[:0], offers[:0]
 		return nil
 	}
 
@@ -537,8 +631,11 @@ func (s *Service) Import(ctx context.Context, documents []string) (*ImportResult
 			})
 			continue
 		}
-		signed, encrypted := vcard.SplitForStorage(card)
-		stored, err := storedCards(ctx, kr, signed, encrypted)
+		signed, encrypted, clear := vcard.SplitForStorage(card)
+		if !opts.Groups {
+			clear = ""
+		}
+		stored, err := storedCards(ctx, kr, signed, encrypted, clear)
 		if err != nil {
 			res.Skipped = append(res.Skipped, SkippedContact{
 				Name: vcard.Field(card, "FN"), Reason: err.Error(),
@@ -546,7 +643,7 @@ func (s *Service) Import(ctx context.Context, documents []string) (*ImportResult
 			continue
 		}
 		pending = append(pending, map[string]any{"Cards": stored})
-		names = append(names, vcard.Field(card, "FN"))
+		offers = append(offers, offered{name: vcard.Field(card, "FN"), groups: vcard.StoredMembership(signed, clear)})
 		if len(pending) == batch {
 			if err := flush(); err != nil {
 				return nil, err
@@ -556,7 +653,58 @@ func (s *Service) Import(ctx context.Context, documents []string) (*ImportResult
 	if err := flush(); err != nil {
 		return nil, err
 	}
+	if len(wanted) > 0 {
+		s.applyGroups(ctx, wanted, opts.GroupColor, res)
+	}
 	return res, nil
+}
+
+// applyGroups puts the imported addresses in the groups the file gave them.
+//
+// The contacts are already in the book by the time this runs, so a group that
+// cannot be applied is a fact about the result rather than a reason to fail it:
+// it is named on the result, and the person can put the addresses in by hand.
+func (s *Service) applyGroups(ctx context.Context, wanted map[string][]string, color string, res *ImportResult) {
+	names := make([]string, 0, len(wanted))
+	for name := range wanted {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	ids, created, err := s.groupsNamed(ctx, names, color)
+	res.GroupsCreated = created
+	if err != nil {
+		for _, name := range names {
+			if _, ok := ids[name]; !ok {
+				res.GroupsFailed = append(res.GroupsFailed, GroupFailure{Name: name, Reason: err.Error()})
+			}
+		}
+	}
+	for _, name := range names {
+		id, ok := ids[name]
+		if !ok {
+			continue
+		}
+		addresses := dedupe(wanted[name])
+		if err := s.GroupAddEmails(ctx, id, addresses); err != nil {
+			res.GroupsFailed = append(res.GroupsFailed, GroupFailure{Name: name, Reason: err.Error()})
+			continue
+		}
+		res.Grouped += len(addresses)
+		res.GroupsUsed = append(res.GroupsUsed, name)
+	}
+}
+
+func dedupe(ids []string) []string {
+	seen := make(map[string]bool, len(ids))
+	out := make([]string, 0, len(ids))
+	for _, id := range ids {
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		out = append(out, id)
+	}
+	return out
 }
 
 // ── merging duplicates ──
@@ -657,9 +805,10 @@ func (s *Service) Merge(ctx context.Context, group Duplicate) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	stored, err := storedCards(ctx, kr,
-		vcard.BuildSigned(signedPart(firstNonEmpty(keep.Name, merged.name), uid, merged.emails, &old)),
-		vcard.BuildEncrypted(merged.encrypted))
+	signed := vcard.BuildSigned(signedPart(firstNonEmpty(keep.Name, merged.name), uid, merged.emails, &old))
+	stored, err := storedCards(ctx, kr, signed,
+		vcard.BuildEncrypted(merged.encrypted),
+		vcard.BuildClear(signed, vcard.StoredMembership(keep.signed, keep.clear)))
 	if err != nil {
 		return "", err
 	}

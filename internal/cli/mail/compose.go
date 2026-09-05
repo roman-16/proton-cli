@@ -282,7 +282,8 @@ func (f *deliveryFlags) delivery() (mailsvc.Delivery, time.Time, error) {
 
 // withPinnedKeys consults Contacts for each recipient's pinned keys. A pinned key
 // means the message is encrypted to the key the user trusts rather than to
-// whatever the server hands back.
+// whatever the server hands back - and a contact that would not open is handed
+// on as exactly that, for the send to decide about.
 func withPinnedKeys(c *kit.Invocation, del *mailsvc.Delivery, content mailsvc.Content) error {
 	for _, email := range content.RecipientAddresses() {
 		pin, err := c.App.Contacts.PinnedKeysFor(c.Ctx, email)
@@ -301,6 +302,7 @@ func withPinnedKeys(c *kit.Invocation, del *mailsvc.Delivery, content mailsvc.Co
 			Sign:              pin.Sign,
 			Scheme:            pin.Scheme,
 			SignatureVerified: pin.SignatureVerified,
+			Unknown:           pin.Unknown,
 		}
 	}
 	return nil

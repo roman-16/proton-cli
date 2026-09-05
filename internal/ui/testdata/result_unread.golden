@@ -1,0 +1,5 @@
+== stdout ==
+== stderr ==
+✓ Moved 12 items to trash.
+! 1 folder could not be opened, so nothing inside it was included.
+  This is a bug or damaged data - `proton report` has the details.

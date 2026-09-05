@@ -114,8 +114,14 @@ func (s *Service) VaultCreate(ctx context.Context, name string) (string, error) 
 	if err != nil {
 		return "", err
 	}
-	msg := pgp.NewPlainMessage(rawKey)
-	encKey, err := u.UserKR.Encrypt(msg, u.UserKR)
+	// Sealed to the primary user key alone, as Proton's own client seals it:
+	// every key the account ever had has to open old secrets, but a new one
+	// under a retired key is a secret whose reach is wider than its owner thinks.
+	ownKey, err := u.PrimaryUserKey()
+	if err != nil {
+		return "", err
+	}
+	encKey, err := ownKey.Encrypt(pgp.NewPlainMessage(rawKey), ownKey)
 	if err != nil {
 		return "", err
 	}

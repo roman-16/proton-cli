@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -159,7 +160,7 @@ func TestUpdateSealsTheEncryptedCardToThePrimaryUserKeyAlone(t *testing.T) {
 	d := &contactDoer{cards: []map[string]any{signedCard(t, ring, base)}}
 
 	svc := New(d, testKeys(&keys.Unlocked{UserKR: ring}))
-	if err := svc.Update(context.Background(), "c1", NewContact{Note: "Likes tea"}); err != nil {
+	if _, err := svc.Update(context.Background(), "c1", NewContact{Note: "Likes tea"}); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -194,7 +195,7 @@ func TestUpdateDoesNotDuplicateWhatTheSignedCardHolds(t *testing.T) {
 	d := &contactDoer{cards: []map[string]any{signedCard(t, ring, base)}}
 
 	svc := New(d, testKeys(&keys.Unlocked{UserKR: ring}))
-	if err := svc.Update(context.Background(), "c1", NewContact{Name: "Bobby"}); err != nil {
+	if _, err := svc.Update(context.Background(), "c1", NewContact{Name: "Bobby"}); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -246,6 +247,57 @@ func TestPinnedKeysForReadsSignedCard(t *testing.T) {
 	}
 }
 
+// A contact that will not open is not a contact with no pin. The answer says so,
+// and leaves what to do about it to the send.
+func TestPinnedKeysForSaysWhenItCannotTell(t *testing.T) {
+	kr := testKeyRing(t)
+	d := &contactDoer{
+		emails: []map[string]any{{"ContactID": "c1", "Defaults": 0}},
+		// An encrypted card sealed to a key this account does not hold.
+		cards: []map[string]any{{"Type": float64(pgp.CardEncryptedSigned), "Data": "not a message", "Signature": ""}},
+	}
+	cc, err := New(d, testKeys(&keys.Unlocked{UserKR: kr})).PinnedKeysFor(context.Background(), "bob@example.com")
+	if err != nil {
+		t.Fatalf("PinnedKeysFor: %v", err)
+	}
+	if cc == nil || !cc.Unknown {
+		t.Fatalf("a contact that would not open came back as %+v, want Unknown", cc)
+	}
+}
+
+// A pin is read off the signed card alone: a KEY anywhere else was vouched for by
+// nobody, and Proton's own clients do not treat it as a pin either.
+func TestPinnedKeysIgnoreAKeyOutsideTheSignedCard(t *testing.T) {
+	_, keyValue := armoredPubKey(t)
+	ct := &Contact{
+		ID: "c1", Signature: pgp.Verified,
+		signed: vcard.BuildSigned(vcard.Signed{Name: "Bob", UID: "u", Emails: []vcard.SignedEmail{{Address: "bob@example.com"}}}),
+		clear:  "BEGIN:VCARD\r\nVERSION:4.0\r\nitem1.EMAIL:bob@example.com\r\nitem1.KEY:" + keyValue + "\r\nEND:VCARD",
+	}
+	if cc := PinnedKeys(context.Background(), ct, "bob@example.com"); cc != nil {
+		t.Errorf("a KEY in the clear card was taken as a pin: %+v", cc)
+	}
+}
+
+// A pinned key that will not decode is a pin that cannot be seen, and the
+// answer says so alongside whatever did decode.
+func TestPinnedKeysSayWhenAKeyWillNotDecode(t *testing.T) {
+	_, keyValue := armoredPubKey(t)
+	ct := &Contact{
+		ID: "c1", Signature: pgp.Verified,
+		signed: vcard.BuildSigned(vcard.Signed{Name: "Bob", UID: "u", Emails: []vcard.SignedEmail{{
+			Address: "bob@example.com", KeyValues: []string{keyValue, "data:application/pgp-keys;base64,bm9wZQ=="},
+		}}}),
+	}
+	cc := PinnedKeys(context.Background(), ct, "bob@example.com")
+	if cc == nil || len(cc.ArmoredKeys) != 1 {
+		t.Fatalf("PinnedKeys = %+v, want the one key that decoded", cc)
+	}
+	if !cc.Unknown {
+		t.Error("a key that would not decode was passed over in silence")
+	}
+}
+
 func TestPinnedKeysForNoConfigIsMiss(t *testing.T) {
 	d := &contactDoer{emails: []map[string]any{{"ContactID": "c1", "Defaults": 1}}}
 	cc, err := New(d, testKeys(&keys.Unlocked{UserKR: testKeyRing(t)})).PinnedKeysFor(context.Background(), "x@example.com")
@@ -266,8 +318,12 @@ func TestPinKeyAddsKeyAndPreservesOtherCards(t *testing.T) {
 	u := &keys.Unlocked{UserKR: kr}
 
 	armored, keyValue := armoredPubKey(t)
-	if err := New(d, testKeys(u)).PinKey(context.Background(), "c1", "bob@example.com", armored, nil, nil, ""); err != nil {
+	verdict, err := New(d, testKeys(u)).PinKey(context.Background(), "c1", "bob@example.com", armored, nil, nil, "")
+	if err != nil {
 		t.Fatalf("PinKey: %v", err)
+	}
+	if verdict != pgp.Verified {
+		t.Errorf("a card signed by this account came back %q", verdict)
 	}
 
 	newSigned := putSignedCardText(t, d)
@@ -289,17 +345,41 @@ func TestPinKeyAddsKeyAndPreservesOtherCards(t *testing.T) {
 	}
 }
 
-func TestPinKeyRejectsUnverifiedCard(t *testing.T) {
+// A card that does not verify is far more often one signed by a key this
+// account has since retired than one somebody altered, and the two cannot be
+// told apart. So the write goes ahead, as Proton's own client's does, and the
+// verdict comes back for the caller to say - which is the one thing a refusal
+// could not do.
+func TestAWriteOverAnUnverifiedCardGoesAheadAndSaysSo(t *testing.T) {
 	kr := testKeyRing(t)
-	other := testKeyRing(t) // signs with a different key than the verifier
+	other := testKeyRing(t) // signs with a key this account no longer holds
 	base := vcard.BuildSigned(vcard.Signed{Name: "Bob", UID: "u", Emails: []vcard.SignedEmail{{Address: "bob@example.com"}}})
-	d := &contactDoer{cards: []map[string]any{signedCard(t, other, base)}}
 	u := &keys.Unlocked{UserKR: kr}
 
-	armored, _ := armoredPubKey(t)
-	if err := New(d, testKeys(u)).PinKey(context.Background(), "c1", "bob@example.com", armored, nil, nil, ""); err == nil {
-		t.Error("PinKey should refuse to edit a card it cannot verify")
-	}
+	t.Run("pin", func(t *testing.T) {
+		d := &contactDoer{cards: []map[string]any{signedCard(t, other, base)}}
+		armored, _ := armoredPubKey(t)
+		verdict, err := New(d, testKeys(u)).PinKey(context.Background(), "c1", "bob@example.com", armored, nil, nil, "")
+		if err != nil {
+			t.Fatalf("PinKey refused a card it could not verify: %v", err)
+		}
+		if verdict != pgp.Unverified {
+			t.Errorf("verdict = %q, want %q", verdict, pgp.Unverified)
+		}
+		if d.putBody == nil {
+			t.Error("nothing was written")
+		}
+	})
+	t.Run("update", func(t *testing.T) {
+		d := &contactDoer{cards: []map[string]any{signedCard(t, other, base)}}
+		verdict, err := New(d, testKeys(u)).Update(context.Background(), "c1", NewContact{Note: "Likes tea"})
+		if err != nil {
+			t.Fatalf("Update: %v", err)
+		}
+		if verdict != pgp.Unverified {
+			t.Errorf("verdict = %q, want %q", verdict, pgp.Unverified)
+		}
+	})
 }
 
 func TestUnpinKeyRemovesKeys(t *testing.T) {
@@ -312,7 +392,7 @@ func TestUnpinKeyRemovesKeys(t *testing.T) {
 	d := &contactDoer{cards: []map[string]any{signedCard(t, kr, base)}}
 	u := &keys.Unlocked{UserKR: kr}
 
-	if err := New(d, testKeys(u)).UnpinKey(context.Background(), "c1", "bob@example.com"); err != nil {
+	if _, err := New(d, testKeys(u)).UnpinKey(context.Background(), "c1", "bob@example.com"); err != nil {
 		t.Fatalf("UnpinKey: %v", err)
 	}
 	model := vcard.ParseSigned(putSignedCardText(t, d))
@@ -449,5 +529,170 @@ func TestMergeCardsDeduplicatesAddressesByCase(t *testing.T) {
 	})
 	if len(got.emails) != 1 {
 		t.Errorf("emails = %v, want one; the same mailbox written twice is one mailbox", got.emails)
+	}
+}
+
+// bookDoer fakes the parts of the contacts API an import and an export touch:
+// the labels, the address listing, the batch add, and the labelling. It records
+// what was labelled so a test can ask where an import put the addresses.
+type bookDoer struct {
+	groups   []map[string]any
+	emails   []map[string]any
+	contact  []map[string]any
+	created  []string
+	labelled map[string][]string
+}
+
+func (d *bookDoer) Do(_ context.Context, _ proton.Request) (*proton.Response, error) {
+	return &proton.Response{Status: 200, Body: []byte(`{"Code":1000}`)}, nil
+}
+
+func (d *bookDoer) Decode(_ context.Context, r proton.Request, out any) error {
+	var payload any
+	switch {
+	case r.Method == "GET" && r.Path == "/core/v4/labels":
+		payload = map[string]any{"Labels": d.groups}
+	case r.Method == "POST" && r.Path == "/core/v4/labels":
+		name, _ := r.Body.(map[string]any)["Name"].(string)
+		id := "group-" + name
+		d.groups = append(d.groups, map[string]any{"ID": id, "Name": name, "Color": "#8080FF"})
+		d.created = append(d.created, name)
+		payload = map[string]any{"Label": map[string]any{"ID": id}}
+	case r.Method == "GET" && strings.HasSuffix(r.Path, "/contacts/emails"):
+		payload = map[string]any{"ContactEmails": d.emails}
+	case r.Method == "POST" && r.Path == "/contacts/v4/contacts":
+		var responses []map[string]any
+		for i, raw := range r.Body.(map[string]any)["Contacts"].([]map[string]any) {
+			var addresses []map[string]any
+			for _, c := range raw["Cards"].([]any) {
+				card, ok := c.(*pgp.Card)
+				if !ok || card.Type != pgp.CardSigned {
+					continue
+				}
+				for j, e := range vcard.Values(card.Data, "EMAIL") {
+					addresses = append(addresses, map[string]any{"ID": fmt.Sprintf("e%d-%d", i, j), "Email": e})
+				}
+			}
+			responses = append(responses, map[string]any{"Index": i, "Response": map[string]any{
+				"Code": 1000, "Contact": map[string]any{"ID": fmt.Sprintf("c%d", i), "ContactEmails": addresses},
+			}})
+		}
+		payload = map[string]any{"Responses": responses}
+	case r.Method == "PUT" && r.Path == "/contacts/v4/contacts/emails/label":
+		body := r.Body.(map[string]any)
+		if d.labelled == nil {
+			d.labelled = map[string][]string{}
+		}
+		d.labelled[body["LabelID"].(string)] = body["ContactEmailIDs"].([]string)
+		return nil
+	case r.Method == "GET":
+		payload = map[string]any{"Contact": map[string]any{"ID": "c1", "Cards": d.contact}}
+	default:
+		return nil
+	}
+	b, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	if out == nil {
+		return nil
+	}
+	return json.Unmarshal(b, out)
+}
+
+// An import puts each address in the groups the file gave it - the group of a
+// CATEGORIES under the address's own group, every address for one under none -
+// creating the groups the account does not have and reporting which.
+func TestImportPutsAddressesInTheGroupsTheFileNames(t *testing.T) {
+	d := &bookDoer{groups: []map[string]any{{"ID": "g-work", "Name": "Work", "Color": "#8080FF"}}}
+	svc := New(d, testKeys(&keys.Unlocked{UserKR: testKeyRing(t)}))
+	file := []string{
+		"BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Jane Roe\r\nUID:u1\r\n" +
+			"item1.EMAIL:jane@example.com\r\nitem1.CATEGORIES:Climbing\r\n" +
+			"item2.EMAIL:jane@work.example\r\nitem2.CATEGORIES:Work\r\nEND:VCARD",
+		"BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Bob\r\nUID:u2\r\nEMAIL:bob@example.com\r\nCATEGORIES:Work,Climbing\r\nEND:VCARD",
+		"BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Nobody\r\nUID:u3\r\nCATEGORIES:Work\r\nEND:VCARD",
+	}
+	res, err := svc.Import(context.Background(), file, ImportOptions{Groups: true, GroupColor: "#8080FF"})
+	if err != nil {
+		t.Fatalf("Import: %v", err)
+	}
+	if len(res.Imported) != 3 || len(res.Skipped) != 0 {
+		t.Fatalf("imported %d, skipped %v", len(res.Imported), res.Skipped)
+	}
+	if strings.Join(d.created, ",") != "Climbing" {
+		t.Errorf("created %v, want only the group the account did not have", d.created)
+	}
+	if got := strings.Join(d.labelled["g-work"], ","); got != "e0-1,e1-0" {
+		t.Errorf("Work holds %q, want jane@work.example and bob@example.com", got)
+	}
+	if got := strings.Join(d.labelled["group-Climbing"], ","); got != "e0-0,e1-0" {
+		t.Errorf("Climbing holds %q, want jane@example.com and bob@example.com", got)
+	}
+	if res.Grouped != 4 || strings.Join(res.GroupsUsed, ",") != "Climbing,Work" || strings.Join(res.GroupsCreated, ",") != "Climbing" {
+		t.Errorf("the result does not say what happened: %+v", res)
+	}
+	// A contact with no address has no address to put anywhere, as in Proton's
+	// own importer, and says nothing about it.
+	if len(res.GroupsFailed) != 0 {
+		t.Errorf("a card with no address was reported as a failure: %v", res.GroupsFailed)
+	}
+}
+
+func TestImportLeavesGroupsOutWhenAsked(t *testing.T) {
+	d := &bookDoer{}
+	svc := New(d, testKeys(&keys.Unlocked{UserKR: testKeyRing(t)}))
+	file := []string{"BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Bob\r\nUID:u2\r\nEMAIL:bob@example.com\r\nCATEGORIES:Work\r\nEND:VCARD"}
+	res, err := svc.Import(context.Background(), file, ImportOptions{})
+	if err != nil {
+		t.Fatalf("Import: %v", err)
+	}
+	if len(d.created) != 0 || len(d.labelled) != 0 || res.Grouped != 0 {
+		t.Errorf("groups were applied under --no-groups: created %v, labelled %v", d.created, d.labelled)
+	}
+}
+
+// Membership is read where it lives - the labels - and joined to the names.
+func TestMembershipJoinsLabelsToNames(t *testing.T) {
+	d := &bookDoer{
+		groups: []map[string]any{{"ID": "g-work", "Name": "Work"}, {"ID": "g-climb", "Name": "Climbing"}},
+		emails: []map[string]any{
+			{"ID": "e1", "ContactID": "c1", "Email": "Jane@Example.com", "LabelIDs": []string{"g-work", "g-climb"}},
+			{"ID": "e2", "ContactID": "c1", "Email": "jane@work.example", "LabelIDs": []string{}},
+			{"ID": "e3", "ContactID": "c2", "Email": "bob@example.com", "LabelIDs": []string{"g-climb", "gone"}},
+		},
+	}
+	got, err := New(d, testKeys(&keys.Unlocked{UserKR: testKeyRing(t)})).Membership(context.Background())
+	if err != nil {
+		t.Fatalf("Membership: %v", err)
+	}
+	if strings.Join(got["c1"]["jane@example.com"], ",") != "Work,Climbing" {
+		t.Errorf("c1's groups = %v", got["c1"])
+	}
+	if _, ok := got["c1"]["jane@work.example"]; ok {
+		t.Error("an address in no group has a membership")
+	}
+	if strings.Join(got["c2"]["bob@example.com"], ",") != "Climbing" {
+		t.Errorf("c2's groups = %v, want a label with no group left out", got["c2"])
+	}
+}
+
+// An edit keeps the stored copy of the groups, by address: the signed card
+// numbers its addresses afresh, and the copy has to follow the person.
+func TestUpdateKeepsTheGroupsWithTheirAddresses(t *testing.T) {
+	kr := testKeyRing(t)
+	signed := vcard.BuildSigned(vcard.Signed{Name: "Jane", UID: "u1", Emails: []vcard.SignedEmail{
+		{Address: "a@example.com"}, {Address: "b@example.com"},
+	}})
+	clear := map[string]any{"Type": float64(pgp.CardClear), "Data": "BEGIN:VCARD\r\nVERSION:4.0\r\nitem1.CATEGORIES:Work\r\nEND:VCARD"}
+	d := &contactDoer{cards: []map[string]any{signedCard(t, kr, signed), clear}}
+
+	svc := New(d, testKeys(&keys.Unlocked{UserKR: kr}))
+	if _, err := svc.Update(context.Background(), "c1", NewContact{Emails: []string{"b@example.com", "a@example.com"}}); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	written := putCard(t, d, pgp.CardClear).Data
+	if !strings.Contains(written, "item2.CATEGORIES:Work") || strings.Contains(written, "item1.CATEGORIES") {
+		t.Errorf("Work did not follow a@example.com to its new place:\n%s", written)
 	}
 }

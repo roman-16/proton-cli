@@ -3,6 +3,7 @@ package pass
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sort"
@@ -24,7 +25,10 @@ import (
 //
 // Proton passes it along without being able to read it, and the signature is
 // what tells the recipient the vault really came from you rather than from
-// whoever happened to send the request.
+// whoever happened to send the request - which is why an offer is only ever
+// opened against the keys Proton publishes for the person it names as sender,
+// under the context the sender signed it with. A key that anybody could have put
+// in the record is a key nobody should accept.
 
 // inviteContext is the signature context on an invitation to somebody who
 // already has a Proton account. Marking it critical means a client that does not
@@ -304,6 +308,8 @@ func (s *Service) InvitesReceived(ctx context.Context) ([]Invite, error) {
 	if err != nil {
 		return nil, err
 	}
+	// One sender's keys serve every offer they made.
+	inviters := map[string]*pgp.KeyRing{}
 	out := make([]Invite, 0, len(r.Invites))
 	for _, i := range r.Invites {
 		invite := Invite{
@@ -314,18 +320,49 @@ func (s *Service) InvitesReceived(ctx context.Context) ([]Invite, error) {
 			invite.ItemID = i.TargetID
 		}
 		// The vault's name is readable before the offer is taken: the invitation
-		// carries the key that opens it, encrypted to the address it was sent to.
-		// A name that will not come out is left empty rather than guessed at -
-		// the offer is still there to answer.
-		if key, err := s.openInviteKey(i, u); err == nil {
-			if vault, err := decryptVault(i.VaultData.Content, key); err == nil {
-				invite.Vault = vault.Name
-			}
-		}
+		// carries the key that opens it, encrypted to the address it was sent to
+		// and signed by the sender. A name that will not come out - the key will
+		// not open, or was not signed by the sender - is left empty rather than
+		// guessed at; the offer is still there to answer, and answering it is
+		// where a key nobody vouches for is refused.
+		invite.Vault = s.previewName(ctx, i, u, inviters)
 		out = append(out, invite)
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Inviter < out[j].Inviter })
 	return out, nil
+}
+
+// previewName is the vault's name as the invitation lets it be read, or "".
+//
+// Recorded and not counted. The row is on the screen with its name blank, so
+// nothing is hidden; the log says which of the ways it failed to come out this
+// was, which the blank cell cannot.
+func (s *Service) previewName(ctx context.Context, i rawUserInvite, u *keys.Unlocked, inviters map[string]*pgp.KeyRing) string {
+	inviter, ok := inviters[i.InviterEmail]
+	if !ok {
+		kr, err := s.inviterKeys(ctx, i.InviterEmail)
+		if err != nil {
+			slog.DebugContext(ctx, "pass: an inviter's keys could not be read",
+				"signer", i.InviterEmail, "error", err.Error())
+		}
+		inviter, inviters[i.InviterEmail] = kr, kr
+	}
+	if inviter == nil {
+		return ""
+	}
+	key, err := s.openInviteKey(i, u, inviter, i.VaultData.ContentKeyRotation)
+	if err != nil {
+		slog.DebugContext(ctx, "pass: an invitation's key did not open for its preview",
+			"signer", i.InviterEmail, "error", err.Error())
+		return ""
+	}
+	vault, err := decryptVault(i.VaultData.Content, key)
+	if err != nil {
+		slog.DebugContext(ctx, "pass: an invitation's preview did not decrypt",
+			"signer", i.InviterEmail, "error", err.Error())
+		return ""
+	}
+	return vault.Name
 }
 
 // rawUserInvite is an invitation as it reaches the person offered it. The vault's
@@ -351,63 +388,100 @@ type rawUserInvite struct {
 	}
 }
 
-// openInviteKey unseals the vault key an invitation carries.
+// errUnsigned is an invitation whose key was not signed by the person it names
+// as sender - or was signed for something other than an invitation.
+var errUnsigned = errors.New("the key was not signed by the inviter")
+
+// inviterKeys are the keys an invitation's sender may have signed it with.
 //
-// An invitation holds every rotation of the key; the one that opens the preview
-// is the rotation the preview was sealed under.
-func (s *Service) openInviteKey(i rawUserInvite, u *keys.Unlocked) ([]byte, error) {
+// Every key Proton publishes for the address goes in, because the invitation
+// may be older than the sender's current key. An address Proton publishes no
+// key for cannot have sent an invitation, and one whose keys this build cannot
+// read is reported as such rather than as a forgery.
+func (s *Service) inviterKeys(ctx context.Context, email string) (*pgp.KeyRing, error) {
+	kr, err := keys.Signing(ctx, s.C, email)
+	if err != nil {
+		return nil, err
+	}
+	if kr == nil {
+		return nil, errs.Problemf("Proton publishes no key for %s, so nothing can vouch for this offer.", email)
+	}
+	return kr, nil
+}
+
+// openInviteKey unseals one rotation of the vault key an invitation carries,
+// checking on the way that the sender signed it.
+//
+// The check is under the same context the sender signed with, and it is
+// required: a signature made for anything else, or by anybody else, opens
+// nothing. This is the one place an offered key is opened, so the preview and
+// the acceptance cannot come to disagree about who sent it.
+func (s *Service) openInviteKey(i rawUserInvite, u *keys.Unlocked, inviter *pgp.KeyRing, rotation int) ([]byte, error) {
 	addrKR, ok := u.AddrKR(i.InvitedAddressID)
 	if !ok {
 		return nil, fmt.Errorf("no key for the address this was sent to")
 	}
 	for _, k := range i.Keys {
-		if k.KeyRotation != i.VaultData.ContentKeyRotation {
+		if k.KeyRotation != rotation {
 			continue
 		}
 		raw, err := base64.StdEncoding.DecodeString(k.Key)
 		if err != nil {
 			return nil, err
 		}
-		opened, err := addrKR.Decrypt(pgp.NewPGPMessage(raw), nil, pgp.GetUnixTime())
+		opened, err := addrKR.DecryptWithContext(pgp.NewPGPMessage(raw), inviter, pgp.GetUnixTime(),
+			pgp.NewVerificationContext(inviteContext, true, 0))
 		if err != nil {
+			var unsigned pgp.SignatureVerificationError
+			if errors.As(err, &unsigned) {
+				return nil, fmt.Errorf("%w: %v", errUnsigned, err)
+			}
 			return nil, err
 		}
 		return opened.GetBinary(), nil
 	}
-	return nil, fmt.Errorf("the invitation carries no key for its own preview")
+	return nil, fmt.Errorf("the invitation carries no key for rotation %d", rotation)
 }
 
 // InviteAccept takes what somebody offered, whether a vault or one item.
 //
-// The keys arrive encrypted to the address the offer was sent to. They are moved
-// onto the account's own user key here, which is where the CLI reads a share's
+// The keys arrive encrypted to the address the offer was sent to and signed by
+// the sender. Each is checked against the sender's published keys and moved onto
+// the account's own primary user key, which is where the CLI reads a share's
 // keys from afterwards - so accepting is what turns an offer into something that
-// opens like anything else.
+// opens like anything else. A key the sender did not sign is refused: Proton
+// could not read it, so only the signature says who put it there.
 func (s *Service) InviteAccept(ctx context.Context, token string) error {
 	invite, u, err := s.findInvite(ctx, token)
 	if err != nil {
 		return err
 	}
-	addrKR, ok := u.AddrKR(invite.InvitedAddressID)
-	if !ok {
+	if _, ok := u.AddrKR(invite.InvitedAddressID); !ok {
 		return errs.Problemf("The keys for %s will not open, so that offer cannot be taken.", invite.InvitedEmail)
 	}
+	inviter, err := s.inviterKeys(ctx, invite.InviterEmail)
+	if err != nil {
+		return err
+	}
+	ownKey, err := u.PrimaryUserKey()
+	if err != nil {
+		return err
+	}
 
-	keys := make([]map[string]any, 0, len(invite.Keys))
+	sealedKeys := make([]map[string]any, 0, len(invite.Keys))
 	for _, k := range invite.Keys {
-		raw, err := base64.StdEncoding.DecodeString(k.Key)
-		if err != nil {
-			return err
+		opened, err := s.openInviteKey(invite, u, inviter, k.KeyRotation)
+		if errors.Is(err, errUnsigned) {
+			return errs.Problemf("The key in this offer was not signed by %s, so it cannot be taken.", invite.InviterEmail)
 		}
-		opened, err := addrKR.Decrypt(pgp.NewPGPMessage(raw), nil, pgp.GetUnixTime())
 		if err != nil {
 			return fmt.Errorf("open the vault key sent to you: %w", err)
 		}
-		sealed, err := u.UserKR.Encrypt(pgp.NewPlainMessage(opened.GetBinary()), u.UserKR)
+		sealed, err := ownKey.Encrypt(pgp.NewPlainMessage(opened), ownKey)
 		if err != nil {
 			return err
 		}
-		keys = append(keys, map[string]any{
+		sealedKeys = append(sealedKeys, map[string]any{
 			"Key":         base64.StdEncoding.EncodeToString(sealed.GetBinary()),
 			"KeyRotation": k.KeyRotation,
 		})
@@ -415,7 +489,7 @@ func (s *Service) InviteAccept(ctx context.Context, token string) error {
 
 	return s.C.Decode(ctx, proton.Request{
 		Method: "POST", Path: "/pass/v1/invite/" + token,
-		Body: map[string]any{"Keys": keys},
+		Body: map[string]any{"Keys": sealedKeys},
 	}, nil)
 }
 

@@ -66,7 +66,13 @@ Rules:
 
 After making code changes, run these in order. Stop on the first failure and fix it before continuing.
 
-**The live suite is the user's to run, never the agent's.** `just test` takes the best part of an hour, spends allowances Proton meters by the hour, and acts on three real accounts - one of them somebody's own. An agent runs **`just test-fast`** and nothing else. When a change wants the live suite - a new command, anything touching a request, a fix that only the live API can confirm - say so, say why, and let the user decide. Never start one to find out.
+**The live suite is the user's to run, never the agent's.** `just test` takes the best part of an hour, spends allowances Proton meters by the hour, and acts on three real accounts - one of them somebody's own. An agent runs **`just test-fast`** and nothing else. When a change wants live confirmation - a new command, anything touching a request, a fix that only the live API can confirm - the agent's job is to name exactly which tests, not to ask for the suite:
+
+- **Name the tests, as one command.** `just test-one` takes a regex, so the whole ask is one line: `just test-one 'TestContactsCRUD|TestContactsExportAndImportRoundTrip'`. Beside it, one line per test saying what that test proves about the change, so the user can judge the list rather than trust it. Read `tests/live/` to find them; a test that does not exist yet is a test to write first, not a reason to run everything.
+- **Say what the subset cannot prove.** A state no test account is in, a path only reachable by hand - name it, and how the user could see it for themselves.
+- **Ask for `just test` only when a subset cannot answer** - a change under every command (`kit.Run`, the client, the key hierarchy, the harness itself), or the coverage record needing a re-record. Then say which of those it is. "To be safe" is not one of them.
+
+Never start one to find out.
 
 1. **Tests** - `just test-fast` is the gate an agent runs: unit, golden, conformance, the rules the live suite is held to, and the offline suite. No credentials, about two seconds. `just test` adds the live suite, one test at a time, against all three accounts; it is the user's. A live run fails on the first sign of Proton rate-limiting rather than pressing on, so a failure that says so means wait, not fix the code.
 2. **Lint** - **always run `just lint`** and fix everything before considering the work done. It formats Go and Nix and regenerates the command reference, then checks the workflows with `actionlint`, the release configuration with `goreleaser check`, the shell scripts with `shellcheck`, and the Go with `golangci-lint` (CGO-free, so no C compiler needed). CI runs the same recipe and then fails on anything it rewrote, so leaving a generated file stale is the same failure as leaving a finding.
@@ -83,7 +89,7 @@ There are **two tiers, and one thing separates them: does answering the question
 - **`just test` is the user's.** It signs in all three accounts, including a paid one somebody actually uses, and runs the live suite one test at a time. An agent that wants it asks for it and says why.
 - **All nine `PROTON_CLI_TEST_*` variables are required**, and the suite refuses to start rather than skipping what it cannot reach. `tests/account` is the list.
 - **What limits how often it can be run is the sending allowance, not the clock.** The free accounts are capped at fifty messages an hour and a hundred and fifty a day. Two runs back to back are fine; four in an hour will start failing on the quota, and those failures look like bugs but are not. When in doubt, wait rather than debug.
-- **Single tests are cheaper** (`just test-one TestName`) when verifying one change.
+- **`just test-one PATTERN` is how a change is confirmed live.** It takes a regex, so one command covers every test a change touches; the whole suite is for changes under every command, and nothing else. What to suggest after implementing is spelled out under [Quality Gates](#quality-gates).
 - **`just test-report`** says where the time went and how deep each command's request graph was.
 - **`just docs`** regenerates the command reference from the tree; `just lint` runs it too, and CI fails on the diff. Inside an app's directory every markdown file except `README.md` is generated, one per collection - never edit one. Change the command's `Short`, `Long`, flag usage or `examples.go` entry.
 - **Unit test file naming**: name a unit test file after the source file it tests, with `_test.go` appended (e.g. `size.go` → `size_test.go`) - never after a symbol or after a file that doesn't exist. The live suite is one file per collection, named the way the command is: `mail_messages_test.go`, `pass_vaults_test.go`.

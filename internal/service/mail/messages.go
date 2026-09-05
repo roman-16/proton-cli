@@ -213,11 +213,10 @@ func senderAddress(sender map[string]any) string {
 // senderKeyRing fetches and caches the public key ring a message body's
 // signature is verified against.
 //
-// Every key Proton holds for the sender goes in, external ones included: a
-// message from outside Proton is signed with the key its sender published there,
-// and this is the only thing that would check it. That is what separates this
-// from keys.Published, which answers the narrower question of what a secret may
-// be sealed to.
+// Every key Proton holds for the sender goes in, retired ones included, because
+// an old message was signed with whichever key was current then - which is what
+// keys.Signing answers, and what separates it from keys.Published's narrower
+// question of what a secret may be sealed to.
 //
 // A key that cannot be reached or read is not a failure to show the message, so
 // it is recorded rather than raised. What it costs the reader is the difference
@@ -241,31 +240,9 @@ func (s *Service) senderKeyRing(ctx context.Context, email string) *pgp.KeyRing 
 }
 
 func (s *Service) fetchSenderKeyRing(ctx context.Context, email string) *pgp.KeyRing {
-	var r struct {
-		Address struct {
-			Keys []struct{ PublicKey string }
-		}
-	}
-	if err := s.C.Decode(ctx, proton.Request{
-		Method: "GET", Path: "/core/v4/keys/all", Query: proton.Query("Email", email),
-	}, &r); err != nil {
-		skip.Record(ctx, skip.KindKey, email, skip.Unreadable, err)
-		return nil
-	}
-	ring, err := pgp.NewKeyRing(nil)
+	ring, err := keys.Signing(ctx, s.C, email)
 	if err != nil {
 		skip.Record(ctx, skip.KindKey, email, skip.Unreadable, err)
-		return nil
-	}
-	for _, k := range r.Address.Keys {
-		key, err := pgp.NewKeyFromArmored(k.PublicKey)
-		if err != nil {
-			skip.Record(ctx, skip.KindKey, email, skip.Malformed, err)
-			continue
-		}
-		_ = ring.AddKey(key)
-	}
-	if ring.CountEntities() == 0 {
 		return nil
 	}
 	return ring

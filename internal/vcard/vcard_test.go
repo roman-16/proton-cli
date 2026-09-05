@@ -116,7 +116,7 @@ func TestDocumentMergesTheCardsIntoOne(t *testing.T) {
 	signed := "BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Jane Roe\r\nUID:u1\r\nEMAIL:jane@example.com\r\nEND:VCARD"
 	encrypted := "BEGIN:VCARD\r\nVERSION:4.0\r\nUID:u1\r\nTEL:+43 1 234567\r\nNOTE:Likes tea\r\nEND:VCARD"
 
-	doc := Document([]string{signed, encrypted})
+	doc := Document([]string{signed, encrypted}, nil)
 	for _, want := range []string{"FN:Jane Roe", "EMAIL:jane@example.com", "TEL:+43 1 234567", "NOTE:Likes tea"} {
 		if !strings.Contains(doc, want) {
 			t.Errorf("merged card is missing %q:\n%s", want, doc)
@@ -152,7 +152,7 @@ func TestParseDocumentsKeepsContactsApart(t *testing.T) {
 func TestSplitForStoragePutsIdentityInTheSignedCard(t *testing.T) {
 	card := "BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Jane\r\nUID:u1\r\nEMAIL:jane@example.com\r\n" +
 		"TEL:+43 1 234567\r\nBDAY:1990-01-31\r\nX-CUSTOM:whatever\r\nEND:VCARD"
-	signed, encrypted := SplitForStorage(card)
+	signed, encrypted, _ := SplitForStorage(card)
 
 	for _, want := range []string{"FN:Jane", "UID:u1", "EMAIL:jane@example.com"} {
 		if !strings.Contains(signed, want) {
@@ -175,7 +175,7 @@ func TestSplitForStoragePutsIdentityInTheSignedCard(t *testing.T) {
 
 // A contact with nothing private has no encrypted card to store.
 func TestAContactWithNothingPrivateHasNoEncryptedCard(t *testing.T) {
-	_, encrypted := SplitForStorage("BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Jane\r\nUID:u1\r\nEND:VCARD")
+	_, encrypted, _ := SplitForStorage("BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Jane\r\nUID:u1\r\nEND:VCARD")
 	if HasProperties(encrypted) {
 		t.Errorf("a contact with nothing private should have no encrypted card, got:\n%s", encrypted)
 	}
@@ -218,7 +218,7 @@ func TestRewritingAContactDoesNotGrowIt(t *testing.T) {
 		signed = BuildSigned(ParseSigned(joined))
 		encrypted = BuildEncrypted(ParseEncrypted(joined))
 
-		doc := Document([]string{signed, encrypted})
+		doc := Document([]string{signed, encrypted}, nil)
 		if got := len(Values(doc, "EMAIL")); got != 1 {
 			t.Fatalf("after %d edits the contact holds %d copies of its address:\n%s", round, got, doc)
 		}
@@ -268,8 +268,8 @@ func TestEnsureIdentityFillsInWhatProtonRequires(t *testing.T) {
 func TestDocumentAndSplitRoundTrip(t *testing.T) {
 	original := "BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Jane Roe\r\nUID:u1\r\n" +
 		"EMAIL:jane@example.com\r\nTEL:+43 1 234567\r\nNOTE:Likes tea\r\nEND:VCARD"
-	signed, encrypted := SplitForStorage(original)
-	back := Document([]string{signed, encrypted})
+	signed, encrypted, _ := SplitForStorage(original)
+	back := Document([]string{signed, encrypted}, nil)
 	for _, want := range []string{"FN:Jane Roe", "UID:u1", "EMAIL:jane@example.com", "TEL:+43 1 234567", "NOTE:Likes tea"} {
 		if !strings.Contains(back, want) {
 			t.Errorf("round trip lost %q:\n%s", want, back)
@@ -281,7 +281,7 @@ func TestDocumentAndSplitRoundTrip(t *testing.T) {
 // an EMAIL with no group has nowhere to hang them and the server refuses the
 // whole card. A file written anywhere but Proton ordinarily has no groups at all.
 func TestStoringACardGivesEveryAddressAGroup(t *testing.T) {
-	signed, _ := SplitForStorage(strings.Join([]string{
+	signed, _, _ := SplitForStorage(strings.Join([]string{
 		"BEGIN:VCARD", "VERSION:4.0", "FN:Jane Roe",
 		"EMAIL:jane@example.org", "EMAIL:jane@work.example", "END:VCARD",
 	}, "\r\n"))
@@ -306,7 +306,7 @@ func TestStoringACardGivesEveryAddressAGroup(t *testing.T) {
 // A card that already names its groups keeps them, since the settings stored
 // alongside refer to them by name.
 func TestStoringACardKeepsGroupsItAlreadyHas(t *testing.T) {
-	signed, _ := SplitForStorage(strings.Join([]string{
+	signed, _, _ := SplitForStorage(strings.Join([]string{
 		"BEGIN:VCARD", "VERSION:4.0", "FN:Jane Roe",
 		"item3.EMAIL:jane@example.org", "item3.X-PM-SCHEME:pgp-mime", "END:VCARD",
 	}, "\r\n"))
@@ -319,7 +319,7 @@ func TestStoringACardKeepsGroupsItAlreadyHas(t *testing.T) {
 // A group cannot be handed out twice: the second address needs one of its own,
 // and it must not be a group the card is already using for something else.
 func TestStoringACardResolvesAGroupClash(t *testing.T) {
-	signed, _ := SplitForStorage(strings.Join([]string{
+	signed, _, _ := SplitForStorage(strings.Join([]string{
 		"BEGIN:VCARD", "VERSION:4.0", "FN:Jane Roe",
 		"item1.EMAIL:jane@example.org", "item1.EMAIL:jane@work.example", "END:VCARD",
 	}, "\r\n"))
@@ -328,5 +328,113 @@ func TestStoringACardResolvesAGroupClash(t *testing.T) {
 	second := EmailGroup(signed, "jane@work.example")
 	if first == "" || second == "" || first == second {
 		t.Errorf("groups %q and %q; each address needs one of its own", first, second)
+	}
+}
+
+// ── groups ──
+//
+// Group membership lives on the label, and CATEGORIES is the copy of it a vCard
+// file carries. Export writes the copy from the labels beside each address, and
+// import reads it back onto the labels; the stored clear card holds the same
+// copy for Proton's own clients to read.
+
+func TestDocumentWritesEachAddressGroupsBesideIt(t *testing.T) {
+	signed := BuildSigned(Signed{Name: "Jane Roe", UID: "u1", Emails: []SignedEmail{
+		{Address: "jane@example.com"}, {Address: "jane@work.example", Kind: "work"},
+	}})
+	// A stored CATEGORIES is what the contact said when it was last edited, not
+	// what is true now, so it is dropped in favour of what the caller knows.
+	stale := "BEGIN:VCARD\r\nVERSION:4.0\r\nitem1.CATEGORIES:Old\r\nEND:VCARD"
+	doc := Document([]string{signed, stale}, Membership{
+		"jane@example.com": {"Work", "Climbing"},
+	})
+	if !strings.Contains(doc, "item1.CATEGORIES:Climbing,Work\r\n") {
+		t.Errorf("the first address's groups are not written beside it, sorted:\n%s", doc)
+	}
+	if strings.Contains(doc, "Old") {
+		t.Errorf("a stale stored CATEGORIES survived the export:\n%s", doc)
+	}
+	if strings.Contains(doc, "item2.CATEGORIES") {
+		t.Errorf("an address in no group was given a CATEGORIES:\n%s", doc)
+	}
+	// And a contact in no groups is exactly the document it always was.
+	if strings.Contains(Document([]string{signed}, nil), "CATEGORIES") {
+		t.Error("a contact in no group was given a CATEGORIES")
+	}
+}
+
+func TestSplitForStoragePutsGroupsInTheClearCard(t *testing.T) {
+	card := "BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Jane\r\nUID:u1\r\n" +
+		"item1.EMAIL:jane@example.com\r\nitem1.CATEGORIES:Work,Climbing\r\nTEL:+43 1 234567\r\nEND:VCARD"
+	signed, encrypted, clear := SplitForStorage(card)
+	if !strings.Contains(clear, "item1.CATEGORIES:Work,Climbing") {
+		t.Errorf("the clear card is missing the groups:\n%s", clear)
+	}
+	for name, text := range map[string]string{"signed": signed, "encrypted": encrypted} {
+		if strings.Contains(text, "CATEGORIES") {
+			t.Errorf("the %s card carries the groups, which are the clear card's:\n%s", name, text)
+		}
+	}
+	// A card that names no group has no clear card to store.
+	_, _, clear = SplitForStorage("BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Jane\r\nUID:u1\r\nEND:VCARD")
+	if HasProperties(clear) {
+		t.Errorf("a contact in no group should have no clear card, got:\n%s", clear)
+	}
+}
+
+// A CATEGORIES under an address's group is about that address; one under no
+// group is about every address, which is how other address books write it.
+func TestStoredMembershipIsByAddress(t *testing.T) {
+	cards := []string{
+		"BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Jane\r\nitem1.EMAIL:Jane@Example.com\r\nitem2.EMAIL:jane@work.example\r\nEND:VCARD",
+		"BEGIN:VCARD\r\nVERSION:4.0\r\nitem2.CATEGORIES:Work\r\nCATEGORIES:Friends\\, close,Friends\r\nEND:VCARD",
+	}
+	got := StoredMembership(cards...)
+	want := Membership{
+		"jane@example.com":  {"Friends, close", "Friends"},
+		"jane@work.example": {"Work", "Friends, close", "Friends"},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("StoredMembership = %v, want %v", got, want)
+	}
+	for addr, names := range want {
+		if strings.Join(got[addr], "|") != strings.Join(names, "|") {
+			t.Errorf("%s is in %v, want %v", addr, got[addr], names)
+		}
+	}
+	if StoredMembership("BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Jane\r\nEND:VCARD") != nil {
+		t.Error("a contact with no groups has a membership")
+	}
+}
+
+// The signed card numbers its addresses afresh on every write, so the clear card
+// is rebuilt from the membership by address rather than carried over: a
+// CATEGORIES left under item1 would otherwise follow the number, not the person.
+func TestBuildClearFollowsTheAddressNotTheNumber(t *testing.T) {
+	before := BuildSigned(Signed{Name: "Jane", UID: "u1", Emails: []SignedEmail{
+		{Address: "a@example.com"}, {Address: "b@example.com"},
+	}})
+	clear := BuildClear(before, Membership{"a@example.com": {"Work"}})
+	if !strings.Contains(clear, "item1.CATEGORIES:Work") {
+		t.Fatalf("the clear card does not put a@ in Work:\n%s", clear)
+	}
+	// The addresses change places, as `update --email b --email a` would have it.
+	after := BuildSigned(Signed{Name: "Jane", UID: "u1", Emails: []SignedEmail{
+		{Address: "b@example.com"}, {Address: "a@example.com"},
+	}})
+	rebuilt := BuildClear(after, StoredMembership(before, clear))
+	if !strings.Contains(rebuilt, "item2.CATEGORIES:Work") || strings.Contains(rebuilt, "item1.CATEGORIES") {
+		t.Errorf("the groups did not follow a@ to its new number:\n%s", rebuilt)
+	}
+}
+
+// Export and import are each other's inverse for groups as for everything else.
+func TestGroupsSurviveAnExportAndAnImport(t *testing.T) {
+	signed := BuildSigned(Signed{Name: "Jane Roe", UID: "u1", Emails: []SignedEmail{{Address: "jane@example.com"}}})
+	exported := Document([]string{signed}, Membership{"jane@example.com": {"Climbing", "Work"}})
+	back, _, clear := SplitForStorage(exported)
+	got := StoredMembership(back, clear)
+	if strings.Join(got["jane@example.com"], "|") != "Climbing|Work" {
+		t.Errorf("the groups did not survive the round trip: %v\n%s", got, exported)
 	}
 }

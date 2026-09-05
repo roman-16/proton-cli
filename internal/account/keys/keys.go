@@ -190,12 +190,18 @@ func Unlock(ctx context.Context, c *proton.Client, ask KeyPassword) (*Unlocked, 
 // open unlocks the hierarchy with a passphrase: the user keys, then the address
 // keys they hold the tokens for.
 //
-// Every address is tried and every failure is recorded, because "none of them
-// opened" is four different problems wearing one sentence - keys Proton has
-// retired, tokens this user key cannot decrypt, armour that will not parse, a
+// Every address is tried and every failure is written to the log, because "none
+// of them opened" is four different problems wearing one sentence - keys Proton
+// has retired, tokens this user key cannot decrypt, armour that will not parse, a
 // passphrase that is simply wrong - and they have four different answers. The
 // shape of the account is written down beside them, since a hierarchy in trouble
 // is a thing you diagnose by counting.
+//
+// Recorded and not counted. An address that will not open hides nothing by
+// itself: a listing of messages, contacts or vaults is not one address shorter
+// for it. What it hides is whatever was sealed to it, and that is counted where
+// it fails to open - the item, the share, the card - so counting the address as
+// well would say a listing is short when it is whole.
 func open(ctx context.Context, user *User, addrs []Address, skp string) (*Unlocked, error) {
 	userKR, err := unlockKeyRing(ctx, user.Keys, []byte(skp), nil)
 	if err != nil {
@@ -211,7 +217,8 @@ func open(ctx context.Context, user *User, addrs []Address, skp string) (*Unlock
 		addressKeys += len(a.Keys)
 		kr, err := unlockKeyRing(ctx, a.Keys, []byte(skp), userKR)
 		if err != nil {
-			skip.Record(ctx, skip.KindAddress, a.ID, reasonFor(err), nil)
+			slog.DebugContext(ctx, "keys: an address did not open",
+				"kind", string(skip.KindAddress), "reason", string(reasonFor(err)), "ref", a.ID)
 			continue
 		}
 		addrKRs[a.ID] = kr
@@ -552,20 +559,35 @@ var (
 	errKeyLocked          = errors.New("key did not unlock with the passphrase")
 )
 
+// unlockKeyRing opens every key of one owner that will open.
+//
+// Recorded and not counted. A key that stays shut is the ordinary shape of an
+// account that has changed its password or retired a key, and the ring still
+// opens on the others; whatever was sealed to the shut key alone is counted at
+// the moment it fails to open. The log keeps each key's own reason, which is
+// what tells a retired key from a hierarchy in trouble.
 func unlockKeyRing(ctx context.Context, keys []Key, passphrase []byte, userKR *pgp.KeyRing) (*pgp.KeyRing, error) {
 	kr, err := pgp.NewKeyRing(nil)
 	if err != nil {
 		return nil, err
 	}
-	// The reason the last key failed for, which stands for the address when the
-	// caller phrases one sentence about it. Every key's own reason is recorded as
-	// it happens, so nothing is lost by the summary being approximate: a reader
-	// with the log has the whole picture and a reader with the sentence has the
+	// The reason the last key failed for, which stands for the owner when the
+	// caller phrases one line about it. Every key's own reason is logged as it
+	// happens, so nothing is lost by the summary being approximate: a reader
+	// with the log has the whole picture and a reader with the line has the
 	// common case, which is an address with one key.
 	last := errNoActiveKey
+	shut := func(k Key, reason skip.Reason, cause error) {
+		detail := ""
+		if cause != nil {
+			detail = cause.Error()
+		}
+		slog.DebugContext(ctx, "keys: a key did not open",
+			"kind", string(skip.KindKey), "reason", string(reason), "ref", k.ID, "error", detail)
+	}
 	for _, k := range keys {
 		if k.Active == 0 {
-			skip.Record(ctx, skip.KindKey, k.ID, skip.Inactive, nil)
+			shut(k, skip.Inactive, nil)
 			continue
 		}
 		secret := passphrase
@@ -573,7 +595,7 @@ func unlockKeyRing(ctx context.Context, keys []Key, passphrase []byte, userKR *p
 			s, err := decryptToken(k.Token, k.Signature, userKR)
 			if err != nil {
 				last = errTokenUndecryptable
-				skip.Record(ctx, skip.KindKey, k.ID, skip.Untokenized, err)
+				shut(k, skip.Untokenized, err)
 				continue
 			}
 			secret = s
@@ -581,13 +603,13 @@ func unlockKeyRing(ctx context.Context, keys []Key, passphrase []byte, userKR *p
 		locked, err := pgp.NewKeyFromArmored(k.PrivateKey)
 		if err != nil {
 			last = errKeyMalformed
-			skip.Record(ctx, skip.KindKey, k.ID, skip.Malformed, err)
+			shut(k, skip.Malformed, err)
 			continue
 		}
 		unlocked, err := locked.Unlock(secret)
 		if err != nil {
 			last = errKeyLocked
-			skip.Record(ctx, skip.KindKey, k.ID, skip.Unlockable, err)
+			shut(k, skip.Unlockable, err)
 			continue
 		}
 		_ = kr.AddKey(unlocked)
@@ -629,6 +651,45 @@ func Unreadable(email string) error {
 		Hint("run `proton report`").Exit(errs.ExitBug)
 }
 
+// publicKey is one key Proton publishes for an address.
+type publicKey struct {
+	PublicKey string
+	Primary   int
+}
+
+// published asks Proton what keys it holds for somebody else's address.
+//
+// It answers two questions at once, and the caller needs them apart:
+//
+//	keys     Proton holds the address and these are its keys
+//	nil, nil Proton publishes no key, so the address is outside Proton
+//
+// Asking with InternalOnly makes Proton refuse an address it does not hold
+// rather than answer with an empty list, and that refusal is this question's
+// answer rather than a failure: whether having no key is a problem is the
+// caller's to decide, and a calendar attendee outside Proton is no problem at
+// all.
+func published(ctx context.Context, c proton.Doer, email string) ([]publicKey, error) {
+	var r struct {
+		Address struct{ Keys []publicKey }
+	}
+	q := proton.Query()
+	q.Set("Email", email)
+	// Internal only: an address outside Proton has no key here, and asking for
+	// external ones would return records that cannot be encrypted to or that
+	// nobody at Proton vouches for.
+	q.Set("InternalOnly", "1")
+	if err := c.Decode(ctx, proton.Request{
+		Method: "GET", Path: "/core/v4/keys/all", Query: q,
+	}, &r); err != nil {
+		if proton.NoSuchAddress(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return r.Address.Keys, nil
+}
+
 // Published returns the primary key Proton holds for somebody else's address.
 //
 // Handing a person something encrypted - a calendar's passphrase, a vault's key -
@@ -640,47 +701,23 @@ func Unreadable(email string) error {
 //	nil, nil Proton publishes no key, so the address is outside Proton
 //	nil, err there is a key and this build cannot read it
 //
-// Asking with InternalOnly makes Proton refuse an address it does not hold
-// rather than answer with an empty list, and that refusal is this question's
-// answer rather than a failure: whether having no key is a problem is the
-// caller's to decide, and a calendar attendee outside Proton is no problem at
-// all.
-//
 // Collapsing the last into the second is how a real Proton address comes to be
 // called an address outside Proton, which is false and points the reader at the
 // one thing that is not the problem.
 //
 // Only the primary key is returned: it is what Proton's own clients encrypt to,
 // and adding the others would mean sealing a secret under keys the owner may
-// have retired.
+// have retired. Signing is the other view of the same answer.
 func Published(ctx context.Context, c proton.Doer, email string) (*pgp.KeyRing, error) {
-	var r struct {
-		Address struct {
-			Keys []struct {
-				PublicKey string
-				Primary   int
-			}
-		}
-	}
-	q := proton.Query()
-	q.Set("Email", email)
-	// Internal only: an address outside Proton has no key here, and asking for
-	// external ones would return records that cannot be encrypted to.
-	q.Set("InternalOnly", "1")
-	if err := c.Decode(ctx, proton.Request{
-		Method: "GET", Path: "/core/v4/keys/all", Query: q,
-	}, &r); err != nil {
-		if proton.NoSuchAddress(err) {
-			return nil, nil
-		}
+	keys, err := published(ctx, c, email)
+	if err != nil {
 		return nil, err
 	}
-
 	kr, err := pgp.NewKeyRing(nil)
 	if err != nil {
 		return nil, err
 	}
-	for _, k := range r.Address.Keys {
+	for _, k := range keys {
 		if k.Primary != 1 {
 			continue
 		}
@@ -697,6 +734,50 @@ func Published(ctx context.Context, c proton.Doer, email string) (*pgp.KeyRing, 
 	}
 	if len(kr.GetKeys()) == 0 {
 		return nil, nil
+	}
+	return kr, nil
+}
+
+// Signing returns every key Proton holds for somebody else's address.
+//
+// Checking that a person signed something - a message, the key inside an
+// invitation - means checking against whichever of their keys they signed with,
+// and that may be one they have since retired. So where Published hands back the
+// one key to seal to, this hands back all of them, and answers the same three
+// questions the same way:
+//
+//	a ring   the keys a signature by this address is checked against
+//	nil, nil Proton publishes no key, so the address is outside Proton
+//	nil, err Proton publishes keys and this build can read none of them
+//
+// One key that will not parse among others that do is logged and left out,
+// since the signature may well be by one of the others.
+func Signing(ctx context.Context, c proton.Doer, email string) (*pgp.KeyRing, error) {
+	keys, err := published(ctx, c, email)
+	if err != nil {
+		return nil, err
+	}
+	if len(keys) == 0 {
+		return nil, nil
+	}
+	kr, err := pgp.NewKeyRing(nil)
+	if err != nil {
+		return nil, err
+	}
+	for _, k := range keys {
+		key, err := pgp.NewKeyFromArmored(k.PublicKey)
+		if err != nil {
+			// Recorded and not counted: a signature that does not check out is
+			// said on the screen by whoever asked, and this line is what tells a
+			// key that was never there from one this build could not read.
+			slog.DebugContext(ctx, "keys: a published key is not readable armour",
+				"signer", email, "error", err)
+			continue
+		}
+		_ = kr.AddKey(key)
+	}
+	if len(kr.GetKeys()) == 0 {
+		return nil, Unreadable(email)
 	}
 	return kr, nil
 }

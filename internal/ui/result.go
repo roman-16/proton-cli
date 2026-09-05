@@ -147,6 +147,13 @@ type ResultSpec struct {
 	// produces rather than the second of two. A dry run writes no record, so it
 	// reports as usual.
 	AnswerFollows bool
+
+	// Skipped is what the run could not read on the way to this change; see
+	// IncompleteSpec. It is filled in by kit from the invocation's tally rather
+	// than by the command, exactly as TableSpec.Skipped is, so that a change made
+	// on a short reading says so at every moment it is described - the preview,
+	// the question, the confirmation - instead of wherever somebody remembered.
+	Skipped IncompleteSpec
 }
 
 // Result reports a mutation. In text mode the new ID (if any) goes to Out and
@@ -164,8 +171,14 @@ func Result(u *UI, spec ResultSpec) error {
 		_, _ = fmt.Fprintf(u.Err, "%s\n", spec.dryRunLine())
 		if spec.Preview != nil {
 			_, _ = fmt.Fprintln(u.Err)
-			return spec.Preview(u.preview())
+			if err := spec.Preview(u.preview()); err != nil {
+				return err
+			}
+			if spec.Skipped.Count > 0 {
+				_, _ = fmt.Fprintln(u.Err)
+			}
 		}
+		u.Unread(spec.Skipped)
 		return nil
 	}
 
@@ -175,6 +188,7 @@ func Result(u *UI, spec ResultSpec) error {
 	if !u.Quiet {
 		_, _ = fmt.Fprintf(u.Err, "%s %s\n", u.errStyle.Paint(Success, GlyphSuccess), spec.message())
 	}
+	u.Unread(spec.Skipped)
 	return nil
 }
 
@@ -276,6 +290,13 @@ func Confirm(u *UI, spec ResultSpec) (bool, error) {
 	} else {
 		question = line + " " + question
 	}
+	// What the run could not read is said before the question, because it is
+	// part of what is being approved: a selection short of a folder is not the
+	// selection the table shows.
+	if spec.Skipped.Count > 0 {
+		u.Unread(spec.Skipped)
+		_, _ = fmt.Fprintln(u.Err)
+	}
 	return u.Confirm(question)
 }
 
@@ -293,6 +314,11 @@ func (s ResultSpec) object() map[string]any {
 	}
 	if s.Name != "" {
 		obj["name"] = s.Name
+	}
+	// Omitted when nothing was skipped, for the same reason the table envelope
+	// omits it: a consumer that never sees the key acted on a whole reading.
+	if s.Skipped.Count > 0 {
+		obj["skipped"] = s.Skipped.Count
 	}
 	for k, v := range s.Extra {
 		obj[k] = v
