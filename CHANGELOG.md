@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 Adding a version section here is what publishes a release, so this file is the one place a version is decided: see [Releases](CONTRIBUTING.md#releases). Versions that shipped before this file existed are on the [releases page](https://github.com/roman-16/proton-cli/releases).
 
+## [3.6.0] - 2026-09-07
+
+### Changed
+
+- **Breaking.** `--page-size 0` on a mail listing returns the whole folder rather than the first 25, and a size above 150 is filled rather than cut short. Affects `mail messages list`, `mail conversations list` and `mail drafts list`.
+- **Breaking.** `--limit 0` on a mail bulk verb lifts the cap rather than acting on the first 25; the default is still 150.
+- **Breaking.** A negative `--page`, `--page-size` or `--limit` is refused, as is `--page` beside `--page-size 0`.
+- A mail bulk verb's dry run and confirmation say when the selection filled `--limit` and more may exist.
+- `proton skill` states what the commands do and leaves how an agent should behave to you - whether it asks before a change is yours to set. It now covers paging and how an all-day event's dates read.
+
+### Fixed
+
+- `pass items revisions list` and `revisions get` reached only an item's 50 most recent revisions.
+
 ## [3.5.0] - 2026-09-05
 
 ### Added
