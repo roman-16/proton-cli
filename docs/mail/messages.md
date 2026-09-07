@@ -103,7 +103,7 @@ proton mail messages empty --folder spam
 
 Make messages delete themselves after a while, or stop them.
 
---in takes a duration and Proton stores the moment it lands on, so a message already counting down reports when rather than how long.
+--in takes a duration. A message already counting down reports the moment it expires rather than how long is left.
 
 ```
 proton mail messages expire [REF...]
@@ -557,7 +557,7 @@ proton mail messages unlabel 'Invoice #2291' --label Accounting
 
 Cancel a scheduled send.
 
-The message leaves the queue and returns to Drafts, keeping its ID - the same thing the web client's "Edit and reschedule" does. To change the time, cancel it and send again with --send-at.
+The message leaves the queue and returns to Drafts, keeping its ID. To change the time, cancel it and send again with --send-at.
 
 ```
 proton mail messages unschedule [REF...]

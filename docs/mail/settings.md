@@ -40,7 +40,7 @@ proton mail settings addresses list
 
 Set the display name recipients see and the signature appended to mail sent from this address.
 
-Proton stores signatures as HTML. Plain text is escaped and its newlines become line breaks; --html passes markup through untouched.
+A signature is stored as HTML. Plain text is escaped and its newlines become line breaks; --html passes markup through untouched.
 
 ```
 proton mail settings addresses update REF

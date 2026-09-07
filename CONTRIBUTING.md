@@ -6,6 +6,20 @@ Thanks for helping out. Issues, ideas, and pull requests are all welcome.
 
 proton-cli mirrors what the Proton **web clients** let a user do. If an action isn't possible in the official web UI, it doesn't belong here, even when an API endpoint for it exists. Web-client parity beats API completeness.
 
+## Design rules
+
+These hold across every command. `internal/cli/conformance_test.go` checks most of them; the rest are checked in review.
+
+- **One flag name, one meaning.** `--to` is a mail recipient, `--into` a container on Proton's side, `--dest` a local path, `--force` overwriting a local file, `--all` everything in scope. A new shared flag is declared in `flagMeanings` in the conformance test. Only the root owns single-letter forms, and there are five: `-p`, `-o`, `-n`, `-q`, `-y`.
+- **A password is never a flag value.** `argv` is readable through `ps` and survives in shell history and unit files, so a secret comes from `--password-file`, `--password-stdin`, `--secret-file NAME=FILE` or `--secret-stdin NAME`. A password chosen for somebody else gets its own name (`--link-password-file`, `--eo-password-file`) and is bounded here, not by the server.
+- **Three spellings of none.** A flag whose value can carry the word takes it (`--expires never`); a flag naming a state takes `--no-x`; a value that cannot carry the word, such as text or a password read from a file, gets `--clear-x` beside the flag it clears.
+- **The confirmation policy resolves strictest-wins.** Every other setting takes the nearest source; a `deny` cannot be lifted from the command line, so no policy can make proton less careful than it is unconfigured.
+- **A count is exact.** The number in a confirmation or a dry run is the number of things that will happen: a filter matching a folder and its contents selects the folder alone, a bulk verb acts on the IDs its selection resolved and reports what landed, and a series with no end has no occurrence count rather than a capped one.
+- **A page size is the user's, not Proton's.** `--page-size N` yields N rows whatever the endpoint serves per page, `0` yields everything, and `--limit` caps a bulk verb the same way.
+- **Times are read against one named zone**, settled once per run from `--zone`, `TZ`, the file or the system. A wall-clock reading that names two instants or none is refused with the offset form that settles it.
+- **A listing carries no secret.** Only `items get`, `revisions get`, `links get` and `pass export` decrypt secret fields; a list row is a type that cannot hold one.
+- **The reference is generated** from the tree, and the guides are written by hand in files of their own, so a page is never half of each.
+
 ## Getting set up
 
 The repository uses [devbox](https://www.jetify.com/devbox) and [direnv](https://direnv.net/) to pin the toolchain:
@@ -55,16 +69,9 @@ The two never share a file. A page that is half prose and half generated cannot 
 
 ### How to write it
 
-**Write for the person running the command, not for the person reviewing the design.** A `Short` names the command. A `Long` says the thing that would otherwise surprise them: a constraint, a default, a value list, a way it can go wrong.
+The writing rules are the `user-docs` skill, [`.agents/skills/user-docs/SKILL.md`](.agents/skills/user-docs/SKILL.md). It is written for an agent and holds for a person: what the reader wants, which page owns which topic, what never goes into a user-facing page, and how a command and its output are shown. Read it before writing a guide, a `Long`, or an example.
 
-Why the design is that way is worth writing down, but it belongs in `docs/about/why.md`, which a reader can skip. A `Long` that argues its own case is read by everybody, on a help screen and again in the reference, whether they wanted it or not.
-
-The same rules hold for the guides:
-
-- One idea per sentence. Aim for about 15 words, and no more than 26.
-- Put the answer first, the condition before the instruction, and the reason last or on the page for reasons.
-- Headings are what a reader would type into search, not a phrase that reads well in sequence.
-- A page's title, its sidebar label and its slug are the same words.
+Why a design is the way it is belongs in the commit message and, when contributors must keep it, under [Design rules](#design-rules). A user-facing page states what the tool does and refuses, never why.
 
 A help screen and a reference page agree about where a command is documented because `kit.Reference` answers for both. Adding a command therefore documents it in three places at once, and none of them by hand.
 

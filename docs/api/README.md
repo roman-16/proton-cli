@@ -22,6 +22,6 @@ Stdout carries the response and nothing else. A body that is not JSON - a proxy'
 
 The [API reference](https://proton-cli.lerchster.dev/api-reference/) documents Proton's endpoints: paths, methods, request and response schemas, and query parameters.
 
-It is generated from Proton's own web client source, and a weekly job keeps it in step with upstream.
+It is regenerated weekly from the Proton web clients' source.
 
 The spec behind it is served as [`openapi.yaml`](https://proton-cli.lerchster.dev/openapi.yaml), for a code generator or an HTTP client to read.

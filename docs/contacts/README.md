@@ -31,7 +31,7 @@ proton contacts create --name "Jane Roe" \
   --language de-AT --timezone Europe/Vienna --note "Likes tea"
 ```
 
-`--email`, `--phone`, `--address` and `--website` are repeatable and may say what kind they are, the way Proton's own editor offers one on each. A bare value states no kind, which vCard distinguishes from `other`.
+`--email`, `--phone`, `--address` and `--website` are repeatable and may say what kind they are. A bare value states no kind, which is not the same as `other`.
 
 | Field | Kinds |
 | --- | --- |
@@ -52,9 +52,9 @@ proton contacts groups add Team jane --email jane@acme.com    # only that one
 proton contacts groups remove Team jane
 ```
 
-With `--email`, exactly one contact may be named, because which address belongs to whom is a question only one contact can answer.
+With `--email`, exactly one contact may be named.
 
-A *listing* of groups cannot say who is in one, because Proton keeps membership on the address rather than on the group. `get` is what asks the addresses.
+A *listing* of groups does not show members. `get` does.
 
 ## Merge duplicates
 

@@ -63,10 +63,8 @@ var vaultTarget = target{
 	},
 	long: map[string]string{
 		"add": "Offer a vault to somebody.\n\n" +
-			"They are sent an invitation and see nothing until they take it. What is\n" +
-			"sent is the key that opens the vault, encrypted to their key and signed\n" +
-			"with yours - so it has to be another Proton account, because an address\n" +
-			"Proton holds no keys for has nothing to encrypt to.",
+			"They are sent an invitation and see nothing until they take it. Only\n" +
+			"another Proton account can be invited.",
 		"get": "Show who can open a vault.\n\n" +
 			"Members have accepted; the invited have not answered yet.",
 		"update": "Change what somebody may do with a vault.\n\n" +

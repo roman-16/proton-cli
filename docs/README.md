@@ -41,14 +41,13 @@ One guide each, task by task, with the reference for that app beside it.
 | Page | What it covers |
 | --- | --- |
 | [Troubleshooting](help/troubleshooting.md) | CAPTCHAs, expired sessions, rate limits |
-| [What it can't do](help/limits.md) | Known gaps, and why |
+| [What it can't do](help/limits.md) | Known gaps, and what to do instead |
 
 ## About
 
 | Page | What it covers |
 | --- | --- |
 | [FAQ](about/faq.md) | Is this official? How does it differ from Bridge? Is my password safe? |
-| [Security and encryption](about/security.md) | Sign-in, keys, what is encrypted with what, what is on disk |
-| [Why it works this way](about/why.md) | The reasoning behind the interface |
+| [Security](about/security.md) | What leaves your machine, what is on disk, how to reduce your risk |
 | [All commands](about/commands.md) | Every command in one table |
 | [`proton` itself](proton.md) | Updating, uninstalling, completions, changelog |

@@ -38,7 +38,7 @@ proton calendar settings calendars create --name Timetable --url https://example
 
 Delete calendars, and every event in them.
 
-Proton guards this behind an elevated session, so it asks for your password even when a saved session already exists. With no terminal to ask, pass --password-file or --password-stdin.
+Asks for your password even when you are signed in. With no terminal to ask, pass --password-file or --password-stdin.
 
 ```
 proton calendar settings calendars delete REF...
@@ -88,7 +88,7 @@ Holds `add`, `list` and `remove`.
 
 Give somebody a calendar.
 
-It has to be another Proton account: what travels is the key that opens the calendar, encrypted to their key.
+Only another Proton account can be given one.
 
 They are sent an invitation and see nothing until they accept. They can then read the calendar; --edit lets them change it too.
 

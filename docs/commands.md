@@ -43,6 +43,35 @@ Each word means one thing, everywhere it appears.
 
 To rename anything, use `update --name`. There is no `rename` verb.
 
+## Flags that mean the same thing everywhere
+
+| Flag | Always means |
+| --- | --- |
+| `--to` | An email recipient, or a filter matching one |
+| `--into` | A container on Proton's side: a folder, a vault, a calendar |
+| `--dest` | A path on your disk |
+| `--force` | Overwrite a local file that already exists |
+| `--all` | Everything in scope, rather than a subset |
+
+```bash
+proton mail messages send --to alice@proton.me       # a recipient
+proton mail messages list --to alice@proton.me       # matching a recipient
+proton mail messages move REF --into archive         # a container over there
+proton drive items download /report.pdf --dest .     # a path over here
+```
+
+Five flags have a single-letter form: `-p` profile, `-o` output, `-n` dry run, `-q` quiet, `-y` yes. They cluster, so `-qn` is a quiet dry run.
+
+## Saying none
+
+Removing an optional value takes one of three spellings, and each flag's help says which:
+
+| Spelling | Used when | Example |
+| --- | --- | --- |
+| The value itself | The word is one the flag already prints | `--expires never` |
+| `--no-x` | The flag names a state | `calendar events update REF --no-remind` |
+| `--clear-x` | The value cannot carry the word: text, or a password read from a file | `--clear-signature`, `--clear-link-password` |
+
 ## Getting help
 
 Every command documents itself and links to its own page:

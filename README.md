@@ -79,7 +79,7 @@ Everything is at **[proton-cli.lerchster.dev](https://proton-cli.lerchster.dev)*
 | Let an AI agent use it | [AI agents](docs/using/agents.md) - `proton skill` prints what it needs to know |
 | Look up a command | [All commands](docs/about/commands.md) |
 | Know whether this is the right tool | [FAQ](docs/about/faq.md) - including how it compares to Proton's own CLIs and to Bridge |
-| Understand the encryption | [Security and encryption](docs/about/security.md) |
+| Decide whether to trust it with your password | [Security](docs/about/security.md) |
 | Fix a failing command | [Troubleshooting](docs/help/troubleshooting.md) |
 
 [`CHANGELOG.md`](CHANGELOG.md) records what each version changed, and `proton changelog` prints it. Already installed? `proton update`.

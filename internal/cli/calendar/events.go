@@ -210,9 +210,8 @@ func seriesLabel(e calsvc.Event) string {
 // colorParagraph is what both commands say about --color, since an event's
 // colour behaves the same whether it is being given one or given another.
 const colorParagraph = "--color gives an event a color of its own; without one it is drawn in its\n" +
-	"calendar's. Once it has one there is no way back, in Proton's apps or here.\n" +
-	"A color of its own is a paid feature: Proton stores one for a free account,\n" +
-	"but its apps draw the calendar's."
+	"calendar's. Once it has one there is no way back. A color of its own is a paid\n" +
+	"feature: on a free account it is stored but not drawn."
 
 // details are the fields an event carries. create and update share them, so the
 // two commands cannot disagree about what an event is.

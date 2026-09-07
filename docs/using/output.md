@@ -21,7 +21,7 @@ ID        FROM              SUBJECT                DATE              FLAGS
 
 An empty collection prints nothing on stdout, so a redirect yields an empty file rather than a stray header. On stderr it says `No messages.`, or `No messages match.` when a filter was applied.
 
-Every `list` takes `--page` and `--page-size`. `--page-size 0` is the whole collection in one answer, however many requests that costs - mail is read from Proton page by page until it runs out, and `count` then equals `total`. Everything except mail also takes `--sort` and `--desc`. Each listing offers only the sort keys it has, and says so when given another. Mail comes back newest first, in Proton's own order.
+Every `list` takes `--page` and `--page-size`; `--page-size 0` returns the whole collection. Everything except mail also takes `--sort` and `--desc`, and each listing names the sort keys it accepts. Mail comes back newest first.
 
 ### Records
 
@@ -81,7 +81,7 @@ $ proton mail messages watch
 14:41  9xL4pQrT  Trailhead             Weekly digest
 ```
 
-In JSON, each line is one object, which `jq` reads without `--slurp`. There is no envelope and no footer ([why](../about/why.md#why-a-stream-has-no-footer)).
+In JSON, each line is one object, which `jq` reads without `--slurp`. There is no envelope and no footer.
 
 Ctrl+C or SIGTERM ends a watch quietly with exit `0`, so a service manager does not log a failure every time you stop it.
 
@@ -98,18 +98,22 @@ Anything judgeable from your command line alone is caught before signing in or c
 
 ## Exit codes
 
-| Code | Meaning |
-| --- | --- |
-| `0` | Success |
-| `1` | Something you passed was wrong |
-| `2` | Authentication failed |
-| `3` | Not found |
-| `4` | Ambiguous, or a conflict |
-| `5` | Network or server problem |
-| `6` | Refused by your [confirmation policy](confirmations.md#deny) |
-| `130` | Cancelled with Ctrl+C |
+The message says what happened and what to try; the code is what a script reads.
 
-[What to do about each one](../help/troubleshooting.md#what-the-exit-code-is-telling-you).
+| Code | Meaning | What to do |
+| --- | --- | --- |
+| `0` | Success | |
+| `1` | Something you passed was wrong | Fix the command. Nothing was sent |
+| `2` | Authentication failed | Sign in again, or fix the password |
+| `3` | Not found | Run the matching `list` |
+| `4` | Ambiguous, or a conflict | Narrow the term, or use the ID it printed |
+| `5` | Network or server problem, including a rate limit | Wait and retry |
+| `6` | Refused by your [confirmation policy](confirmations.md#deny) | Change the policy; nothing about the command was wrong |
+| `7` | A bug in proton | [Report it](../help/troubleshooting.md#reporting-a-bug). Nothing you typed caused it |
+| `8` | Not supported yet | See [What it can't do](../help/limits.md) |
+| `130` | Cancelled with Ctrl+C | |
+
+For a scheduled job the difference between `2` and `5` is the one that matters: `2` means fix the credential, `5` means come back later. Retrying never helps with `6` or `8`.
 
 ## JSON and YAML
 
@@ -166,7 +170,7 @@ The one exception is [`proton api`](../api/README.md), which passes Proton's res
 
 Colour marks the parts that carry a verdict: `✓` green, `!` yellow, `Error:` red, IDs magenta, `●` unread, `★` starred, and the signature line green, yellow or red. A `■` beside a label, folder, calendar or group is the exact colour Proton stores for it. Everything else stays plain.
 
-Shades come from your terminal's theme, not from proton ([why](../about/why.md#why-colour-is-asked-for-by-name)).
+Shades come from your terminal's theme, not from proton.
 
 Colour is off whenever output is piped or redirected, under `--output json` or `yaml`, and with `--no-color` or `NO_COLOR`. It never changes the layout, and it never carries meaning on its own: every verdict is spelled out in words.
 

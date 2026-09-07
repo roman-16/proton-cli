@@ -354,9 +354,8 @@ func calendarsDeleteCmd() *cobra.Command {
 		Use:   "delete REF...",
 		Short: "Delete calendars, and every event in them",
 		Long: "Delete calendars, and every event in them.\n\n" +
-			"Proton guards this behind an elevated session, so it asks for your password\n" +
-			"even when a saved session already exists. With no terminal to ask, pass\n" +
-			"--password-file or --password-stdin.",
+			"Asks for your password even when you are signed in. With no terminal to ask,\n" +
+			"pass --password-file or --password-stdin.",
 		Args: cobra.MinimumNArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			if err := reauth.Supply(c); err != nil {

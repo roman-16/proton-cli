@@ -46,8 +46,6 @@ This cannot be undone. Continue? [y/N]
 
 Anything but a plain `y` means no, including pressing Enter.
 
-[Why these two cases and no others](../about/why.md#why-it-asks-before-some-removals-and-not-others).
-
 ## In a script
 
 A script has nobody to ask, so the question becomes an error and nothing is removed. `--yes` answers it in advance.
@@ -155,4 +153,4 @@ Error: Deleting is turned off by your confirmation policy.
 
 The exit code is `6`. Nothing answers a deny: not `--yes`, not `--dry-run`, and not a `--confirm` on the command line. To lift it, edit the file that declared it.
 
-**A deny is not a security boundary.** It guards against a command run carelessly. Anything that can edit your config file can remove it. [The reasoning](../about/why.md#why-the-confirmation-policy-resolves-the-other-way).
+**A deny is not a security boundary.** It stops a command run carelessly. Anything running as you can edit the config file that declares it.

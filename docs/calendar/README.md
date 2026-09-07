@@ -69,13 +69,13 @@ proton calendar events create --title Deadline --start 2026-04-30T17:00 --durati
 proton calendar events update Dentist --color pacific
 ```
 
-Name one of Proton's twenty accent colours or give its hex value. Anything else is refused before the request goes out, and the refusal prints the palette.
+Name one of the twenty accent colours or give its hex value. Anything else is refused, and the refusal prints the palette.
 
 An edit that says nothing about the colour leaves it alone, and a colour reaches exactly what the reference names: one occurrence takes its own, `--onwards` colours that one and every later one, and the series' own reference colours all of it.
 
-A colour cannot be taken away once an event has one - it can only be changed. Proton has no value meaning "none", and its own apps offer no way back either.
+A colour cannot be taken away once an event has one - it can only be changed.
 
-A colour per event is a paid feature, and Proton enforces it when drawing rather than when storing. A free account's colour is stored, and `events get` reports it, but Proton's own apps draw the calendar's.
+A colour per event is a paid feature. On a free account the colour is stored and `events get` reports it, but Proton's apps draw the calendar's colour instead.
 
 ### Attendees
 
@@ -92,7 +92,7 @@ proton calendar events create --title Standup --start 2026-04-16T09:00 --duratio
   --rrule "FREQ=WEEKLY;COUNT=10" --remind 15m
 ```
 
-The series is anchored to the zone you are working in, so a 09:00 standup stays at 09:00 when the clocks change. One stored as a plain UTC instant would slide to 08:00.
+The series is anchored to the zone you are working in, so a 09:00 standup stays at 09:00 when the clocks change.
 
 ### Time zones
 
@@ -111,8 +111,6 @@ The four hours a year where a clock reading means two instants or none are refus
 $ proton calendar events create --title 'Night shift' --start 2026-10-25T02:30
 Error: 02:30 happens twice on 2026-10-25 in Europe/Vienna, when the clocks go back; say which one, as 2026-10-25T02:30:00+02:00 or 2026-10-25T02:30:00+01:00
 ```
-
-[Why an ambiguous time is refused](../about/why.md#why-an-ambiguous-time-is-refused-rather-than-resolved).
 
 ## Change or answer one
 
@@ -159,9 +157,9 @@ Fh3jAe…/9xL4pQ…@2026-04-16T09:00  2026-04-16  09:00  15m       Standup  Room
 …
 ```
 
-A series with no end says so instead of giving a number ([why](../about/why.md#why-an-occurrence-count-is-a-number-or-nothing)).
+A series with no end says so instead of giving a number.
 
-`--onwards` on the *first* occurrence is refused, because nothing would be left. Delete the series instead.
+`--onwards` on the *first* occurrence is refused. Delete the series instead.
 
 ## Reminders
 
@@ -201,7 +199,7 @@ curl -s https://example.com/team.ics | proton calendar events import -
 
 A recurring series is exported **once** with its rule rather than expanded, so another client reads it back as the same series. Reminders travel as `VALARM` components. An event that cannot be decrypted is left out rather than written as a stub.
 
-An event's own colour travels as a `COLOR` property, so a round trip keeps it. On the way in, a colour the file names in CSS - `tomato`, `#FF6347` - becomes the nearest of Proton's twenty accents, since those are the only colours it stores.
+An event's own colour travels as a `COLOR` property, so a round trip keeps it. On the way in, a colour the file names in CSS - `tomato`, `#FF6347` - becomes the nearest of the twenty accent colours.
 
 **An import is addressed by UID.** An event carries the UID of the event it is, so reading a file back changes that event rather than making a second one. Export, edit, import, and the calendar says what the file says.
 
@@ -225,7 +223,7 @@ Each calendar carries its own defaults for the events made in it.
 
 Colours have to be Proton accent colours.
 
-**Deleting a calendar asks for your password** even though you are signed in, because Proton guards that endpoint behind an elevated session. With no terminal, pass `--password-file` or `--password-stdin`.
+**Deleting a calendar asks for your password** even though you are signed in. With no terminal, pass `--password-file` or `--password-stdin`. The other commands that do this are listed in [Account](../account/README.md#commands-that-ask-for-the-password-again).
 
 ### Subscribe to a published calendar
 
@@ -245,7 +243,7 @@ proton calendar settings calendars share list Work
 proton calendar settings calendars share remove Work jane@proton.me
 ```
 
-**It only works with another Proton account.** A calendar is opened by a passphrase, and every member holds that passphrase encrypted to their own key. So sharing is not a permission Proton grants: it is handing somebody the key, encrypted so only they can read it and signed so they can tell it came from you. An address Proton holds no keys for has nothing to encrypt to.
+**It only works with another Proton account.**
 
 They see nothing until they accept, and until then `share list` shows them as `pending`. `share remove` withdraws an unanswered invitation or ends a membership.
 

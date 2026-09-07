@@ -31,7 +31,7 @@ Short IDs carry no ellipsis and never start with a dash, so they copy cleanly ou
 
 ## Tab completion
 
-With [completion installed](../install.md#shell-completions), a `REF` completes from what your listings showed you - the short ID, and the subject, name or address beside it.
+With [completion installed](../install.md#shell-completions), Tab completes every command, every flag, and the values a flag accepts: folder names, item types, output formats, setting keys. A `REF` completes from what your listings showed you - the short ID, and the subject, name or address beside it.
 
 ```console
 $ proton mail conversations list
@@ -42,7 +42,7 @@ $ proton mail conversations get ket⇥
 ketTSogw  -- Reservation Confirmation - Vero Sushi
 ```
 
-The subject completes too, because it is a reference just as much as the ID is. Your shell decides between them by what you have already typed:
+The subject completes too. Your shell decides between them by what you have already typed:
 
 ```console
 $ proton mail messages get Invo⇥
@@ -53,7 +53,7 @@ Jane Doe          -- QmxLp2Rt
 jane@example.com  -- QmxLp2Rt
 ```
 
-**It offers only what this machine has seen.** Completion reads the same table short IDs come from, so it never waits on Proton - and a collection you have not listed yet has nothing to offer, and says which listing would fill it:
+**It offers only what this machine has seen.** A collection you have not listed yet has nothing to offer, and says which listing would fill it:
 
 ```console
 $ proton pass items get ⇥

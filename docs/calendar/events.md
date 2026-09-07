@@ -14,7 +14,7 @@ Create an event.
 
 Without --end or --duration an event lasts as long as the calendar it is made in says a new event lasts, which `settings calendars get` shows; an all-day event lasts a day.
 
---color gives an event a color of its own; without one it is drawn in its calendar's. Once it has one there is no way back, in Proton's apps or here. A color of its own is a paid feature: Proton stores one for a free account, but its apps draw the calendar's.
+--color gives an event a color of its own; without one it is drawn in its calendar's. Once it has one there is no way back. A color of its own is a paid feature: on a free account it is stored but not drawn.
 
 ```
 proton calendar events create
@@ -180,7 +180,7 @@ Anything you do not mention is left alone, including the reminders and the recur
 
 A reference that names one occurrence of a recurring event changes only that occurrence. Add --onwards to change it and every later one, or drop the @ part of the reference to change the whole series, which --dry-run will show you before you do.
 
---color gives an event a color of its own; without one it is drawn in its calendar's. Once it has one there is no way back, in Proton's apps or here. A color of its own is a paid feature: Proton stores one for a free account, but its apps draw the calendar's.
+--color gives an event a color of its own; without one it is drawn in its calendar's. Once it has one there is no way back. A color of its own is a paid feature: on a free account it is stored but not drawn.
 
 ```
 proton calendar events update REF

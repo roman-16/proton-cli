@@ -68,7 +68,7 @@ Holds `add`, `get`, `remove` and `update`.
 
 Offer a vault to somebody.
 
-They are sent an invitation and see nothing until they take it. What is sent is the key that opens the vault, encrypted to their key and signed with yours - so it has to be another Proton account, because an address Proton holds no keys for has nothing to encrypt to.
+They are sent an invitation and see nothing until they take it. Only another Proton account can be invited.
 
 ```
 proton pass vaults share add REF EMAIL
@@ -149,7 +149,7 @@ proton pass vaults transfer Work jane@proton.me
 
 Rename a vault, or change how it looks.
 
-Icons and colors are numbers, because Pass shows them as an unnamed grid: --icon 7, --color 3.
+Icons and colors are numbers: --icon 7, --color 3.
 
 Anything you do not mention is left alone, including a description written in the Pass app.
 

@@ -44,7 +44,7 @@ The top level applies whichever profile you are acting as. `per-profile:` narrow
 | `no-update-check` | `PROTON_NO_UPDATE_CHECK` |
 | `confirm` | `--confirm`; `PROTON_CONFIRM` ([what it does](confirmations.md#making-more-commands-ask)) |
 
-`profile` only works at the top level, because proton has to know which profile you are acting as before it can pick the section for it. Everything else may appear in either place.
+`profile` only works at the top level. Everything else may appear in either place.
 
 **An unrecognised key is an error**, and so is a value of the wrong shape. Nothing runs until the file parses:
 
@@ -52,8 +52,6 @@ The top level applies whichever profile you are acting as. `per-profile:` narrow
 $ proton mail messages list
 Error: /home/you/.config/proton-cli/config.yaml: [4:1] unknown field "loglevel"
 ```
-
-This is deliberate. The file carries your confirmation policy, and a policy that quietly fails to load is one that fails open.
 
 ### Settings the file rejects
 
@@ -83,7 +81,7 @@ A file you name and that is not there is an error. The default one being absent 
 --flag  >  environment variable  >  per-profile section  >  top level  >  built-in default
 ```
 
-Which profile you are acting as is settled first, because the section depends on it:
+Which profile you are acting as is settled first:
 
 ```
 --profile  >  PROTON_PROFILE  >  top-level profile:  >  default
@@ -95,7 +93,7 @@ Which profile you are acting as is settled first, because the section depends on
 strongest of { built-in, top level, per-profile section, PROTON_CONFIRM, --confirm }
 ```
 
-So nothing you write can make proton less careful than it is with no configuration at all. [Why this one is inverted](../about/why.md#why-the-confirmation-policy-resolves-the-other-way).
+So nothing you write can make proton less careful than it is with no configuration at all.
 
 ### Turning a file setting off for one run
 
@@ -115,7 +113,7 @@ $ proton --quiet=false mail messages list
 | `PROTON_API_URL` | API base URL (default: `https://mail.proton.me/api`) |
 | `NO_COLOR` | Set to any value, even empty, to turn colour off ([no-color.org](https://no-color.org)) |
 | `FORCE_COLOR` | Set to any value, even empty, to paint even when the output is piped ([force-color.org](https://force-color.org)). Set beside `NO_COLOR`, this one wins |
-| `COLORTERM` | Set to `truecolor` or `24bit` if your terminal takes 24-bit colour and does not advertise it. Only affects how exactly a colour swatch is drawn ([why](../about/why.md#why-colour-is-asked-for-by-name)) |
+| `COLORTERM` | Set to `truecolor` or `24bit` if your terminal takes 24-bit colour and does not advertise it. Only affects how exactly a colour swatch is drawn |
 | `PROTON_NO_INPUT` | Set to any value, even empty, to never prompt. A missing credential becomes an error |
 | `PROTON_LOG_LEVEL` | `debug`, `info`, `warn` or `error` |
 | `PROTON_NO_LOG` | Set to any value, even empty, to write no diagnostic log ([what that is](#the-diagnostic-log)) |
@@ -137,9 +135,7 @@ Those are the Linux paths. macOS uses `~/Library/Application Support/proton-cli/
 
 ## The diagnostic log
 
-Every run writes what it did to `~/.config/proton-cli/logs/`, one file per day named for it, at full detail whatever `--log-level` says - that flag decides what reaches your screen, not what is recorded. The last **16 files** are kept.
-
-It exists so that `proton report` can tell a maintainer what happened without you having to reproduce it. **Addresses, IDs, filenames and search terms never enter it.** An address is written as a stand-in like `address:3f9c1e@proton.me` - the same address reads the same way in every line, so a reader can follow which one failed, and it cannot be turned back into an address by anybody. What is left is the shape of what ran: which command, which endpoints, which status codes, how long, what terminal it drew to, and what went wrong. Every record names the run it belongs to, so a day's file reads back as the runs that made it up.
+Every run writes what it did to `~/.config/proton-cli/logs/`, one file per day, at full detail whatever `--log-level` says; that flag decides what reaches your screen. `proton report` reads it. What it holds, what never enters it, and how to send it with a bug report: [Reporting a bug](../help/troubleshooting.md#reporting-a-bug).
 
 To write nothing at all:
 
@@ -176,6 +172,6 @@ Every command takes these.
 | `--no-log` | Write no diagnostic log for this run (env: `PROTON_NO_LOG`) |
 | `--verified TOKEN` | A human verification already solved, as the refusal printed it (env: `PROTON_VERIFIED`) |
 
-The five you type most have a single-letter form, and they cluster, so `-qn` is a quiet dry run. [Why only five](../about/why.md#why-one-flag-name-means-one-thing).
+The five you type most have a single-letter form, and they cluster, so `-qn` is a quiet dry run.
 
-`--api-url URL` points the CLI at a different API host. It works, but it is hidden from `--help` because it is for developing proton rather than using it.
+`--api-url URL` points the CLI at a different API host. It is for developing proton and is hidden from `--help`.

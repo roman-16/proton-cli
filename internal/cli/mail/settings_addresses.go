@@ -83,7 +83,7 @@ func addressesUpdateCmd() *cobra.Command {
 		Short: "Set an address's display name or signature",
 		Long: "Set the display name recipients see and the signature appended to mail sent\n" +
 			"from this address.\n\n" +
-			"Proton stores signatures as HTML. Plain text is escaped and its newlines become\n" +
+			"A signature is stored as HTML. Plain text is escaped and its newlines become\n" +
 			"line breaks; --html passes markup through untouched.",
 		Args: cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {

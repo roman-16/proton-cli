@@ -46,11 +46,9 @@ If you want mail in a graphical client, use Bridge. If you want mail in a pipeli
 
 Your password is never sent to Proton and never leaves your machine.
 
-Login uses [SRP](https://en.wikipedia.org/wiki/Secure_Remote_Password_protocol), a challenge-response exchange in which the server proves it knows your verifier while you prove you know your password. Neither side ever transmits it. The key password derived from it stays local and unlocks your PGP keys in memory.
+Login uses [SRP](https://en.wikipedia.org/wiki/Secure_Remote_Password_protocol), so the password itself is never transmitted. What is saved on disk is a session file that revoking the session makes useless, even to someone who copied it.
 
-proton writes one file per profile, mode `0600`. It holds your session tokens and your key password, encrypted with a random key that lives on Proton's servers rather than yours. So revoking the session from any Proton app makes a leaked copy of that file undecryptable.
-
-The honest caveat: **proton-cli is unaudited**, and it is a third-party program you are trusting with a credential. Read [Security and encryption](security.md) before you decide, and judge the source rather than this paragraph.
+The honest caveat: **proton-cli is unaudited**, and it is a third-party program you are trusting with a credential. Read [Security](security.md) before you decide, and judge the source rather than this paragraph.
 
 ## Can Proton ban my account for using it?
 
@@ -74,23 +72,22 @@ Proton sometimes asks for a CAPTCHA at login. proton prints the verification pag
 
 ## Can an AI agent use it?
 
-Yes, and proton tells it how. `proton skill` prints a skill in the [Agent Skills](https://agentskills.io) format - what the tool is for, the grammar, and the rules it should hold to - which you save wherever your agent reads skills:
+Yes, and proton tells it how. `proton skill` prints a skill in the [Agent Skills](https://agentskills.io) format, which you save wherever your agent reads skills:
 
 ```bash
 mkdir -p /path/to/skills/proton-cli
 proton skill > /path/to/skills/proton-cli/SKILL.md
 ```
 
-There is no MCP server, and the [AI agents](../using/agents.md) page says why, along with how to fence what an agent may do.
+There is no MCP server and none is planned: the CLI itself is the interface an agent uses. [AI agents](../using/agents.md) shows how to fence what one may do.
 
 ## Can I use two Proton accounts at once?
 
-Yes. Each account gets a named profile with its own session file, and they never mix:
+Yes. Each account gets a named profile, and they never mix:
 
 ```bash
 proton account login --profile work
 proton --profile work mail messages list
-export PROTON_PROFILE=work          # make it the default for this shell
 ```
 
 See [More than one account](../account/README.md#more-than-one-account).

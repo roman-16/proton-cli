@@ -80,7 +80,7 @@ proton drive items trash --scope /Build --pattern "*.tmp" --recursive
 proton drive items delete --larger-than 100MB --scope /Downloads --recursive --dry-run
 ```
 
-A filter that matches a folder and the files inside it selects the folder alone, because a folder is trashed, deleted, moved and copied whole. See [Filters and bulk changes](../using/filters.md).
+A filter that matches a folder and the files inside it selects the folder alone. See [Filters and bulk changes](../using/filters.md).
 
 A trashed item has no place in the tree, so it has no path. Address it by the ID its listing showed.
 
@@ -114,7 +114,7 @@ proton drive items share unlink /Documents/report.pdf
 The password that opens a public link is a secret, so it comes from a file or from standard input rather than from a flag value. Proton allows at most 50 characters.
 
 - `--expires never` makes an expiring link permanent.
-- `--clear-link-password` removes the password, because a value read from a file has no way of saying "none".
+- `--clear-link-password` removes the password.
 
 ### With named people
 

@@ -15,7 +15,7 @@ Two-factor code:  123456
 
 That is the whole setup. Signing in saves the session **and** unlocks your keys, so your password is needed once on this machine and not again.
 
-If there is no terminal to answer the prompts, name the account and point at the password ([never a flag value](about/why.md#why-a-password-is-never-a-flag-value)):
+If there is no terminal to answer the prompts, name the account and point at a file holding the password. A password is never a flag value:
 
 ```bash
 proton account login --user you@proton.me --password-file /run/secrets/proton
@@ -52,18 +52,7 @@ That grammar is the whole trick: [learn it once](commands.md) and you can guess 
 
 ## Turn on completion
 
-```bash
-# zsh
-proton completion zsh > "${fpath[1]}/_proton"
-
-# bash
-proton completion bash | sudo tee /etc/bash_completion.d/proton
-
-# fish
-proton completion fish > ~/.config/fish/completions/proton.fish
-```
-
-Completion covers every command and flag, and offers real values as you type: your folder names, item types, output formats and setting keys. Where a command takes a `REF` it offers back what your listings showed - see [naming what to act on](using/naming.md#tab-completion).
+Package installs come with it. For a script or manual install, run the line for your shell from [Shell completions](install.md#shell-completions). Tab then offers folder names, item types, and the IDs and subjects your last listing showed.
 
 ## Preview a change before making it
 

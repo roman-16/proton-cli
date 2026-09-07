@@ -367,9 +367,8 @@ func unscheduleCmd() *cobra.Command {
 		Use:   "unschedule [REF...]",
 		Short: "Cancel a scheduled send, returning the message to drafts",
 		Long: "Cancel a scheduled send.\n\n" +
-			"The message leaves the queue and returns to Drafts, keeping its ID - the same\n" +
-			"thing the web client's \"Edit and reschedule\" does. To change the time, cancel\n" +
-			"it and send again with --send-at.",
+			"The message leaves the queue and returns to Drafts, keeping its ID. To change\n" +
+			"the time, cancel it and send again with --send-at.",
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			ids, rows, err := scheduled(c, all)
 			if err != nil {
@@ -538,8 +537,8 @@ func expireCmd() *cobra.Command {
 		Use:   "expire [REF...]",
 		Short: "Make messages delete themselves after a while",
 		Long: "Make messages delete themselves after a while, or stop them.\n\n" +
-			"--in takes a duration and Proton stores the moment it lands on, so a\n" +
-			"message already counting down reports when rather than how long.",
+			"--in takes a duration. A message already counting down reports the moment\n" +
+			"it expires rather than how long is left.",
 		Args: cobra.ArbitraryArgs,
 		RunE: kit.Run([]kit.Step{
 			kit.StepSelection(f.set, filterHint, "a whole folder"), kit.StepExpand,

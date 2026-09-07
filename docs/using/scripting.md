@@ -153,7 +153,7 @@ proton calendar reminders watch --output json |
   while read -r line; do notify-send "Reminder" "$line"; done
 ```
 
-A watcher reports what happens while it is watching. It never replays what arrived before it started. It asks Proton for changes at the same interval the web client does.
+A watcher reports what happens while it is watching. It never replays what arrived before it started.
 
 ### Run a watch under systemd
 
@@ -285,46 +285,14 @@ alias() {
 alias newsletter-xyz
 ```
 
-## What to know before you automate
+## Before you automate
 
-### Credentials
-
-Attach an account to a profile with `account login`. Hand the password over with `--password-file`, from a path only your user can read. systemd's `LoadCredential=`, Kubernetes secrets and Docker secrets all give you one.
-
-An account in [two-password mode](../account/README.md#two-password-mode) needs `--second-password-file` beside it, from a second such path. A Pass protected with [an extra password](../pass/README.md#an-extra-password) needs `--extra-password-file` from a third.
-
-### Two-factor
-
-`--totp` is only consulted during a fresh login, and a security key can never answer for one - it needs a finger on it. For unattended jobs, sign in once interactively so the session file exists, then let the job reuse it.
-
-### Commands that ask for the password again
-
-Proton asks for your password again before `calendar settings calendars delete`, `mail messages expire`, `mail settings autoreply set`, `mail settings autoreply enable` and `mail settings autoreply disable` - it guards the autoresponder whichever way the switch goes. A session cannot answer for it, so those commands take `--password-file` and `--password-stdin` of their own.
-
-### Secrets you store
-
-`pass items create` and `pass items update` take the secret parts of an item from `--secret-file NAME=FILE` or `--secret-stdin NAME`, never from a flag value. `--generate-password` needs neither: it makes the password locally and prints it beside the new item's ID.
-
-### CAPTCHAs
-
-Proton can ask a job to prove a human is there, and only a human can answer. The job exits `2` with the verification page and a token. Solve the page, then repeat the command with `--verified TOKEN` or `PROTON_VERIFIED`.
-
-The proof outlives the run that asked for it; the challenge does not. So this is always two runs, never one. See [Troubleshooting](../help/troubleshooting.md#solving-a-captcha-in-a-script).
-
-### Quiet output
-
-`--quiet` silences the `✓` lines and progress bars, which is useful in cron.
-
-### Retries
-
-A 502 from Proton's edge, or a connection that fails, is waited out and retried - for anything that only reads, and for signing in. Nothing that changes something is ever sent twice.
-
-A failure that outlasts the waiting exits `5`, so a job can tell "Proton is having trouble, come back later" from "the password is wrong", which is exit `2`.
-
-### Rate limits
-
-Bulk commands page through Proton's API and respect its caps, which are 150 messages per page. Long-running loops should sleep between iterations.
-
-### Search lag
-
-Proton's index is eventually consistent, so a message you just sent may not appear in `list` for a few seconds. Act on the ID the command printed rather than searching again.
+- **Credentials.** Hand the password to `account login` with `--password-file`, from a path only your user can read; systemd's `LoadCredential=`, Kubernetes secrets and Docker secrets all give you one. A [two-password](../account/README.md#two-password-mode) account adds `--second-password-file`, a Pass [extra password](../pass/README.md#an-extra-password) adds `--extra-password-file`. See [Sign in without a terminal](../account/README.md#sign-in-without-a-terminal).
+- **Two-factor.** A code or a security key is only asked for at a fresh login. Sign in once at a terminal so the session file exists, then let the job reuse it.
+- **Commands that ask for the password again.** A few do, even with a session; they take `--password-file` and `--password-stdin` of their own. [The list](../account/README.md#commands-that-ask-for-the-password-again).
+- **Secrets you store.** `pass items create` and `pass items update` take them from `--secret-file NAME=FILE` or `--secret-stdin NAME`, never from a flag value. See [Secrets](../pass/README.md#secrets).
+- **CAPTCHAs.** A job that is asked for one exits `2` with the page and a token; solve the page, then run the command again with `--verified TOKEN`. See [Solving a CAPTCHA in a script](../help/troubleshooting.md#solving-a-captcha-in-a-script).
+- **Quiet output.** `--quiet` silences the `✓` lines and progress bars, which is what cron wants.
+- **Failures.** Exit `5` means come back later, `2` means fix the credential, and retrying never helps with `6` or `8`. See [Exit codes](output.md#exit-codes).
+- **Rate limits.** A loop that acts on many things should sleep between iterations. See [Everything started failing at once](../help/troubleshooting.md#everything-started-failing-at-once).
+- **Search lag.** A change reaches `list` a few seconds late. Act on the ID the command printed rather than searching for it again.

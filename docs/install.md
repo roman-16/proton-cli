@@ -90,7 +90,7 @@ proton completion zsh > "${fpath[1]}/_proton"
 proton completion fish > ~/.config/fish/completions/proton.fish
 ```
 
-Completion covers every command and flag, and offers real values as you type: your folder names, item types, output formats and setting keys. Where a command takes a `REF` it offers back what your listings showed - see [naming what to act on](using/naming.md#tab-completion).
+What Tab then offers is described under [Tab completion](using/naming.md#tab-completion).
 
 One script covers both command names, except in fish, which looks for a file named after the command being typed:
 
@@ -108,7 +108,7 @@ proton update --check     # only report whether an update exists
 proton update 2.5.0       # install a specific version
 ```
 
-An install that no package manager owns has nothing to tell it a release happened, so proton says so itself, **once a day**, after the command has finished:
+On an install no package manager owns, proton looks for a new release **once a day** and says so after the command has finished:
 
 ```console
 $ proton mail messages list
@@ -123,7 +123,7 @@ It stays quiet when a package manager owns this copy, when stderr is not a termi
 `proton changelog` prints what each release changed: the whole file, one version, or a range with `--since 2.3.0 --until 2.4.0`.
 
 > [!NOTE]
-> `proton update` downloads the binary and the `checksums.txt` it is checked against from the same release, and neither is signed. An install from a package manager is verified by the package manager. See [What it can't do](help/limits.md).
+> `proton update` checks the download against `checksums.txt` from the same release, and neither is signed. An install from a package manager is verified by the package manager.
 
 ## Uninstalling
 

@@ -31,7 +31,7 @@ proton drive items list /Build --pattern "*.tmp" --recursive     # see what matc
 proton drive items trash --scope /Build --pattern "*.tmp" --recursive   # act on it
 ```
 
-`list` takes a path as its argument. Bulk verbs take `--scope` instead, because their arguments name individual items.
+`list` takes a path as its argument. Bulk verbs take `--scope` instead; their arguments name individual items.
 
 You can also preview the change itself with [`--dry-run`](confirmations.md#preview-a-change-with---dry-run).
 
@@ -52,6 +52,6 @@ Try:   pass a REF, or a filter such as --unread, --starred, --from or --older-th
 
 Bulk verbs act on the IDs the selection resolved to, in batches of fifty, and report Proton's answer per item. Whatever was refused is named, and the count reports what actually landed.
 
-A filter that matches a folder and the files inside it selects the folder alone, because every verb acts on a folder whole.
+A filter that matches a folder and the files inside it selects the folder alone.
 
-**Drive filters run on your machine.** `--pattern` and the size and age filters walk the tree folder by folder, because Drive's index is built by the web client rather than by the server. Over a large tree that is one request per folder, so narrow it with `--scope`.
+**Drive filters walk the tree.** `--pattern` and the size and age filters visit every folder under the scope, so over a large tree narrow it with `--scope`.

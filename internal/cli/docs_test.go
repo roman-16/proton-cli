@@ -62,12 +62,8 @@ type enumeration struct {
 }
 
 var enumerations = []enumeration{{
-	what: "the commands Proton makes you prove yourself for again",
-	pages: []string{
-		doc("docs/account/README.md"),
-		doc("docs/using/scripting.md"),
-		doc("docs/help/troubleshooting.md"),
-	},
+	what:  "the commands Proton makes you prove yourself for again",
+	pages: []string{doc("docs/account/README.md")},
 	members: func(root *cobra.Command) []string {
 		var out []string
 		walkTree(root, func(c *cobra.Command) {

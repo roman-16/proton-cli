@@ -217,8 +217,7 @@ export default defineConfig({
         {
           items: [
             { label: "FAQ", slug: "about/faq" },
-            { label: "Security and encryption", slug: "about/security" },
-            { label: "Why it works this way", slug: "about/why" },
+            { label: "Security", slug: "about/security" },
             { label: "All commands", slug: "about/commands" },
             { label: "Changelog", slug: "changelog" },
             { label: "Proton API reference", link: "/api-reference/" },
@@ -236,6 +235,7 @@ export default defineConfig({
    * the page that answers it rather than on a 404.
    */
   redirects: {
+    "/about/why/": "/about/faq/",
     "/apps/account/": "/account/",
     "/apps/api/": "/api/",
     "/apps/calendar/": "/calendar/",
@@ -252,7 +252,7 @@ export default defineConfig({
     "/commands/pass/": "/pass/",
     "/commands/self/": "/proton/",
     "/configuration/": "/using/settings/",
-    "/design-notes/": "/about/why/",
+    "/design-notes/": "/about/faq/",
     "/faq/": "/about/faq/",
     "/getting-started/": "/first-commands/",
     "/how-it-works/": "/about/security/",

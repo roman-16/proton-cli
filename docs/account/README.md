@@ -30,7 +30,7 @@ proton account login
 
 It asks for your email, password and two-factor code, attaches the account to a profile, and saves the session. Every later command acts as whichever profile it names.
 
-Signing in also **unlocks your keys**, so your password is needed once per machine and not again. Your password itself never leaves your machine: it derives the keys that decrypt your data locally. See [Security and encryption](../about/security.md).
+Signing in also **unlocks your keys**, so your password is needed once per machine and not again. Your password never leaves your machine. See [Security](../about/security.md).
 
 Signing in again as the same account changes nothing, so an unattended job can run it ahead of its real work and recover on its own from a session that expired or was revoked:
 
@@ -67,15 +67,13 @@ Touch your security key.
 
 The key has to be one you plug in. On Windows the sign-in goes through Windows Hello, so a key built into the machine counts.
 
-A passkey living in a phone does not work, because reaching it needs the Bluetooth handoff only a browser performs. Sign in with a code instead.
+A passkey living in a phone does not work. Sign in with a code instead.
 
-**On Linux, a key needs udev rules** to be readable by anyone but root. Every distribution ships them with `libfido2` or its own FIDO package, and `login` says so if it finds a key it cannot open. See [Troubleshooting](../help/troubleshooting.md#a-security-key-that-nothing-finds).
+**On Linux, a key needs udev rules** to be readable by anyone but root. Every distribution ships them with `libfido2` or its own FIDO package. See [Troubleshooting](../help/troubleshooting.md#a-security-key-that-nothing-finds).
 
 ### Two-password mode
 
-Proton can keep the password that proves who you are apart from the one that opens your data.
-
-If your account is in [two-password mode](https://proton.me/support/switch-two-password-mode), `login` asks for the second password once it has signed in, exactly where Proton's own sign-in asks for it:
+If your account is in [two-password mode](https://proton.me/support/switch-two-password-mode), `login` asks for the second password once it has signed in:
 
 ```console
 $ proton account login
@@ -85,11 +83,11 @@ Second password:
 ✓ Signed in as alice@proton.me (profile "default").
 ```
 
-The second password is the one sealed into the session, so afterwards nothing is asked again. `proton account settings get` reports which mode the account is in.
+Afterwards nothing is asked again. `proton account settings get` reports which mode the account is in.
 
 ### A Pass extra password
 
-Pass can be protected with [a password of its own](https://proton.me/support/pass-extra-password). `login` does not ask for it, because only Pass needs it: the first `proton pass` command asks, and Proton then lets the session reach Pass for as long as it lives.
+Pass can be protected with [a password of its own](https://proton.me/support/pass-extra-password). `login` does not ask for it; the first `proton pass` command does, once per session.
 
 An unattended run has nobody to ask, so it hands the password over here instead:
 
@@ -103,7 +101,7 @@ On an account with no extra password, the flag is reported as unnecessary and th
 
 ### Sign in without a terminal
 
-A password is read from a pipe or a file, [never from a flag value](../about/why.md#why-a-password-is-never-a-flag-value).
+A password is read from a pipe or a file, never from a flag value.
 
 ```bash
 # from a pipe
@@ -125,7 +123,7 @@ proton account login --user alice@proton.me \
 
 ### Commands that ask for the password again
 
-These commands reach an endpoint Proton guards behind an elevated session, and ask for your password again at that moment:
+These commands ask for your password again even when you are signed in:
 
 - `calendar settings calendars delete`
 - `mail messages expire`
@@ -153,7 +151,7 @@ proton account logout --revoke     # also invalidate it at Proton
 proton account logout --all        # every profile on this machine
 ```
 
-Revoking is what makes a leaked copy of the session file worthless: the sealed key password cannot be opened without a live session.
+Revoking also makes a leaked copy of the session file worthless.
 
 ## More than one account
 
@@ -221,11 +219,7 @@ proton account sessions revoke --others     # everything but this one
 
 ## Where the session lives
 
-`account login` writes `~/.config/proton-cli/sessions/<profile>.json` with mode `0600` and reuses it, so later commands do not re-authenticate.
-
-It holds the session tokens and your key password, [encrypted with a key held on Proton's side](../about/security.md#what-is-stored-on-disk).
-
-Two things end a session: revoking it, and Proton expiring it. Either means signing in again.
+In a file per profile on this machine, listed under [Files on disk](../using/settings.md#files-on-disk); what protects it is under [Security](../about/security.md#what-is-stored-on-disk). A session ends when it is revoked or when Proton expires it, and either means signing in again.
 
 ## Settings
 
@@ -243,7 +237,7 @@ proton account settings set locale de_AT
 | `week-start` | `locale`, `monday` … `sunday` |
 | `crash-reports` · `telemetry` | `off`, `on` |
 
-Values can be given by name or by Proton's own number, and mistakes are caught before anything is sent.
+Values can be given by name or by number, and mistakes are caught before anything is sent.
 
 `get` shows more than `set` can change. Proton Sentinel, two-factor state, whether the account is in two-password mode, and recovery addresses are readable here but can only be changed at [account.proton.me](https://account.proton.me), along with your password, recovery secrets, billing and account deletion.
 

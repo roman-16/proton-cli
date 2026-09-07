@@ -96,8 +96,7 @@ func vaultsUpdateCmd() *cobra.Command {
 		Use:   "update REF",
 		Short: "Rename a vault, or change how it looks",
 		Long: "Rename a vault, or change how it looks.\n\n" +
-			"Icons and colors are numbers, because Pass shows them as an unnamed grid:\n" +
-			"--icon 7, --color 3.\n\n" +
+			"Icons and colors are numbers: --icon 7, --color 3.\n\n" +
 			"Anything you do not mention is left alone, including a description written\n" +
 			"in the Pass app.",
 		Args: cobra.ExactArgs(1),

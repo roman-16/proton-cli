@@ -45,8 +45,7 @@ func shareAddCmd() *cobra.Command {
 		Use:   "add REF EMAIL",
 		Short: "Give somebody a calendar",
 		Long: "Give somebody a calendar.\n\n" +
-			"It has to be another Proton account: what travels is the key that opens the\n" +
-			"calendar, encrypted to their key.\n\n" +
+			"Only another Proton account can be given one.\n\n" +
 			"They are sent an invitation and see nothing until they accept. They can then\n" +
 			"read the calendar; --edit lets them change it too.",
 		Args: cobra.ExactArgs(2),

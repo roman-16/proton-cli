@@ -1,6 +1,6 @@
 # Mail
 
-Read, send, search and organize Proton Mail from your terminal. Bodies are decrypted on your machine, and outgoing mail is encrypted and signed with your address key, exactly like the web client.
+Read, send, search and organize Proton Mail from your terminal. Bodies are decrypted on your machine, and outgoing mail is encrypted and signed with your address key.
 
 This page is what people actually do. For every command and flag, see the reference: [messages](messages.md), [conversations](conversations.md), [drafts](drafts.md), [settings](settings.md).
 
@@ -22,9 +22,7 @@ A `Signature:` line reports the verdict of the signature check against the sende
 
 ## Search
 
-Searching is `list` with a filter, because it is one request to Proton either way.
-
-`list` opens on the inbox, so **`--folder all` is what widens it to everything.**
+Searching is `list` with a filter. `list` looks in the inbox; **`--folder all` searches everything.**
 
 ```bash
 proton mail messages list --keyword invoice --folder all
@@ -34,7 +32,7 @@ proton mail messages list --subject "Q1 report" --folder archive
 
 `--from` and `--to` match addresses. `--keyword` also matches display names and body text.
 
-Proton's index lags a change by a few seconds ([why](../about/why.md#why-search-lags)).
+A change reaches `list` a few seconds late. To confirm one right away, `get` the ID the command printed.
 
 ## Send
 
@@ -47,7 +45,7 @@ echo "Deployed." | proton mail messages send --to me@proton.me --subject Deploy 
 
 `send` prints the new message ID on stdout, so `ID=$(proton mail messages send …)` works.
 
-**Your signature is applied automatically**, as in the web client: the address's own signature, plus Proton's *"Sent with Proton Mail secure email."* footer when your account has it enabled. Free accounts have that footer forced on.
+**Your signature is applied automatically**: the address's own signature, plus Proton's *"Sent with Proton Mail secure email."* footer when your account has it enabled. Free accounts have that footer forced on.
 
 - `--no-signature` leaves both out of one message.
 - `proton mail settings set pm-signature off` turns the footer off account-wide.
@@ -67,7 +65,7 @@ proton mail messages send … --eo-password-file /run/secrets/jane --eo-password
 pass show mail/jane | proton mail messages send … --eo-password-stdin
 ```
 
-The password a recipient outside Proton types is a secret, so it comes from a file or from standard input rather than from a flag value. Proton asks for at least eight characters.
+The password a recipient outside Proton types comes from a file or from standard input, never from a flag value. It needs at least eight characters.
 
 Such a message expires after 28 days whatever `--expires` says. `--eo-password-stdin` takes the stream for itself, so it cannot be combined with `--body -`.
 
@@ -128,7 +126,7 @@ proton mail messages delete --folder spam --all
 
 Add `--dry-run` to see the list first. `--limit` defaults to 150, which is Proton's per-page cap. See [Filters and bulk changes](../using/filters.md).
 
-**`empty` is not `delete --all`.** A filtered delete enumerates what it will touch and shows you. `empty` asks Proton to clear the folder without ever naming its contents, which is why it takes no filter and always asks.
+**`empty` is not `delete --all`.** A filtered delete shows what it will touch. `empty` clears the folder whole, takes no filter, and always asks.
 
 ```bash
 proton mail messages empty --folder trash
@@ -136,7 +134,7 @@ proton mail messages expire REF --in 7d        # delete itself later; --never st
 proton mail messages unsubscribe REF           # ask a mailing list to stop
 ```
 
-`unsubscribe` uses whatever the message offered: a `List-Unsubscribe` header, or the one-click form behind it. Proton sends the request, because Proton is the party the list already knows.
+`unsubscribe` uses whatever the message offered: a `List-Unsubscribe` header, or the one-click form behind it.
 
 ## Threads
 
@@ -148,7 +146,7 @@ proton mail conversations get --summary REF    # one line per message
 proton mail conversations snooze REF --until 3d
 ```
 
-Snooze works on **threads**, not messages, because that is what Proton snoozes: a conversation leaves the inbox as a whole and returns as a whole.
+Snooze works on **threads**, not messages: a conversation leaves the inbox as a whole and returns as a whole.
 
 `--until` takes a duration from now or a moment. A moment in the past is refused.
 
@@ -178,7 +176,7 @@ It takes the same filters as `trash` and `move`.
 - `--format mbox` concatenates everything into one file.
 - `--no-attachments` skips downloads, which is much faster for a large archive.
 
-**Exported files are not encrypted.** Their `DKIM-Signature` and `ARC-*` headers no longer verify either, since the body those headers signed was the encrypted one. The web client's export behaves the same way.
+**Exported files are not encrypted.** Their `DKIM-Signature` and `ARC-*` headers no longer verify either.
 
 Going the other way, `--eml` reads a file back into a draft or a send:
 
@@ -189,7 +187,7 @@ proton mail messages send --eml ./message.eml --to someone-else@proton.me
 
 Any flag you also pass overrides what the file says, and no signature is appended: the file is already a finished message.
 
-There is no way to place an old message into your archive. Proton exposes no endpoint that ingests one, for any client.
+There is no way to place an old message into your archive.
 
 ## Watch for new mail
 
@@ -219,11 +217,11 @@ Colours have to be one of Proton's 20 accent colours. An invalid one prints the 
 
 Deleting a folder or label asks first. The messages it held are not deleted.
 
-Folders carry a **NOTIFY** switch, which is whether mail landing there is worth telling you about. It shows in `folders list`, `--notify` sets it, and it decides what `messages watch` covers by default. Proton offers it on folders alone, so labels have neither.
+Folders carry a **NOTIFY** switch, which is whether mail landing there is worth telling you about. It shows in `folders list`, `--notify` sets it, and it decides what `messages watch` covers by default. Labels have no such switch.
 
 ## Filters
 
-Server-side filters, the same ones the web client creates. Describe one with `--if` and Proton writes the [Sieve](https://en.wikipedia.org/wiki/Sieve_(mail_filtering_language)) - the same script the web client's builder produces, so a filter made here opens in it.
+Server-side filters. Describe one with `--if`; it is stored as [Sieve](https://en.wikipedia.org/wiki/Sieve_(mail_filtering_language)) and opens in the web client's filter builder afterwards.
 
 ```bash
 proton mail settings filters create --name "Archive invoices" \
@@ -261,7 +259,7 @@ proton mail settings filters apply                       # every enabled filter
 proton mail settings filters reorder Newsletters Receipts Archive
 ```
 
-Order decides the outcome, because the first rule to file a message wins. `reorder` replaces the **whole** order and refuses a partial one.
+Order decides the outcome: the first rule to file a message wins. `reorder` replaces the **whole** order and refuses a partial one.
 
 ## Auto-reply
 
@@ -286,11 +284,11 @@ All of them take `--zone`, any IANA name, defaulting to your system's.
 
 Saving a schedule turns the auto-reply on. `disable` keeps it for later.
 
-Proton sends every auto-reply with the subject `Auto` and offers no way to change it. Auto-reply is a paid feature.
+Every auto-reply goes out with the subject `Auto`, which cannot be changed. Auto-reply is a paid feature.
 
 ## Who reaches the inbox
 
-Proton's settings page shows three lists - spam, block, allow - but they are one record with a destination on it, so `list` shows all three:
+Spam, block and allow are one list with a destination on each entry, so `list` shows all three:
 
 ```bash
 proton mail settings senders list
@@ -312,6 +310,6 @@ proton mail settings addresses update me@proton.me --display-name "Roman L."
 proton mail settings addresses update me@proton.me --signature - < signature.html --html
 ```
 
-Every key has a fixed set of values, checked before anything is sent. Values can be given by name or by Proton's own number.
+Every key has a fixed set of values, checked before anything is sent. Values can be given by name or by number.
 
 Signatures are stored as HTML. Plain text is escaped and its newlines become line breaks; `--html` passes markup through.

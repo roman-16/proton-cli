@@ -18,11 +18,11 @@ proton pass generate --words 4                  # or a passphrase
 
 `get` prints the item's fields, including the password and the TOTP **secret**, to stdout. Pass stores the secret rather than the code, so `totp` is what works the current code out, and it reports how long that code has left.
 
-**A listing carries no secret.** `items list`, `aliases list`, `trash list` and `shared list` show what an item is and where it lives, in every format including JSON. The password, the card, the keys and the hidden fields are what `items get` is for. ([Why](../about/why.md#why-a-listing-carries-no-secret).)
+**A listing carries no secret.** `items list`, `aliases list`, `trash list` and `shared list` show what an item is and where it lives, in every format including JSON. The password, the card, the keys and the hidden fields are what `items get` is for.
 
-`generate` reaches no account and needs no session. Its alphabet is Proton's own, which leaves out `i`, `o`, `l` and their capitals unless letters are all the password may contain. Every character kind you ask for is guaranteed to appear, and a length too short to hold one of each is refused.
+`generate` reaches no account and needs no session. The alphabet leaves out `i`, `o`, `l` and their capitals unless letters are all the password may contain. Every character kind you ask for is guaranteed to appear, and a length too short to hold one of each is refused.
 
-`--words N` makes a passphrase from Proton's own wordlist instead: capitalised, each word followed by a digit, joined by `--separator`.
+`--words N` makes a passphrase instead: capitalised words, each followed by a digit, joined by `--separator`.
 
 ## Create and edit
 
@@ -50,7 +50,7 @@ Types are `login` (the default), `note`, `credit-card`, `wifi`, `ssh-key`, `iden
 
 ### Secrets
 
-**A secret is never a flag value.** `argv` is readable by every user on the machine through `ps`, and it survives in shell history. So the secret parts of an item arrive from a file or from stdin, the way the account password does ([why](../about/why.md#why-a-password-is-never-a-flag-value)).
+**A secret is never a flag value.** The secret parts of an item come from a file or from stdin, the way the account password does.
 
 - `--secret-file NAME=FILE` can be given as often as you like.
 - `--secret-stdin NAME` reads one of them from the stream. Only one thing per run may read stdin.
@@ -81,7 +81,7 @@ Only the types whose Pass editor offers headings can carry them: `custom`, `ssh-
 proton pass items move github.com --into Work
 ```
 
-The item keeps its history and everything it holds, but gets a new ID, because an item in Pass is identified by its vault as well as itself. The new ID is printed on stdout.
+The item keeps its history and everything it holds, but gets a new ID, which is printed on stdout.
 
 ## Trash and delete
 
@@ -102,7 +102,7 @@ proton pass vaults update Work --description "Shared team logins" --icon 7 --col
 proton pass vaults delete Work               # by name, or by share ID
 ```
 
-Icons and colours are numbers, because Pass shows them as an unnamed grid.
+Icons and colours are numbers.
 
 Deleting a vault takes everything in it, so it names the vault and asks first.
 
@@ -174,11 +174,9 @@ proton pass items share get github.com          # members, invitations and links
 proton pass items share remove github.com jane@proton.me
 ```
 
-**It only works with another Proton account.** The key goes out encrypted to their key and signed with yours, and an address Proton holds no keys for has nothing to encrypt to.
+**It only works with another Proton account.**
 
-A vault is opened by its share key, and every item is sealed under that key. So sharing a vault means handing over the key itself, **and every rotation of it**, since an item made before the last rotation is still sealed under an older one.
-
-Sharing one item hands over that item's own key instead, so the person you share with can open it and nothing else in the vault.
+Sharing a vault shares everything in it. Sharing one item lets the person open that item and nothing else in the vault.
 
 `--access` is `viewer`, `editor` or `manager`. `share get` shows the people who accepted as members and the rest as invited. `update` and `remove` act on the address whichever it turns out to be.
 
@@ -201,7 +199,7 @@ proton pass sharing list            # items you share with other people
 proton pass vaults list             # your vaults, with how many members each has
 ```
 
-For a vault, you can read its name and item count before accepting, because the invitation carries the key that opens that much. What is *in* it stays sealed until you accept. An item offered on its own shows no preview at all.
+For a vault, you can read its name and item count before accepting; what is *in* it stays sealed until you accept. An item offered on its own shows no preview at all.
 
 An item somebody shared with you **is in no vault of yours**, so `items list` does not show it. `shared list` has it, addressed by the ID that listing shows, or by name.
 
@@ -234,11 +232,11 @@ proton pass import pass-backup.zip --passphrase-file ~/.backup-passphrase
 
 The archive is the one **Proton Pass itself writes**, so the app opens what this writes and this opens what the app wrote.
 
-It holds **the vaults you own**. A vault somebody shared with you is theirs to back up and stays out, as it does in Proton's own export. When something is left out, the command says how much on stderr.
+It holds **the vaults you own**. A vault somebody shared with you is theirs to back up and stays out. When something is left out, the command says how much on stderr.
 
-**Without a passphrase the archive holds every password in plain text**, and the command says so as it writes. With one, the document is encrypted to it and stored as `data.pgp`, which is what Proton's own importer looks for first.
+**Without a passphrase the archive holds every password in plain text**, and the command says so as it writes. With one, the document is encrypted to it and stored as `data.pgp`, which Proton Pass can import.
 
-The passphrase comes from a file, from stdin with `--passphrase-stdin`, or from a prompt. Never from a flag value ([why](../about/why.md#why-a-password-is-never-a-flag-value)).
+The passphrase comes from a file, from stdin with `--passphrase-stdin`, or from a prompt. Never from a flag value.
 
 Importing **adds** items. Nothing in an export says which existing item it was, so importing the same file twice puts the items in twice. Items land in the vault the file names, and a vault that is not there yet is made. Use `--dry-run` to list what would land, and where.
 
@@ -246,7 +244,7 @@ Aliases are the exception. An alias address belongs to the account Proton gave i
 
 ## An extra password
 
-Pass can be protected with [an extra password](https://proton.me/support/pass-extra-password) of its own, on top of your Proton account password. Proton then refuses every Pass request from a session that has not answered it, so the first `pass` command asks:
+Pass can be protected with [an extra password](https://proton.me/support/pass-extra-password) of its own, on top of your Proton account password. The first `pass` command in a session asks for it:
 
 ```console
 $ proton pass items list
@@ -269,7 +267,7 @@ proton account login --user me@proton.me \
 
 A `pass` command that needs it and finds nobody to ask says so and names that flag. Like every other secret it is read from a file, from stdin with `--extra-password-stdin`, or from a prompt.
 
-Proton counts wrong answers and ends the session after a few, so a wrong one is worth reading rather than retrying blindly.
+A few wrong answers end the session, so read a refusal rather than retrying blindly.
 
 Turning the extra password on or off is not something proton does. See [What it can't do](../help/limits.md).
 
