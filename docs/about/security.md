@@ -9,6 +9,7 @@ Signing in runs [Secure Remote Password](https://en.wikipedia.org/wiki/Secure_Re
 - API requests to `https://mail.proton.me/api` over HTTPS, authenticated with your session tokens.
 - Encrypted payloads you asked to create: an encrypted message, an encrypted file block, an encrypted event.
 - The SRP proof during login, which does not reveal your password.
+- Opening a public link with `--link` or `--shared` carries your session, so Proton knows which account opened it, and the owner sees one more visit.
 - Once a day, on an install no package manager owns, a request to GitHub asking which release is newest. It carries nothing about you or your account, and `PROTON_NO_UPDATE_CHECK` ends it ([Updating](../install.md#updating)).
 
 **What never leaves:** your password, your second password if you have one, your key password, and your private keys.
@@ -24,6 +25,10 @@ The paths are listed under [Files on disk](../using/settings.md#files-on-disk). 
 **The session file**, one per profile, mode `0600`, holds the session tokens and your key password. The key password is stored encrypted with a key that Proton holds and hands out only to a live session, so it is never on disk in cleartext, and **revoking the session** - `proton account logout --revoke`, or from any Proton app - makes a leaked copy undecryptable. The file still holds the session's refresh token, so it is not safe to share; revoking neutralises a leak, it does not excuse one.
 
 **The diagnostic log**, mode `0600`, holds what each run did, written so it can be handed to a stranger: addresses, IDs, paths, tokens, subjects, filenames, search terms and flag values never enter it. `--no-log` or `PROTON_NO_LOG` stops it being written ([Settings](../using/settings.md#the-diagnostic-log)).
+
+## A file downloaded from a public link
+
+Every file downloaded anywhere else is checked against a hash list its author signed. A public link is served without that signature, because whoever opens a link is outside the share and cannot hold the key that signed it. Each block is still checked against the hash list the link came with, so a file that arrives damaged is refused - but the list itself is Proton's word rather than the author's.
 
 ## Two-factor and security keys
 

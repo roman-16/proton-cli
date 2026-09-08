@@ -325,12 +325,20 @@ func TestXorVerifier(t *testing.T) {
 	}
 }
 
-// seqDoer is a proton.Doer that replays a scripted sequence of Decode outcomes,
+// seqDoer is a drive.Client that replays a scripted sequence of Decode outcomes,
 // so requestBlockLinks retry behaviour can be tested without the network.
 type seqDoer struct {
 	calls int
 	steps []doerStep
 	seen  []proton.Request
+}
+
+func (d *seqDoer) PublicLinkInfo(context.Context, string) (*proton.PublicLinkInfo, error) {
+	return nil, errors.New("PublicLinkInfo unused")
+}
+
+func (d *seqDoer) PublicLinkAuth(context.Context, string, *proton.PublicLinkInfo, string) (*proton.PublicLinkShare, error) {
+	return nil, errors.New("PublicLinkAuth unused")
 }
 
 type doerStep struct {

@@ -63,6 +63,11 @@ const (
 // for both (PASSWORD_WRONG_ERROR, packages/shared/lib/api/auth.ts).
 const invalidLoginCode = 8002
 
+// wrongLinkPasswordCode is what a public link answers when the password proved
+// against it is not the one it was made with (ERROR_CODE_INVALID_SRP_PARAMS,
+// packages/drive-store/store/_api/usePublicSession.tsx).
+const wrongLinkPasswordCode = 2026
+
 // Succeeded reports whether a Proton code is one of the ways of saying it worked:
 // done, one answer per item, or accepted and being carried out in the background.
 //
@@ -116,6 +121,13 @@ func DoesNotExist(err error) bool {
 		return true
 	}
 	return apiErr.HTTPStatus == 404
+}
+
+// WrongLinkPassword reports whether err is a public link refusing the password
+// it was opened with, which is the one failure a different password would fix.
+func WrongLinkPassword(err error) bool {
+	var apiErr *APIError
+	return errors.As(err, &apiErr) && apiErr.Code == wrongLinkPasswordCode
 }
 
 // AlreadyExists reports whether err is Proton refusing to write a second thing

@@ -148,3 +148,34 @@ func TestASecureLinkNeedsAnExpiry(t *testing.T) {
 	refuses(t, 1, []string{"pass", "links", "create", "anything", "--expires", "next tuesday"},
 		"--expires")
 }
+
+// A public link is a URL, and one that is not a Drive link is wrong before
+// anybody looks it up. The whole answer is on the command line: no session, no
+// request, and nothing for Proton to be asked about.
+func TestALinkThatIsNotADriveLinkIsRefused(t *testing.T) {
+	for _, link := range []string{
+		"https://example.com/somewhere",
+		"7X2K9M3N1P",
+		"not a url at all",
+		"https://drive.proton.me/urls/",
+	} {
+		refuses(t, 1, []string{"drive", "items", "list", "/", "--link", link},
+			"That is not a Proton Drive link")
+	}
+}
+
+// The two ways of naming a tree name different trees, so asking for both is a
+// contradiction rather than a preference.
+func TestNamingTwoDriveTreesAtOnceIsRefused(t *testing.T) {
+	refuses(t, 1, []string{"drive", "items", "list", "/", "--shared", "Project",
+		"--link", "https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL"},
+		"[link shared] were all set")
+}
+
+// A link's password is a secret like every other one here, so it is read from a
+// file or from stdin and never from a flag value.
+func TestALinkPasswordIsNotAFlagValue(t *testing.T) {
+	refuses(t, 1, []string{"drive", "items", "list", "/", "--link",
+		"https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL", "--link-password", "hunter2"},
+		"Unknown flag: --link-password")
+}

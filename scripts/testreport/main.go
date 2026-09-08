@@ -283,6 +283,15 @@ var opaque = regexp.MustCompile(`^[A-Za-z0-9_=-]{20,}$`)
 // them and about one in a hundred is all letters, so the words are named instead.
 var words = map[string]bool{"checkAvailableHashes": true}
 
+// holders are the segments whose next segment names a thing rather than
+// continuing the endpoint.
+//
+// A public link's token is ten characters of letters and digits, which nothing
+// can tell apart from a word, so it is recognised by where it sits instead. A
+// token left as itself would put one run's links in a file every run has to
+// agree with.
+var holders = map[string]bool{"urls": true}
+
 var numeric = regexp.MustCompile(`^[0-9]+$`)
 
 func printCoverage(runs []invocation) {
@@ -319,9 +328,12 @@ func printCoverage(runs []invocation) {
 }
 
 func template(path string) string {
-	segments := strings.Split(path, "/")
-	for i, s := range segments {
+	sent := strings.Split(path, "/")
+	segments := slices.Clone(sent)
+	for i, s := range sent {
 		switch {
+		case i > 0 && holders[sent[i-1]]:
+			segments[i] = "{id}"
 		case opaque.MatchString(s) && !words[s]:
 			segments[i] = "{id}"
 		case numeric.MatchString(s):

@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"log/slog"
 	"strconv"
 
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
@@ -79,7 +80,7 @@ func (r revision) author() string {
 // one: the name the bytes land under on disk is the item's, which is not a thing
 // a path always carries - the root of a shared file is `/`.
 func (s *Service) Download(ctx context.Context, res *Resolved, w io.Writer, opts DownloadOptions) error {
-	return s.downloadFile(ctx, res.ShareID, res.Link, res.NodeKR, activeRevisionID(res.Link), res.Link.Size, w, opts)
+	return s.downloadFile(ctx, res.dc, res.Link, res.NodeKR, activeRevisionID(res.Link), res.Link.Size, w, opts)
 }
 
 // DownloadRevision streams and decrypts one earlier version of a file.
@@ -88,7 +89,7 @@ func (s *Service) Download(ctx context.Context, res *Resolved, w io.Writer, opts
 // is the difference between wanting the bytes back and wanting them back in
 // place.
 func (s *Service) DownloadRevision(ctx context.Context, fr *FileRevision, w io.Writer, opts DownloadOptions) error {
-	return s.downloadFile(ctx, fr.res.ShareID, fr.res.Link, fr.res.NodeKR, fr.ID, fr.Size, w, opts)
+	return s.downloadFile(ctx, fr.res.dc, fr.res.Link, fr.res.NodeKR, fr.ID, fr.Size, w, opts)
 }
 
 // activeRevisionID is the version a file holds now, which is what a download
@@ -104,7 +105,7 @@ func activeRevisionID(link *Link) string {
 // downloadFile streams and decrypts one revision of a file link whose node key
 // ring (nodeKR) has already been unwrapped. The content session key belongs to
 // the file rather than to any one revision, so every version opens with it.
-func (s *Service) downloadFile(ctx context.Context, shareID string, link *Link, nodeKR *pgp.KeyRing,
+func (s *Service) downloadFile(ctx context.Context, dc *Context, link *Link, nodeKR *pgp.KeyRing,
 	revisionID string, size int64, w io.Writer, opts DownloadOptions) error {
 	if link.FileProperties == nil {
 		return fmt.Errorf("%s: no file properties", link.LinkID)
@@ -118,7 +119,7 @@ func (s *Service) downloadFile(ctx context.Context, shareID string, link *Link, 
 		return fmt.Errorf("get file session key: %w", err)
 	}
 
-	rev, err := s.revision(ctx, shareID, link.LinkID, revisionID)
+	rev, err := s.revision(ctx, dc, link.LinkID, revisionID)
 	if err != nil {
 		return err
 	}
@@ -126,7 +127,7 @@ func (s *Service) downloadFile(ctx context.Context, shareID string, link *Link, 
 	if err != nil {
 		return err
 	}
-	if err := s.verifyManifest(ctx, nodeKR, rev.author(), manifest, rev.ManifestSignature); err != nil {
+	if err := s.verifyManifest(ctx, dc, nodeKR, rev.author(), manifest, rev.ManifestSignature); err != nil {
 		return err
 	}
 
@@ -208,14 +209,15 @@ func (a *blockAuthor) verify(ctx context.Context, plain *pgp.PlainMessage, encSi
 }
 
 // revision reads every page of a revision's block list.
-func (s *Service) revision(ctx context.Context, shareID, linkID, revID string) (revision, error) {
+//
+// A public link serves the version its file holds now and no other, so there is
+// no revision to name there: what a reader of a link can have is what they would
+// get by opening it.
+func (s *Service) revision(ctx context.Context, dc *Context, linkID, revID string) (revision, error) {
 	const pageSize = 50
 	var out revision
 	for from := 1; ; {
-		q := proton.Request{
-			Method: "GET",
-			Path:   fmt.Sprintf("/drive/shares/%s/files/%s/revisions/%s", shareID, linkID, revID),
-		}
+		q := revisionRequest(dc, linkID, revID)
 		q.Query = make(map[string][]string)
 		q.Query.Set("FromBlockIndex", strconv.Itoa(from))
 		q.Query.Set("PageSize", strconv.Itoa(pageSize))
@@ -239,6 +241,17 @@ func (s *Service) revision(ctx context.Context, shareID, linkID, revID string) (
 			return revision{}, fmt.Errorf("revision block pagination did not advance past index %d", from)
 		}
 		from = last + 1
+	}
+}
+
+// revisionRequest asks for one version of a file, of whichever endpoint serves
+// the tree it is in.
+func revisionRequest(dc *Context, linkID, revID string) proton.Request {
+	if dc.Public() {
+		return proton.Request{Method: "GET", Path: fmt.Sprintf("/drive/urls/%s/files/%s", dc.Token, linkID)}
+	}
+	return proton.Request{
+		Method: "GET", Path: fmt.Sprintf("/drive/shares/%s/files/%s/revisions/%s", dc.ShareID, linkID, revID),
 	}
 }
 
@@ -286,7 +299,19 @@ func decodeSHA256(encoded string) ([]byte, error) {
 
 // verifyManifest checks the revision signature against the key of whoever
 // committed it, or against the node key for content uploaded anonymously.
-func (s *Service) verifyManifest(ctx context.Context, nodeKR *pgp.KeyRing, author string, manifest []byte, signature string) error {
+//
+// A public link is served without one. Whoever opens a link is outside the share
+// and cannot hold the key that signed it, so Proton sends no signature there and
+// its own clients skip the check for the same reason. Every block is still
+// checked against the hash list the revision came with, so what arrives is what
+// that list describes; the list itself is then Proton's word rather than the
+// author's, which is the one guarantee a link cannot carry.
+func (s *Service) verifyManifest(ctx context.Context, dc *Context, nodeKR *pgp.KeyRing, author string, manifest []byte, signature string) error {
+	if dc.Public() {
+		slog.DebugContext(ctx, "drive: a public link serves no manifest signature, so the block hashes are Proton's word",
+			"share", dc.Token)
+		return nil
+	}
 	if signature == "" {
 		return fmt.Errorf("the revision carries no manifest signature, so its content cannot be verified")
 	}

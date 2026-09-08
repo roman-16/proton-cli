@@ -106,7 +106,10 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton drive settings get`](../drive/settings.md#get) | Show the drive settings now in effect |
 | [`proton drive settings list`](../drive/settings.md#list) | List the drive settings that can be changed |
 | [`proton drive settings set`](../drive/settings.md#set) | Change one drive setting |
+| [`proton drive shared add`](../drive/shared.md#add) | Add a public link to what is shared with you |
+| [`proton drive shared leave`](../drive/shared.md#leave) | Give up an item somebody shared with you |
 | [`proton drive shared list`](../drive/shared.md#list) | List what other people have shared with you |
+| [`proton drive shared remove`](../drive/shared.md#remove) | Forget a public link you saved |
 | [`proton drive sharing list`](../drive/sharing.md#list) | List what you have shared |
 | [`proton drive trash empty`](../drive/trash.md#empty) | Delete everything in the trash, permanently |
 | [`proton drive trash list`](../drive/trash.md#list) | List what is in the trash |

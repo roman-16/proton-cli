@@ -16,21 +16,38 @@ import (
 	"github.com/roman-16/proton-cli/internal/proton"
 )
 
+// Client is what Drive asks of the transport: every request, and the handshake
+// that opens a public link, which is SRP and so lives beside signing in.
+type Client interface {
+	proton.Doer
+	PublicLinkInfo(ctx context.Context, token string) (*proton.PublicLinkInfo, error)
+	PublicLinkAuth(ctx context.Context, token string, info *proton.PublicLinkInfo, password string) (*proton.PublicLinkShare, error)
+}
+
 type Service struct {
-	C    proton.Doer
+	C    Client
 	keys keys.Get
 }
 
-func New(c proton.Doer, k keys.Get) *Service { return &Service{C: c, keys: k} }
+func New(c Client, k keys.Get) *Service { return &Service{C: c, keys: k} }
 
 type Context struct {
-	ShareID    string
-	ShareKR    *pgp.KeyRing
-	AddrKR     *pgp.KeyRing
-	AddrID     string
-	AddrEmail  string
-	VolumeID   string
-	RootLinkID string
+	ShareID string
+	// Token names the public link a tree hangs from, and is empty for a share.
+	// It is the other way a tree can be reached, so it is what decides where a
+	// request about this tree goes.
+	Token string
+	// URL is the link this tree was opened with, and LinkPassword the one its
+	// owner set on it. Both are empty for a share, and the password is empty for a
+	// link that has none.
+	URL          string
+	LinkPassword string
+	ShareKR      *pgp.KeyRing
+	AddrKR       *pgp.KeyRing
+	AddrID       string
+	AddrEmail    string
+	VolumeID     string
+	RootLinkID   string
 	// Type is the kind of share the tree hangs from, as Proton numbers them.
 	Type int
 	// RootName is what the tree is called: a computer's name, or the name of the
@@ -44,6 +61,22 @@ type Context struct {
 	rootLink *Link
 }
 
+// Public reports whether this tree is a public link, which can be read and not
+// written.
+//
+// Proton serves a link's tree under the token that names it, in place of the
+// share ID nobody outside the share has, so the two are read through endpoints
+// of their own.
+func (dc *Context) Public() bool { return dc.Token != "" }
+
+// handle names the tree in a log record, whichever way it is reached.
+func (dc *Context) handle() string {
+	if dc.Public() {
+		return dc.Token
+	}
+	return dc.ShareID
+}
+
 // RootKR is the key ring of the share's root.
 //
 // It is not the share key. The share key opens the root link's passphrase; the
@@ -53,7 +86,7 @@ type Context struct {
 func (dc *Context) RootKR() (*pgp.KeyRing, error) {
 	kr, err := unlockNode(dc.rootLink, dc.ShareKR, dc.AddrKR)
 	if err != nil {
-		return nil, fmt.Errorf("unlock the root of share %s: %w", dc.ShareID, err)
+		return nil, fmt.Errorf("unlock the root of share %s: %w", dc.handle(), err)
 	}
 	return kr, nil
 }
@@ -228,26 +261,40 @@ type Link struct {
 	XAttr            string
 	ShareIDs         []string
 	ShareUrls        []struct{ ShareURLID string }
-	FolderProperties *struct{ NodeHashKey string }
-	AlbumProperties  *struct{ NodeHashKey string }
+	FolderProperties *FolderProperties
+	AlbumProperties  *AlbumProperties
 	PhotoProperties  *struct {
 		Albums []struct{ AlbumLinkID string }
 		Tags   []int
 	}
-	FileProperties *struct {
-		ContentKeyPacket string
-		ActiveRevision   struct {
-			ID    string
-			Photo struct {
-				ContentHash          string
-				RelatedPhotosLinkIDs []string
-			}
+	FileProperties *FileProperties
+}
+
+// FolderProperties and AlbumProperties each carry the key the names of what is
+// inside are hashed under. Proton names them apart, so they are named apart.
+type (
+	FolderProperties struct{ NodeHashKey string }
+	AlbumProperties  struct{ NodeHashKey string }
+)
+
+// FileProperties is what a file has and a folder does not: the key packet its
+// content is encrypted under, and the version it holds now.
+type FileProperties struct {
+	ContentKeyPacket string
+	ActiveRevision   struct {
+		ID    string
+		Photo struct {
+			ContentHash          string
+			RelatedPhotosLinkIDs []string
 		}
 	}
 }
 
 type Resolved struct {
-	ShareID  string
+	// dc is the tree the path was resolved in. A resolved item means nothing
+	// outside it - its keys came from that tree, and so does the address every
+	// request about it is sent to.
+	dc       *Context
 	LinkID   string
 	ParentKR *pgp.KeyRing
 	NodeKR   *pgp.KeyRing
@@ -323,7 +370,7 @@ func (s *Service) resolveTo(ctx context.Context, dc *Context, path string) (*sto
 	// being assumed.
 	st := &stopped{
 		at: &Resolved{
-			ShareID: dc.ShareID, LinkID: dc.RootLinkID, ParentKR: dc.ShareKR,
+			dc: dc, LinkID: dc.RootLinkID, ParentKR: dc.ShareKR,
 			NodeKR: rootKR, Name: dc.RootName, IsFolder: dc.rootLink.Type == protonFolder,
 			Link: dc.rootLink,
 		},
@@ -351,7 +398,7 @@ func (s *Service) resolveTo(ctx context.Context, dc *Context, path string) (*sto
 // childNamed finds one named child of a folder, or nothing when the folder has
 // no such child. A name that will not decrypt is not the name being looked for.
 func (s *Service) childNamed(ctx context.Context, dc *Context, parent *Resolved, name string) (*Resolved, error) {
-	children, err := s.listRawChildren(ctx, parent.ShareID, parent.LinkID)
+	children, err := s.listRawChildren(ctx, dc, parent.LinkID)
 	if err != nil {
 		return nil, err
 	}
@@ -364,7 +411,7 @@ func (s *Service) childNamed(ctx context.Context, dc *Context, parent *Resolved,
 			return nil, fmt.Errorf("unlock %s: %w", name, err)
 		}
 		return &Resolved{
-			ShareID: parent.ShareID, LinkID: child.LinkID,
+			dc: dc, LinkID: child.LinkID,
 			ParentKR: parent.NodeKR, NodeKR: childKR, Name: name,
 			IsFolder: child.Type == protonFolder, Link: &child,
 		}, nil
@@ -447,19 +494,32 @@ func (s *Service) getLink(ctx context.Context, shareID, linkID string) (*Link, e
 // childrenPageSize is how many links one listing of a folder asks for.
 const childrenPageSize = 150
 
-func (s *Service) listRawChildren(ctx context.Context, shareID, linkID string) ([]Link, error) {
+func (s *Service) listRawChildren(ctx context.Context, dc *Context, linkID string) ([]Link, error) {
 	return proton.All(ctx, func(ctx context.Context, page int) ([]Link, bool, error) {
 		q := url.Values{}
 		q.Set("Page", fmt.Sprintf("%d", page))
 		q.Set("PageSize", fmt.Sprintf("%d", childrenPageSize))
+		req := childrenRequest(dc, linkID)
+		req.Query = q
 		var r struct{ Links []Link }
-		if err := s.C.Decode(ctx, proton.Request{
-			Method: "GET", Path: fmt.Sprintf("/drive/shares/%s/folders/%s/children", shareID, linkID), Query: q,
-		}, &r); err != nil {
+		if err := s.C.Decode(ctx, req, &r); err != nil {
 			return nil, false, err
 		}
 		return r.Links, proton.Full(r.Links, childrenPageSize), nil
 	})
+}
+
+// childrenRequest asks a folder what is in it, of whichever endpoint serves the
+// tree it is in.
+func childrenRequest(dc *Context, linkID string) proton.Request {
+	if dc.Public() {
+		return proton.Request{
+			Method: "GET", Path: fmt.Sprintf("/drive/urls/%s/folders/%s/children", dc.Token, linkID),
+		}
+	}
+	return proton.Request{
+		Method: "GET", Path: fmt.Sprintf("/drive/shares/%s/folders/%s/children", dc.ShareID, linkID),
+	}
 }
 
 func dirOf(path string) string {

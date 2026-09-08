@@ -253,6 +253,10 @@ The exception is the `■` beside a label, folder, calendar or group, which is t
 
 `--no-color` or `NO_COLOR` turns colour off entirely, and `--force-color` or `FORCE_COLOR` keeps it through a pipe - a pager, a multiplexer, a CI log that renders the escapes itself.
 
+## "The link does not exist any more, or has expired"
+
+A public link answers this when its owner removed it, when it passed the date it was set to expire, or when it reached the number of downloads its owner allowed. Ask whoever sent it for a new one.
+
 ## Still stuck
 
 ```console

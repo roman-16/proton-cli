@@ -306,7 +306,7 @@ func (s *Service) freeNames(ctx context.Context, parent *Resolved, hashKey []byt
 		var r struct{ AvailableHashes []string }
 		if err := s.C.Decode(ctx, proton.Request{
 			Method: "POST",
-			Path:   fmt.Sprintf("/drive/shares/%s/links/%s/checkAvailableHashes", parent.ShareID, parent.LinkID),
+			Path:   fmt.Sprintf("/drive/shares/%s/links/%s/checkAvailableHashes", parent.dc.ShareID, parent.LinkID),
 			Body:   map[string]any{"Hashes": hashes},
 		}, &r); err != nil {
 			return available{}, err
@@ -387,7 +387,7 @@ func (s *Service) startRevision(ctx context.Context, dc *Context, plan *UploadPl
 		var r struct{ Revision struct{ ID string } }
 		if err := s.C.Decode(ctx, proton.Request{
 			Method: "POST",
-			Path:   fmt.Sprintf("/drive/shares/%s/files/%s/revisions", link.ShareID, link.LinkID),
+			Path:   fmt.Sprintf("/drive/shares/%s/files/%s/revisions", link.dc.ShareID, link.LinkID),
 			Body:   map[string]any{"CurrentRevisionID": plan.from},
 		}, &r); err != nil {
 			return "", "", nil, nil, err
@@ -416,7 +416,7 @@ func (s *Service) startRevision(ctx context.Context, dc *Context, plan *UploadPl
 		File struct{ ID, RevisionID string }
 	}
 	if err := s.C.Decode(ctx, proton.Request{
-		Method: "POST", Path: "/drive/shares/" + parent.ShareID + "/files",
+		Method: "POST", Path: "/drive/shares/" + parent.dc.ShareID + "/files",
 		Body: map[string]any{
 			"Name": encName, "Hash": plan.hash,
 			"ParentLinkID":   parent.LinkID,

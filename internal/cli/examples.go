@@ -226,8 +226,12 @@ var examples = map[string][]string{
 		"proton drive items list /Documents",
 		"proton drive items list / --computer 'Work laptop'",
 		"proton drive items list / --shared Project",
+		"proton drive items list / --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL'",
 	},
-	"proton drive items get": {"proton drive items get /Documents/report.pdf"},
+	"proton drive items get": {
+		"proton drive items get /Documents/report.pdf",
+		"proton drive items get / --shared Q3-report.pdf",
+	},
 	"proton drive items upload": {
 		"proton drive items upload ./report.pdf /Documents",
 		"proton drive items upload --recursive ./project /Backup",
@@ -238,6 +242,8 @@ var examples = map[string][]string{
 		"proton drive items download /Documents/report.pdf --dest-dir .",
 		"proton drive items download /Documents/report.pdf --dest - > report.pdf",
 		"proton drive items download /report.pdf --shared Project --dest-dir .",
+		"proton drive items download / --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL' --dest-dir .",
+		"proton drive items download / --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL' --link-password-file /run/secrets/q3-link --dest-dir .",
 	},
 	"proton drive items update": {"proton drive items update /Documents/report.pdf --name summary.pdf"},
 	"proton drive items move": {
@@ -289,7 +295,16 @@ var examples = map[string][]string{
 	"proton drive items share resend": {
 		"proton drive items share resend /Reports jane@proton.me",
 	},
-	"proton drive shared list":  {"proton drive shared list"},
+	"proton drive shared list": {"proton drive shared list"},
+	"proton drive shared add": {
+		"proton drive shared add 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL'",
+		"proton drive shared add 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL' --link-password-file /run/secrets/q3-link",
+	},
+	"proton drive shared remove": {"proton drive shared remove Q3-report.pdf"},
+	"proton drive shared leave": {
+		"proton drive shared leave Project",
+		"proton drive shared leave Project --yes",
+	},
 	"proton drive sharing list": {"proton drive sharing list"},
 	"proton drive trash list": {
 		"proton drive trash list",

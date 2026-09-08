@@ -103,12 +103,22 @@ func TestManifestRefusesAHashItCannotUse(t *testing.T) {
 // A revision with no signature cannot be checked, and content that cannot be
 // checked is content that must not be written.
 func TestVerifyManifestRefusesARevisionWithNoSignature(t *testing.T) {
-	err := (&Service{}).verifyManifest(context.Background(), nil, "", []byte("manifest"), "")
+	err := (&Service{}).verifyManifest(context.Background(), &Context{}, nil, "", []byte("manifest"), "")
 	if err == nil {
 		t.Fatal("a revision with no manifest signature was accepted")
 	}
 	if !strings.Contains(err.Error(), "no manifest signature") {
 		t.Errorf("the refusal does not say why: %v", err)
+	}
+}
+
+// Behind a public link there is no signature to check, because the reader is
+// outside the share the signing key belongs to. Refusing the file over that
+// would refuse every file a link can offer.
+func TestVerifyManifestAcceptsAPublicLinkWithNoSignature(t *testing.T) {
+	err := (&Service{}).verifyManifest(context.Background(), &Context{Token: "7X2K9M3N1P"}, nil, "", []byte("manifest"), "")
+	if err != nil {
+		t.Errorf("a public link's content was refused for want of a signature: %v", err)
 	}
 }
 

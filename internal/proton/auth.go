@@ -231,17 +231,20 @@ func (c *Client) host() string {
 	return u.Hostname()
 }
 
-// srpExchange is one SRP exchange: the endpoint that answers it, who is proving
-// what, and what the proof carries alongside itself.
+// srpExchange is one SRP exchange: where the parameters come from, the endpoint
+// that answers the proof, who is proving what, and what the proof carries
+// alongside itself.
 type srpExchange struct {
+	// parameters fetches one set of SRP parameters. It is asked once per attempt,
+	// because the SRPSession a set carries is spent by the attempt that used it.
+	parameters func(context.Context) (*authInfo, error)
+
 	method string
 	path   string
 
 	username string
 	password []byte
 
-	// scope is the elevation the parameters are asked for, empty when signing in.
-	scope Scope
 	// extra is what the endpoint wants alongside the proof.
 	extra map[string]any
 	// secondFactor answers the challenge the parameters come back with, for the
@@ -273,7 +276,7 @@ func (c *Client) exchange(ctx context.Context, x srpExchange) (*Response, error)
 	return c.retrying(ctx,
 		Request{Method: x.method, Path: x.path, Repeatable: x.repeatable()},
 		func() (*Response, error) {
-			info, err := c.getAuthInfo(ctx, x.username, x.scope)
+			info, err := x.parameters(ctx)
 			if err != nil {
 				return nil, err
 			}
@@ -358,6 +361,14 @@ func (c *Client) createSession(ctx context.Context) (*authResp, error) {
 	return &r, nil
 }
 
+// accountParameters asks Proton what an account password is proved against, for
+// the scope the exchange is for.
+func (c *Client) accountParameters(username string, scope Scope) func(context.Context) (*authInfo, error) {
+	return func(ctx context.Context) (*authInfo, error) {
+		return c.getAuthInfo(ctx, username, scope)
+	}
+}
+
 // getAuthInfo fetches the SRP parameters for username.
 //
 // Intent identifies the sign-in flow, and ReauthScope tells the server which
@@ -391,7 +402,8 @@ func (c *Client) getAuthInfo(ctx context.Context, username string, reauthScope S
 // When hvToken/hvType are non-empty they're attached as HV headers on the proof.
 func (c *Client) loginSRP(ctx context.Context, username string, password []byte, hvToken, hvType string) (*authResp, error) {
 	resp, err := c.exchange(ctx, srpExchange{
-		method: "POST", path: "/core/v4/auth",
+		parameters: c.accountParameters(username, ""),
+		method:     "POST", path: "/core/v4/auth",
 		username: username, password: password,
 		extra:   map[string]any{"Username": username},
 		hvToken: hvToken, hvType: hvType,

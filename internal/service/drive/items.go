@@ -48,7 +48,7 @@ func (s *Service) List(ctx context.Context, dc *Context, path string) ([]Child, 
 	if !res.IsFolder {
 		return nil, errs.Problemf("%s is not a folder.", res.Describe(path))
 	}
-	raw, err := s.listRawChildren(ctx, res.ShareID, res.LinkID)
+	raw, err := s.listRawChildren(ctx, dc, res.LinkID)
 	if err != nil {
 		return nil, err
 	}
@@ -73,11 +73,11 @@ func (s *Service) Walk(ctx context.Context, dc *Context, path string) ([]Child, 
 	if !res.IsFolder {
 		return nil, errs.Problemf("%s is not a folder.", res.Describe(path))
 	}
-	return s.walk(ctx, res.ShareID, res.LinkID, res.NodeKR, strings.TrimRight(path, "/"))
+	return s.walk(ctx, dc, res.LinkID, res.NodeKR, strings.TrimRight(path, "/"))
 }
 
-func (s *Service) walk(ctx context.Context, shareID, linkID string, parentKR *pgp.KeyRing, prefix string) ([]Child, error) {
-	raw, err := s.listRawChildren(ctx, shareID, linkID)
+func (s *Service) walk(ctx context.Context, dc *Context, linkID string, parentKR *pgp.KeyRing, prefix string) ([]Child, error) {
+	raw, err := s.listRawChildren(ctx, dc, linkID)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +99,7 @@ func (s *Service) walk(ctx context.Context, shareID, linkID string, parentKR *pg
 				skip.Record(ctx, skip.KindFolder, r.LinkID, skip.Unlockable, err)
 				continue
 			}
-			nested, err := s.walk(ctx, shareID, r.LinkID, childKR, full)
+			nested, err := s.walk(ctx, dc, r.LinkID, childKR, full)
 			if err != nil {
 				skip.Record(ctx, skip.KindFolder, r.LinkID, skip.Unreadable, err)
 				continue
@@ -179,7 +179,7 @@ func folderOf(res *Resolved, path string) (*folder, error) {
 		return nil, err
 	}
 	return &folder{
-		shareID: res.ShareID, linkID: res.LinkID, path: path,
+		shareID: res.dc.ShareID, linkID: res.LinkID, path: path,
 		nodeKR: res.NodeKR, hashKey: hashKey,
 	}, nil
 }
@@ -236,7 +236,7 @@ func (s *Service) Rename(ctx context.Context, dc *Context, path, newName string)
 	if err != nil {
 		return err
 	}
-	parentLink, err := s.getLink(ctx, res.ShareID, res.Link.ParentLinkID)
+	parentLink, err := s.getLink(ctx, res.dc.ShareID, res.Link.ParentLinkID)
 	if err != nil {
 		return err
 	}
@@ -265,7 +265,7 @@ func (s *Service) rename(ctx context.Context, dc *Context, res *Resolved, newNam
 		return err
 	}
 	return s.C.Decode(ctx, proton.Request{
-		Method: "PUT", Path: fmt.Sprintf("/drive/shares/%s/links/%s/rename", res.ShareID, res.LinkID),
+		Method: "PUT", Path: fmt.Sprintf("/drive/shares/%s/links/%s/rename", res.dc.ShareID, res.LinkID),
 		Body: map[string]any{"Name": encName, "Hash": newHash, "OriginalHash": oldHash, "NameSignatureEmail": dc.AddrEmail},
 	}, nil)
 }
@@ -310,7 +310,7 @@ func (s *Service) Move(ctx context.Context, dc *Context, sourcePath string, dst 
 		return fmt.Errorf("re-encrypt passphrase: %w", err)
 	}
 	return s.C.Decode(ctx, proton.Request{
-		Method: "PUT", Path: fmt.Sprintf("/drive/shares/%s/links/%s/move", src.ShareID, src.LinkID),
+		Method: "PUT", Path: fmt.Sprintf("/drive/shares/%s/links/%s/move", src.dc.ShareID, src.LinkID),
 		Body: map[string]any{
 			"Name": encName, "Hash": newHash, "ParentLinkID": dst.LinkID,
 			"NodePassphrase": newPass, "NameSignatureEmail": dc.AddrEmail,

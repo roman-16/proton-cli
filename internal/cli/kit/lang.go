@@ -80,6 +80,7 @@ var Verbs = map[string]string{
 	"unlink":      "remove a public link",
 	"add":         "put a member into a container",
 	"remove":      "take a member out of a container",
+	"leave":       "give up access somebody granted you",
 	"accept":      "agree to an invitation",
 	"verify":      "confirm an address is yours",
 	"resend":      "send an invitation again",
@@ -134,8 +135,11 @@ var Verbs = map[string]string{
 //
 // `uninstall` belongs beside the two removals because it is the strictest case
 // of the same thing: afterwards there is no proton left to undo it with.
+//
+// `leave` is here for what it takes back: only the person who shared the thing
+// can grant it again, so nothing this account does undoes it.
 var Irreversible = map[string]bool{
-	"delete": true, "empty": true, "uninstall": true,
+	"delete": true, "empty": true, "leave": true, "uninstall": true,
 }
 
 // OnThisMachine marks a command that changes this computer rather than the
@@ -169,7 +173,7 @@ var Mutating = map[string]bool{
 	"send": true, "reply": true, "forward": true, "unschedule": true,
 	"read": true, "unread": true, "label": true, "unlabel": true, "star": true,
 	"unstar": true, "enable": true, "disable": true, "link": true,
-	"unlink": true, "add": true, "remove": true, "accept": true,
+	"unlink": true, "add": true, "remove": true, "leave": true, "accept": true,
 	"decline": true, "resend": true, "block": true, "allow": true,
 	"spam": true, "forget": true, "expire": true, "unsubscribe": true,
 	"snooze": true, "unsnooze": true, "apply": true, "reorder": true, "favorite": true, "unfavorite": true, "pin": true,
@@ -262,6 +266,7 @@ var Placeholders = map[string]Placeholder{
 	"REVISION_REF":      {Means: "a revision of the addressed file", Picks: PicksHolding},
 	"SHELL":             {Means: "a shell to write the script for"},
 	"SRC":               {Means: "a local file or directory to read"},
+	"URL":               {Means: "a public link, as it was sent to you"},
 	"VALUE":             {Means: "a setting value"},
 	"VERSION":           {Means: "a " + Program + " release, as X.Y.Z"},
 }

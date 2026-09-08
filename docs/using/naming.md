@@ -96,11 +96,12 @@ proton drive trash restore 7Kd91mQx
 proton drive photos download 3Ns8pT2v --dest-dir ./photos
 ```
 
-A computer and an item somebody shared with you each hold a tree of their own. Name the tree with `--computer REF` or `--shared REF`, and everything in it by path from its root:
+A computer, an item somebody shared with you and a public link somebody sent you each hold a tree of their own. Name the tree with `--computer REF`, `--shared REF` or `--link URL`, and everything in it by path from its root:
 
 ```bash
 proton drive items list /Documents --computer "Work laptop"
 proton drive items download /report.pdf --shared Project --dest-dir .
+proton drive items list / --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL'
 ```
 
 ## Full IDs that start with a dash

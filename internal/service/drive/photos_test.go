@@ -3,21 +3,44 @@ package drive
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 
 	"github.com/roman-16/proton-cli/internal/proton"
 )
 
-// stubDoer records the requests issued through the proton.Doer seam and replays
+// stubDoer records the requests issued through the drive.Client seam and replays
 // canned JSON bodies, so wire-format contracts can be asserted without the API.
 //
 // routes answers one request each, keyed by method and path; respBody answers
 // whatever routes does not name, which is all a test of a single request needs.
+// linkInfo and linkShare stand in for the SRP handshake, which is proved against
+// Proton and cannot be canned.
 type stubDoer struct {
-	reqs     []proton.Request
-	respBody []byte
-	routes   map[string]string
+	reqs      []proton.Request
+	respBody  []byte
+	routes    map[string]string
+	linkInfo  *proton.PublicLinkInfo
+	linkShare *proton.PublicLinkShare
+	proved    string
+}
+
+func (s *stubDoer) PublicLinkInfo(_ context.Context, token string) (*proton.PublicLinkInfo, error) {
+	s.reqs = append(s.reqs, proton.Request{Method: "GET", Path: "/drive/urls/" + token + "/info"})
+	if s.linkInfo == nil {
+		return nil, errors.New("no public link info canned")
+	}
+	return s.linkInfo, nil
+}
+
+func (s *stubDoer) PublicLinkAuth(_ context.Context, token string, _ *proton.PublicLinkInfo, password string) (*proton.PublicLinkShare, error) {
+	s.reqs = append(s.reqs, proton.Request{Method: "POST", Path: "/drive/urls/" + token + "/auth"})
+	s.proved = password
+	if s.linkShare == nil {
+		return nil, errors.New("no public link share canned")
+	}
+	return s.linkShare, nil
 }
 
 func (s *stubDoer) body(r proton.Request) []byte {

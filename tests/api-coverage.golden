@@ -9,6 +9,7 @@ DELETE /drive/shares/{id}/files/{id}/revisions/{id}
 DELETE /drive/shares/{id}/urls/{id}
 DELETE /drive/v2/shares/{id}/invitations/{id}
 DELETE /drive/v2/shares/{id}/members/{id}
+DELETE /drive/v2/urls/{id}/bookmark
 DELETE /drive/volumes/{id}/trash
 DELETE /mail/v4/attachments/{id}
 DELETE /mail/v4/filters/{id}
@@ -58,6 +59,11 @@ GET /drive/shares/{id}/folders/{id}/children
 GET /drive/shares/{id}/links/{id}
 GET /drive/shares/{id}/links/{id}/revisions/{id}/verification
 GET /drive/shares/{id}/urls
+GET /drive/urls/{id}
+GET /drive/urls/{id}/files/{id}
+GET /drive/urls/{id}/folders/{id}/children
+GET /drive/urls/{id}/info
+GET /drive/v2/shared-bookmarks
 GET /drive/v2/shares/invitations
 GET /drive/v2/shares/invitations/{id}
 GET /drive/v2/shares/{id}/invitations
@@ -114,10 +120,12 @@ POST /drive/shares/{id}/folders
 POST /drive/shares/{id}/links/fetch_metadata
 POST /drive/shares/{id}/links/{id}/checkAvailableHashes
 POST /drive/shares/{id}/urls
+POST /drive/urls/{id}/auth
 POST /drive/v2/shares/invitations/{id}/accept
 POST /drive/v2/shares/invitations/{id}/reject
 POST /drive/v2/shares/{id}/invitations
 POST /drive/v2/shares/{id}/invitations/{id}/sendemail
+POST /drive/v2/urls/{id}/bookmark
 POST /drive/v2/volumes/{id}/trash/delete_multiple
 POST /drive/v2/volumes/{id}/trash_multiple
 POST /drive/volumes/{id}/links/{id}/copy

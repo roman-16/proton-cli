@@ -42,7 +42,7 @@ These are the listings that can be narrowed, and what narrows them. The same fla
 - `proton calendar events list --calendar string --end string --start string`
 - `proton calendar reminders list --calendar string --end string --start string`
 - `proton contacts list --desc --keyword string --page int --page-size int --sort string`
-- `proton drive items list [PATH] --computer string --desc --larger-than string --newer-than string --older-than string --page int --page-size int --pattern string --recursive --shared string --smaller-than string --sort string`
+- `proton drive items list [PATH] --computer string --desc --larger-than string --link string --link-password-file string --link-password-stdin --newer-than string --older-than string --page int --page-size int --pattern string --recursive --shared string --smaller-than string --sort string`
 - `proton drive items revisions list PATH --computer string --shared string`
 - `proton drive photos list --album string --tag string`
 - `proton drive trash list --desc --page int --page-size int --sort string`
@@ -137,7 +137,7 @@ One line per group, with the verbs under it. Arguments, flags and examples are i
 - `proton drive photos` - Your photo library: delete, download, favorite, list, trash, unfavorite, upload
 - `proton drive photos albums` - Photo albums: add, create, delete, list, remove, update
 - `proton drive settings` - How Drive behaves: get, list, set
-- `proton drive shared` - Files and folders other people have shared with you: list
+- `proton drive shared` - Files and folders other people have shared with you: add, leave, list, remove
 - `proton drive sharing` - What you have shared with other people: list
 - `proton drive trash` - Items you have removed but not yet deleted: empty, list, restore
 

@@ -85,6 +85,7 @@ var (
 	Unlinked     = Action{"Removed", "remove", "unlinked", Ordinary}
 	Added        = Action{"Added", "add", "added", Ordinary}
 	Removed      = Action{"Removed", "remove", "removed", Ordinary}
+	Left         = Action{"Left", "leave", "left", Forever}
 	Accepted     = Action{"Accepted", "accept", "accepted", Ordinary}
 	Declined     = Action{"Declined", "decline", "declined", Ordinary}
 	Favorited    = Action{"Favorited", "favorite", "favorited", Ordinary}
@@ -114,7 +115,7 @@ var Actions = []Action{
 	Created, Updated, Deleted, Trashed, Restored, Emptied, Uninstalled, Moved,
 	Copied, Uploaded, Downloaded, Exported, Imported, Merged, Resent, Verified, Blocked, Allowed, Filed, Forgot, Unsubscribed, Snoozed, Unsnoozed, Applied, Reordered, Sent, Scheduled, Unscheduled, Saved,
 	Labelled, Unlabelled, Starred, Unstarred, MarkedRead, MarkedUnread,
-	Enabled, Disabled, Linked, Unlinked, Added, Removed, Accepted, Declined,
+	Enabled, Disabled, Linked, Unlinked, Added, Removed, Left, Accepted, Declined,
 	Favorited, Unfavorited, Pinned, Unpinned, Responded, Set, Invited, Revoked,
 	Transferred, SignedIn, SignedOut,
 }

@@ -70,7 +70,7 @@ func (s *Service) Upload(ctx context.Context, dc *Context, plan *UploadPlan, r i
 		ContentKeyPacket string
 	}
 	if err := s.C.Decode(ctx, proton.Request{
-		Method: "GET", Path: fmt.Sprintf("/drive/shares/%s/links/%s/revisions/%s/verification", parent.ShareID, linkID, revisionID),
+		Method: "GET", Path: fmt.Sprintf("/drive/shares/%s/links/%s/revisions/%s/verification", parent.dc.ShareID, linkID, revisionID),
 	}, &verResult); err != nil {
 		return fmt.Errorf("get verification data: %w", err)
 	}
@@ -84,7 +84,7 @@ func (s *Service) Upload(ctx context.Context, dc *Context, plan *UploadPlan, r i
 	defer prog.Done()
 
 	rawHashByIdx, tokenByIdx, err := s.streamBlocks(
-		ctx, parent.ShareID, linkID, revisionID, dc.AddrID,
+		ctx, parent.dc.ShareID, linkID, revisionID, dc.AddrID,
 		sessionKey, nodeKR, dc.AddrKR, verCode, r, prog,
 	)
 
@@ -112,7 +112,7 @@ func (s *Service) Upload(ctx context.Context, dc *Context, plan *UploadPlan, r i
 		commit["Photo"] = opts.Photo
 	}
 	return s.C.Decode(ctx, proton.Request{
-		Method: "PUT", Path: fmt.Sprintf("/drive/shares/%s/files/%s/revisions/%s", parent.ShareID, linkID, revisionID),
+		Method: "PUT", Path: fmt.Sprintf("/drive/shares/%s/files/%s/revisions/%s", parent.dc.ShareID, linkID, revisionID),
 		Body: commit,
 	}, nil)
 }

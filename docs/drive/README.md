@@ -145,7 +145,40 @@ proton drive items download /report.pdf --shared Project --dest-dir ./downloads/
 proton drive items download / --shared quarterly.pdf    # a shared file is / itself
 ```
 
+`shared leave` gives up an item somebody shared with you. Only a new invitation from them brings it back, so it asks first.
+
 An item whose name cannot be decrypted is still listed, so you can still act on it by ID.
+
+### A link somebody sent you
+
+A public link is a tree of its own. Name it with `--link`, and everything in it by path from its root:
+
+```bash
+proton drive items list / --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL'
+proton drive items download /Q3-report.pdf --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL' --dest-dir ./downloads/
+proton drive items download / --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL' --dest-dir .
+```
+
+A link to a single file is `/` itself. Quote the link: the password is what follows the `#`, which a shell would otherwise drop.
+
+A link with a password of its own takes it from a file or from standard input, as `items share link` does:
+
+```bash
+proton drive items download / --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL' --link-password-file /run/secrets/q3-link --dest-dir .
+```
+
+A link can be listed, shown and downloaded. Uploading into one, and opening one without signing in, are in [Limits](../help/limits.md).
+
+Save a link to open it later without the URL or the password:
+
+```bash
+proton drive shared add 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL'
+proton drive shared list
+proton drive items download / --shared Q3-report.pdf --dest-dir .
+proton drive shared remove Q3-report.pdf
+```
+
+A saved link shows `public link` under SHARED BY. `shared remove` forgets it; the link itself keeps working, and `shared add` brings it back.
 
 ## Computers
 

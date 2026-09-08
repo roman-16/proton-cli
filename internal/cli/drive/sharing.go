@@ -476,7 +476,7 @@ func trashEmptyCmd() *cobra.Command {
 
 func sharedItemColumns() []ui.Column[drivesvc.SharedItem] {
 	return []ui.Column[drivesvc.SharedItem]{
-		{Header: "ID", ID: true, Cell: func(i drivesvc.SharedItem) string { return i.LinkID }},
+		{Header: "ID", ID: true, Cell: drivesvc.SharedItem.Ref},
 		{Header: "TYPE", Cell: func(i drivesvc.SharedItem) string { return i.Type }},
 		{Header: "NAME", Flex: true, Handle: true, Cell: func(i drivesvc.SharedItem) string { return i.Name }},
 		{Header: "SIZE", Right: true, Cell: func(i drivesvc.SharedItem) string {
@@ -494,20 +494,37 @@ func sharedList(c *kit.Invocation) *kit.Lookup[drivesvc.SharedItem] {
 	return &kit.Lookup[drivesvc.SharedItem]{
 		Kind:   "shared item",
 		Load:   func(ctx stdctx.Context) ([]drivesvc.SharedItem, error) { return c.App.Drive.SharedWithMe(ctx) },
-		ID:     func(i drivesvc.SharedItem) string { return i.LinkID },
+		ID:     drivesvc.SharedItem.Ref,
 		Handle: func(i drivesvc.SharedItem) string { return i.Name },
 	}
 }
 
+// sharedName is what to call a shared item in a sentence: its own name, or the
+// ID it is addressable by when the name would not decrypt.
+func sharedName(i drivesvc.SharedItem) string {
+	if i.Name != "" {
+		return i.Name
+	}
+	return i.Ref()
+}
+
 func sharedCmd() *cobra.Command {
 	c := &cobra.Command{Use: "shared", Short: "Files and folders other people have shared with you"}
-	c.AddCommand(&cobra.Command{
+	c.AddCommand(sharedListCmd(), sharedAddCmd(), sharedRemoveCmd(), sharedLeaveCmd())
+	return c
+}
+
+func sharedListCmd() *cobra.Command {
+	return &cobra.Command{
 		Use:   "list",
 		Short: "List what other people have shared with you",
 		Long: "List what other people have shared with you.\n\n" +
+			"Items shared with you directly and public links you saved with `shared add`\n" +
+			"are listed together. A saved link shows `public link` under SHARED BY.\n\n" +
 			"These are not in your tree and have no path of their own. To open one, pass\n" +
 			"`--shared REF` to any `items` command: / is then the item itself, and\n" +
-			"anything below it is a path inside it.\n\n" +
+			"anything below it is a path inside it. A saved link can only be listed, shown\n" +
+			"and downloaded.\n\n" +
 			"An item whose name cannot be decrypted is still listed, so you can still\n" +
 			"act on it by ID.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
@@ -517,15 +534,147 @@ func sharedCmd() *cobra.Command {
 			}
 			cols := append(sharedItemColumns(), ui.Column[drivesvc.SharedItem]{
 				Header: "SHARED BY", Flex: true,
-				Cell: func(i drivesvc.SharedItem) string { return i.SharedBy },
+				Cell: sharedBy,
 			})
 			return kit.List(c, ui.TableSpec[drivesvc.SharedItem]{
 				Noun: "items", Columns: cols,
 				Total: ui.Unknown, Page: ui.Unpaged,
 			}, items)
 		}),
-	})
+	}
+}
+
+// sharedBy says where an item came from. A link came from a URL and says so:
+// nobody's address is attached to one, and the person who sent it is not
+// something Proton knows.
+func sharedBy(i drivesvc.SharedItem) string {
+	if i.IsLink() {
+		return "public link"
+	}
+	return i.SharedBy
+}
+
+func sharedAddCmd() *cobra.Command {
+	password := kit.LinkPasswordToOpen()
+	c := &cobra.Command{
+		Use:   "add URL",
+		Short: "Add a public link to what is shared with you",
+		Long: "Add a public link to what is shared with you.\n\n" +
+			"URL is the link as it was sent to you, including everything after the #.\n" +
+			"Once added it appears in `shared list` and opens with `--shared REF`, with\n" +
+			"nothing to pass again. A link with a password takes it from\n" +
+			"--link-password-file or --link-password-stdin and keeps it.",
+		RunE: kit.Run([]kit.Step{password.Supply}, func(c *kit.Invocation) error {
+			custom := ""
+			if password.Wanted() {
+				var err error
+				if custom, err = password.Value(); err != nil {
+					return err
+				}
+			}
+			// The link is opened before it is saved, which is what makes the answer
+			// name what was added rather than repeat the URL back, and what keeps a
+			// link nobody can open out of the listing.
+			dc, err := c.App.Drive.OpenLink(c.Ctx, c.Args[0], custom)
+			if err != nil {
+				return err
+			}
+			return kit.Create(c, ui.ResultSpec{
+				Action: ui.Added, Kind: "shared items", Name: dc.RootName,
+			}, func() (string, error) {
+				return c.App.Drive.SaveLink(c.Ctx, dc)
+			})
+		}),
+	}
+	password.Declare(c)
 	return c
+}
+
+func sharedRemoveCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "remove REF...",
+		Short: "Forget a public link you saved",
+		Long: "Forget a public link you saved.\n\n" +
+			"The link itself keeps working, and `shared add` brings it back. To give up\n" +
+			"an item somebody shared with you directly, use `shared leave`.",
+		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
+			items, err := findShared(c, drivesvc.SharedItem.IsLink,
+				"%q was shared with you directly, so there is no link to forget.",
+				"`"+kit.Program+" drive shared leave` gives up an item somebody shared with you.")
+			if err != nil {
+				return err
+			}
+			return kit.Mutate(c, sharedSpec(ui.Removed, items), func() error {
+				for _, item := range items {
+					if err := c.App.Drive.ForgetLink(c.Ctx, item); err != nil {
+						return err
+					}
+				}
+				return nil
+			})
+		}),
+	}
+}
+
+func sharedLeaveCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "leave REF...",
+		Short: "Give up an item somebody shared with you",
+		Long: "Give up an item somebody shared with you.\n\n" +
+			"Only a new invitation from whoever shared it brings it back, so this asks\n" +
+			"first. To take a public link you saved out of the listing, use\n" +
+			"`shared remove`.",
+		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
+			items, err := findShared(c, func(i drivesvc.SharedItem) bool { return !i.IsLink() },
+				"%q is a public link somebody sent you, so there is no share to leave.",
+				"`"+kit.Program+" drive shared remove` forgets a link you saved.")
+			if err != nil {
+				return err
+			}
+			return kit.Mutate(c, sharedSpec(ui.Left, items), func() error {
+				for _, item := range items {
+					if err := c.App.Drive.LeaveShare(c.Ctx, item); err != nil {
+						return err
+					}
+				}
+				return nil
+			})
+		}),
+	}
+}
+
+// findShared resolves every REF to something in the shared listing, and refuses
+// the kind this command is not about.
+//
+// The two kinds sit in one listing and are removed by different verbs, so the
+// refusal names the other one: a reference that matched is not a reference that
+// was wrong.
+func findShared(c *kit.Invocation, wanted func(drivesvc.SharedItem) bool, refusal, hint string) ([]drivesvc.SharedItem, error) {
+	lookup := sharedList(c)
+	items := make([]drivesvc.SharedItem, 0, len(c.Args))
+	for _, ref := range c.Args {
+		item, err := lookup.Find(c.Ctx, ref)
+		if err != nil {
+			return nil, err
+		}
+		if !wanted(item) {
+			return nil, kit.Fail(refusal, sharedName(item)).Hint(hint)
+		}
+		items = append(items, item)
+	}
+	return items, nil
+}
+
+// sharedSpec reports what a removal from the shared listing is about to touch.
+func sharedSpec(action ui.Action, items []drivesvc.SharedItem) ui.ResultSpec {
+	spec := ui.ResultSpec{Action: action, Kind: "shared items", Count: len(items)}
+	for _, item := range items {
+		spec.IDs = append(spec.IDs, item.Ref())
+	}
+	if len(items) == 1 {
+		spec.Name = sharedName(items[0])
+	}
+	return spec
 }
 
 func sharingCmd() *cobra.Command {

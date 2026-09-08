@@ -13,6 +13,7 @@ import (
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
 	"github.com/roman-16/proton-cli/internal/account/keys"
 	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
+	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/fetch"
 	"github.com/roman-16/proton-cli/internal/proton"
 )
@@ -42,6 +43,10 @@ type ItemInfo struct {
 	OriginalSize int64  `json:"original_size_bytes,omitempty"`
 	SHA1         string `json:"sha1,omitempty"`
 	Shared       bool   `json:"shared"`
+	// URL is the public link the item was reached through, and LinkPassword the
+	// one its owner set on it. Both are empty for an item in your own files.
+	URL          string `json:"url,omitempty"`
+	LinkPassword string `json:"link_password,omitempty"`
 	LinkID       string `json:"link_id"`
 	ShareID      string `json:"share_id"`
 	VolumeID     string `json:"volume_id"`
@@ -129,17 +134,19 @@ func (s *Service) Info(ctx context.Context, dc *Context, path string) (*ItemInfo
 		modified = link.ModifyTime
 	}
 	info := &ItemInfo{
-		Name:      name,
-		Location:  dirOf("/" + strings.Trim(path, "/")),
-		Type:      typeLabel,
-		CreatedBy: link.SignatureEmail,
-		Uploaded:  link.CreateTime,
-		Modified:  modified,
-		Size:      link.Size,
-		Shared:    len(link.ShareUrls) > 0,
-		LinkID:    res.LinkID,
-		ShareID:   res.ShareID,
-		VolumeID:  dc.VolumeID,
+		Name:         name,
+		Location:     dirOf("/" + strings.Trim(path, "/")),
+		Type:         typeLabel,
+		CreatedBy:    link.SignatureEmail,
+		Uploaded:     link.CreateTime,
+		Modified:     modified,
+		Size:         link.Size,
+		Shared:       dc.Public() || len(link.ShareUrls) > 0,
+		URL:          dc.URL,
+		LinkPassword: dc.LinkPassword,
+		LinkID:       res.LinkID,
+		ShareID:      res.dc.ShareID,
+		VolumeID:     dc.VolumeID,
 	}
 	if link.Type != 1 {
 		info.MIMEType = link.MIMEType
@@ -574,22 +581,47 @@ const (
 // share of theirs that you were granted. So it is addressed by ID, the way
 // trashed items and photos are.
 type SharedItem struct {
-	ShareID  string `json:"share_id"`
+	ShareID  string `json:"share_id,omitempty"`
 	LinkID   string `json:"link_id"`
-	VolumeID string `json:"volume_id"`
+	VolumeID string `json:"volume_id,omitempty"`
 	Name     string `json:"name"`
 	Type     string `json:"type"`
 	Size     int64  `json:"size,omitempty"`
-	// SharedBy is the address that granted the access.
+	// SharedBy is the address that granted the access, and is empty for a public
+	// link: a link says nothing about who sent it.
 	SharedBy string `json:"shared_by,omitempty"`
-	Created  int64  `json:"create_time,omitempty"`
+	// Token names the public link this is, and URL is that link. Both are empty
+	// for an item somebody shared with you directly.
+	Token string `json:"token,omitempty"`
+	URL   string `json:"url,omitempty"`
+	// LinkPassword is the password the link's owner set on it. It is kept out of
+	// every listing: what a listing is for is finding the thing, and `items get`
+	// is where one item is looked at in full.
+	LinkPassword string `json:"-"`
+	Created      int64  `json:"create_time,omitempty"`
+}
+
+// IsLink reports whether this is a public link somebody sent you rather than a
+// share you are a member of. The two are removed differently and only one of
+// them can be written to, so nothing may assume.
+func (i SharedItem) IsLink() bool { return i.Token != "" }
+
+// Ref is what addresses the item on a command line. A link is named by its
+// token, which is the only name Proton has for it and the one every request
+// about it carries; everything else by the ID of the item shared.
+func (i SharedItem) Ref() string {
+	if i.IsLink() {
+		return i.Token
+	}
+	return i.LinkID
 }
 
 // SharedWithMe lists what other people have granted you.
 //
-// Accepting an invitation makes you a member of somebody's share, and until now
-// nothing reached it: `invitations accept` succeeded and the item was
-// unaddressable. This is where it lands.
+// Two things arrive that way and both belong in the one answer: a share you were
+// invited into and accepted, and a public link you saved. They are addressed
+// alike, by `--shared REF`, and differ in what may be done with them - a link
+// can be read and not written - which each item says of itself.
 //
 // A share is somebody else's when its creator is not one of your own addresses.
 // The main share, the photos share and the desktop client's device shares are
@@ -599,7 +631,11 @@ func (s *Service) SharedWithMe(ctx context.Context) ([]SharedItem, error) {
 	if err != nil {
 		return nil, err
 	}
-	var out []SharedItem
+	saved, err := s.savedLinks(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := saved
 	for _, sh := range shares {
 		if sh.Locked || sh.Type != shareTypeStandard || mine[strings.ToLower(sh.Creator)] {
 			continue
@@ -713,5 +749,220 @@ func (s *Service) describeShare(ctx context.Context, sh rawShare) (*SharedItem, 
 // is `/` there: a shared folder holds the paths below it, and a shared file is
 // that path itself.
 func (s *Service) OpenShared(ctx context.Context, item SharedItem) (*Context, error) {
+	if item.IsLink() {
+		_, urlPassword, err := ParseLink(item.URL)
+		if err != nil {
+			return nil, err
+		}
+		return s.openLink(ctx, item.Token, urlPassword, item.LinkPassword)
+	}
 	return s.unlockShare(ctx, item.ShareID, item.LinkID, item.VolumeID)
+}
+
+// ── public links you saved ──
+
+// A saved link is a link somebody sent you, kept in the account so opening it
+// again needs neither the URL nor the password.
+//
+// What is stored is the password, encrypted to your own address key and signed
+// with it; Proton keeps the token beside it and serves the link's own share
+// alongside, which is why a listing can name what each one points at without
+// opening anything.
+
+// savedLinks reads the links this account has saved.
+func (s *Service) savedLinks(ctx context.Context) ([]SharedItem, error) {
+	var r struct {
+		Bookmarks []struct {
+			EncryptedUrlPassword string
+			CreateTime           int64
+			Token                struct {
+				Token             string
+				LinkID            string
+				LinkType          int
+				Name              string
+				Size              int64
+				ShareKey          string
+				SharePassphrase   string
+				SharePasswordSalt string
+			}
+		}
+	}
+	var u *keys.Unlocked
+	if err := fetch.Together(ctx,
+		func(ctx context.Context) error {
+			return s.C.Decode(ctx, proton.Request{Method: "GET", Path: "/drive/v2/shared-bookmarks"}, &r)
+		},
+		func(ctx context.Context) error {
+			var err error
+			u, err = s.keys(ctx)
+			return err
+		},
+	); err != nil {
+		return nil, err
+	}
+	out := make([]SharedItem, 0, len(r.Bookmarks))
+	for _, b := range r.Bookmarks {
+		item := SharedItem{
+			Token: b.Token.Token, LinkID: b.Token.LinkID,
+			Type: linkType(b.Token.LinkType), Size: b.Token.Size, Created: b.CreateTime,
+		}
+		password, err := decryptSavedPassword(u, b.EncryptedUrlPassword)
+		if err != nil {
+			// A link whose password will not open is listed by its token rather than
+			// dropped, the way a share that will not open is: knowing it is saved is
+			// what lets somebody remove it, and the empty name says as much.
+			slog.DebugContext(ctx, "drive: a saved link's password could not be decrypted",
+				"share", b.Token.Token, "error", err)
+			out = append(out, item)
+			continue
+		}
+		urlPassword, custom := splitLinkPassword(password)
+		item.URL, item.LinkPassword = LinkURL(b.Token.Token, urlPassword), custom
+		shareKR, err := unlockLinkShare(&proton.PublicLinkShare{
+			ShareKey: b.Token.ShareKey, SharePassphrase: b.Token.SharePassphrase,
+			SharePasswordSalt: b.Token.SharePasswordSalt,
+		}, password)
+		if err != nil {
+			slog.DebugContext(ctx, "drive: a saved link's share key could not be opened",
+				"share", b.Token.Token, "error", err)
+			out = append(out, item)
+			continue
+		}
+		if name, err := decryptName(b.Token.Name, shareKR); err == nil {
+			item.Name = name
+		} else {
+			slog.DebugContext(ctx, "drive: a saved link's name could not be decrypted",
+				"share", b.Token.Token, "error", err)
+		}
+		out = append(out, item)
+	}
+	return out, nil
+}
+
+// splitLinkPassword takes the two halves of a saved password apart: what the URL
+// carried, and what the link's owner set after it.
+func splitLinkPassword(password string) (urlPassword, custom string) {
+	if len(password) <= generatedPasswordLen {
+		return password, ""
+	}
+	return password[:generatedPasswordLen], password[generatedPasswordLen:]
+}
+
+// decryptSavedPassword opens a saved link's password with whichever of the
+// account's addresses it was written to.
+func decryptSavedPassword(u *keys.Unlocked, armored string) (string, error) {
+	if armored == "" {
+		return "", fmt.Errorf("the saved link carries no password")
+	}
+	msg, err := pgp.NewPGPMessageFromArmored(armored)
+	if err != nil {
+		return "", err
+	}
+	for _, addr := range u.Addresses {
+		kr, ok := u.AddrKR(addr.ID)
+		if !ok {
+			continue
+		}
+		if dec, err := kr.Decrypt(msg, nil, pgp.GetUnixTime()); err == nil {
+			return dec.GetString(), nil
+		}
+	}
+	return "", fmt.Errorf("no address key opens it")
+}
+
+// SaveLink keeps an open link, so it can be opened again by name alone.
+func (s *Service) SaveLink(ctx context.Context, dc *Context) (string, error) {
+	if !dc.Public() {
+		return "", fmt.Errorf("only a public link can be saved")
+	}
+	_, urlPassword, err := ParseLink(dc.URL)
+	if err != nil {
+		return "", err
+	}
+	if urlPassword == "" {
+		return "", errs.Problemf("This link is too old to be saved.").
+			Hint("Open it with --link each time, or ask whoever sent it for a new link.")
+	}
+	addrID, keyID, addrKR, err := s.savingAddress(ctx)
+	if err != nil {
+		return "", err
+	}
+	sealed, err := sealLinkPassword(urlPassword+dc.LinkPassword, addrKR)
+	if err != nil {
+		return "", err
+	}
+	body := map[string]any{"BookmarkShareURL": map[string]any{
+		"EncryptedUrlPassword": sealed,
+		"AddressID":            addrID,
+		"AddressKeyID":         keyID,
+	}}
+	if err := s.C.Decode(ctx, proton.Request{
+		Method: "POST", Path: "/drive/v2/urls/" + dc.Token + "/bookmark", Body: body,
+	}, nil); err != nil {
+		return "", err
+	}
+	return dc.Token, nil
+}
+
+// ForgetLink takes a saved link out of the account. The link itself is not
+// touched: it is its owner's, and it goes on working for everyone they sent it
+// to.
+func (s *Service) ForgetLink(ctx context.Context, item SharedItem) error {
+	return s.C.Decode(ctx, proton.Request{
+		Method: "DELETE", Path: "/drive/v2/urls/" + item.Token + "/bookmark",
+	}, nil)
+}
+
+// LeaveShare gives up membership of something somebody shared with you.
+//
+// Only its owner can put it back, which is what makes this the one thing in this
+// collection worth stopping for.
+func (s *Service) LeaveShare(ctx context.Context, item SharedItem) error {
+	var sh struct {
+		Memberships []struct{ MemberID string }
+	}
+	if err := s.C.Decode(ctx, proton.Request{Method: "GET", Path: "/drive/shares/" + item.ShareID}, &sh); err != nil {
+		return err
+	}
+	if len(sh.Memberships) == 0 {
+		return errs.Problemf("You are not a member of that share, so there is nothing to leave.")
+	}
+	return s.C.Decode(ctx, proton.Request{
+		Method: "DELETE",
+		Path:   fmt.Sprintf("/drive/v2/shares/%s/members/%s", item.ShareID, sh.Memberships[0].MemberID),
+	}, nil)
+}
+
+// savingAddress is the address a saved link is written to: the one your own
+// files hang from, and its primary key.
+func (s *Service) savingAddress(ctx context.Context) (addrID, keyID string, kr *pgp.KeyRing, err error) {
+	dc, err := s.Resolve(ctx)
+	if err != nil {
+		return "", "", nil, err
+	}
+	u, err := s.keys(ctx)
+	if err != nil {
+		return "", "", nil, err
+	}
+	for _, addr := range u.Addresses {
+		if addr.ID != dc.AddrID {
+			continue
+		}
+		for _, key := range addr.Keys {
+			if key.Primary == 1 {
+				return addr.ID, key.ID, dc.AddrKR, nil
+			}
+		}
+	}
+	return "", "", nil, fmt.Errorf("no primary key for address %s", dc.AddrID)
+}
+
+// sealLinkPassword encrypts a link's password to your own address key and signs
+// it with the same, which is what makes a saved link yours to read back.
+func sealLinkPassword(password string, addrKR *pgp.KeyRing) (string, error) {
+	enc, err := addrKR.Encrypt(pgp.NewPlainMessageFromString(password), addrKR)
+	if err != nil {
+		return "", err
+	}
+	return enc.GetArmored()
 }

@@ -56,9 +56,9 @@ func itemsListCmd() *cobra.Command {
 			"selection here before acting on it. What PATH is here, those commands call\n" +
 			"--scope.\n\n" +
 			"PATH is in your own files. --computer REF lists inside a computer instead,\n" +
-			"and --shared REF inside something somebody shared with you, where / is the\n" +
-			"item itself.",
-		RunE: kit.Run(nil, func(c *kit.Invocation) error {
+			"--shared REF inside something somebody shared with you, and --link URL inside\n" +
+			"a public link somebody sent you. In the last two, / is the item itself.",
+		RunE: kit.Run([]kit.Step{t.supply}, func(c *kit.Invocation) error {
 			dc, err := t.context(c)
 			if err != nil {
 				return err
@@ -89,7 +89,7 @@ func itemsListCmd() *cobra.Command {
 		}),
 	}
 	f.registerNarrowing(c.Flags())
-	t.register(c)
+	t.registerReadOnly(c)
 	order.Register(c, "name", "size", "modified")
 	page.Register(c, "items")
 	return c
@@ -134,7 +134,10 @@ func itemsGetCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "get PATH",
 		Short: "Show a file or folder's details",
-		RunE: kit.Run(nil, func(c *kit.Invocation) error {
+		Long: "Show a file or folder's details.\n\n" +
+			"Reached through a public link, the details include the link itself and, for a\n" +
+			"link saved with `shared add`, the password its owner set on it.",
+		RunE: kit.Run([]kit.Step{t.supply}, func(c *kit.Invocation) error {
 			dc, err := t.context(c)
 			if err != nil {
 				return err
@@ -159,13 +162,15 @@ func itemsGetCmd() *cobra.Command {
 			}
 			fields = append(fields,
 				ui.Field{Label: "SHA-1", Value: info.SHA1},
+				ui.Field{Label: "Public Link", Value: info.URL},
+				ui.Field{Label: "Link Password", Value: info.LinkPassword},
 				ui.Field{Label: "Shared", Value: yesNo(info.Shared), Always: true},
 				ui.Field{Label: "ID", Value: info.LinkID, ID: true},
 			)
 			return kit.Show(c, ui.RecordSpec{Object: info, Fields: fields})
 		}),
 	}
-	t.register(c)
+	t.registerReadOnly(c)
 	return c
 }
 
@@ -415,7 +420,11 @@ func itemsDownloadCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "download PATH",
 		Short: "Download a file",
-		RunE: kit.Run(nil, func(c *kit.Invocation) error {
+		Long: "Download a file.\n\n" +
+			"Behind a public link, a file is / when the link points at the file itself, and\n" +
+			"a path inside the folder when it points at a folder. A link with a password\n" +
+			"takes it from --link-password-file or --link-password-stdin.",
+		RunE: kit.Run([]kit.Step{t.supply}, func(c *kit.Invocation) error {
 			if err := dest.Validate(true); err != nil {
 				return err
 			}
@@ -461,7 +470,7 @@ func itemsDownloadCmd() *cobra.Command {
 		}),
 	}
 	dest.Register(c)
-	t.register(c)
+	t.registerReadOnly(c)
 	return c
 }
 

@@ -25,7 +25,7 @@ proton asks in two cases: before it removes something it cannot put back, and be
 
 | | You named it | A filter found it |
 | --- | --- | --- |
-| `delete` · `empty` · `uninstall` | asks | asks |
+| `delete` · `empty` · `leave` · `uninstall` | asks | asks |
 | `trash` | acts | asks |
 | everything else | acts | acts |
 

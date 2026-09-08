@@ -65,7 +65,7 @@ func (s *Service) revisions(ctx context.Context, res *Resolved) ([]Revision, err
 		}
 	}
 	if err := s.C.Decode(ctx, proton.Request{
-		Method: "GET", Path: fmt.Sprintf("/drive/shares/%s/files/%s/revisions", res.ShareID, res.LinkID),
+		Method: "GET", Path: fmt.Sprintf("/drive/shares/%s/files/%s/revisions", res.dc.ShareID, res.LinkID),
 	}, &r); err != nil {
 		return nil, err
 	}
@@ -123,7 +123,7 @@ func (s *Service) RevisionRestore(ctx context.Context, fr *FileRevision) error {
 	return s.C.Decode(ctx, proton.Request{
 		Method: "POST",
 		Path: fmt.Sprintf("/drive/shares/%s/files/%s/revisions/%s/restore",
-			fr.res.ShareID, fr.res.LinkID, fr.ID),
+			fr.res.dc.ShareID, fr.res.LinkID, fr.ID),
 	}, nil)
 }
 
@@ -139,6 +139,6 @@ func (s *Service) RevisionDelete(ctx context.Context, fr *FileRevision) error {
 	return s.C.Decode(ctx, proton.Request{
 		Method: "DELETE",
 		Path: fmt.Sprintf("/drive/shares/%s/files/%s/revisions/%s",
-			fr.res.ShareID, fr.res.LinkID, fr.ID),
+			fr.res.dc.ShareID, fr.res.LinkID, fr.ID),
 	}, nil)
 }

@@ -80,6 +80,8 @@ proton drive items delete --pattern '*.tmp' --scope /Build --recursive --yes
 
 Download a file.
 
+Behind a public link, a file is / when the link points at the file itself, and a path inside the folder when it points at a folder. A link with a password takes it from --link-password-file or --link-password-stdin.
+
 ```
 proton drive items download PATH
 ```
@@ -88,6 +90,8 @@ proton drive items download PATH
 proton drive items download /Documents/report.pdf --dest-dir .
 proton drive items download /Documents/report.pdf --dest - > report.pdf
 proton drive items download /report.pdf --shared Project --dest-dir .
+proton drive items download / --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL' --dest-dir .
+proton drive items download / --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL' --link-password-file /run/secrets/q3-link --dest-dir .
 ```
 
 | Flag | Description |
@@ -96,11 +100,16 @@ proton drive items download /report.pdf --shared Project --dest-dir .
 | `--dest string` | Write to this path, or - for stdout |
 | `--dest-dir string` | Write into this directory, keeping each item's own name |
 | `--force` | Overwrite a file that already exists |
+| `--link string` | Work inside a public link somebody sent you, by URL |
+| `--link-password-file string` | Read the public link's password from a file |
+| `--link-password-stdin` | Read the public link's password from stdin |
 | `--shared string` | Work inside an item shared with you, by name or ID |
 
 ## `get`
 
 Show a file or folder's details.
+
+Reached through a public link, the details include the link itself and, for a link saved with `shared add`, the password its owner set on it.
 
 ```
 proton drive items get PATH
@@ -108,11 +117,15 @@ proton drive items get PATH
 
 ```bash
 proton drive items get /Documents/report.pdf
+proton drive items get / --shared Q3-report.pdf
 ```
 
 | Flag | Description |
 | --- | --- |
 | `--computer string` | Work inside this computer's files, by name or ID |
+| `--link string` | Work inside a public link somebody sent you, by URL |
+| `--link-password-file string` | Read the public link's password from a file |
+| `--link-password-stdin` | Read the public link's password from stdin |
 | `--shared string` | Work inside an item shared with you, by name or ID |
 
 ## `list`
@@ -121,7 +134,7 @@ List what is in a folder.
 
 Takes the same filters as move, copy, trash and delete, so you can preview a selection here before acting on it. What PATH is here, those commands call --scope.
 
-PATH is in your own files. --computer REF lists inside a computer instead, and --shared REF inside something somebody shared with you, where / is the item itself.
+PATH is in your own files. --computer REF lists inside a computer instead, --shared REF inside something somebody shared with you, and --link URL inside a public link somebody sent you. In the last two, / is the item itself.
 
 ```
 proton drive items list [PATH]
@@ -132,6 +145,7 @@ proton drive items list
 proton drive items list /Documents
 proton drive items list / --computer 'Work laptop'
 proton drive items list / --shared Project
+proton drive items list / --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL'
 ```
 
 | Flag | Description |
@@ -139,6 +153,9 @@ proton drive items list / --shared Project
 | `--computer string` | Work inside this computer's files, by name or ID |
 | `--desc` | Reverse the order |
 | `--larger-than string` | Match files above SIZE (e.g. 100MB, 2GB) |
+| `--link string` | Work inside a public link somebody sent you, by URL |
+| `--link-password-file string` | Read the public link's password from a file |
+| `--link-password-stdin` | Read the public link's password from stdin |
 | `--newer-than string` | Match files newer than DURATION |
 | `--older-than string` | Match files older than DURATION (e.g. 30d, 2w, 1h) |
 | `--page int` | Which page of results, counting from zero |

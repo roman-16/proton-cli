@@ -50,7 +50,8 @@ const (
 	EOPasswordStdinUsage   = "Read the password for recipients outside Proton from stdin"
 )
 
-// LinkPassword is what somebody must type to open a Drive public link.
+// LinkPassword is what somebody must type to open a Drive public link, for the
+// command that puts one on.
 //
 // Fifty characters is where Proton's own clients stop
 // (MAX_SHARED_URL_PASSWORD_LENGTH), and an empty one means the link goes back to
@@ -61,6 +62,16 @@ func LinkPassword() *Password {
 		name: "link-password", label: "A link password", max: 50,
 		fileUsage: LinkPasswordFileUsage, stdinUsage: LinkPasswordStdinUsage,
 		clearUsage: ClearLinkPasswordUsage,
+	}
+}
+
+// LinkPasswordToOpen is the same password, for a command opening a link
+// somebody sent. There is nothing to clear: the password belongs to whoever made
+// the link.
+func LinkPasswordToOpen() *Password {
+	return &Password{
+		name: "link-password", label: "A link password", max: 50,
+		fileUsage: LinkPasswordFileUsage, stdinUsage: LinkPasswordStdinUsage,
 	}
 }
 

@@ -232,7 +232,7 @@ func (s *Service) PhotoDownload(ctx context.Context, dc *Context, linkID string,
 	if err != nil {
 		return "", err
 	}
-	return name, s.downloadFile(ctx, dc.ShareID, link, nodeKR, activeRevisionID(link), link.Size, w, opts)
+	return name, s.downloadFile(ctx, dc, link, nodeKR, activeRevisionID(link), link.Size, w, opts)
 }
 
 // PhotoUpload uploads a file to the photos volume, marking the revision as a
