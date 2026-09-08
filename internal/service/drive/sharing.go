@@ -175,7 +175,12 @@ func (s *Service) verifyCreator(ctx context.Context, dc *Context, res *Resolved,
 	if link.SignatureEmail != dc.AddrEmail {
 		kr, err := s.addressKeyRing(ctx, link.SignatureEmail)
 		if err != nil {
-			return "unknown"
+			// Recorded and not counted: the verdict is on the screen beside the
+			// address whose key could not be read - which, behind a public link
+			// opened without an account, is every address there is.
+			slog.DebugContext(ctx, "drive: the key of who wrote an item could not be read",
+				"share", dc.handle(), "signer", link.SignatureEmail, "error", err)
+			return string(pgphelper.Unverified)
 		}
 		verKR = kr
 	}

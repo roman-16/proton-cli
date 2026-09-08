@@ -181,6 +181,10 @@ func newBlockAuthor(s *Service, email string, nodeKR *pgp.KeyRing) *blockAuthor 
 }
 
 // verify returns "" when there is nothing to report, and the verdict otherwise.
+//
+// A block whose author is not named is nobody's to judge, which is what every
+// block behind a public link is: Proton tells a link's reader what the tree
+// holds and not whose address wrote it.
 func (a *blockAuthor) verify(ctx context.Context, plain *pgp.PlainMessage, encSignature string) string {
 	if encSignature == "" || a.email == "" {
 		return ""

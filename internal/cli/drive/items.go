@@ -136,7 +136,9 @@ func itemsGetCmd() *cobra.Command {
 		Short: "Show a file or folder's details",
 		Long: "Show a file or folder's details.\n\n" +
 			"Reached through a public link, the details include the link itself and, for a\n" +
-			"link saved with `shared add`, the password its owner set on it.",
+			"link saved with `shared add`, the password its owner set on it. A link names\n" +
+			"nobody as the author of what is in it, so Created By is absent and Signature\n" +
+			"reads anonymous.",
 		RunE: kit.Run([]kit.Step{t.supply}, func(c *kit.Invocation) error {
 			dc, err := t.context(c)
 			if err != nil {

@@ -3,17 +3,45 @@ package proton
 import (
 	"context"
 	"fmt"
+	"strings"
 )
 
 // A public link is a share nobody had to be invited to, opened by proving the
 // password that is in its URL.
 //
 // The exchange is the one SRP code path everything else uses, so the server's
-// proof is verified here as it is at sign-in. What differs is only where the
-// parameters come from and what comes back: a signed-in caller's session is
-// granted access to the link, so the answer carries no tokens and every request
-// that follows is an ordinary one. Mirrors SharingPublicLinkSession in Proton's
-// Drive SDK (client/js/src/internal/sharingPublic/session).
+// proof is verified here as it is at sign-in. What differs is where the
+// parameters come from and what the answer carries. A signed-in caller sends its
+// own UID with the proof, and that session is granted access: the answer carries
+// no tokens and every request that follows is an ordinary one. A caller with no
+// account proves the link as nobody, and Proton answers with a session of its
+// own, good for that link and nothing else - which is what lets a link be read
+// without an account. Mirrors SharingPublicLinkSession in Proton's Drive SDK
+// (client/js/src/internal/sharingPublic/session).
+
+// linkSession is what a public link hands a caller who had no account.
+//
+// It is never written anywhere and never mixed with the account's. Proton mints
+// it for one link, gives it no refresh token, and stops accepting it in its own
+// time - so what it holds beside the credential is what proved the link, which
+// is all it takes to prove it again.
+type linkSession struct {
+	// uid and access are what Proton answered the proof with, and what every
+	// request about the link carries.
+	uid, access string
+	// token names the link and password opens it.
+	token, password string
+}
+
+// covers reports whether a request is about this link.
+//
+// Proton serves a link's tree under the token that names it, in place of the
+// share ID nobody outside the share has - so a request that names the link is
+// the whole of what the link's session is granted, and everything else is about
+// the account whether or not a link is open.
+func (s linkSession) covers(req Request) bool {
+	return strings.Contains(req.Path, "/urls/"+s.token)
+}
 
 // Public link flags, as Proton numbers them. A link made today carries a
 // generated password in its URL and, when its owner set one, a second password
@@ -80,7 +108,9 @@ func (c *Client) PublicLinkInfo(ctx context.Context, token string) (*PublicLinkI
 	// there was is Drive. Reading it as the zero value would be right by
 	// accident; saying so is what keeps a Docs link from being read as one.
 	r.VendorType = vendorTypeUnread
-	if err := c.Decode(ctx, Request{Method: "GET", Path: "/drive/urls/" + token + "/info"}, &r); err != nil {
+	if err := c.Decode(ctx, Request{
+		Method: "GET", Path: "/drive/urls/" + token + "/info", opensLink: true,
+	}, &r); err != nil {
 		return nil, err
 	}
 	if r.VendorType == vendorTypeUnread {
@@ -108,6 +138,10 @@ func (c *Client) PublicLinkInfo(ctx context.Context, token string) (*PublicLinkI
 // Proton is told who is opening the link and what grants it access. The answer
 // then carries no tokens of its own, so nothing here has a second session to
 // keep: every request about the link that follows is an ordinary one.
+//
+// A caller with no account gets a session for the link instead, which is taken
+// up for the rest of the run: it is what every request about the link then
+// carries, and it is all Proton will answer.
 func (c *Client) PublicLinkAuth(ctx context.Context, token string, info *PublicLinkInfo, password string) (*PublicLinkShare, error) {
 	held := info
 	resp, err := c.exchange(ctx, srpExchange{
@@ -124,24 +158,65 @@ func (c *Client) PublicLinkAuth(ctx context.Context, token string, info *PublicL
 			return &fresh.auth, nil
 		},
 		method: "POST", path: "/drive/urls/" + token + "/auth",
-		password: []byte(password),
+		password: []byte(password), opensLink: true,
 	})
 	if err != nil {
 		return nil, err
 	}
 	var r struct {
+		UID         string
 		AccessToken string
 		Share       PublicLinkShare
 	}
 	if err := readAnswer(resp.Body, &r); err != nil {
 		return nil, err
 	}
-	if r.AccessToken != "" {
-		c.log.DebugContext(ctx, "the public link opened a session of its own rather than using this one",
-			"share", token)
-	}
 	if r.Share.LinkID == "" {
 		return nil, fmt.Errorf("the public link opened, but Proton named no root for it")
 	}
+	if r.AccessToken != "" {
+		c.mu.Lock()
+		c.link = &linkSession{uid: r.UID, access: r.AccessToken, token: token, password: password}
+		c.mu.Unlock()
+		c.log.DebugContext(ctx, "the public link opened a session of its own, so nobody is behind this tree",
+			"share", token)
+	}
 	return &r.Share, nil
+}
+
+// linkHeld is the public-link session and whether there is one.
+func (c *Client) linkHeld() (linkSession, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if c.link == nil {
+		return linkSession{}, false
+	}
+	return *c.link, true
+}
+
+// reproveLink opens a public link again, for a session Proton has stopped
+// accepting.
+//
+// A link session cannot be refreshed - Proton mints it from the URL and hands
+// out nothing to renew it with - so the URL is what mints it again, and the
+// whole URL is held. failed is the token whose refusal prompted this, so a
+// caller that queued behind another's proof asks for nothing.
+//
+// What comes back opens the same share, and a link that is gone answers what it
+// answers: passing that on is why a link revoked mid-run says so instead of
+// telling somebody their session expired.
+func (c *Client) reproveLink(ctx context.Context, failed credential) error {
+	c.linkMu.Lock()
+	defer c.linkMu.Unlock()
+
+	held, ok := c.linkHeld()
+	if !ok || held.access != failed.token {
+		return nil
+	}
+	info, err := c.PublicLinkInfo(ctx, held.token)
+	if err != nil {
+		return err
+	}
+	_, err = c.PublicLinkAuth(ctx, held.token, info, held.password)
+	return err
 }

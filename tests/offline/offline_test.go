@@ -16,6 +16,7 @@ package offline
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"maps"
 	"os"
 	"os/exec"
@@ -23,6 +24,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 )
 
 var (
@@ -90,7 +92,21 @@ func runIn(t *testing.T, stdin string, env map[string]string, args ...string) (s
 	cmd.Stdin = strings.NewReader(stdin)
 	cmd.Stdout = &outBuf
 	cmd.Stderr = &errBuf
-	cmd.Env = []string{
+	cmd.Env = childEnv(env)
+	if err := cmd.Run(); err != nil {
+		exitErr, ok := err.(*exec.ExitError)
+		if !ok {
+			t.Fatalf("failed to run %v: %v", args, err)
+		}
+		exitCode = exitErr.ExitCode()
+	}
+	return outBuf.String(), errBuf.String(), exitCode
+}
+
+// childEnv is the whole environment a run here gets: no account, no API, plus
+// whatever the test is about.
+func childEnv(env map[string]string) []string {
+	out := []string{
 		"PROTON_PROFILE=nobody",
 		"PROTON_NO_INPUT=1",
 		"XDG_CONFIG_HOME=" + configDir,
@@ -101,16 +117,42 @@ func runIn(t *testing.T, stdin string, env map[string]string, args ...string) (s
 		"HOME=" + configDir,
 	}
 	for _, name := range slices.Sorted(maps.Keys(env)) {
-		cmd.Env = append(cmd.Env, name+"="+env[name])
+		out = append(out, name+"="+env[name])
 	}
-	if err := cmd.Run(); err != nil {
-		exitErr, ok := err.(*exec.ExitError)
-		if !ok {
-			t.Fatalf("failed to run %v: %v", args, err)
-		}
-		exitCode = exitErr.ExitCode()
+	return out
+}
+
+// runBriefly starts the binary and stops it after a moment, for an answer that
+// is about a run reaching the network rather than about what it finally said.
+//
+// Nothing listens on the API here, so such a run cannot finish: it spends its
+// time asking a dead port again. What it did in its first moment is the whole of
+// what is being asked, and a run that had something to refuse would have
+// refused it in microseconds.
+func runBriefly(t *testing.T, args ...string) (stderr string, exited bool) {
+	t.Helper()
+	var errBuf bytes.Buffer
+	cmd := exec.Command(binaryPath, args...)
+	cmd.Stdin = strings.NewReader("")
+	cmd.Stdout = io.Discard
+	cmd.Stderr = &errBuf
+	cmd.Env = childEnv(nil)
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("failed to start %v: %v", args, err)
 	}
-	return outBuf.String(), errBuf.String(), exitCode
+	stopped := make(chan struct{})
+	go func() {
+		_ = cmd.Wait()
+		close(stopped)
+	}()
+	select {
+	case <-stopped:
+		exited = true
+	case <-time.After(time.Second):
+		_ = cmd.Process.Kill()
+		<-stopped
+	}
+	return errBuf.String(), exited
 }
 
 // refuses runs the command and asserts it was refused with the given exit code

@@ -167,9 +167,9 @@ A link with a password of its own takes it from a file or from standard input, a
 proton drive items download / --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL' --link-password-file /run/secrets/q3-link --dest-dir .
 ```
 
-A link can be listed, shown and downloaded. Uploading into one, and opening one without signing in, are in [Limits](../help/limits.md).
+A link can be listed, shown and downloaded without an account. A link names nobody as the author of what is in it, so `items get` shows no Created By and reports Signature as `anonymous`. Uploading into a link is in [Limits](../help/limits.md).
 
-Save a link to open it later without the URL or the password:
+Save a link to open it later without the URL or the password. Saving needs an account:
 
 ```bash
 proton drive shared add 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL'

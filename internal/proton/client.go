@@ -90,10 +90,16 @@ type Client struct {
 	// third refresh would spend a token the first had already replaced.
 	renewMu sync.Mutex
 
+	// linkMu is the same promise for a public link's session, kept apart because
+	// the two are different sessions: proving a link again is a pair of requests
+	// that may themselves find the account's session expired.
+	linkMu sync.Mutex
+
 	mu            sync.RWMutex
 	uid           string
 	acc           string
 	ref           string
+	link          *linkSession
 	encKeyBlob    string // persisted (salted key password encrypted with the server-held client key)
 	profile       string
 	dryRun        bool
@@ -311,6 +317,42 @@ type Request struct {
 	// the refresh, which authenticates with the refresh token in its body: the
 	// token it is replacing has no business on it.
 	omitBearer bool
+
+	// opensLink marks one of the two requests that open a public link. They name
+	// the link like every other request about it, and are the exception to what
+	// that means: they carry the account when there is one, because Proton is
+	// being told whose access grants the link, and nobody when there is not -
+	// which is what lets a link be opened without an account, and what keeps a
+	// session being proved again from carrying the one it is replacing.
+	opensLink bool
+}
+
+// credential is what a request identifies itself with: a session's UID and the
+// token that goes with it.
+type credential struct {
+	uid   string
+	token string
+	// link marks a public link's session, which is renewed by proving the link
+	// again rather than by refreshing anything.
+	link bool
+}
+
+// nobody reports that a request carrying this identifies no one.
+func (c credential) nobody() bool { return c.uid == "" && c.token == "" }
+
+// credentialFor is what a request goes out as.
+//
+// A request about an opened public link carries that link's session, which is
+// all Proton grants it and all Proton will answer it for. Everything else is
+// about the account, whether or not a link is open, so a run that opened one
+// still has to be signed in to save it.
+func (c *Client) credentialFor(req Request) credential {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if c.link != nil && !req.opensLink && c.link.covers(req) {
+		return credential{uid: c.link.uid, token: c.link.access, link: true}
+	}
+	return credential{uid: c.uid, token: c.acc}
 }
 
 type Response struct {
@@ -326,13 +368,8 @@ type Response struct {
 // again), 401 (refresh + retry), 429 (Retry-After + retry) and 9001 (human
 // verification + retry).
 func (c *Client) Do(ctx context.Context, req Request) (*Response, error) {
-	c.mu.RLock()
-	guard := c.sessionGuard
-	c.mu.RUnlock()
-	if guard != nil {
-		if err := guard(); err != nil {
-			return nil, err
-		}
+	if err := c.guardRefuses(req); err != nil {
+		return nil, err
 	}
 	if err := c.dryRunRefuses(req); err != nil {
 		return nil, err
@@ -380,27 +417,53 @@ func (c *Client) Do(ctx context.Context, req Request) (*Response, error) {
 	return resp, apiErr
 }
 
+// guardRefuses asks the guard about a request that would go out as nobody.
+//
+// That is the whole of what the guard is for: putting a sentence to a command
+// that has nothing to act as. A request carrying a session has an answer to give
+// whatever the guard would have said, and a public link is opened by requests
+// Proton answers to nobody by design.
+func (c *Client) guardRefuses(req Request) error {
+	if !c.credentialFor(req).nobody() || req.opensLink {
+		return nil
+	}
+	c.mu.RLock()
+	guard := c.sessionGuard
+	c.mu.RUnlock()
+	if guard == nil {
+		return nil
+	}
+	return guard()
+}
+
 // send makes the request, renewing a session the server no longer accepts, and
 // returns the response it settled on.
 func (c *Client) send(ctx context.Context, req Request) (*Response, error) {
 	for renewals := 0; ; {
-		c.mu.RLock()
-		used := c.acc
-		c.mu.RUnlock()
+		used := c.credentialFor(req)
 
 		resp, err := c.attempt(ctx, req)
 		if err != nil {
 			return nil, err
 		}
-		if resp.Status == http.StatusUnauthorized && tokenRejected(resp) && renewals < sessionRenewals {
+		if resp.Status == http.StatusUnauthorized && tokenRejected(resp) &&
+			!used.nobody() && renewals < sessionRenewals {
 			renewals++
-			if rerr := c.renewSession(ctx, used); rerr != nil {
-				return resp, ErrUnauthorized
+			if rerr := c.renew(ctx, used); rerr != nil {
+				return resp, rerr
 			}
 			continue
 		}
 		return resp, nil
 	}
+}
+
+// renew gets whichever session a request was refused under working again.
+func (c *Client) renew(ctx context.Context, used credential) error {
+	if used.link {
+		return c.reproveLink(ctx, used)
+	}
+	return c.renewSession(ctx, used.token)
 }
 
 // attempt sends one request, waiting out what is worth asking about again.
@@ -539,10 +602,32 @@ func (c *Client) renewSession(ctx context.Context, failed string) error {
 		if c.adoptStoredTokens() {
 			return nil
 		}
-		return err
+		return sessionRefused(err)
 	}
 	c.Persist()
 	return nil
+}
+
+// sessionRefused separates Proton ruling a session over from a refresh that
+// never got an answer.
+//
+// The difference is the whole of what a scheduled job branches on: one is fixed
+// by signing in again and nothing else, the other by coming back later. A
+// connection that failed, an edge that broke and a rate limit still standing
+// after the waits all say nothing about the session, and reporting them as an
+// expired one sends somebody to re-enter a credential that is fine. Mirrors
+// SESSION_INVALID_REFRESH_STATUSES in WebClients
+// (packages/shared/lib/api/helpers/refreshHandlers.ts).
+func sessionRefused(err error) error {
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) {
+		return err
+	}
+	switch apiErr.HTTPStatus {
+	case http.StatusBadRequest, http.StatusUnauthorized, http.StatusUnprocessableEntity:
+		return ErrUnauthorized
+	}
+	return err
 }
 
 // Decode is Do + JSON unmarshal into out (out may be nil for discard).
@@ -580,9 +665,7 @@ func (c *Client) doOnce(ctx context.Context, req Request) (*Response, error) {
 		return nil, ctx.Err()
 	}
 
-	c.mu.RLock()
-	uid, acc := c.uid, c.acc
-	c.mu.RUnlock()
+	cred := c.credentialFor(req)
 
 	u := c.base + req.Path
 	if len(req.Query) > 0 {
@@ -604,11 +687,11 @@ func (c *Client) doOnce(ctx context.Context, req Request) (*Response, error) {
 		r.Header.Set("Content-Type", "application/json")
 	}
 	c.setClientHeaders(r)
-	if uid != "" {
-		r.Header.Set("x-pm-uid", uid)
+	if cred.uid != "" {
+		r.Header.Set("x-pm-uid", cred.uid)
 	}
-	if acc != "" && !req.omitBearer {
-		r.Header.Set("Authorization", "Bearer "+acc)
+	if cred.token != "" && !req.omitBearer {
+		r.Header.Set("Authorization", "Bearer "+cred.token)
 	}
 	if req.HVToken != "" && req.HVType != "" {
 		r.Header.Set("x-pm-human-verification-token", req.HVToken)
@@ -720,8 +803,8 @@ func (c *Client) refreshAuth(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if resp.Status != http.StatusOK {
-		return fmt.Errorf("refresh returned %d: %s", resp.Status, string(resp.Body))
+	if err := responseError(resp); err != nil {
+		return err
 	}
 	var result struct {
 		AccessToken  string

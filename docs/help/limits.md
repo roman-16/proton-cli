@@ -21,7 +21,6 @@ Each of these has an equivalent in a web client.
 | What is missing | What to do instead |
 | --- | --- |
 | Uploading into a public link that allows editing | Open it in a browser |
-| Opening a public link without signing in | Open it in a browser |
 | Accepting a forwarding somebody sent you | Accept it in the web client. Setting one up, pausing it and taking it down are built |
 | Mail forwarding to a non-Proton address | Proton emails the address a link its owner must follow; finish it there |
 | Turning the Pass [extra password](../pass/README.md#an-extra-password) on or off | Use the Pass app. *Answering* one, so the commands work, is built |

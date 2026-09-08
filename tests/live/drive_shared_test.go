@@ -59,6 +59,63 @@ func TestDriveSharedLinkIsReadableByAnotherAccount(t *testing.T) {
 	}
 }
 
+// A link is the one thing here that needs no account, so it is read with none:
+// a profile nobody signed in lists the tree, downloads from it and shows what it
+// holds.
+//
+// A link names nobody as the author of what is in it, so the signature reads
+// anonymous and nothing is warned about - there is no guarantee here that was
+// lost.
+func TestDriveSharedLinkOpensWithoutAnAccount(t *testing.T) {
+	_, url := sharedLink(t, "nobody", "nobody-payload")
+	profile := "no-such-" + testID()
+	nobody := map[string]string{"PROTON_PROFILE": profile}
+
+	listing, stderr, code := runWithEnv(t, nobody, "drive", "items", "list", "/", "--link", url)
+	if code != 0 {
+		t.Fatalf("listing a link with no account exited %d:\n%s", code, truncateOutput(stderr))
+	}
+	assertContains(t, listing, "payload.txt")
+
+	out := filepath.Join(t.TempDir(), "downloaded")
+	_, stderr, code = runWithEnv(t, nobody, "drive", "items", "download", "/payload.txt",
+		"--link", url, "--dest", out)
+	if code != 0 {
+		t.Fatalf("downloading from a link with no account exited %d:\n%s", code, truncateOutput(stderr))
+	}
+	got, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "nobody-payload" {
+		t.Errorf("downloaded %q, want %q", got, "nobody-payload")
+	}
+	assertNotContains(t, stderr, "who wrote it cannot be confirmed")
+
+	stdout, stderr, code := runWithEnv(t, nobody,
+		asJSON([]string{"drive", "items", "get", "/payload.txt", "--link", url})...)
+	if code != 0 {
+		t.Fatalf("showing an item in a link with no account exited %d:\n%s", code, truncateOutput(stderr))
+	}
+	details := parseJSONObject(t, stdout)
+	if details["signature"] != "anonymous" {
+		t.Errorf("signature = %v, want anonymous for an item that names no author", details["signature"])
+	}
+	if by, named := details["created_by"]; named {
+		t.Errorf("created_by = %v, want a link to name nobody", by)
+	}
+
+	// A link mints a session of its own, and it is nobody's account: a profile
+	// that opened one is still a profile nobody signed in.
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		t.Fatalf("user config dir: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(configDir, "proton-cli", "sessions", profile+".json")); err == nil {
+		t.Errorf("opening a link wrote a session file for %q", profile)
+	}
+}
+
 // The details of something reached through a link say which link it was, so a
 // script that was handed one can report where the bytes came from.
 func TestDriveSharedLinkItemDetailsNameTheLink(t *testing.T) {
@@ -67,6 +124,11 @@ func TestDriveSharedLinkItemDetailsNameTheLink(t *testing.T) {
 	info := runJSONSecondary(t, "drive", "items", "get", "/payload.txt", "--link", url)
 	if info["url"] != url {
 		t.Errorf("item reports url %v, want %s", info["url"], url)
+	}
+	// Being signed in buys no more of the story: what a link tells its reader is
+	// the tree, and not whose address wrote what is in it.
+	if info["signature"] != "anonymous" {
+		t.Errorf("signature = %v, want anonymous for an item that names no author", info["signature"])
 	}
 	if info["shared"] != true {
 		t.Errorf("an item behind a public link reports shared %v, want true", info["shared"])

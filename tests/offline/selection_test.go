@@ -1,6 +1,9 @@
 package offline
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // A command line that names nothing to act on, asks for something impossible, or
 // contradicts itself is wrong before anybody is signed in. None of these needs an
@@ -161,6 +164,23 @@ func TestALinkThatIsNotADriveLinkIsRefused(t *testing.T) {
 	} {
 		refuses(t, 1, []string{"drive", "items", "list", "/", "--link", link},
 			"That is not a Proton Drive link")
+	}
+}
+
+// A public link is for people who do not have an account, so a run that opens
+// one is not stopped at the door. Every other command with no session answers
+// "you are not signed in" before it does anything; this one reaches for the
+// link, and here that means asking a port nothing listens on until it is
+// stopped.
+func TestOpeningALinkIsNotRefusedForWantOfAnAccount(t *testing.T) {
+	args := []string{"drive", "items", "list", "/",
+		"--link", "https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL"}
+	stderr, exited := runBriefly(t, args...)
+	if strings.Contains(stderr, "not signed in") {
+		t.Errorf("opening a public link asked for an account\nstderr: %s", truncate(stderr))
+	}
+	if exited {
+		t.Errorf("the run was over at once rather than reaching for the link\nstderr: %s", truncate(stderr))
 	}
 }
 

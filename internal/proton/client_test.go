@@ -452,6 +452,82 @@ func TestASessionReplacedTwiceUnderARequestStillSucceeds(t *testing.T) {
 	}
 }
 
+// What a failed refresh says about the session is what a scheduled job branches
+// on: one answer means sign in again and nothing else will do, the other means
+// come back later. Proton refuses a session it has ended; anything else is the
+// refresh not getting through, and reading that as an expired session sends
+// somebody to re-enter a credential that is fine.
+func TestARefreshThatFailedIsOnlyTheSessionWhenProtonSaysSo(t *testing.T) {
+	shrinkBackoff(t)
+
+	cases := []struct {
+		name     string
+		status   int
+		wantExit int
+	}{
+		{"a request Proton would not read", http.StatusBadRequest, 2},
+		{"a session Proton has ended", http.StatusUnauthorized, 2},
+		{"a refresh token Proton will not take", http.StatusUnprocessableEntity, 2},
+		{"an edge that broke", http.StatusServiceUnavailable, 5},
+		{"a rate limit still standing", http.StatusTooManyRequests, 5},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/auth/v4/refresh" {
+					w.WriteHeader(tc.status)
+					return
+				}
+				w.WriteHeader(http.StatusUnauthorized)
+			}))
+			defer srv.Close()
+
+			c := New(Options{BaseURL: srv.URL, Logger: slog.New(slog.DiscardHandler)})
+			c.SetTokens("uid", "stale", "stale-refresh")
+
+			_, err := c.Do(context.Background(), Request{Method: "GET", Path: "/x"})
+			var coded interface{ ExitCode() int }
+			if !errors.As(err, &coded) {
+				t.Fatalf("err = %v, want one that says what to do about it", err)
+			}
+			if got := coded.ExitCode(); got != tc.wantExit {
+				t.Errorf("exit = %d, want %d (err = %v)", got, tc.wantExit, err)
+			}
+			if tc.wantExit == 2 && !errors.Is(err, ErrUnauthorized) {
+				t.Errorf("err = %v, want the session reported as expired", err)
+			}
+		})
+	}
+}
+
+// A network that never reached the refresh says nothing about the session
+// either, and a job that waits on 5 has to be able to tell.
+func TestARefreshThatNeverArrivedIsANetworkFailure(t *testing.T) {
+	shrinkBackoff(t)
+
+	var srv *httptest.Server
+	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/auth/v4/refresh" {
+			srv.CloseClientConnections()
+			return
+		}
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer srv.Close()
+
+	c := New(Options{BaseURL: srv.URL, Logger: slog.New(slog.DiscardHandler)})
+	c.SetTokens("uid", "stale", "stale-refresh")
+
+	_, err := c.Do(context.Background(), Request{Method: "GET", Path: "/x"})
+	var netErr *NetworkError
+	if !errors.As(err, &netErr) {
+		t.Fatalf("err = %v, want the network failure it was", err)
+	}
+	if netErr.ExitCode() != 5 {
+		t.Errorf("exit = %d, want 5", netErr.ExitCode())
+	}
+}
+
 // A session that is genuinely gone is reported rather than renewed forever.
 func TestAnUnrecoverableSessionIsReportedRatherThanRetriedForever(t *testing.T) {
 	var asked int

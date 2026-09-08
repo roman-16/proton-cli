@@ -109,7 +109,7 @@ proton drive items download / --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ
 
 Show a file or folder's details.
 
-Reached through a public link, the details include the link itself and, for a link saved with `shared add`, the password its owner set on it.
+Reached through a public link, the details include the link itself and, for a link saved with `shared add`, the password its owner set on it. A link names nobody as the author of what is in it, so Created By is absent and Signature reads anonymous.
 
 ```
 proton drive items get PATH

@@ -5,9 +5,12 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
-	"github.com/roman-16/proton-cli/internal/account/keys"
 	"strings"
 	"testing"
+
+	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	"github.com/roman-16/proton-cli/internal/account/keys"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 )
 
 func hashOf(b []byte) string {
@@ -119,6 +122,32 @@ func TestVerifyManifestAcceptsAPublicLinkWithNoSignature(t *testing.T) {
 	err := (&Service{}).verifyManifest(context.Background(), &Context{Token: "7X2K9M3N1P"}, nil, "", []byte("manifest"), "")
 	if err != nil {
 		t.Errorf("a public link's content was refused for want of a signature: %v", err)
+	}
+}
+
+// A block whose author is not named is nobody's to judge, and behind a public
+// link that is every block: Proton tells a link's reader what the tree holds and
+// not whose address wrote it. Reaching for a key anyway would spend a request to
+// learn nothing, and warn about a guarantee the link never carried.
+func TestABlockWithNoAuthorNamedIsNotJudged(t *testing.T) {
+	block := pgp.NewPlainMessageFromString("block")
+	doer := &stubDoer{}
+	s := New(doer, testKeys(nil))
+
+	unnamed := newBlockAuthor(s, "", nil)
+	if got := unnamed.verify(context.Background(), block, "signature"); got != "" {
+		t.Errorf("verdict = %q, want nothing said about a signature nothing can judge", got)
+	}
+	if doer.sent("GET", "/core/v4/keys/all") {
+		t.Error("a key was asked for on behalf of nobody")
+	}
+
+	named := newBlockAuthor(s, testLinkSigner, nil)
+	if got := named.verify(context.Background(), block, "signature"); got != string(pgphelper.Unverified) {
+		t.Errorf("verdict = %q, want %q for a key that could not be read", got, pgphelper.Unverified)
+	}
+	if !doer.sent("GET", "/core/v4/keys/all") {
+		t.Error("the uploader's key was never asked for")
 	}
 }
 

@@ -17,6 +17,7 @@ const (
 	testToken       = "7X2K9M3N1P"
 	testURLPassword = "kQ81mDx4T9wL"
 	testLinkSalt    = "sixteen-byte-slt"
+	testLinkSigner  = "jane@proton.me"
 )
 
 func TestParseLink(t *testing.T) {
@@ -123,7 +124,7 @@ func newPublicTree(t *testing.T, password, rootName string, rootType int) *publi
 		root: object(t, map[string]any{"Token": map[string]any{
 			"Token": testToken, "LinkID": testRootID, "LinkType": rootType, "Name": encName,
 			"NodeKey": rootKey, "NodePassphrase": rootPass, "NodePassphraseSignature": rootPassSig,
-			"ContentKeyPacket": "", "Size": 1234,
+			"SignatureEmail": testLinkSigner, "ContentKeyPacket": "", "Size": 1234,
 		}}),
 	}
 }

@@ -1,8 +1,12 @@
 package drive
 
 import (
+	"context"
 	"strings"
 	"testing"
+
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
+	"github.com/roman-16/proton-cli/internal/proton"
 )
 
 func TestComposePassword(t *testing.T) {
@@ -87,6 +91,33 @@ func TestToShareLink(t *testing.T) {
 			t.Error("CanEdit should be false for view permission")
 		}
 	})
+}
+
+// A key that cannot be read is the same answer as a signature that does not
+// check out against it: not verified. Anything else invents a fifth verdict for
+// a field whose values are the four.
+//
+// It is the answer a public link opened without an account gets for anything it
+// does find an address on, because the key lookup is about the account and there
+// is none.
+func TestAnItemWhoseAuthorsKeyCannotBeReadIsUnverified(t *testing.T) {
+	tree := newPublicTree(t, testURLPassword, "Q3-report.pdf", 2)
+	s, doer := publicService(t, tree, proton.PublicLinkGeneratedPassword, nil)
+
+	dc, err := s.OpenLink(context.Background(), LinkURL(testToken, testURLPassword), "")
+	if err != nil {
+		t.Fatalf("OpenLink: %v", err)
+	}
+	info, err := s.Info(context.Background(), dc, "/")
+	if err != nil {
+		t.Fatalf("Info: %v", err)
+	}
+	if info.Signature != string(pgphelper.Unverified) {
+		t.Errorf("signature = %q, want %q", info.Signature, pgphelper.Unverified)
+	}
+	if !doer.sent("GET", "/core/v4/keys/all") {
+		t.Error("the author's key was never asked for")
+	}
 }
 
 func TestRoleLabel(t *testing.T) {

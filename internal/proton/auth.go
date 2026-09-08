@@ -254,6 +254,10 @@ type srpExchange struct {
 
 	hvToken string
 	hvType  string
+
+	// opensLink marks the exchange that proves a public link, which Proton answers
+	// whether or not anybody is behind it. See Request.opensLink.
+	opensLink bool
 }
 
 // repeatable reports whether the whole exchange may be run a second time.
@@ -323,7 +327,7 @@ func (c *Client) srpCall(ctx context.Context, x srpExchange, info *authInfo) (*R
 
 	resp, err := c.authCall(ctx, Request{
 		Method: x.method, Path: x.path, Body: payload,
-		HVToken: x.hvToken, HVType: x.hvType,
+		HVToken: x.hvToken, HVType: x.hvType, opensLink: x.opensLink,
 	})
 	if err != nil {
 		return nil, err
