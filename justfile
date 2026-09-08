@@ -74,9 +74,11 @@ og:
         --use-fonts-dir "$DEVBOX_PACKAGES_DIR/share/fonts" \
         --font-family "JetBrains Mono" --monospace-family "JetBrains Mono"
 
+webClients := "/tmp/proton-cli-WebClients"
+
 [doc("Regenerate openapi.yaml from the WebClients TypeScript source")]
-openapi:
-    cd scripts && bun install --frozen-lockfile && bun run generate-openapi
+openapi: webclients
+    cd scripts && bun install --frozen-lockfile && bun run generate-openapi {{ webClients }} > ../openapi.yaml
 
 [doc("Build the documentation site, which type-checks it and validates every link")]
 web:
@@ -85,6 +87,25 @@ web:
 [doc("Serve the documentation site, rebuilding as the pages change")]
 web-dev:
     cd web && bun install --frozen-lockfile && bun run dev
+
+# Nothing here is anyone's to keep: the checkout is a shallow, read-only copy of
+# upstream's main, so a local state that will not take the update is discarded
+# and cloned again rather than repaired.
+[doc("Clone or update the WebClients checkout that openapi.yaml and the reference reading come from")]
+webclients:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    update() {
+        git -C {{ webClients }} fetch --depth 1 origin main \
+            && git -C {{ webClients }} reset --hard --quiet FETCH_HEAD
+    }
+    clone() {
+        rm --recursive --force {{ webClients }}
+        git clone --depth 1 --branch main \
+            https://github.com/ProtonMail/WebClients.git {{ webClients }}
+    }
+    update 2>/dev/null || clone
+    git -C {{ webClients }} --no-pager log --max-count=1 --format='WebClients %h %cs %s'
 
 [doc("Regenerate the Pass protobuf bindings")]
 proto:

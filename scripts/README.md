@@ -69,7 +69,7 @@ Auto-generates `openapi.yaml` from [ProtonMail/WebClients](https://github.com/Pr
 just openapi
 ```
 
-This outputs `openapi.yaml` in the project root. First run clones the WebClients repo to `/tmp/proton-cli-WebClients` (~30 seconds). Subsequent runs pull updates (~1 second).
+This outputs `openapi.yaml` in the project root. It runs `just webclients` first, which clones `ProtonMail/WebClients` to `/tmp/proton-cli-WebClients` (~30 seconds) or updates a checkout that is already there (~1 second). Run `just webclients` on its own to refresh that checkout for reading.
 
 ### What It Extracts
 
@@ -103,7 +103,7 @@ Global:
 
 ### How It Works
 
-1. **Clone** - shallow clones (or pulls) `ProtonMail/WebClients` into `/tmp/`
+1. **Checkout** - `just webclients` puts the current `ProtonMail/WebClients` main in `/tmp/proton-cli-WebClients`, and the directory is passed to the generator
 2. **Project setup** - creates a ts-morph `Project` with `tsconfig.base.json` for path resolution
 3. **Registry** - scans all source files for string/number constants and enum declarations
 4. **Parse** - walks all exported declarations in `api/**/*.ts`, extracts endpoint metadata from the AST
@@ -115,7 +115,6 @@ Global:
 ```
 openapi-generator/
 ├── index.ts              - entry point
-├── clone.ts              - git clone/pull
 ├── parse.ts              - ts-morph project setup, file discovery
 ├── registry.ts           - constant and enum collection
 ├── extract-endpoint.ts   - endpoint extraction from AST nodes

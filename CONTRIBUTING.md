@@ -160,10 +160,10 @@ Unit test files are named after the file they test (`size.go` → `size_test.go`
 
 ## Working with Proton's API
 
-Proton's web client is the reference for endpoints, payload shapes, and crypto flows:
+Proton's web client is the reference for endpoints, payload shapes, and crypto flows. Put a current copy in `/tmp/proton-cli-WebClients` to read:
 
 ```bash
-cd /tmp && git clone --depth 1 https://github.com/ProtonMail/WebClients.git
+just webclients
 ```
 
 `openapi.yaml` in the repository root is generated from that source and covers roughly 740 endpoints. Regenerate it with:

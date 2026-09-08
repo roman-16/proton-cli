@@ -106,5 +106,5 @@ The Proton WebClients TypeScript source is available at `/tmp/proton-cli-WebClie
 
 If the clone is missing or stale, run:
 ```bash
-cd /tmp && git clone --depth 1 --branch main https://github.com/ProtonMail/WebClients.git proton-cli-WebClients
+just webclients
 ```

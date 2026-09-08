@@ -54,7 +54,7 @@ jobs:
             exit 0
           fi
 
-          # Clone path is CLONE_DIR in scripts/openapi-generator/index.ts.
+          # Checkout path is `webClients` in the justfile.
           webclients=$(git -C /tmp/proton-cli-WebClients rev-parse --short HEAD)
 
           git config user.name "Roman"
