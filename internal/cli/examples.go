@@ -53,7 +53,7 @@ var examples = map[string][]string{
 	"proton account settings list": {"proton account settings list"},
 	"proton account settings set": {
 		"proton account settings set locale de_AT",
-		"proton account settings set news off",
+		"proton account settings set week-start monday",
 	},
 	"proton api": {
 		"proton api GET /core/v4/users",
@@ -152,8 +152,8 @@ var examples = map[string][]string{
 	"proton calendar settings get":              {"proton calendar settings get"},
 	"proton calendar settings list":             {"proton calendar settings list"},
 	"proton calendar settings set": {
-		"proton calendar settings set week-start monday",
-		"proton calendar settings set default-duration 30",
+		"proton calendar settings set view week",
+		"proton calendar settings set primary-timezone Europe/Vienna",
 	},
 
 	// ── contacts ──
@@ -315,7 +315,7 @@ var examples = map[string][]string{
 	},
 	"proton drive settings get":  {"proton drive settings get"},
 	"proton drive settings list": {"proton drive settings list"},
-	"proton drive settings set":  {"proton drive settings set revision-retention 30"},
+	"proton drive settings set":  {"proton drive settings set version-history 30d"},
 
 	// ── mail: messages ──
 	"proton mail messages list": {
@@ -484,8 +484,8 @@ var examples = map[string][]string{
 	"proton mail settings get":  {"proton mail settings get"},
 	"proton mail settings list": {"proton mail settings list"},
 	"proton mail settings set": {
-		"proton mail settings set signature off",
-		"proton mail settings set view-mode conversation",
+		"proton mail settings set pm-signature off",
+		"proton mail settings set view-mode conversations",
 	},
 	"proton mail settings labels list": {"proton mail settings labels list"},
 	"proton mail settings labels create": {

@@ -193,8 +193,8 @@ proton calendar settings set KEY VALUE
 ```
 
 ```bash
-proton calendar settings set week-start monday
-proton calendar settings set default-duration 30
+proton calendar settings set view week
+proton calendar settings set primary-timezone Europe/Vienna
 ```
 
 ---

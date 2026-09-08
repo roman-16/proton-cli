@@ -13,7 +13,7 @@ import (
 func recorded(t *testing.T, level slog.Level, write func(log, trace *slog.Logger)) (screen string, file []map[string]any) {
 	t.Helper()
 	var errb, jsonl bytes.Buffer
-	log, trace := newLoggers(&errb, level, []byte("a salt to test with"), &jsonl, "a91f")
+	log, trace := newLoggers(&errb, Style{}, level, []byte("a salt to test with"), &jsonl, "a91f")
 	write(log, trace)
 
 	for line := range strings.SplitSeq(strings.TrimSpace(jsonl.String()), "\n") {
@@ -113,7 +113,7 @@ func TestAnUndeclaredNameIsRefusedRatherThanWritten(t *testing.T) {
 func TestBothDestinationsAgreeOnAHandle(t *testing.T) {
 	const id = "5bH2mQxKT9wLpN4vRs8kZc1yXd7fGh3jAe6bUi0oQm2nWr5tYv=="
 	screen, file := recorded(t, slog.LevelDebug, func(log, _ *slog.Logger) {
-		log.Warn("not shown", "kind", "item", "ref", id)
+		log.Debug("not shown", "kind", "item", "ref", id)
 	})
 	ref, _ := file[0]["ref"].(string)
 	if !strings.Contains(screen, ref) {
@@ -123,15 +123,44 @@ func TestBothDestinationsAgreeOnAHandle(t *testing.T) {
 
 func TestWithNoFileTheScreenStillWorks(t *testing.T) {
 	var errb bytes.Buffer
-	log, trace := newLoggers(&errb, slog.LevelDebug, nil, nil, "a91f")
-	log.Warn("rate limited by Proton; waiting before trying again", "method", "GET", "wait_ms", 5000)
+	log, trace := newLoggers(&errb, Style{}, slog.LevelDebug, nil, nil, "a91f")
+	log.Warn("Proton is rate limiting this run; trying again in 5s.", "method", "GET", "wait_ms", 5000)
 	trace.Error("run failed", "exit", 7)
 
-	if !strings.Contains(errb.String(), "rate limited") {
+	if !strings.Contains(errb.String(), "rate limiting") {
 		t.Errorf("the screen lost its warning: %q", errb.String())
 	}
 	if strings.Contains(errb.String(), "run failed") {
 		t.Errorf("with nowhere to record it, the run's own record was printed instead: %q", errb.String())
+	}
+}
+
+// The screen and the file are two audiences, and the level is what says which
+// one a record is for. A caveat raised while the work goes on is the run
+// speaking to the person watching it, so it reads as one of this CLI's own
+// lines; the machinery behind it is in the file, whole, either way.
+func TestACaveatIsPutToThePersonWatching(t *testing.T) {
+	screen, file := recorded(t, slog.LevelWarn, func(log, _ *slog.Logger) {
+		log.Warn("Proton is rate limiting this run; trying again in 5s.",
+			"method", "GET", "path", "/mail/v4/messages", "wait_ms", 5000, "attempt", 1)
+	})
+	if want := GlyphCaution + " Proton is rate limiting this run; trying again in 5s.\n"; screen != want {
+		t.Errorf("the screen read as a record rather than a sentence:\n got %q\nwant %q", screen, want)
+	}
+	if len(file) != 1 || file[0]["wait_ms"] != float64(5000) || file[0]["attempt"] != float64(1) {
+		t.Errorf("the file lost what the screen left out: %v", file)
+	}
+}
+
+// Below a warning the reader has asked for the machinery, so they get it.
+func TestAskedForDetailTheScreenKeepsTheRecord(t *testing.T) {
+	screen, _ := recorded(t, slog.LevelDebug, func(log, _ *slog.Logger) {
+		log.Debug("api request", "method", "GET", "path", "/core/v4/users", "status", 200)
+	})
+	for _, want := range []string{"level=DEBUG", "method=GET", "path=/core/v4/users", "status=200"} {
+		if !strings.Contains(screen, want) {
+			t.Errorf("the screen dropped %q from a debug record: %q", want, screen)
+		}
 	}
 }
 

@@ -56,7 +56,6 @@ func sendersListCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List every standing decision about a sender",
-		Args:  cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			rules, err := c.App.Mail.SendersList(c.Ctx)
 			if err != nil {
@@ -80,7 +79,6 @@ func senderVerb(use, short, destination string, action ui.Action) *cobra.Command
 			"A whole domain works too, written with the @: `@example.com`.\n\n" +
 			"Deciding again about the same sender replaces the earlier decision rather\n" +
 			"than colliding with it.",
-		Args: cobra.MinimumNArgs(1),
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			targets := kit.Dedupe(c.Args)
 			return kit.Mutate(c, ui.ResultSpec{
@@ -103,7 +101,6 @@ func sendersForgetCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "forget EMAIL...",
 		Short: "Drop a standing decision, letting the spam filter decide again",
-		Args:  cobra.MinimumNArgs(1),
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			targets := kit.Dedupe(c.Args)
 			return kit.Mutate(c, ui.ResultSpec{

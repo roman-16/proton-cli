@@ -20,7 +20,7 @@ import (
 // extended to register the second one before it is written out.
 func completionCmd(root *cobra.Command) *cobra.Command {
 	c := &cobra.Command{
-		Use:   "completion",
+		Use:   "completion SHELL",
 		Short: "Generate a shell completion script",
 		Long: `Generate a shell completion script.
 
@@ -40,7 +40,6 @@ One script covers both ` + kit.Program + ` and ` + kit.Alias + `.
   fish        ` + kit.Program + ` completion fish > ~/.config/fish/completions/` + kit.Program + `.fish
   powershell  ` + kit.Program + ` completion powershell | Out-String | Invoke-Expression`,
 		ValidArgs: []string{"bash", "zsh", "fish", "powershell"},
-		Args:      cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var buf bytes.Buffer
 			var err error

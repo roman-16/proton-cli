@@ -2,10 +2,7 @@ package ui
 
 import (
 	"fmt"
-	"os"
 	"strings"
-
-	"golang.org/x/term"
 )
 
 // Column describes one column of a collection. Cell extracts the text; the
@@ -313,15 +310,7 @@ func (u *UI) width() int {
 	if u.Width > 0 {
 		return u.Width
 	}
-	f, ok := u.Out.(*os.File)
-	if !ok {
-		return 0
-	}
-	cols, _, err := term.GetSize(int(f.Fd()))
-	if err != nil || cols <= 0 {
-		return 0
-	}
-	return cols
+	return u.out.columns()
 }
 
 // Columns is the width this run laid its tables out against, which the run's

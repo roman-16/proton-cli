@@ -3,10 +3,12 @@ package cli
 import (
 	"errors"
 	"io"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/roman-16/proton-cli/internal/cli/kit"
+	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/ui"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -59,33 +61,40 @@ func TestPreprocessArgs(t *testing.T) {
 	})
 }
 
-func TestRewrapFlagError(t *testing.T) {
-	t.Run("non-pflag error passes through", func(t *testing.T) {
-		err := errors.New("some other error")
-		if got := rewrapFlagError(err, []string{"proton"}); got != err {
-			t.Errorf("rewrapFlagError altered non-pflag error: got %v", got)
+// The protection has one visible edge: everything after the inserted "--" is
+// positional, so a flag written after the ID arrives as an argument. That
+// surfaces as a command holding more arguments than it has places for, and it is
+// the one such failure that is not the reader having typed one too many.
+func TestAFlagAfterADashedIDIsExplained(t *testing.T) {
+	cmd, _, err := newRoot().Find([]string{"mail", "messages", "get"})
+	if err != nil {
+		t.Fatalf("find: %v", err)
+	}
+	var hints []string
+	if problem := cmd.Args(cmd, []string{dashedID, "--output", "json"}); problem != nil {
+		var hinter errs.Hinter
+		if errors.As(problem, &hinter) {
+			hints = hinter.Hints()
 		}
-	})
-	t.Run("nil passes through", func(t *testing.T) {
-		if rewrapFlagError(nil, []string{"proton"}) != nil {
-			t.Error("rewrapFlagError(nil) != nil")
+	} else {
+		t.Fatal("three arguments were accepted by a command taking one")
+	}
+	if !slices.ContainsFunc(hints, func(h string) bool { return strings.Contains(h, "put the flags first") }) {
+		t.Errorf("nothing said where the flags went: %v", hints)
+	}
+
+	if problem := cmd.Args(cmd, []string{plainID, "extra"}); problem == nil {
+		t.Fatal("two arguments were accepted by a command taking one")
+	} else {
+		var hinter errs.Hinter
+		if errors.As(problem, &hinter) {
+			for _, h := range hinter.Hints() {
+				if strings.Contains(h, "put the flags first") {
+					t.Errorf("an ordinary surplus was blamed on a dash: %v", h)
+				}
+			}
 		}
-	})
-	t.Run("cobra accepts-N-args error with dashed ID rewraps", func(t *testing.T) {
-		err := errors.New("accepts 1 arg(s), received 3")
-		argv := []string{"proton", "mail", "messages", "read", dashedID, "--format", "raw"}
-		gotMsg := rewrapFlagError(err, argv).Error()
-		if !strings.Contains(gotMsg, "insert -- before it") || !strings.Contains(gotMsg, "Put flags") || !strings.Contains(gotMsg, dashedID) {
-			t.Errorf("unexpected message: %s", gotMsg)
-		}
-	})
-	t.Run("cobra accepts-N-args error without dashed ID passes through", func(t *testing.T) {
-		err := errors.New("accepts 1 arg(s), received 3")
-		argv := []string{"proton", "mail", "messages", "read", plainID, "--format", "raw"}
-		if strings.Contains(rewrapFlagError(err, argv).Error(), "insert -- before it") {
-			t.Error("rewrap fired without dashed ID")
-		}
-	})
+	}
 }
 
 func equalSlice(a, b []string) bool {

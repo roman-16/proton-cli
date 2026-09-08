@@ -204,6 +204,10 @@ func New(opts Options) (*App, error) {
 // body, a key, or a file to upload. Whichever asked second would find an empty
 // stream and fail somewhere further along with a puzzle, so it is told here
 // instead, in terms of the two flags that collided.
+//
+// Standard input that nothing is piped into is a terminal, and reading one
+// waits for typing. A run that sat there silently would look like a run that
+// had hung, so it says whose input it is waiting for and which key ends it.
 func (a *App) Stdin(claim string) (io.Reader, error) {
 	a.stdinMu.Lock()
 	defer a.stdinMu.Unlock()
@@ -213,6 +217,10 @@ func (a *App) Stdin(claim string) (io.Reader, error) {
 			Hint(elsewhere(a.stdinClaim, claim))
 	}
 	a.stdinClaim = claim
+	if a.UI.InIsTTY() {
+		a.UI.Instruct(fmt.Sprintf("Reading %s from the terminal. Finish with %s.",
+			strings.TrimSuffix(claim, " -"), ui.EOFKey))
+	}
 	return a.UI.In, nil
 }
 

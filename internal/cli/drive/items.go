@@ -54,7 +54,6 @@ func itemsListCmd() *cobra.Command {
 			"Takes the same filters as move, copy, trash and delete, so you can preview a\n" +
 			"selection here before acting on it. What PATH is here, those commands call\n" +
 			"--scope.",
-		Args: cobra.MaximumNArgs(1),
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			dc, err := context(c)
 			if err != nil {
@@ -129,7 +128,6 @@ func itemsGetCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "get PATH",
 		Short: "Show a file or folder's details",
-		Args:  cobra.ExactArgs(1),
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			dc, err := context(c)
 			if err != nil {
@@ -183,7 +181,6 @@ func itemsUploadCmd() *cobra.Command {
 			"  skip     leave what is there alone\n\n" +
 			"With --recursive that answer is about the folder the tree lands in.\n\n" +
 			"SRC of - reads standard input, and then DEST has to name the file.",
-		Args: cobra.RangeArgs(1, 2),
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			dc, err := context(c)
 			if err != nil {
@@ -407,7 +404,6 @@ func itemsDownloadCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "download PATH",
 		Short: "Download a file",
-		Args:  cobra.ExactArgs(1),
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			if err := dest.Validate(true); err != nil {
 				return err
@@ -474,7 +470,6 @@ func itemsUpdateCmd() *cobra.Command {
 		Long: "Rename a file or folder.\n\n" +
 			"Renaming is `update --name`; there is no `rename` verb. To put something\n" +
 			"somewhere else, use `move`.",
-		Args: cobra.ExactArgs(1),
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			dc, err := context(c)
 			if err != nil {
@@ -622,7 +617,6 @@ func revisionsListCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list PATH",
 		Short: "List a file's earlier versions",
-		Args:  cobra.ExactArgs(1),
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			dc, err := context(c)
 			if err != nil {
@@ -666,7 +660,6 @@ func revisionsDownloadCmd() *cobra.Command {
 		Long: "Download an earlier version of a file.\n\n" +
 			"The file itself is not changed. To put an old version back in place, use\n" +
 			"`revisions restore`.",
-		Args: cobra.ExactArgs(2),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			if err := dest.Validate(true); err != nil {
 				return err
@@ -705,7 +698,6 @@ func revisionsRestoreCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "restore PATH REVISION_REF",
 		Short: "Restore a file to an earlier version",
-		Args:  cobra.ExactArgs(2),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			rev, err := findRevision(c)
 			if err != nil {
@@ -725,7 +717,6 @@ func revisionsDeleteCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "delete PATH REVISION_REF",
 		Short: "Delete an earlier version permanently",
-		Args:  cobra.ExactArgs(2),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			rev, err := findRevision(c)
 			if err != nil {
@@ -751,7 +742,6 @@ func itemsCreateCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "create PATH",
 		Short: "Create a folder, and any missing folder above it",
-		Args:  cobra.ExactArgs(1),
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			dc, err := context(c)
 			if err != nil {

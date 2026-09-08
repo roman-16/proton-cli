@@ -41,7 +41,9 @@ func TestUnknownSettingKeyIsRefusedAndPointsAtTheList(t *testing.T) {
 
 func TestSettingSomethingNeedsAKeyAndAValue(t *testing.T) {
 	refuses(t, 1, []string{"account", "settings", "set"},
-		"KEY and a VALUE", "account settings list")
+		"needs KEY: a setting key", "account settings set --help")
+	refuses(t, 1, []string{"account", "settings", "set", "locale"},
+		"needs VALUE: a setting value", "account settings set --help")
 }
 
 func TestFlagValueOutsideItsDomainIsRefused(t *testing.T) {
@@ -92,9 +94,16 @@ func TestColourOffProtonsPaletteIsRefused(t *testing.T) {
 	}
 }
 
+// The usage line says how many arguments a command takes, so the refusal is
+// written from the same names it shows: what is missing, what it stands for, and
+// a command line that works.
 func TestWrongNumberOfArgumentsIsRefused(t *testing.T) {
-	refuses(t, 1, []string{"api"}, "arg")
-	refuses(t, 1, []string{"mail", "messages", "get"}, "arg")
+	refuses(t, 1, []string{"api"}, "`proton api` needs METHOD: an HTTP method.", "proton api GET ")
+	refuses(t, 1, []string{"api", "GET"}, "needs ENDPOINT: a Proton API path")
+	refuses(t, 1, []string{"mail", "messages", "get"},
+		"needs REF: a full ID, a short ID, or a human handle")
+	refuses(t, 1, []string{"mail", "messages", "list", "inbox"},
+		"takes no arguments, but 1 argument was given")
 }
 
 // An event's length can be said as an end or as a duration, and saying it both

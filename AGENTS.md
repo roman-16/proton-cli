@@ -60,6 +60,7 @@ Rules:
 - **Make the line distinguish causes.** "It failed" earns nothing. Which of the several ways it fails, and the counts around it, is the whole value. A fact that changes the advice is worth one request once the failure has already happened.
 - **`skip.Record` counts as well as logs**, so `kit.List` warns that a listing is short and the envelope carries `skipped`. Never hand-roll that: a listing that under-reports and exits `0` is a wrong answer presented as a right one. Kinds and reasons are declared in `internal/skip`; `skip.Hides` marks the kinds whose loss takes their contents too.
 - **`--log-level` is the screen only.** The file is always at debug. Never lower a record's level to keep it off the screen - use `UI.Trace`.
+- **Write a warning as a sentence to a person.** At warn and above the screen shows the message alone, under the caution mark, with no attributes beside it - so the message has to stand on its own and carry whatever a reader needs to act, the wait included. Below warn the screen keeps the record form, and the file holds every attribute either way.
 - **Phrase user errors with `errs.Problemf`; leave internal failures bare.** `kit.Run` tags an unphrased error out of a command body as exit `7` and invites a report, so a bare `fmt.Errorf` about a mistyped flag reads as "report this", and a polished sentence over a broken key hierarchy hides a real bug.
 
 ## Quality Gates

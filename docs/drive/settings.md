@@ -39,7 +39,7 @@ proton drive settings set KEY VALUE
 ```
 
 ```bash
-proton drive settings set revision-retention 30
+proton drive settings set version-history 30d
 ```
 
 ---

@@ -27,7 +27,6 @@ func draftsListCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "list",
 		Short: "List drafts",
-		Args:  cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			msgs, total, err := c.App.Mail.DraftsList(c.Ctx, page.Number, page.Size)
 			if err != nil {
@@ -51,7 +50,6 @@ func draftsCreateCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "create",
 		Short: "Save a draft without sending it",
-		Args:  cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			content, err := f.content(c)
 			if err != nil {
@@ -84,7 +82,6 @@ func draftsUpdateCmd() *cobra.Command {
 		Long: "Change a draft. Only what you pass is replaced; everything else is kept.\n\n" +
 			"--to, --cc and --bcc replace the whole list rather than adding to it. --attach\n" +
 			"adds files and --detach removes one by name or ID.",
-		Args: cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			id, err := c.App.Mail.ResolveDraft(c.Ctx, c.Args[0])
 			if err != nil {
@@ -157,7 +154,6 @@ func draftsSendCmd() *cobra.Command {
 		Long: "Send a draft as it stands.\n\n" +
 			"No signature is appended: the draft already holds whatever signature it was\n" +
 			"created with.",
-		Args: cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{d.supply, kit.StepExpand}, func(c *kit.Invocation) error {
 			del, at, err := d.delivery()
 			if err != nil {
@@ -200,7 +196,6 @@ func draftsDeleteCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "delete REF...",
 		Short: "Delete drafts",
-		Args:  cobra.MinimumNArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			sel, err := kit.Select(c, kit.Selector[mailsvc.Message]{
 				Noun:    "drafts",

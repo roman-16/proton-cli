@@ -143,7 +143,7 @@ func TestTheMapNamesEverythingTheTreeHolds(t *testing.T) {
 	walk = func(c *cobra.Command) {
 		var verbs []string
 		for _, sub := range c.Commands() {
-			if sub.Hidden || sub.Name() == "help" {
+			if sub.Hidden {
 				continue
 			}
 			if sub.Runnable() {
@@ -184,7 +184,7 @@ func TestEveryListingThatTakesFiltersShowsThem(t *testing.T) {
 	var walk func(*cobra.Command)
 	walk = func(c *cobra.Command) {
 		for _, sub := range c.Commands() {
-			if sub.Hidden || sub.Name() == "help" {
+			if sub.Hidden {
 				continue
 			}
 			if sub.Name() == "list" {

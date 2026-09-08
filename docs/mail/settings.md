@@ -266,7 +266,7 @@ Set the order filters run in.
 The first rule to file a message wins, so the order decides where mail lands. Name every filter, in the order you want them. This replaces the whole order; a partial one is refused.
 
 ```
-proton mail settings filters reorder REF...
+proton mail settings filters reorder REF REF...
 ```
 
 ```bash
@@ -645,8 +645,8 @@ proton mail settings set KEY VALUE
 ```
 
 ```bash
-proton mail settings set signature off
-proton mail settings set view-mode conversation
+proton mail settings set pm-signature off
+proton mail settings set view-mode conversations
 ```
 
 ---

@@ -47,7 +47,6 @@ func vaultsListCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List your vaults",
-		Args:  cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			vaults, err := vaultList(c).Rows(c.Ctx)
 			if err != nil {
@@ -66,7 +65,6 @@ func vaultsCreateCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "create",
 		Short: "Create a vault",
-		Args:  cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			if name == "" {
 				return kit.Fail("A vault needs a name.").Hint("--name Work")
@@ -99,7 +97,6 @@ func vaultsUpdateCmd() *cobra.Command {
 			"Icons and colors are numbers: --icon 7, --color 3.\n\n" +
 			"Anything you do not mention is left alone, including a description written\n" +
 			"in the Pass app.",
-		Args: cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			iconValue, err := icon.Value()
 			if err != nil {
@@ -146,7 +143,6 @@ func vaultsDeleteCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "delete REF...",
 		Short: "Delete vaults, and everything in them",
-		Args:  cobra.MinimumNArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			sel, err := kit.SelectFrom(c, "vaults", vaultColumns(), vaultList(c))
 			if err != nil {
@@ -174,7 +170,6 @@ func vaultsGetCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "get REF",
 		Short: "Show one vault in full",
-		Args:  cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			v, err := vaultList(c).Find(c.Ctx, c.Args[0])
 			if err != nil {

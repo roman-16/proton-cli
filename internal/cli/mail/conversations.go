@@ -41,7 +41,6 @@ func convListCmd() *cobra.Command {
 			"Proton's index, which lags a change by a few seconds.\n\n" +
 			"Looks in the inbox unless told otherwise. Use --folder all to search\n" +
 			"everything.",
-		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			opts, err := f.list()
 			if err != nil {
@@ -73,7 +72,6 @@ func convGetCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "get REF",
 		Short: "Show a whole thread, decrypted",
-		Args:  cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			shape, err := render.Value()
 			if err != nil {
@@ -329,7 +327,6 @@ func convAnswerCmd(use, short string, forward bool) *cobra.Command {
 	c := &cobra.Command{
 		Use:   use + " REF",
 		Short: short,
-		Args:  cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{d.supply, kit.StepExpand}, func(c *kit.Invocation) error {
 			del, at, err := d.delivery()
 			if err != nil {
@@ -409,7 +406,6 @@ func convAttachmentsListCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "list REF",
 		Short: "List every attachment in a thread",
-		Args:  cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			id, err := c.App.Mail.ResolveConversation(c.Ctx, c.Args[0])
 			if err != nil {
@@ -432,7 +428,6 @@ func convAttachmentsDownloadCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "download REF [ATTACHMENT_REF]",
 		Short: "Download and decrypt attachments from a thread",
-		Args:  cobra.RangeArgs(1, 2),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			one := len(c.Args) == 2
 			if err := dest.Validate(one); err != nil {
@@ -502,7 +497,6 @@ func convSnoozeCmd() *cobra.Command {
 			"--until takes a duration from now, such as 3d, or a moment written out\n" +
 			"in full, such as 2026-04-17T09:00. The thread returns to the inbox then,\n" +
 			"unread.",
-		Args: cobra.ArbitraryArgs,
 		RunE: kit.Run([]kit.Step{
 			kit.StepSelection(f.set, filterHint, "a whole folder"), kit.StepExpand,
 		}, func(c *kit.Invocation) error {
@@ -553,7 +547,6 @@ func convUnsnoozeCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "unsnooze [REF...]",
 		Short: "Bring snoozed threads back to the inbox now",
-		Args:  cobra.ArbitraryArgs,
 		RunE: kit.Run([]kit.Step{
 			kit.StepSelection(f.set, filterHint, "a whole folder"), kit.StepExpand,
 		}, func(c *kit.Invocation) error {

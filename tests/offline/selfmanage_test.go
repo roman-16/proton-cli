@@ -41,5 +41,5 @@ func TestChangelogArgumentsAreJudgedBeforeTheFetch(t *testing.T) {
 		`"2" is not a version`, "changelog --until 2.4.1")
 	refuses(t, 1, []string{"changelog", "2.4.1", "--since", "2.3.0"},
 		"ask for different things", "changelog 2.4.1", "changelog --since 2.4.1")
-	refuses(t, 1, []string{"changelog", "2.4.1", "2.3.0"}, "Accepts at most 1 arg")
+	refuses(t, 1, []string{"changelog", "2.4.1", "2.3.0"}, "takes VERSION, but 2 arguments were given")
 }

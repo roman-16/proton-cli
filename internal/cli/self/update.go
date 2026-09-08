@@ -31,7 +31,6 @@ SHA-256 checksums.
 Only a curl-script install or a manually downloaded binary can update
 itself. If proton was installed with a package manager (apt, dnf,
 apk, Homebrew, winget, npm, Nix), update it with that package manager.`,
-		Args: cobra.MaximumNArgs(1),
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			target := ""
 			if len(c.Args) == 1 {

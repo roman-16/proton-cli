@@ -95,7 +95,6 @@ func mailboxListCmd(noun string, folder bool) *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List your " + noun,
-		Args:  cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			rows, err := mailboxes(c, noun, folder).Rows(c.Ctx)
 			if err != nil {
@@ -116,7 +115,6 @@ func mailboxCreateCmd(noun string, folder bool) *cobra.Command {
 	c := &cobra.Command{
 		Use:   "create",
 		Short: "Create a " + ui.Singular(noun),
-		Args:  cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			if name == "" {
 				return kit.Fail("A %s needs a name.", ui.Singular(noun)).Hint("--name Work")
@@ -148,7 +146,6 @@ func mailboxUpdateCmd(noun string, folder bool) *cobra.Command {
 	c := &cobra.Command{
 		Use:   "update REF",
 		Short: "Rename or recolor a " + ui.Singular(noun),
-		Args:  cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			spec := mailsvc.LabelSpec{Name: name, Color: color.Value(), Parent: parent}
 			if c.Changed("notify") {
@@ -185,7 +182,6 @@ func mailboxDeleteCmd(noun string, folder bool) *cobra.Command {
 	return &cobra.Command{
 		Use:   "delete REF...",
 		Short: "Delete " + noun,
-		Args:  cobra.MinimumNArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			sel, err := kit.SelectFrom(c, noun, mailboxColumns(folder), mailboxes(c, noun, folder))
 			if err != nil {

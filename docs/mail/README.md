@@ -303,8 +303,8 @@ A decision applies before the spam filter forms an opinion. Deciding again about
 ## Settings
 
 ```bash
-proton mail settings              # everything, at a glance
-proton mail settings set          # the writable keys, grouped by page
+proton mail settings get          # everything, at a glance
+proton mail settings list         # the writable keys, grouped by page
 proton mail settings set view-mode conversations
 proton mail settings addresses update me@proton.me --display-name "Roman L."
 proton mail settings addresses update me@proton.me --signature - < signature.html --html

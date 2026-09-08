@@ -47,7 +47,6 @@ func groupsGetCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "get REF",
 		Short: "Show one group and the addresses in it",
-		Args:  cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			group, err := groupList(c).Find(c.Ctx, c.Args[0])
 			if err != nil {
@@ -81,7 +80,6 @@ func groupsListCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List contact groups",
-		Args:  cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			groups, err := groupList(c).Rows(c.Ctx)
 			if err != nil {
@@ -101,7 +99,6 @@ func groupsCreateCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "create",
 		Short: "Create a contact group",
-		Args:  cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			if name == "" {
 				return kit.Fail("A group needs a name.").Hint("--name Team")
@@ -124,7 +121,6 @@ func groupsUpdateCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "update REF",
 		Short: "Rename or recolor a contact group",
-		Args:  cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			if name == "" && !color.Set() {
 				return kit.Fail("Nothing to change.").Hint("pass --name or --color.")
@@ -146,7 +142,6 @@ func groupsDeleteCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "delete REF...",
 		Short: "Delete contact groups",
-		Args:  cobra.MinimumNArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			sel, err := kit.SelectFrom(c, "groups", groupColumns(), groupList(c))
 			if err != nil {
@@ -184,7 +179,6 @@ func membersCmd(use, short string, action ui.Action, preposition string) *cobra.
 			"can be in a group while their personal one is not. Naming a contact means\n" +
 			"all of their addresses; --email narrows it to the ones you name, and then\n" +
 			"exactly one contact may be named.",
-		Args: cobra.MinimumNArgs(2),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			// Judged before the network: which contact an address belongs to is a
 			// question only one contact can answer.

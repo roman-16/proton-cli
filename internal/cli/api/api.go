@@ -28,7 +28,6 @@ func New() *cobra.Command {
 
 The response is passed through as the API returned it, so this is where to reach
 anything the commands do not cover.`,
-		Args: cobra.ExactArgs(2),
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			method := strings.ToUpper(c.Args[0])
 			q := make(map[string][]string)

@@ -84,6 +84,8 @@ Global flags:    proton --help
 Full reference:  https://proton-cli.lerchster.dev/mail/messages/#send
 ```
 
+`proton help mail messages send` shows the same screen.
+
 The page a command links to is named after the command. `proton drive items upload` is documented at `/drive/items/#upload`.
 
 Shell completion knows the whole tree, including which values each flag accepts. See [Install](install.md#shell-completions).

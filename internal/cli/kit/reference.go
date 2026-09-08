@@ -112,8 +112,14 @@ func ReferenceAnchor(c *cobra.Command) string {
 // written down".
 const Index = "about/commands"
 
-// Reference is where a command is documented in full.
+// Reference is where a command is documented in full, and nothing at all for a
+// command that is not published. The reference is generated from this same
+// tree and passes over what is hidden, so a link to a hidden command's page
+// would be a link to a page nobody wrote.
 func Reference(c *cobra.Command) string {
+	if c.Hidden {
+		return ""
+	}
 	page := ReferencePage(c)
 	if page == "" {
 		return Docs + "/" + Index + "/"

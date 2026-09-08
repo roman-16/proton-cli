@@ -120,7 +120,6 @@ func conversationExportCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "export REF",
 		Short: "Write a whole thread out as .eml files or one mbox",
-		Args:  cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			shape, err := format.Value()
 			if err != nil {

@@ -25,7 +25,6 @@ func autoreplyGetCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "get",
 		Short: "Show the auto-reply and its schedule",
-		Args:  cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			ar, err := c.App.Mail.AutoReplyGet(c.Ctx)
 			if err != nil {
@@ -66,7 +65,6 @@ func autoreplySetCmd() *cobra.Command {
 			"  permanent  -                  no bounds\n\n" +
 			"Proton sends every auto-reply with the subject \"Auto\" and offers no way to\n" +
 			"change it. Auto-reply is a paid feature.",
-		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			if err := reauth.Supply(c); err != nil {
 				return err
@@ -120,7 +118,6 @@ func autoreplyToggleCmd(use, short string, action ui.Action, enabled bool) *cobr
 	c := &cobra.Command{
 		Use:   use,
 		Short: short,
-		Args:  cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			if err := reauth.Supply(c); err != nil {
 				return err

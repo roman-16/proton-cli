@@ -33,7 +33,6 @@ is refused, with the right command to use instead.
 
 Only the binary goes, under both names it answers to. --purge also deletes
 your saved sessions, the ID cache and the diagnostic log.`,
-		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			return runUninstall(c, purge)
 		}),

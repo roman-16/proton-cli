@@ -350,7 +350,6 @@ func sendCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "send",
 		Short: "Compose and send a message",
-		Args:  cobra.NoArgs,
 		RunE: kit.Run([]kit.Step{d.supply}, func(c *kit.Invocation) error {
 			if f.eml == "" && f.subject == "" {
 				return kit.Fail("A subject is required.").Hint("--subject \"Quarterly numbers\"")
@@ -413,7 +412,6 @@ func answerCmd(use, short, long string, forward bool) *cobra.Command {
 		Use:   use + " REF",
 		Short: short,
 		Long:  long,
-		Args:  cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{d.supply, kit.StepExpand}, func(c *kit.Invocation) error {
 			del, at, err := d.delivery()
 			if err != nil {

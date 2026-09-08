@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/roman-16/proton-cli/internal/ref"
@@ -74,29 +73,4 @@ func isFlagValue(path []string) bool {
 	// A boolean flag never consumes the next argument, so what follows one is a
 	// positional and is exactly what the protection exists for.
 	return flag != nil && flag.NoOptDefVal == ""
-}
-
-// rewrapFlagError explains the one way a protected reference still collides with
-// flag parsing: everything after the inserted "--" is positional, so a flag
-// written after the ID arrives as an argument.
-func rewrapFlagError(err error, argv []string) error {
-	if err == nil {
-		return err
-	}
-	msg := err.Error()
-	if !strings.Contains(msg, "accepts ") || !strings.Contains(msg, "arg(s)") {
-		return err
-	}
-	for _, a := range argv[1:] {
-		if ref.Unambiguous(a) {
-			return fmt.Errorf(
-				"%w\n"+
-					"Hint: %q starts with '-' so it is auto-protected with -- before it.\n"+
-					"      Any flags after the ID then become positional arguments. Put flags\n"+
-					"      before the ID, or insert -- before it explicitly:\n"+
-					"        proton ... --flag value -- %s",
-				err, a, a)
-		}
-	}
-	return err
 }

@@ -165,7 +165,6 @@ func Settings(scope, short string, specs map[string]Setting, show Handler) *cobr
 		&cobra.Command{
 			Use:   "get",
 			Short: "Show the " + scope + " settings now in effect",
-			Args:  cobra.NoArgs,
 			RunE:  Run(nil, show),
 		},
 		settingsListCmd(scope, specs),
@@ -186,7 +185,6 @@ func settingsListCmd(scope string, specs map[string]Setting) *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List the " + scope + " settings that can be changed",
-		Args:  cobra.NoArgs,
 		// No authentication: this is the schema, not the state.
 		RunE: Run(nil, func(c *Invocation) error {
 			keys := SortedKeys(specs)
@@ -223,10 +221,6 @@ func settingsSetCmd(scope string, specs map[string]Setting) *cobra.Command {
 		// runs Args before the persistent setup, so no session is established to
 		// reject a value that could never have been sent.
 		Args: func(_ *cobra.Command, args []string) error {
-			if len(args) != 2 {
-				return Fail("set takes a KEY and a VALUE.").
-					Hint(fmt.Sprintf("proton %s settings list", scope))
-			}
 			spec, ok := specs[args[0]]
 			if !ok {
 				return Fail("There is no %s setting called %q.", scope, args[0]).

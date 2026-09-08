@@ -3,13 +3,11 @@ package ui
 import (
 	"fmt"
 	"io"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/roman-16/proton-cli/internal/progress"
 	"github.com/roman-16/proton-cli/internal/units"
-	"golang.org/x/term"
 )
 
 // A transfer raises exactly one question - how long? - so the line answers it.
@@ -84,19 +82,14 @@ type sample struct {
 // result and no bar, rather than one frame per update with the erase printed in
 // front of each.
 func NewProgress(u *UI) progress.Sink {
-	if u.Quiet || u.Format.Machine() {
-		return progress.Nop{}
-	}
-	f, ok := u.Err.(*os.File)
-	if !ok || !term.IsTerminal(int(f.Fd())) || !terminalDepth(f).escapes() {
+	if !u.animates() {
 		return progress.Nop{}
 	}
 	return &Progress{w: u.Err, style: u.errStyle, active: true, interval: redrawEvery, width: func() int {
-		cols, _, err := term.GetSize(int(f.Fd()))
-		if err != nil || cols <= 0 {
-			return defaultWidth
+		if cols := u.err.columns(); cols > 0 {
+			return cols
 		}
-		return cols
+		return defaultWidth
 	}}
 }
 

@@ -29,6 +29,11 @@ const (
 
 // installHelp gives the whole tree one voice. Cobra resolves both functions by
 // walking to the parent, so setting them on the root is setting them everywhere.
+//
+// The tree is given its `help` command here too, and given it before anything
+// walks the tree: cobra would otherwise add its own inside Execute, which is
+// after the probe that judges an unknown word has already looked - and a word
+// nothing has heard of is exactly what that probe complains about.
 func installHelp(root *cobra.Command) {
 	root.SetHelpFunc(func(c *cobra.Command, _ []string) {
 		writeHelp(c.OutOrStdout(), c)
@@ -39,6 +44,58 @@ func installHelp(root *cobra.Command) {
 		_, err := io.WriteString(c.ErrOrStderr(), b.String())
 		return err
 	})
+	root.SetHelpCommand(helpCmd())
+	root.InitDefaultHelpCmd()
+}
+
+// helpName is the word, which several places have to recognise without
+// spelling it again.
+const helpName = "help"
+
+// helpCmd is the other way to ask, for the hand that types `git help log`.
+//
+// It is the same screen --help shows, from the same renderer, and it fails the
+// same way: a word the tree does not hold is the one complaint this CLI makes
+// about an unknown word, wherever it was typed. It stays out of the listings
+// because every screen already teaches --help, and a second entry for the same
+// thing would be the only command in the map that documents nothing.
+func helpCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:    helpName + " [COMMAND...]",
+		Short:  "Show the help for a command",
+		Hidden: true,
+		ValidArgsFunction: func(_ *cobra.Command, typed []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return helpTopics(typed, toComplete), cobra.ShellCompDirectiveNoFileComp
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Probed on a tree of its own, for the reason Execute probes on one:
+			// Find and ParseFlags leave state behind, and the tree that is running
+			// this command is that tree.
+			probe := newRoot()
+			if err := unknownSubcommand(probe, args); err != nil {
+				return err
+			}
+			target, _, _ := probe.Find(args)
+			writeHelp(cmd.OutOrStdout(), target)
+			return nil
+		},
+	}
+}
+
+// helpTopics is what may follow what has been typed so far: the subcommands of
+// wherever those words have reached.
+func helpTopics(typed []string, toComplete string) []string {
+	found, _, err := newRoot().Find(typed)
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for _, sub := range visibleSubcommands(found) {
+		if strings.HasPrefix(sub.Name(), toComplete) {
+			out = append(out, sub.Name()+"\t"+sub.Short)
+		}
+	}
+	return out
 }
 
 // writeHelp renders a command's whole screen: what it is, then how to use it.
@@ -84,8 +141,7 @@ func usage(b *strings.Builder, c *cobra.Command) {
 // writeCommands lists what a group holds.
 //
 // The root lists them under its own headings, because that is the map of the
-// product; everywhere else the flat list is the map, and cobra's own `help`
-// command is left out of both - it documents nothing this does not.
+// product; everywhere else the flat list is the map.
 func writeCommands(b *strings.Builder, c *cobra.Command) {
 	subs := visibleSubcommands(c)
 	if len(subs) == 0 {
@@ -128,8 +184,13 @@ func writeTail(b *strings.Builder, c *cobra.Command) {
 	if !c.HasParent() {
 		lead, pointer = perCommandLabel, kit.Program+" <command> --help"
 	}
+	reference := kit.Reference(c)
+	if reference == "" {
+		fmt.Fprintf(b, "\n%-*s%s\n", len(lead)+2, lead, pointer)
+		return
+	}
 	width := max(len(lead), len(referenceLabel)) + 2
-	fmt.Fprintf(b, "\n%-*s%s\n%-*s%s\n", width, lead, pointer, width, referenceLabel, kit.Reference(c))
+	fmt.Fprintf(b, "\n%-*s%s\n%-*s%s\n", width, lead, pointer, width, referenceLabel, reference)
 }
 
 // usageLine is the shape of the command.
@@ -152,7 +213,7 @@ func usageLine(c *cobra.Command) string {
 func visibleSubcommands(c *cobra.Command) []*cobra.Command {
 	var out []*cobra.Command
 	for _, sub := range c.Commands() {
-		if sub.Hidden || sub.Name() == "help" {
+		if sub.Hidden {
 			continue
 		}
 		out = append(out, sub)

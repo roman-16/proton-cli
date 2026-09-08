@@ -25,7 +25,6 @@ func watchCmd() *cobra.Command {
 			"beforehand comes up. A thread returning from snooze counts as arriving.\n\n" +
 			"Without --folder it covers the inbox plus every folder whose notifications\n" +
 			"are on, which `settings folders list` shows under NOTIFY.",
-		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			in, err := c.App.Mail.WatchedIn(c.Ctx, folder)
 			if err != nil {

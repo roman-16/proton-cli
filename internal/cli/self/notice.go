@@ -38,7 +38,7 @@ func Available(u *ui.UI, current, latest string) {
 // offline, or one whose owner runs a hundred commands in a shell loop, makes one
 // attempt between them rather than one each.
 func Notice(ctx context.Context, u *ui.UI, version string, off bool) {
-	if off || u.Quiet || !ui.IsTerminal(u.Err) {
+	if off || u.Quiet || !u.ErrIsTTY() {
 		return
 	}
 	exe, err := resolveExe()

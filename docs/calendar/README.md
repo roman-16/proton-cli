@@ -259,7 +259,7 @@ Until you accept, you see the calendar's name and who sent it, and nothing that 
 ## Settings
 
 ```bash
-proton calendar settings          # time zones, layout, invitations
+proton calendar settings get      # time zones, layout, invitations
 proton calendar settings set view week
 proton calendar settings set primary-timezone Europe/Vienna
 ```

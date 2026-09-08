@@ -26,7 +26,6 @@ import (
 
 	"github.com/goccy/go-yaml"
 	"github.com/roman-16/proton-cli/internal/errs"
-	"golang.org/x/term"
 )
 
 // Format is how the answer is serialised.
@@ -113,6 +112,17 @@ type UI struct {
 	// should.
 	style    Style
 	errStyle Style
+
+	// What each stream is, asked once. Every renderer reads these rather than
+	// asking a writer whether it is a terminal: Out and Err are wrapped while a
+	// sign of life is on the screen, and a wrapper is not a file to ask.
+	out, err measured
+	in       bool
+
+	// sp is the sign of life, shared by every clone of this UI so that a frame is
+	// retired by whichever of them writes first. Nil when this run may not draw
+	// one.
+	sp *spinner
 }
 
 // Options configures a UI. Out, Err and In default to the process streams.
@@ -156,11 +166,8 @@ func New(opts Options) *UI {
 	if opts.Format.Machine() {
 		want = ColorNever
 	}
-	style, errStyle := StyleFor(out, want), StyleFor(errw, want)
-	log, trace := newLoggers(errw, opts.LogLevel, opts.Salt, opts.Log, opts.Run)
-	return &UI{
-		Log:      log,
-		Trace:    trace,
+	outStream, errStream := measure(out), measure(errw)
+	u := &UI{
 		Format:   opts.Format,
 		Out:      out,
 		Err:      errw,
@@ -169,9 +176,46 @@ func New(opts Options) *UI {
 		NoInput:  opts.NoInput,
 		FullIDs:  opts.FullIDs,
 		Width:    opts.Width,
-		style:    style,
-		errStyle: errStyle,
+		style:    styleFrom(outStream, want),
+		errStyle: styleFrom(errStream, want),
+		out:      outStream,
+		err:      errStream,
+		in:       reading(in),
 	}
+	// The sign of life draws on the raw stream and every other line goes through
+	// a wrapper that takes it back, so nothing this run writes can land beside a
+	// frame - whichever stream it was written to, and whichever clone wrote it.
+	if u.animates() {
+		u.sp = newSpinner(errw, u.errStyle)
+		u.Out, u.Err = yielding{to: out, sp: u.sp}, yielding{to: errw, sp: u.sp}
+	}
+	u.Log, u.Trace = newLoggers(u.Err, u.errStyle, opts.LogLevel, opts.Salt, opts.Log, opts.Run)
+	return u
+}
+
+// animates reports whether this run may draw something that erases itself
+// again: a transfer bar, a sign of life.
+//
+// Drawing in place is an escape sequence like any other, so it needs a terminal
+// that acts on one; and it is commentary, so it needs a run that has not been
+// quietened and an answer meant for a person rather than a program.
+func (u *UI) animates() bool {
+	return !u.Quiet && !u.Format.Machine() && u.err.terminal && u.err.depth.escapes()
+}
+
+// Working draws a sign of life on the commentary stream while the run has
+// nothing to show yet, and returns the way to take it back.
+//
+// A command that has printed nothing is indistinguishable from one that has
+// hung, and the first request of an ordinary listing routinely outlasts the
+// moment a reader starts to wonder. The frame is retired by the first byte the
+// run writes to either stream, so it is never on the screen beside an answer, a
+// question or a bar.
+func (u *UI) Working() func() {
+	if u.sp == nil {
+		return func() {}
+	}
+	return u.sp.start()
 }
 
 // Style returns the styling for Out.
@@ -190,9 +234,16 @@ func (u *UI) IsTTY() bool {
 	if os.Getenv("PROTON_CLI_FORCE_TTY") == "1" {
 		return true
 	}
-	f, ok := u.Out.(*os.File)
-	return ok && term.IsTerminal(int(f.Fd()))
+	return u.out.terminal
 }
+
+// ErrIsTTY reports whether somebody is watching the commentary stream, which is
+// what separates a person at a keyboard from a scheduler collecting a log.
+func (u *UI) ErrIsTTY() bool { return u.err.terminal }
+
+// InIsTTY reports whether standard input is a terminal, so a read that is about
+// to wait for typing can say so rather than look like a hang.
+func (u *UI) InIsTTY() bool { return u.in }
 
 // ShortIDs reports whether IDs should be shortened for display.
 func (u *UI) ShortIDs() bool { return u.IsTTY() && !u.FullIDs }
@@ -205,7 +256,7 @@ func (u *UI) ShortIDs() bool { return u.IsTTY() && !u.FullIDs }
 // has already been stated in the line above the table.
 func (u *UI) preview() *UI {
 	p := *u
-	p.Out = u.Err
+	p.Out, p.out = u.Err, u.err
 	p.style = u.errStyle
 	p.Quiet = true
 	return &p
@@ -270,17 +321,23 @@ func (u *UI) Instruct(msg string) {
 // caveat prints as flat commentary in the same colour as "Downloading…", which
 // is how a warning about an unverifiable signature ends up sitting invisibly
 // above a green tick.
-//
-// Continuation lines are indented under the first, so a wrapped caveat stays
-// visually attached to its mark.
 func (u *UI) Warn(msg string) {
 	if u.Quiet || msg == "" {
 		return
 	}
+	writeCaution(u.Err, u.errStyle, Caution, msg)
+}
+
+// writeCaution draws the third severity wherever it is raised: a command's own
+// caveat, or a record the run logged while the work was going on.
+//
+// Continuation lines are indented under the first, so a wrapped caveat stays
+// visually attached to its mark.
+func writeCaution(w io.Writer, style Style, role Role, msg string) {
 	lines := strings.Split(msg, "\n")
-	_, _ = fmt.Fprintf(u.Err, "%s %s\n", u.errStyle.Paint(Caution, GlyphCaution), lines[0])
+	_, _ = fmt.Fprintf(w, "%s %s\n", style.Paint(role, GlyphCaution), lines[0])
 	for _, cont := range lines[1:] {
-		_, _ = fmt.Fprintf(u.Err, "  %s\n", cont)
+		_, _ = fmt.Fprintf(w, "  %s\n", cont)
 	}
 }
 

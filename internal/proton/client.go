@@ -18,6 +18,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/roman-16/proton-cli/internal/units"
 )
 
 const (
@@ -42,9 +44,12 @@ const (
 	// down rather than to fail and be retried by a human immediately.
 	transientWaits = 4
 
-	// notAnswering is what a wait on a server that broke or a connection that
-	// failed is announced as, for the same reason a rate-limit wait is announced.
-	notAnswering = "Proton is not answering; waiting before trying again"
+	// notAnswering is why a wait happens when a server broke or a connection
+	// failed, and rateLimited why it happens when Proton refuses to be asked
+	// again this soon. Both are announced, for the same reason: the run is about
+	// to sit still for seconds and the person watching should know what for.
+	notAnswering = "Proton is not answering"
+	rateLimited  = "Proton is rate limiting this run"
 
 	// maxInFlight bounds how many requests one invocation has outstanding.
 	// Independent requests are made at the same time, which is what keeps a
@@ -438,15 +443,15 @@ func (c *Client) retrying(ctx context.Context, req Request, once func() (*Respon
 				return resp, err
 			}
 			delay = retryDelay("", attempt)
-			c.log.Warn(notAnswering, "method", req.Method, "path", req.Path,
+			c.log.Warn(waiting(notAnswering, delay), "method", req.Method, "path", req.Path,
 				"error", err, "wait_ms", delay.Milliseconds(), "attempt", attempt)
 		case resp.Status == http.StatusTooManyRequests:
 			delay = retryDelay(resp.retryHeader, attempt)
-			c.log.Warn("rate limited by Proton; waiting before trying again",
+			c.log.Warn(waiting(rateLimited, delay),
 				"method", req.Method, "path", req.Path, "wait_ms", delay.Milliseconds(), "attempt", attempt)
 		case resp.Status >= 500 && repeat:
 			delay = retryDelay(resp.retryHeader, attempt)
-			c.log.Warn(notAnswering, "method", req.Method, "path", req.Path,
+			c.log.Warn(waiting(notAnswering, delay), "method", req.Method, "path", req.Path,
 				"status", resp.Status, "wait_ms", delay.Milliseconds(), "attempt", attempt)
 		default:
 			return resp, nil
@@ -457,6 +462,16 @@ func (c *Client) retrying(ctx context.Context, req Request, once func() (*Respon
 		case <-time.After(delay):
 		}
 	}
+}
+
+// waiting is how a wait is put to the person sitting through it: what is wrong,
+// and how long before the run tries again.
+//
+// A wait shorter than a second is still announced as one second. It is the only
+// part of the sentence that could round to nothing, and "trying again in 0s"
+// reads as a run that is not waiting at all.
+func waiting(reason string, d time.Duration) string {
+	return fmt.Sprintf("%s; trying again in %s.", reason, units.Duration(max(d.Round(time.Second), time.Second)))
 }
 
 // repeatable reports whether sending req twice could not change what the account

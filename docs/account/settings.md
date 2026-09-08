@@ -40,7 +40,7 @@ proton account settings set KEY VALUE
 
 ```bash
 proton account settings set locale de_AT
-proton account settings set news off
+proton account settings set week-start monday
 ```
 
 ---

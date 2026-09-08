@@ -117,11 +117,47 @@ type Style struct {
 	direct bool
 }
 
-// IsTerminal reports whether w is a real terminal, which is what separates
-// someone reading the output from a file, a pipe or a scheduler collecting it.
-func IsTerminal(w io.Writer) bool {
+// measured is what a stream is, asked once: whether a terminal is on the other
+// end of it, what that terminal does with an escape sequence, and how wide it
+// is. A stream that is a file or a pipe answers none of the three.
+//
+// It is asked once because the answer has to survive the stream being wrapped.
+// A run draws a sign of life over its own output and takes it back again by
+// putting a writer in front of both streams, and a writer is not a descriptor
+// to put the question to.
+type measured struct {
+	terminal bool
+	depth    depth
+	file     *os.File
+}
+
+func measure(w io.Writer) measured {
 	f, ok := w.(*os.File)
+	if !ok || !term.IsTerminal(int(f.Fd())) {
+		return measured{}
+	}
+	return measured{terminal: true, depth: terminalDepth(f), file: f}
+}
+
+// reading is the same question of an input stream. A reader that is not a file
+// is a test's buffer, which nobody is typing into.
+func reading(r io.Reader) bool {
+	f, ok := r.(*os.File)
 	return ok && term.IsTerminal(int(f.Fd()))
+}
+
+// columns is how wide the terminal is now, or 0 when there is nothing to ask.
+// It is measured per call rather than kept, because a window is resized while a
+// command runs.
+func (m measured) columns() int {
+	if m.file == nil {
+		return 0
+	}
+	cols, _, err := term.GetSize(int(m.file.Fd()))
+	if err != nil || cols <= 0 {
+		return 0
+	}
+	return cols
 }
 
 // StyleFor returns the styling to use when writing to w.
@@ -130,13 +166,15 @@ func IsTerminal(w io.Writer) bool {
 // so a redirect or a pipe receives the same bytes without them.
 // PROTON_CLI_FORCE_TTY deliberately does not apply, which keeps captured output
 // plain unless colour was asked for by name.
-func StyleFor(w io.Writer, want Color) Style {
+func StyleFor(w io.Writer, want Color) Style { return styleFrom(measure(w), want) }
+
+func styleFrom(m measured, want Color) Style {
 	if want == ColorNever {
 		return Style{}
 	}
 	d := depthNone
-	if f, ok := w.(*os.File); ok && term.IsTerminal(int(f.Fd())) {
-		d = terminalDepth(f)
+	if m.terminal {
+		d = m.depth
 	}
 	if want == ColorAlways && d == depthNone {
 		d = advertised()

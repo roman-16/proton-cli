@@ -26,7 +26,6 @@ func aliasesListCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "list",
 		Short: "List your aliases",
-		Args:  cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			vaultRef, err := kit.Expand(c.App, vault)
 			if err != nil {
@@ -61,7 +60,6 @@ func aliasesToggleCmd(use, short string, action ui.Action, enabled bool) *cobra.
 	return &cobra.Command{
 		Use:   use + " REF",
 		Short: short,
-		Args:  cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			shareID, itemID, err := resolveItem(c, c.Args[0])
 			if err != nil {
@@ -94,7 +92,6 @@ func aliasesCreateCmd() *cobra.Command {
 			"The address is a prefix you choose plus a suffix Proton offers. Mail sent to\n" +
 			"it arrives in the mailboxes you name. Run `aliases options` to see the\n" +
 			"suffixes and mailboxes available.",
-		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			if prefix == "" {
 				return kit.Fail("An alias needs a prefix.").
@@ -154,7 +151,6 @@ func aliasesOptionsCmd() *cobra.Command {
 			"A suffix is the domain an alias is made on, and is what --suffix takes.\n\n" +
 			"Proton adds a random word in front of the suffix, and only settles on it\n" +
 			"when the alias is created.",
-		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			shareID, err := resolveVault(c, "")
 			if err != nil {

@@ -23,6 +23,10 @@ import (
 // that is a user error only because cobra's complaints about a command line
 // arrive that way. The ones from a command body are tagged as they pass through
 // kit.Run, which is what makes the seventh code reachable - see errs.ExitBug.
+// exitCancelled is what a run interrupted from the keyboard exits with, which is
+// the code a shell reports for a program killed by Ctrl-C.
+const exitCancelled = 130
+
 func exitCode(err error) int {
 	if err == nil {
 		return 0

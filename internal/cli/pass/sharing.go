@@ -134,7 +134,6 @@ func shareAddCmd(t target) *cobra.Command {
 		Use:   "add REF EMAIL",
 		Short: t.short["add"],
 		Long:  t.long["add"],
-		Args:  cobra.ExactArgs(2),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			role, err := access.Value()
 			if err != nil {
@@ -164,7 +163,6 @@ func shareGetCmd(t target) *cobra.Command {
 		Use:   "get REF",
 		Short: t.short["get"],
 		Long:  t.long["get"],
-		Args:  cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			shareID, itemID, name, err := t.resolve(c, c.Args[0])
 			if err != nil {
@@ -230,7 +228,6 @@ func shareUpdateCmd(t target) *cobra.Command {
 		Use:   "update REF EMAIL",
 		Short: t.short["update"],
 		Long:  t.long["update"],
-		Args:  cobra.ExactArgs(2),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			role, err := access.Value()
 			if err != nil {
@@ -272,7 +269,6 @@ func shareRemoveCmd(t target) *cobra.Command {
 		Use:   "remove REF EMAIL",
 		Short: t.short["remove"],
 		Long:  t.long["remove"],
-		Args:  cobra.ExactArgs(2),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			shareID, itemID, name, err := t.resolve(c, c.Args[0])
 			if err != nil {
@@ -359,7 +355,6 @@ func vaultsTransferCmd() *cobra.Command {
 			"They have to be a member already, and only the owner can hand a vault over.\n\n" +
 			"Afterwards you are a manager like anybody else. This is the one change to a\n" +
 			"vault you cannot undo on your own.",
-		Args: cobra.ExactArgs(2),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			vault, err := vaultList(c).Find(c.Ctx, c.Args[0])
 			if err != nil {
@@ -427,7 +422,6 @@ func invitationsListCmd() *cobra.Command {
 			"For a vault, you can read its name and how much is in it before accepting.\n" +
 			"Its contents stay sealed until you do.\n\n" +
 			"An item offered on its own shows no preview at all.",
-		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			rows, err := c.App.Pass.InvitesReceived(c.Ctx)
 			if err != nil {
@@ -449,7 +443,6 @@ func invitationsAcceptCmd() *cobra.Command {
 			"re-encrypted to your own. A vault then behaves like any other of yours.\n\n" +
 			"An item accepted on its own is in no vault of yours, so `shared list` is\n" +
 			"where it appears.",
-		Args: cobra.MinimumNArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			return answerInvites(c, ui.Accepted, c.App.Pass.InviteAccept)
 		}),
@@ -460,7 +453,6 @@ func invitationsDeclineCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "decline REF...",
 		Short: "Turn down what somebody offered you",
-		Args:  cobra.MinimumNArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			return answerInvites(c, ui.Declined, c.App.Pass.InviteReject)
 		}),

@@ -136,6 +136,12 @@ func Run(steps []Step, h Handler) func(*cobra.Command, []string) error {
 		// complaints about a command line are just as bare and are nobody's bug.
 		ctx, tally := skip.With(cmd.Context())
 		c := &Invocation{Ctx: ctx, App: app.From(ctx), Args: args, Cmd: cmd, tally: tally}
+		// From here the work is the network's to take as long as it takes, and
+		// nothing has been written yet. Everything judgeable from the command line
+		// has already been judged, so a run that is still silent from here on is
+		// waiting rather than deciding.
+		done := c.UI().Working()
+		defer done()
 		if err := gate(c); err != nil {
 			return errs.Bug(err)
 		}

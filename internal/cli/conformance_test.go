@@ -44,7 +44,7 @@ func partition(t *testing.T) (leaves, groups []*cobra.Command) {
 	t.Helper()
 	var walk func(*cobra.Command)
 	walk = func(c *cobra.Command) {
-		if c.Hidden || c.Name() == "help" || c.Name() == "completion" {
+		if c.Hidden || c.Name() == "completion" {
 			return
 		}
 		if c.HasSubCommands() {
@@ -135,6 +135,33 @@ func TestUsageUsesOnlyDeclaredPlaceholders(t *testing.T) {
 				t.Errorf("%s: undeclared placeholder %q in %q", cmdPath(c), tok, c.Use)
 			}
 		}
+	}
+}
+
+// How many arguments a command takes is said once, on the usage line its help
+// screen shows, and kit is what reads it. A command that declared an arity of
+// its own would be a command that can disagree with the line above its own
+// flags, and two of them did: `completion` showed no argument and demanded one,
+// `filters reorder` showed one and demanded two.
+//
+// A value check is a different thing and stays with the command: what a setting
+// key may be is the command's own knowledge. It runs after the count, so it can
+// take the arguments it is handed as given.
+func TestNoCommandCountsItsOwnArguments(t *testing.T) {
+	arity := []string{
+		"cobra.NoArgs", "cobra.ArbitraryArgs", "cobra.ExactArgs", "cobra.MinimumNArgs",
+		"cobra.MaximumNArgs", "cobra.RangeArgs", "cobra.MatchAll", "cobra.OnlyValidArgs",
+	}
+	offenders := grepGo(t, []string{"."}, func(src string) bool {
+		for _, v := range arity {
+			if strings.Contains(src, v) {
+				return true
+			}
+		}
+		return false
+	})
+	for _, f := range offenders {
+		t.Errorf("%s counts its own arguments; the usage line says how many it takes", f)
 	}
 }
 
@@ -1350,8 +1377,11 @@ var layers = map[string][]string{
 	// log, and what may be written in one is declared in redact rather than
 	// restated by each handler. Putting the policy above every destination is
 	// what makes "the log holds nothing sensitive" one rule instead of two.
-	"ui":       {"units", "progress", "errs", "ref", "redact"},
-	"proton":   {"errs", "crypto/aead", "hv", "hv/hvexit"},
+	"ui": {"units", "progress", "errs", "ref", "redact"},
+	// proton reaches units for the reason ui does: it announces a wait to the
+	// person sitting through it, and how long a span is put to a reader is
+	// declared once rather than spelled a second way here.
+	"proton":   {"errs", "units", "crypto/aead", "hv", "hv/hvexit"},
 	"errs":     {},
 	"units":    {},
 	"progress": {},
@@ -1470,6 +1500,13 @@ func TestEveryExampleIsTheCommandItIllustrates(t *testing.T) {
 			}
 			if err := found.ParseFlags(rest); err != nil {
 				t.Errorf("%s: example %q: %v", cmdPath(c), line, err)
+				continue
+			}
+			// The usage line is what counts a command's arguments, so an example
+			// is where the two meet: a line the reader is invited to copy has to
+			// survive the check the command makes of it.
+			if err := found.Args(found, found.Flags().Args()); err != nil {
+				t.Errorf("%s: example %q is refused by %q: %v", cmdPath(c), line, found.Use, err)
 			}
 		}
 	}

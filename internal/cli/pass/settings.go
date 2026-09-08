@@ -36,7 +36,6 @@ func mailboxesCreateCmd() *cobra.Command {
 		Long: "Add an address for aliases to forward to.\n\n" +
 			"Proton emails the address a code. The mailbox receives nothing until you\n" +
 			"pass that code to `mailboxes verify`.",
-		Args: cobra.ExactArgs(1),
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			return kit.Create(c, ui.ResultSpec{
 				Action: ui.Created, Kind: "mailboxes", Name: c.Args[0],
@@ -60,7 +59,6 @@ func mailboxesVerifyCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "verify REF",
 		Short: "Confirm an address with the code Proton emailed it",
-		Args:  cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			box, err := c.App.Pass.MailboxByEmail(c.Ctx, c.Args[0])
 			if err != nil {
@@ -83,7 +81,6 @@ func mailboxesResendCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "resend REF",
 		Short: "Send the confirmation code again",
-		Args:  cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			box, err := c.App.Pass.MailboxByEmail(c.Ctx, c.Args[0])
 			if err != nil {
@@ -107,7 +104,6 @@ func mailboxesDeleteCmd() *cobra.Command {
 		Long: "Remove an address aliases forward to.\n\n" +
 			"--transfer-to names the mailbox that its aliases move to. It is required:\n" +
 			"without a new mailbox, those aliases would stop receiving mail.",
-		Args: cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			box, err := c.App.Pass.MailboxByEmail(c.Ctx, c.Args[0])
 			if err != nil {
@@ -146,7 +142,6 @@ func mailboxesUpdateCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "update REF",
 		Short: "Change a mailbox",
-		Args:  cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			if !makeDefault {
 				return kit.Fail("Nothing to change.").Hint("--default makes new aliases arrive here.")
@@ -175,7 +170,6 @@ func mailboxesListCmd() *cobra.Command {
 			"An alias is a route, not a mailbox: mail sent to it arrives in one of\n" +
 			"these. To point an alias at one, run `proton pass items update REF\n" +
 			"--mailbox`.",
-		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			rows, err := c.App.Pass.Mailboxes(c.Ctx)
 			if err != nil {
@@ -210,7 +204,6 @@ func domainsListCmd() *cobra.Command {
 		Long: "List the domains an alias can be made on.\n\n" +
 			"These are the values `proton pass aliases create --suffix` accepts: the\n" +
 			"part of an alias after the @.",
-		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			rows, err := c.App.Pass.Domains(c.Ctx)
 			if err != nil {

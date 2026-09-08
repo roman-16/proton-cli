@@ -12,8 +12,8 @@ func TestArgumentsReadsAUsageLine(t *testing.T) {
 		want []Argument
 	}{
 		{"get REF", []Argument{{Name: "REF"}}},
-		{"trash [REF...]", []Argument{{Name: "REF", Variadic: true}}},
-		{"download REF [ATTACHMENT_REF]", []Argument{{Name: "REF"}, {Name: "ATTACHMENT_REF"}}},
+		{"trash [REF...]", []Argument{{Name: "REF", Optional: true, Variadic: true}}},
+		{"download REF [ATTACHMENT_REF]", []Argument{{Name: "REF"}, {Name: "ATTACHMENT_REF", Optional: true}}},
 		{"add REF CONTACT_REF...", []Argument{{Name: "REF"}, {Name: "CONTACT_REF", Variadic: true}}},
 		{"list", nil},
 		{"mark read", nil},
@@ -135,7 +135,7 @@ func TestAnArgumentThatNamesNothingPicksNothing(t *testing.T) {
 
 // A command that completes its own arguments keeps doing so, and one that takes
 // no reference is left alone entirely.
-func TestCompleteReferencesLeavesTheOthersAlone(t *testing.T) {
+func TestInstallArgumentsLeavesTheOthersAlone(t *testing.T) {
 	root := testTree()
 	list := find(t, root, "mail", "messages", "list")
 	own := &cobra.Command{
@@ -146,7 +146,7 @@ func TestCompleteReferencesLeavesTheOthersAlone(t *testing.T) {
 	}
 	find(t, root, "mail", "messages").AddCommand(own)
 
-	CompleteReferences(root)
+	InstallArguments(root)
 
 	if list.ValidArgsFunction != nil {
 		t.Error("a command taking no reference was given a completion")

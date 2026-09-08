@@ -109,7 +109,6 @@ func eventsListCmd() *cobra.Command {
 			"Each occurrence of a recurring event is listed on its own day, with a\n" +
 			"reference that names that occurrence.\n\n" +
 			"Covers every calendar unless --calendar narrows it to one.",
-		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			calIDs, err := listedCalendars(c, calendar)
 			if err != nil {
@@ -135,7 +134,6 @@ func eventsGetCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "get REF",
 		Short: "Show one event, decrypted",
-		Args:  cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			calID, eventID, occurrence, err := resolveEvent(c, c.Args[0])
 			if err != nil {
@@ -262,7 +260,6 @@ func eventsCreateCmd() *cobra.Command {
 			"Without --end or --duration an event lasts as long as the calendar it is made\n" +
 			"in says a new event lasts, which `settings calendars get` shows; an all-day\n" +
 			"event lasts a day.\n\n" + colorParagraph,
-		Args: cobra.NoArgs,
 		RunE: kit.Run([]kit.Step{d.check(true)}, func(c *kit.Invocation) error {
 			if d.title == "" || d.start == "" {
 				return kit.Fail("An event needs a title and a start.").
@@ -338,7 +335,6 @@ func eventsUpdateCmd() *cobra.Command {
 			"occurrence. Add --onwards to change it and every later one, or drop the @ part\n" +
 			"of the reference to change the whole series, which --dry-run will show you\n" +
 			"before you do.\n\n" + colorParagraph,
-		Args: cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{d.check(false), kit.StepExpand}, func(c *kit.Invocation) error {
 			calID, eventID, occurrence, err := resolveEvent(c, c.Args[0])
 			if err != nil {
@@ -772,7 +768,6 @@ func eventsRespondCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "respond REF",
 		Short: "Answer an invitation, telling the organizer",
-		Args:  cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			reply, err := answer.Value()
 			if err != nil {
@@ -823,7 +818,6 @@ func eventsDeleteCmd() *cobra.Command {
 			"A reference that names one occurrence of a recurring event deletes only that\n" +
 			"occurrence. Add --onwards to delete it and every later one, or drop the @ part\n" +
 			"of the reference to delete the whole series.",
-		Args: cobra.MinimumNArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			type target struct {
 				ref                        string
@@ -961,7 +955,6 @@ func eventsExportCmd() *cobra.Command {
 			"--start and --end are whole days in your own zone, both included.\n\n" +
 			"A recurring series is written once, with its rule, so another client reads\n" +
 			"it back as the same series.",
-		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			if err := dest.Validate(true); err != nil {
 				return err
@@ -1015,7 +1008,6 @@ func eventsImportCmd() *cobra.Command {
 			"are sent.\n\n" +
 			"A color in the file becomes the nearest of Proton's twenty accent colors,\n" +
 			"since those are the only ones it stores.",
-		Args: cobra.ExactArgs(1),
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			text, err := kit.ReadTextArg(c, c.Args[0], "PATH")
 			if err != nil {

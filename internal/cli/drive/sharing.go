@@ -23,7 +23,6 @@ func shareGetCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "get PATH",
 		Short: "Show how a file or folder is shared",
-		Args:  cobra.ExactArgs(1),
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			dc, err := context(c)
 			if err != nil {
@@ -91,7 +90,6 @@ func shareLinkCmd() *cobra.Command {
 			"The password is read from a file or from stdin, never from a flag value, and\n" +
 			"may be at most 50 characters. --clear-link-password takes it off again, and\n" +
 			"--expires never makes an expiring link permanent.",
-		Args: cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{password.Supply}, func(c *kit.Invocation) error {
 			opts := drivesvc.LinkOptions{}
 			if c.Changed("edit") {
@@ -153,7 +151,6 @@ func shareUnlinkCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "unlink PATH",
 		Short: "Remove the public links for a file or folder",
-		Args:  cobra.ExactArgs(1),
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			dc, err := context(c)
 			if err != nil {
@@ -180,7 +177,6 @@ func shareAddCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "add PATH EMAIL",
 		Short: "Invite someone to a file or folder",
-		Args:  cobra.ExactArgs(2),
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			dc, err := context(c)
 			if err != nil {
@@ -210,7 +206,6 @@ func shareUpdateCmd() *cobra.Command {
 		Long: "Change what somebody may do with a file or folder.\n\n" +
 			"Name them by address. It works whether they have accepted the share or\n" +
 			"still have it pending.",
-		Args: cobra.ExactArgs(2),
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			if !c.Changed("edit") {
 				return kit.Fail("Nothing to change.").
@@ -238,7 +233,6 @@ func shareResendCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "resend PATH EMAIL",
 		Short: "Send an unanswered invitation again",
-		Args:  cobra.ExactArgs(2),
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			dc, err := context(c)
 			if err != nil {
@@ -258,7 +252,6 @@ func shareRemoveCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "remove PATH EMAIL",
 		Short: "Revoke someone's access, or cancel their invitation",
-		Args:  cobra.ExactArgs(2),
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			dc, err := context(c)
 			if err != nil {
@@ -291,7 +284,6 @@ func invitationsListCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List invitations waiting for an answer",
-		Args:  cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			invitations, err := c.App.Drive.ListInvitations(c.Ctx)
 			if err != nil {
@@ -315,7 +307,6 @@ func invitationVerb(use, short string, action ui.Action) *cobra.Command {
 	return &cobra.Command{
 		Use:   use + " REF...",
 		Short: short,
-		Args:  cobra.MinimumNArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			return kit.Mutate(c, ui.ResultSpec{
 				Action: action, Kind: "invitations", Count: len(c.Args), IDs: c.Args,
@@ -382,7 +373,6 @@ func trashListCmd() *cobra.Command {
 			"empty` deletes all of it.\n\n" +
 			"A trashed item has no path, so address it by the ID shown here. An item\n" +
 			"whose name cannot be decrypted is still listed, so you can still act on it.",
-		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			dc, err := context(c)
 			if err != nil {
@@ -417,7 +407,6 @@ func trashRestoreCmd() *cobra.Command {
 		Short: "Put items back where they came from",
 		Long: "Put items back where they came from.\n\n" +
 			"A trashed item has no path. Name it by the ID that `trash list` shows.",
-		Args: cobra.MinimumNArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			dc, err := context(c)
 			if err != nil {
@@ -438,7 +427,6 @@ func trashEmptyCmd() *cobra.Command {
 		Short: "Delete everything in the trash, permanently",
 		Long: "Delete everything in the trash, permanently.\n\n" +
 			"That is everything `trash list` shows, trashed photos included.",
-		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			dc, err := context(c)
 			if err != nil {
@@ -490,7 +478,6 @@ func sharedCmd() *cobra.Command {
 			"here, as you would a trashed item or a photo.\n\n" +
 			"An item whose name cannot be decrypted is still listed, so you can still\n" +
 			"act on it.",
-		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			items, err := c.App.Drive.SharedWithMe(c.Ctx)
 			if err != nil {
@@ -516,7 +503,6 @@ func sharingCmd() *cobra.Command {
 		Short: "List what you have shared",
 		Long: "List everything you have shared, by public link or with named people.\n\n" +
 			"To check a single item instead, run `items share get PATH`.",
-		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			items, err := c.App.Drive.SharedByMe(c.Ctx)
 			if err != nil {

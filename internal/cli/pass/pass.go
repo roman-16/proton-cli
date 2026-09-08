@@ -114,7 +114,6 @@ func generateCmd() *cobra.Command {
 			"--words makes a passphrase instead, from Proton's own wordlist. Each word is\n" +
 			"capitalised and followed by a digit, unless --no-uppercase or --no-digits\n" +
 			"says otherwise.",
-		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			pw, err := g.make()
 			if err != nil {

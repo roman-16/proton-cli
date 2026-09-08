@@ -21,7 +21,6 @@ func addressesListCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List the addresses on the account",
-		Args:  cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			addrs, err := c.App.Mail.AddressesList(c.Ctx)
 			if err != nil {
@@ -49,7 +48,6 @@ func addressesGetCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "get REF",
 		Short: "Show one address, including its signature",
-		Args:  cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			a, err := c.App.Mail.ResolveAddress(c.Ctx, c.Args[0])
 			if err != nil {
@@ -85,7 +83,6 @@ func addressesUpdateCmd() *cobra.Command {
 			"from this address.\n\n" +
 			"A signature is stored as HTML. Plain text is escaped and its newlines become\n" +
 			"line breaks; --html passes markup through untouched.",
-		Args: cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			setName, setSig := c.Changed("display-name"), c.Changed("signature")
 			if clear && setSig {

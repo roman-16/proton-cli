@@ -113,7 +113,7 @@ func TestPagesThatPromiseAWholeListHaveTheWholeList(t *testing.T) {
 }
 
 func walkTree(c *cobra.Command, visit func(*cobra.Command)) {
-	if c.Hidden || c.Name() == "help" {
+	if c.Hidden {
 		return
 	}
 	if c.Runnable() {

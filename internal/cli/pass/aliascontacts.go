@@ -43,7 +43,6 @@ func aliasContactsListCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list REF",
 		Short: "List the addresses an alias can write to",
-		Args:  cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			shareID, itemID, err := aliasOf(c, c.Args[0])
 			if err != nil {
@@ -70,7 +69,6 @@ func aliasContactsCreateCmd() *cobra.Command {
 			"Proton answers with a second address standing for that one person. Mail you\n" +
 			"send there reaches them as though the alias had written it, so your real\n" +
 			"address is never shown.",
-		Args: cobra.ExactArgs(2),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			shareID, itemID, err := aliasOf(c, c.Args[0])
 			if err != nil {
@@ -98,7 +96,6 @@ func aliasContactsDeleteCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "delete REF ALIAS_CONTACT_REF...",
 		Short: "Remove an address an alias can write to",
-		Args:  cobra.MinimumNArgs(2),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			return actOnAliasContacts(c, ui.Deleted, func(shareID, itemID string, id int) error {
 				return c.App.Pass.AliasContactDelete(c.Ctx, shareID, itemID, id)
@@ -111,7 +108,6 @@ func aliasContactBlockCmd(use, short string, action ui.Action, blocked bool) *co
 	return &cobra.Command{
 		Use:   use + " REF ALIAS_CONTACT_REF...",
 		Short: short,
-		Args:  cobra.MinimumNArgs(2),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			return actOnAliasContacts(c, action, func(shareID, itemID string, id int) error {
 				return c.App.Pass.AliasContactSetBlocked(c.Ctx, shareID, itemID, id, blocked)

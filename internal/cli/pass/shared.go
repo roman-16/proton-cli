@@ -27,7 +27,6 @@ func sharedCmd() *cobra.Command {
 			"them by the ID shown here, or by name.\n\n" +
 			"An item whose content cannot be decrypted is still listed, so you can still\n" +
 			"act on it.",
-		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			rows, err := c.App.Pass.SharedWithMe(c.Ctx)
 			if err != nil {
@@ -61,7 +60,6 @@ func sharingCmd() *cobra.Command {
 			"To check a single item instead, run `items share get REF`. Shared vaults\n" +
 			"are in `vaults list` with the number of people in each, and secure links\n" +
 			"are in `links list`.",
-		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			rows, err := c.App.Pass.SharedByMe(c.Ctx)
 			if err != nil {

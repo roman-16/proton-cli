@@ -8,6 +8,10 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+// EOFKey is how somebody typing into a console says they have finished, which a
+// read that is about to wait for them has to name.
+const EOFKey = "Ctrl-Z, then Enter"
+
 // terminalDepth is what the console behind f can render.
 //
 // A Windows console prints an escape sequence instead of acting on it until a

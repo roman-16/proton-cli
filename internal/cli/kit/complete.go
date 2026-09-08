@@ -27,19 +27,24 @@ import (
 type Argument struct {
 	// Name is the placeholder, as kit.Placeholders declares it.
 	Name string
+	// Optional marks an argument written in brackets, which the command manages
+	// without.
+	Optional bool
 	// Variadic marks the argument that swallows the rest, so the position after
 	// it is still the same kind of thing.
 	Variadic bool
 }
 
 // Arguments reads the positionals out of a Use string, dropping the command name
-// and the optional brackets. It is the one parser for the notation, so a usage
-// line, the conformance test and a completion all read a command's arguments the
-// same way.
+// and reading the brackets rather than discarding them. It is the one parser for
+// the notation, so what a command completes, how many arguments it accepts, and
+// what the conformance test checks are all read off the line the help screen
+// shows.
 func Arguments(use string) []Argument {
 	fields := strings.Fields(use)
 	out := make([]Argument, 0, len(fields))
 	for _, f := range fields[min(1, len(fields)):] {
+		optional := strings.HasPrefix(f, "[")
 		f = strings.Trim(f, "[]{}()")
 		variadic := strings.HasSuffix(f, "...")
 		f = strings.TrimSuffix(f, "...")
@@ -48,7 +53,7 @@ func Arguments(use string) []Argument {
 		}
 		// Only shouted tokens are placeholders; a literal subcommand word is not.
 		if f == strings.ToUpper(f) && strings.ContainsFunc(f, unicode.IsLetter) {
-			out = append(out, Argument{Name: f, Variadic: variadic})
+			out = append(out, Argument{Name: f, Optional: optional, Variadic: variadic})
 		}
 	}
 	return out
@@ -123,24 +128,29 @@ func listsWholly(c *cobra.Command) bool {
 	return false
 }
 
-// CompleteReferences teaches every command that takes a reference to offer back
-// what has already been shown.
+// InstallArguments gives every command the two things its usage line already
+// declares: how many arguments it takes, and what completes each one.
+//
+// One walk, because they are one declaration. A command that counted its
+// arguments separately from the line that names them could disagree with its own
+// help screen, and two of them did.
 //
 // Installed over the whole tree rather than command by command, because a
-// command that forgot to ask for it would be indistinguishable from one whose
-// collection has nothing in it yet. A command that completes its own arguments -
-// a settings key, a shell name - keeps doing so.
-func CompleteReferences(root *cobra.Command) {
+// command that forgot to ask would be indistinguishable from one whose
+// collection has nothing in it yet. A command that judges its own arguments - a
+// settings key, a shell name - keeps doing so, after the count has passed.
+func InstallArguments(root *cobra.Command) {
 	var walk func(*cobra.Command)
 	walk = func(c *cobra.Command) {
 		for _, sub := range c.Commands() {
 			walk(sub)
 		}
-		if c.HasSubCommands() || c.ValidArgsFunction != nil || len(c.ValidArgs) > 0 {
+		if c.HasSubCommands() {
 			return
 		}
 		args := Arguments(c.Use)
-		if !namesAnything(c, args) {
+		c.Args = counting(args, c.Args)
+		if c.ValidArgsFunction != nil || len(c.ValidArgs) > 0 || !namesAnything(c, args) {
 			return
 		}
 		c.ValidArgsFunction = func(cmd *cobra.Command, typed []string, toComplete string) ([]string, cobra.ShellCompDirective) {

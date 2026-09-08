@@ -76,7 +76,6 @@ records, and everything above debug in between. --dest writes the whole
 of it to a file instead.
 
 Reads only what is already on this machine: no account, no network.`,
-		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			return deliver(c, collect(c, version, all), dest, force)
 		}),

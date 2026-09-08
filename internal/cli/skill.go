@@ -123,7 +123,6 @@ again when the installed ` + kit.Program + ` is a different one.
 Save it as SKILL.md inside a directory named ` + kit.Alias + `, wherever your agent
 reads skills. An agent that reads it as it runs rather than from a saved file
 wants --body-only, which leaves the frontmatter out.`,
-		Args: cobra.NoArgs,
 		// No authentication: this is about the binary, not the account.
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			s := newSkill(root, version)

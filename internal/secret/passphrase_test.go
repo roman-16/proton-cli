@@ -28,7 +28,7 @@ func TestAPassphraseIsWhatProtonWouldHaveMade(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Passphrase: %v", err)
 	}
-	words := strings.Split(got, "-")
+	words := hyphenated(got)
 	if len(words) != DefaultWords {
 		t.Fatalf("%q is %d words, want %d", got, len(words), DefaultWords)
 	}
@@ -43,6 +43,30 @@ func TestAPassphraseIsWhatProtonWouldHaveMade(t *testing.T) {
 			t.Errorf("%q is not from the wordlist, in %q", w, got)
 		}
 	}
+}
+
+// hyphenated takes a passphrase apart into the words it was built from.
+//
+// Splitting on the separator is not enough, because four of Proton's words are
+// themselves hyphenated - drop-down, felt-tip, t-shirt, yo-yo. A digit closes
+// every word here, so a piece that does not end in one is the front half of a
+// word and belongs to the piece after it.
+func hyphenated(passphrase string) []string {
+	var words []string
+	pending := ""
+	for _, piece := range strings.Split(passphrase, "-") {
+		pending += piece
+		if piece == "" || !unicode.IsDigit(rune(piece[len(piece)-1])) {
+			pending += "-"
+			continue
+		}
+		words = append(words, pending)
+		pending = ""
+	}
+	if pending != "" {
+		words = append(words, pending)
+	}
+	return words
 }
 
 // Every switch reads the same way it does for a password: what is off is absent.

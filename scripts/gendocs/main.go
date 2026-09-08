@@ -59,7 +59,7 @@ func collect(root *cobra.Command) map[string][]*cobra.Command {
 	pages := map[string][]*cobra.Command{}
 	var walk func(*cobra.Command)
 	walk = func(c *cobra.Command) {
-		if c.Hidden || c.Name() == "help" {
+		if c.Hidden {
 			return
 		}
 		// An app that holds other commands has its guide for a page, and that is
@@ -335,7 +335,7 @@ func commandPath(c *cobra.Command) string {
 func visible(c *cobra.Command) []*cobra.Command {
 	var out []*cobra.Command
 	for _, sub := range c.Commands() {
-		if !sub.Hidden && sub.Name() != "help" {
+		if !sub.Hidden {
 			out = append(out, sub)
 		}
 	}

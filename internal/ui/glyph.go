@@ -21,6 +21,10 @@ const (
 	GlyphBarPending = "─" // progress, remaining
 )
 
+// GlyphWorking is one turn of the sign of life a run draws while it waits, one
+// frame at a time in the same cell. The one-cell rule holds frame by frame.
+const GlyphWorking = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+
 // Mark is one glyph in a status column, paired with what it means.
 type Mark struct {
 	Glyph string

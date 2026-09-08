@@ -43,7 +43,6 @@ func filtersApplyCmd() *cobra.Command {
 			"A filter normally runs once, as mail arrives, so a rule written today does\n" +
 			"nothing about yesterday's mail.\n\n" +
 			"With no filter named, every enabled filter runs.",
-		Args: cobra.ArbitraryArgs,
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			var ids []string
 			name := "every enabled filter"
@@ -68,13 +67,12 @@ func filtersApplyCmd() *cobra.Command {
 // Order decides the outcome, so it is set as a whole rather than nudged.
 func filtersReorderCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "reorder REF...",
+		Use:   "reorder REF REF...",
 		Short: "Set the order filters run in",
 		Long: "Set the order filters run in.\n\n" +
 			"The first rule to file a message wins, so the order decides where mail\n" +
 			"lands. Name every filter, in the order you want them. This replaces the\n" +
 			"whole order; a partial one is refused.",
-		Args: cobra.MinimumNArgs(2),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			all, err := filterList(c).Rows(c.Ctx)
 			if err != nil {
@@ -125,7 +123,6 @@ func filtersListCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List your filters",
-		Args:  cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			rows, err := filterList(c).Rows(c.Ctx)
 			if err != nil {
@@ -158,7 +155,6 @@ func filtersCreateCmd() *cobra.Command {
 			"`is` wants the whole value; `matches` takes * and ? as wildcards. An\n" +
 			"attachments condition takes no value - it asks whether there is one.\n\n" +
 			"--sieve takes a script you wrote yourself instead.",
-		Args: cobra.NoArgs,
 		RunE: kit.Run([]kit.Step{func(*kit.Invocation) error {
 			return checkRule(sieve, conditions, moveTo, labels, markRead, star)
 		}}, func(c *kit.Invocation) error {
@@ -323,7 +319,6 @@ func filtersUpdateCmd() *cobra.Command {
 			"--if and the actions beside it replace the whole rule rather than adding to\n" +
 			"it. The filter keeps its place in the order, and stays enabled or disabled\n" +
 			"as it was.",
-		Args: cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand, func(*kit.Invocation) error {
 			if len(conditions) == 0 && sieve == "" {
 				return nil
@@ -388,7 +383,6 @@ func filtersGetCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "get REF",
 		Short: "Show what a filter matches and does",
-		Args:  cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			found, err := filterList(c).Find(c.Ctx, c.Args[0])
 			if err != nil {
@@ -458,7 +452,6 @@ func filterVerbCmd(use, short string, action ui.Action, apply func(*kit.Invocati
 	return &cobra.Command{
 		Use:   use + " REF...",
 		Short: short,
-		Args:  cobra.MinimumNArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			sel, err := kit.SelectFrom(c, "filters", filterColumns(), filterList(c))
 			if err != nil {

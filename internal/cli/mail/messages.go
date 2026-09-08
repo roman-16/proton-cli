@@ -42,7 +42,6 @@ func listCmd() *cobra.Command {
 			"index, which lags a change by a few seconds.\n\n" +
 			"Looks in the inbox unless told otherwise. Use --folder all to search\n" +
 			"everything.",
-		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			opts, err := f.list()
 			if err != nil {
@@ -74,7 +73,6 @@ func getCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "get REF",
 		Short: "Show one message, decrypted",
-		Args:  cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			shape, err := render.Value()
 			if err != nil {
@@ -494,7 +492,6 @@ func emptyCmd() *cobra.Command {
 		Long: "Delete everything in a folder, permanently.\n\n" +
 			"Proton clears the folder without reporting what was in it, so nothing is\n" +
 			"listed first. This takes no filters and always asks for confirmation.",
-		Args: cobra.NoArgs,
 		// Which folder to clear is on the command line or it is nowhere, so it is
 		// settled before the sign-in rather than after it.
 		RunE: kit.Run([]kit.Step{func(*kit.Invocation) error {
@@ -539,7 +536,6 @@ func expireCmd() *cobra.Command {
 		Long: "Make messages delete themselves after a while, or stop them.\n\n" +
 			"--in takes a duration. A message already counting down reports the moment\n" +
 			"it expires rather than how long is left.",
-		Args: cobra.ArbitraryArgs,
 		RunE: kit.Run([]kit.Step{
 			kit.StepSelection(f.set, filterHint, "a whole folder"), kit.StepExpand,
 			reauth.Supply,
@@ -593,7 +589,6 @@ func unsubscribeCmd() *cobra.Command {
 		Long: "Ask a mailing list to stop.\n\n" +
 			"Proton sends the request on your behalf, using whatever the message offered:\n" +
 			"a List-Unsubscribe header, or the one-click form behind it.",
-		Args: cobra.MinimumNArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			ids := make([]string, 0, len(c.Args))
 			for _, ref := range c.Args {

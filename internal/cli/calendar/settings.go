@@ -161,7 +161,6 @@ func calendarsListCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List your calendars",
-		Args:  cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			cals, err := calendarList(c).Rows(c.Ctx)
 			if err != nil {
@@ -185,7 +184,6 @@ func calendarsCreateCmd() *cobra.Command {
 			"--url takes the address of an .ics file. Proton fetches it on a schedule\n" +
 			"and fills the calendar from it, so those events are read-only. An address\n" +
 			"Proton cannot read is refused before the calendar is made.",
-		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			if name == "" {
 				return kit.Fail("A calendar needs a name.").Hint("--name Work")
@@ -210,7 +208,6 @@ func calendarsGetCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "get REF",
 		Short: "Show one calendar, with the defaults it gives new events",
-		Args:  cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			cal, err := calendarList(c).Find(c.Ctx, c.Args[0])
 			if err != nil {
@@ -266,7 +263,6 @@ func calendarsUpdateCmd() *cobra.Command {
 		Long: "Rename or recolor a calendar, or change what it gives new events.\n\n" +
 			"Defaults are set per calendar, so a work calendar can open half-hour\n" +
 			"meetings with a reminder while a personal one does not.",
-		Args: cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			busyValue, err := busy.Value()
 			if err != nil {
@@ -356,7 +352,6 @@ func calendarsDeleteCmd() *cobra.Command {
 		Long: "Delete calendars, and every event in them.\n\n" +
 			"Asks for your password even when you are signed in. With no terminal to ask,\n" +
 			"pass --password-file or --password-stdin.",
-		Args: cobra.MinimumNArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			if err := reauth.Supply(c); err != nil {
 				return err

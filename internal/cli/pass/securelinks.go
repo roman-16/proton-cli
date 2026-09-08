@@ -32,7 +32,6 @@ func linksGetCmd() *cobra.Command {
 			"Use this to recover a link you mislaid, rather than revoking it and making\n" +
 			"a new one.\n\n" +
 			"The URL is the secret, so it appears here and in no listing.",
-		Args: cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			found, err := secureLinkList(c).Find(c.Ctx, c.Args[0])
 			if err != nil {
@@ -99,7 +98,6 @@ func linksListCmd() *cobra.Command {
 			"The URLs are not shown: each one carries the key that opens its item. To\n" +
 			"read a URL, use `links get`, or `items share get` for the links on one\n" +
 			"item.",
-		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			rows, err := c.App.Pass.SecureLinksList(c.Ctx)
 			if err != nil {
@@ -126,7 +124,6 @@ func linksCreateCmd() *cobra.Command {
 			"after the '#', which a browser never sends to Proton, so anyone holding the\n" +
 			"whole URL can read the item until the link expires or is revoked.\n\n" +
 			"--expires is required.",
-		Args: cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand, func(*kit.Invocation) error {
 			if expires == "" {
 				return kit.Fail("How long should the link last?").
@@ -183,7 +180,6 @@ func linksRevokeCmd() *cobra.Command {
 		Long: "Stop a link working.\n\n" +
 			"The item is untouched; only the link stops working. This cannot take back\n" +
 			"what somebody already read.",
-		Args: cobra.MinimumNArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			sel, err := kit.SelectFrom(c, "links", linkColumns(), secureLinkList(c))
 			if err != nil {

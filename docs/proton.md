@@ -42,7 +42,7 @@ One script covers both proton and proton-cli.
   powershell  proton completion powershell | Out-String | Invoke-Expression
 
 ```
-proton completion
+proton completion SHELL
 ```
 
 ## `report`

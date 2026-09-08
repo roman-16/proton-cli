@@ -33,7 +33,6 @@ version, or the releases between two of them.
 --since names the version you are on and is not included; --until
 names where to stop and is. Releases older than the changelog itself
 are on the releases page.`,
-		Args: cobra.MaximumNArgs(1),
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			target := ""
 			if len(c.Args) == 1 {

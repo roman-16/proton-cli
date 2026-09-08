@@ -86,17 +86,11 @@ func TestLeadingDashIDWithFlagsBeforeParsesCleanly(t *testing.T) {
 	assertNotFlagParseError(t, stderr)
 }
 
-// TestLeadingDashIDWithFlagsAfterErrors: putting flags AFTER a leading-dash
-// ID produces the rewrapped Layer-C hint. preprocessArgs auto-injects `--`
-// before the ID, which makes any subsequent flag tokens positional;
-// rewrapFlagError catches cobra's "accepts N arg(s)" error and explains
-// the cause.
+// TestLeadingDashIDWithFlagsAfterErrors: putting flags AFTER a leading-dash ID
+// leaves them as arguments. The ID is protected by a `--` written in front of
+// it, and everything after that is positional by definition - so the command
+// reports more arguments than it has places for, and says where the flags went.
 func TestLeadingDashIDWithFlagsAfterErrors(t *testing.T) {
-	_, stderr, code := run(t, "mail", "messages", "get", dashedSyntheticID, "--render", "raw")
-	if code == 0 {
-		t.Errorf("expected non-zero exit, got 0; stderr=%s", stderr)
-	}
-	if !strings.Contains(stderr, "insert -- before it") {
-		t.Errorf("expected stderr to contain 'insert -- before it', got:\n%s", stderr)
-	}
+	refuses(t, 1, []string{"mail", "messages", "get", dashedSyntheticID, "--render", "raw"},
+		"takes REF, but 3 arguments were given", "put the flags first")
 }

@@ -50,7 +50,6 @@ func invitationsListCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List calendars other people have offered you",
-		Args:  cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			rows, err := c.App.Calendar.CalendarInvitations(c.Ctx)
 			if err != nil {
@@ -72,7 +71,6 @@ func invitationsAcceptCmd() *cobra.Command {
 			"The invitation carries the calendar's key, encrypted to the address it was\n" +
 			"sent to. Accepting re-encrypts that key to your own, after which the\n" +
 			"calendar behaves like any other of yours.",
-		Args: cobra.MinimumNArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			return answerInvitations(c, ui.Accepted, c.App.Calendar.CalendarInvitationAccept)
 		}),
@@ -83,7 +81,6 @@ func invitationsDeclineCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "decline REF...",
 		Short: "Turn down a calendar somebody offered you",
-		Args:  cobra.MinimumNArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			return answerInvitations(c, ui.Declined, c.App.Calendar.CalendarInvitationDecline)
 		}),

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"strconv"
 
+	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/redact"
 )
 
@@ -117,6 +118,50 @@ func (h redacting) WithGroup(name string) slog.Handler {
 	return redacting{inner: h.inner.WithGroup(name), redactor: h.redactor}
 }
 
+// spoken is the screen's half of the logging: what a record looks like to the
+// person the run is happening in front of.
+//
+// A record at warn or above is the run telling them something while the work is
+// going on - it is being rate limited, it could not check a signature - and
+// that is a sentence, in the same shape as every other caveat this CLI writes.
+// A timestamp, a level and a list of attributes beside it would be the run
+// talking past them to a machine, and the machine already has the file.
+//
+// Below warn the reader asked for the machinery, so they get it: at info and
+// debug the record keeps its attributes and its record form. The file is
+// untouched either way - it holds every record whole, whatever the screen does
+// with it.
+type spoken struct {
+	w     io.Writer
+	style Style
+	level slog.Level
+	inner slog.Handler
+}
+
+func (h spoken) Enabled(_ context.Context, level slog.Level) bool { return level >= h.level }
+
+func (h spoken) Handle(ctx context.Context, r slog.Record) error {
+	if r.Level < slog.LevelWarn {
+		return h.inner.Handle(ctx, r)
+	}
+	role := Caution
+	if r.Level >= slog.LevelError {
+		role = Danger
+	}
+	writeCaution(h.w, h.style, role, errs.Sentence(r.Message))
+	return nil
+}
+
+func (h spoken) WithAttrs(attrs []slog.Attr) slog.Handler {
+	h.inner = h.inner.WithAttrs(attrs)
+	return h
+}
+
+func (h spoken) WithGroup(name string) slog.Handler {
+	h.inner = h.inner.WithGroup(name)
+	return h
+}
+
 // fanout sends every record to each of several handlers, each with its own idea
 // of what is worth reporting.
 //
@@ -181,11 +226,16 @@ func (f fanout) WithGroup(name string) slog.Handler {
 // attached here rather than passed at each call, so that a line written anywhere
 // - a service, a request, a skip - belongs to its run by construction. The
 // screen is left alone: there is only ever one run on it.
-func newLoggers(errw io.Writer, level slog.Level, salt []byte, file io.Writer, run string) (log, trace *slog.Logger) {
+func newLoggers(errw io.Writer, style Style, level slog.Level, salt []byte, file io.Writer, run string) (log, trace *slog.Logger) {
 	redactor := redact.New(salt)
 	screen := redacting{
 		redactor: redactor,
-		inner:    slog.NewTextHandler(errw, &slog.HandlerOptions{Level: level}),
+		inner: spoken{
+			w:     errw,
+			style: style,
+			level: level,
+			inner: slog.NewTextHandler(errw, &slog.HandlerOptions{Level: level}),
+		},
 	}
 	if file == nil {
 		return slog.New(screen), slog.New(slog.DiscardHandler)

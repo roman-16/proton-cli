@@ -62,7 +62,6 @@ func forwardingListCmd() *cobra.Command {
 			"Outgoing is mail leaving one of your addresses for somebody else's; incoming\n" +
 			"is mail somebody else is sending to you. A forwarding is pending until the\n" +
 			"forwardee accepts it, and outdated once the forwarder's key changes.",
-		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			rows, err := forwardingList(c).Rows(c.Ctx)
 			if err != nil {
@@ -80,7 +79,6 @@ func forwardingGetCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "get REF",
 		Short: "Show one forwarding",
-		Args:  cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			found, err := forwardingList(c).Find(c.Ctx, c.Args[0])
 			if err != nil {
@@ -114,7 +112,6 @@ func forwardingCreateCmd() *cobra.Command {
 			"accepting one writes a new address key, and proton changes no key material.\n\n" +
 			"Forwarding to an address outside Proton is not built: Proton emails it a link\n" +
 			"its owner must follow, which no command can answer.",
-		Args: cobra.ExactArgs(2),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			from, err := c.App.Mail.ResolveAddress(c.Ctx, c.Args[0])
 			if err != nil {
@@ -137,7 +134,6 @@ func forwardingVerbCmd(use, short string, action ui.Action, apply func(*kit.Invo
 	return &cobra.Command{
 		Use:   use + " REF...",
 		Short: short,
-		Args:  cobra.MinimumNArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			sel, err := kit.SelectFrom(c, "forwardings", forwardingColumns(), forwardingList(c))
 			if err != nil {

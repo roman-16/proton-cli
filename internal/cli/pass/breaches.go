@@ -58,7 +58,6 @@ func breachesListCmd() *cobra.Command {
 		Long: "List the addresses Proton watches, and how many breaches each is in.\n\n" +
 			"Worst first. To see which breaches an address is in and what they exposed,\n" +
 			"run `breaches get` on it.",
-		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			rows, err := c.App.Pass.Monitored(c.Ctx)
 			if err != nil {
@@ -76,7 +75,6 @@ func breachesGetCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "get REF",
 		Short: "Show the breaches one address has appeared in",
-		Args:  cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			address, err := breachList(c).Find(c.Ctx, c.Args[0])
 			if err != nil {

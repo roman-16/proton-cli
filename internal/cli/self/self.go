@@ -20,7 +20,6 @@ func VersionCmd(version string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "version",
 		Short: "Print the version and build information",
-		Args:  cobra.NoArgs,
 		// No authentication: this is about the binary, not the account.
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			build := struct {

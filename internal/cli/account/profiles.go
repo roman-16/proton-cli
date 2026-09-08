@@ -24,7 +24,6 @@ func profilesListCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List the profiles with a saved session",
-		Args:  cobra.NoArgs,
 		// No authentication: this reads the filesystem, and being able to see
 		// which accounts are configured without contacting Proton is the point.
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
@@ -61,7 +60,6 @@ func profilesDeleteCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "delete REF...",
 		Short: "Remove saved sessions by profile name",
-		Args:  cobra.MinimumNArgs(1),
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			// A profile names a file, so the names are judged before anything is
 			// removed rather than at the point of removal.

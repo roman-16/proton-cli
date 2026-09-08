@@ -4,6 +4,10 @@ package ui
 
 import "os"
 
+// EOFKey is how somebody typing into a terminal says they have finished, which
+// a read that is about to wait for them has to name.
+const EOFKey = "Ctrl-D"
+
 // terminalDepth is what the terminal behind f can render.
 //
 // TERM is the name a terminal is known by, set by whatever opened it, and the

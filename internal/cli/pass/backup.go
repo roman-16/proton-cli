@@ -30,7 +30,6 @@ func exportCmd() *cobra.Command {
 			"archive holds every password in the clear.\n\n" +
 			"Only vaults you own are included. A vault somebody shared with you is\n" +
 			"theirs to back up.",
-		Args: cobra.NoArgs,
 		RunE: kit.Run([]kit.Step{passphrase.Supply}, func(c *kit.Invocation) error {
 			if err := dest.Validate(true); err != nil {
 				return err
@@ -93,7 +92,6 @@ func importCmd() *cobra.Command {
 			"does not exist.\n\n" +
 			"Items are always added, never matched against what is already there, so\n" +
 			"reading the same file twice creates duplicates.",
-		Args: cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{passphrase.Supply}, func(c *kit.Invocation) error {
 			raw, err := kit.ReadBytesArg(c, c.Args[0], "PATH")
 			if err != nil {

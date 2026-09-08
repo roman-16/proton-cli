@@ -46,7 +46,6 @@ func getCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "get",
 		Short: "Show the account, its storage and this machine's session",
-		Args:  cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			acct, err := c.App.Account.Get(c.Ctx)
 			if err != nil {
@@ -151,7 +150,6 @@ func loginCmd() *cobra.Command {
 			"repeat the command with.\n\n" +
 			"Signing in again as the same account changes nothing, so an unattended job\n" +
 			"can run it first to recover from an expired session.",
-		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			if err := reauth.Supply(c); err != nil {
 				return err
@@ -198,7 +196,6 @@ func logoutCmd() *cobra.Command {
 			"the session file is enough to make it unreadable.\n\n" +
 			"--revoke also invalidates the session at Proton, the same as signing out in\n" +
 			"a Proton app. Use it if the file may have been copied.",
-		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			targets := []profile.Name{c.App.Profile}
 			if all {

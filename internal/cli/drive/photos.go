@@ -49,7 +49,6 @@ func photosListCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "list",
 		Short: "List photos",
-		Args:  cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			dc, err := photosContext(c)
 			if err != nil {
@@ -103,7 +102,6 @@ func photosUploadCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "upload SRC",
 		Short: "Upload a photo to the library",
-		Args:  cobra.ExactArgs(1),
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			dc, err := photosContext(c)
 			if err != nil {
@@ -139,7 +137,6 @@ func photosDownloadCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "download REF",
 		Short: "Download a photo",
-		Args:  cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			if err := dest.Validate(true); err != nil {
 				return err
@@ -175,7 +172,6 @@ func photoTagVerb(use, short string, action ui.Action) *cobra.Command {
 	return &cobra.Command{
 		Use:   use + " REF...",
 		Short: short,
-		Args:  cobra.MinimumNArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			dc, err := photosContext(c)
 			if err != nil {
@@ -210,7 +206,6 @@ func photosRemoveCmd(use, short string, action ui.Action, permanent bool) *cobra
 	return &cobra.Command{
 		Use:   use + " REF...",
 		Short: short,
-		Args:  cobra.MinimumNArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			dc, err := photosContext(c)
 			if err != nil {
@@ -270,7 +265,6 @@ func albumsUpdateCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "update REF",
 		Short: "Change an album's cover",
-		Args:  cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand, func(*kit.Invocation) error {
 			if cover == "" {
 				return kit.Fail("Nothing to change.").Hint("--cover REF")
@@ -316,7 +310,6 @@ func albumsListCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List albums",
-		Args:  cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			dc, err := photosContext(c)
 			if err != nil {
@@ -339,7 +332,6 @@ func albumsCreateCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "create",
 		Short: "Create an album",
-		Args:  cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			dc, err := photosContext(c)
 			if err != nil {
@@ -360,7 +352,6 @@ func albumsDeleteCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "delete REF...",
 		Short: "Delete albums",
-		Args:  cobra.MinimumNArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			dc, err := photosContext(c)
 			if err != nil {
@@ -398,7 +389,6 @@ func albumMembersCmd(use, short string, action ui.Action, preposition string) *c
 	return &cobra.Command{
 		Use:   use + " REF PHOTO_REF...",
 		Short: short,
-		Args:  cobra.MinimumNArgs(2),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			dc, err := photosContext(c)
 			if err != nil {

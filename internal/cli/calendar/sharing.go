@@ -48,7 +48,6 @@ func shareAddCmd() *cobra.Command {
 			"Only another Proton account can be given one.\n\n" +
 			"They are sent an invitation and see nothing until they accept. They can then\n" +
 			"read the calendar; --edit lets them change it too.",
-		Args: cobra.ExactArgs(2),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			cal, err := calendarList(c).Find(c.Ctx, c.Args[0])
 			if err != nil {
@@ -73,7 +72,6 @@ func shareListCmd() *cobra.Command {
 		Long: "List who has a calendar.\n\n" +
 			"Somebody who has not answered yet is listed as pending. They can see nothing\n" +
 			"until they accept.",
-		Args: cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			cal, err := calendarList(c).Find(c.Ctx, c.Args[0])
 			if err != nil {
@@ -97,7 +95,6 @@ func shareRemoveCmd() *cobra.Command {
 		Long: "Take somebody's access to a calendar away.\n\n" +
 			"Works whether they accepted or not. An unanswered invitation is withdrawn;\n" +
 			"an accepted membership is ended.",
-		Args: cobra.ExactArgs(2),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			cal, err := calendarList(c).Find(c.Ctx, c.Args[0])
 			if err != nil {

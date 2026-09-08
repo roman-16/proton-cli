@@ -162,6 +162,13 @@ func newRoot() *cobra.Command {
 		if completing(cmd) {
 			return nil
 		}
+		// A help screen is in this binary already. Asked for with --help it is
+		// written before any of this runs, because cobra answers the flag first, so
+		// the same screen asked for by name must not additionally require a
+		// configuration that parses and a profile that resolves.
+		if cmd.Name() == helpName {
+			return nil
+		}
 		// Everything the configuration decides is settled here, before any command
 		// body runs and so before anything reaches the network: a file that does not
 		// parse, a format that is not one, a policy naming a command that is not
@@ -217,7 +224,7 @@ func newRoot() *cobra.Command {
 
 	attachExamples(root)
 	installHelp(root)
-	kit.CompleteReferences(root)
+	kit.InstallArguments(root)
 
 	return root
 }
@@ -230,8 +237,22 @@ func completing(cmd *cobra.Command) bool {
 }
 
 func Execute() {
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer cancel()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	// The first interrupt is the user changing their mind, and the run is given
+	// the chance to put things down: finish the line it is on, say what it
+	// managed. The second is the user saying they are done waiting for that, and
+	// it ends the run where it stands.
+	//
+	// Handing the signal back is not what does this. A Go program keeps the
+	// runtime's handler for an interrupt whether or not anything is listening, so
+	// a second one after signal.Stop is delivered to nobody and changes nothing.
+	context.AfterFunc(ctx, func() {
+		impatient := make(chan os.Signal, 1)
+		signal.Notify(impatient, os.Interrupt, syscall.SIGTERM)
+		<-impatient
+		os.Exit(exitCancelled)
+	})
 
 	os.Args = preprocessArgs(os.Args)
 
@@ -263,7 +284,7 @@ func Execute() {
 	// "Cancelled." there would blame the user for a stalled connection.
 	if ctx.Err() != nil || errors.Is(err, context.Canceled) {
 		fmt.Fprintln(os.Stderr, "\nCancelled.")
-		os.Exit(finish(root, cmd, 130, err))
+		os.Exit(finish(root, cmd, exitCancelled, err))
 	}
 	// A human verification that reaches here was never answered, and what to do
 	// about it depends on why. It becomes an ordinary refusal so that it is
@@ -272,7 +293,7 @@ func Execute() {
 	if errors.As(err, &hvErr) {
 		err = hvFinalError(hvErr, app.FromOrNil(root.Context()))
 	}
-	ui.WriteError(os.Stderr, rewrapFlagError(err, os.Args), errorStyle(root), shortIDs(root))
+	ui.WriteError(os.Stderr, err, errorStyle(root), shortIDs(root))
 	invite(os.Stderr, root, err)
 	os.Exit(finish(root, cmd, exitCode(err), err))
 }
@@ -363,6 +384,12 @@ func unknownSubcommand(root *cobra.Command, args []string) error {
 	if !cmd.HasSubCommands() {
 		return nil
 	}
+	// Cobra defines these two inside Execute, which a probe never reaches. Left
+	// undefined they are unknown flags, and an unknown flag stops this check -
+	// so `proton drive files download --help` would answer with the help for
+	// drive instead of saying that there is no `files`.
+	cmd.InitDefaultHelpFlag()
+	cmd.InitDefaultVersionFlag()
 	// A malformed flag is cobra's to report, in its own words.
 	if cmd.ParseFlags(rest) != nil {
 		return nil

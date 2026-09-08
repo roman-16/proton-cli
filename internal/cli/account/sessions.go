@@ -22,7 +22,6 @@ func sessionsListCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List every signed-in session",
-		Args:  cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			sessions, err := c.App.API.Sessions(c.Ctx)
 			if err != nil {

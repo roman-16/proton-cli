@@ -46,7 +46,6 @@ func itemsMoveCmd() *cobra.Command {
 			"The item keeps its history and everything it holds, but gets a new ID: an\n" +
 			"item in Pass is identified by its vault as well as itself. The new ID is\n" +
 			"printed on stdout.",
-		Args: cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand, func(*kit.Invocation) error {
 			if into == "" {
 				return kit.Fail("Which vault should it go into?").Hint("--into Work")
@@ -112,7 +111,6 @@ func itemsListCmd() *cobra.Command {
 		Long: "List items across your vaults.\n\n" +
 			"Takes the same filters as trash and delete, so you can preview a selection\n" +
 			"here before acting on it.",
-		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			items, err := matchItems(c.Ctx, c, &f)
 			if err != nil {
@@ -142,7 +140,6 @@ func itemsGetCmd() *cobra.Command {
 		Long: "Show one item, decrypted.\n\n" +
 			"Passwords, TOTP secrets and private keys are printed in full. This is the\n" +
 			"only command that prints them; the listings do not.",
-		Args: cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			shareID, itemID, err := resolveItem(c, c.Args[0])
 			if err != nil {
@@ -423,7 +420,6 @@ func itemsCreateCmd() *cobra.Command {
 			"or any name at all, which makes a hidden custom field of it.\n\n" +
 			"--generate-password makes one instead, so a new login needs no file: it is\n" +
 			"shaped by the same flags `pass generate` takes.",
-		Args: cobra.NoArgs,
 		// What a field says, and whether this kind of item has a section to put it
 		// under, are both answerable from the command line alone.
 		RunE: kit.Run([]kit.Step{d.secrets.Supply, func(*kit.Invocation) error {
@@ -491,7 +487,6 @@ func itemsUpdateCmd() *cobra.Command {
 			"NAME is " + secretFieldNames() + ",\n" +
 			"or any name at all, which makes a hidden custom field of it.\n\n" +
 			"--generate-password replaces the password with one it makes.",
-		Args: cobra.ExactArgs(1),
 		// Whether the item has a section to put a field under depends on what
 		// kind it is, which is not known until it is read; what a field says is
 		// known now.
@@ -715,7 +710,6 @@ func itemsPinCmd(use, short string, action ui.Action, pinned bool) *cobra.Comman
 	return &cobra.Command{
 		Use:   use + " REF...",
 		Short: short,
-		Args:  cobra.MinimumNArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			type target struct{ share, item, name string }
 			targets := make([]target, 0, len(c.Args))
@@ -768,7 +762,6 @@ func itemsRevisionsGetCmd() *cobra.Command {
 			"The password, TOTP secret and private key that revision held are printed in\n" +
 			"full, as `items get` prints the current ones.\n\n" +
 			"REVISION_REF is the number `revisions list` shows.",
-		Args: cobra.ExactArgs(2),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			revision, err := strconv.Atoi(c.Args[1])
 			if err != nil || revision < 1 {
@@ -797,7 +790,6 @@ func itemsRevisionsListCmd() *cobra.Command {
 			"Newest first.\n\n" +
 			"This says what changed and when. To read one revision back in full, use\n" +
 			"`revisions get`.",
-		Args: cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			shareID, itemID, err := resolveItem(c, c.Args[0])
 			if err != nil {
@@ -852,7 +844,6 @@ func itemsTOTPCmd() *cobra.Command {
 			"How long the code has left is reported beside it, so you can tell whether\n" +
 			"to wait for the next one.\n\n" +
 			"For a script: --output json, then read .code.",
-		Args: cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			shareID, itemID, err := resolveItem(c, c.Args[0])
 			if err != nil {

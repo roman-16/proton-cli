@@ -39,7 +39,6 @@ func trashListCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List what is in the trash",
-		Args:  cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			items, err := trashed(c)
 			if err != nil {
@@ -84,7 +83,6 @@ func trashEmptyCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "empty",
 		Short: "Delete everything in the trash, permanently",
-		Args:  cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			items, err := trashed(c)
 			if err != nil {

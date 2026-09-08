@@ -68,7 +68,6 @@ func listCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "list",
 		Short: "List contacts",
-		Args:  cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			all, err := c.App.Contacts.List(c.Ctx)
 			if err != nil {
@@ -112,7 +111,6 @@ func getCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "get REF",
 		Short: "Show one contact in full",
-		Args:  cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			id, err := c.App.Contacts.Resolve(c.Ctx, c.Args[0])
 			if err != nil {
@@ -198,7 +196,6 @@ func createCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "create",
 		Short: "Create a contact",
-		Args:  cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			if d.nc.Name == "" && len(d.nc.Emails) == 0 {
 				return kit.Fail("A contact needs at least a name or an email address.").
@@ -223,7 +220,6 @@ func updateCmd() *cobra.Command {
 		Long: "Change a contact's details.\n\n" +
 			"Only what you pass is replaced. --email and --phone replace the whole list\n" +
 			"rather than adding to it, so pass every address you want the contact to keep.",
-		Args: cobra.ExactArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			id, err := c.App.Contacts.Resolve(c.Ctx, c.Args[0])
 			if err != nil {
@@ -278,7 +274,6 @@ func deleteCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "delete REF...",
 		Short: "Delete contacts",
-		Args:  cobra.MinimumNArgs(1),
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			sel, err := kit.Select(c, kit.Selector[ctsvc.Contact]{
 				Noun:    "contacts",
@@ -329,7 +324,6 @@ func exportCmd() *cobra.Command {
 			"The stored card goes out whole, so properties this tool has no flag for are\n" +
 			"exported too. Each address's groups go out as CATEGORIES beside it, which is\n" +
 			"what `import` reads them back from.",
-		Args: cobra.ArbitraryArgs,
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			all, err := c.App.Contacts.List(c.Ctx)
 			if err != nil {
@@ -425,7 +419,6 @@ func importCmd() *cobra.Command {
 			"makes a file from `export` a backup. A card without one is a new contact, so\n" +
 			"importing such a file twice creates duplicates; use `merge` afterwards to\n" +
 			"fold them together.",
-		Args: cobra.ExactArgs(1),
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			text, err := readWholeArg(c, c.Args[0])
 			if err != nil {
@@ -541,7 +534,6 @@ func mergeCmd() *cobra.Command {
 			"The oldest contact of each set is kept, so groups and pinned keys that refer\n" +
 			"to it keep working. Fields from the others are added; nothing is\n" +
 			"overwritten.",
-		Args: cobra.NoArgs,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			all, err := c.App.Contacts.List(c.Ctx)
 			if err != nil {

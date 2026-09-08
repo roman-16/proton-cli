@@ -241,7 +241,7 @@ Every command that takes an ID also accepts a substring search term; an ambiguou
 
 ### Flags before the positionals
 
-Proton IDs are Base64URL, so about one in sixty-four begins with `-`. `preprocessArgs` inserts `--` ahead of it, which makes everything after it positional - so a flag written *after* a leading-dash full ID arrives as an argument and the command fails with "accepts N arg(s)". Whether it happens depends on which ID the account handed out, so writing the flags last makes a test fail roughly one run in sixty rather than never:
+Proton IDs are Base64URL, so about one in sixty-four begins with `-`. `preprocessArgs` inserts `--` ahead of it, which makes everything after it positional - so a flag written *after* a leading-dash full ID arrives as an argument and the command refuses it as one argument too many. Whether it happens depends on which ID the account handed out, so writing the flags last makes a test fail roughly one run in sixty rather than never:
 
 ```go
 runOK(t, "mail", "messages", "attachments", "download", "--dest-dir", dir, msgID)   // always works
