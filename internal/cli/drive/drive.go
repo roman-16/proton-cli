@@ -1,10 +1,14 @@
 // Package drive is the `proton drive` tree.
 //
 // Drive addresses things two ways, and both are real. A file or folder that
-// exists in the tree is named by its PATH, because that is how a person thinks
-// about it and how Proton's own API resolves it. Something with no place in the
+// exists in a tree is named by its PATH, because that is how a person thinks
+// about it and how Proton's own API resolves it. Something with no place in a
 // tree - a trashed item, a photo, an album - is named by REF, its link ID, which
 // shortens on a terminal like every other reference.
+//
+// There is more than one tree: your own files, each computer syncing to Drive,
+// and each item somebody shared with you. A path means the same thing in all of
+// them, and which one a command works in is said by --computer or --shared.
 package drive
 
 import (
@@ -18,13 +22,13 @@ func New() *cobra.Command {
 		Use:   "drive",
 		Short: "Files and folders in Drive",
 	}
-	c.AddCommand(itemsCmd(), trashCmd(), invitationsCmd(), sharedCmd(), sharingCmd(),
-		photosCmd(), settingsCmd())
+	c.AddCommand(computersCmd(), itemsCmd(), trashCmd(), invitationsCmd(), sharedCmd(),
+		sharingCmd(), photosCmd(), settingsCmd())
 	return c
 }
 
-// context opens the Drive volume. Every command needs it, and it is memoised on
-// the service, so asking for it repeatedly is free.
+// context opens your own files, which is the tree a command works in when it is
+// not pointed at another.
 func context(c *kit.Invocation) (*drivesvc.Context, error) {
 	return c.App.Drive.Resolve(c.Ctx)
 }
@@ -35,8 +39,6 @@ func photosContext(c *kit.Invocation) (*drivesvc.Context, error) {
 	return c.App.Drive.ResolvePhotos(c.Ctx)
 }
 
-// itemType names what a link is, in Proton's own words rather than in the API's
-// integers. No padding: alignment is the table's job, not the value's.
 func yesNo(b bool) string {
 	if b {
 		return "yes"

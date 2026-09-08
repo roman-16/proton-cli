@@ -96,6 +96,13 @@ proton drive trash restore 7Kd91mQx
 proton drive photos download 3Ns8pT2v --dest-dir ./photos
 ```
 
+A computer and an item somebody shared with you each hold a tree of their own. Name the tree with `--computer REF` or `--shared REF`, and everything in it by path from its root:
+
+```bash
+proton drive items list /Documents --computer "Work laptop"
+proton drive items download /report.pdf --shared Project --dest-dir .
+```
+
 ## Full IDs that start with a dash
 
 Proton's IDs are base64, and `-` is one of its characters, so about one ID in sixty-four starts with a dash. Paste them like any other reference:

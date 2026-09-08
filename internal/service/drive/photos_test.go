@@ -10,27 +10,48 @@ import (
 )
 
 // stubDoer records the requests issued through the proton.Doer seam and replays
-// a canned JSON body, so wire-format contracts can be asserted without the API
-// or any crypto.
+// canned JSON bodies, so wire-format contracts can be asserted without the API.
+//
+// routes answers one request each, keyed by method and path; respBody answers
+// whatever routes does not name, which is all a test of a single request needs.
 type stubDoer struct {
 	reqs     []proton.Request
 	respBody []byte
+	routes   map[string]string
+}
+
+func (s *stubDoer) body(r proton.Request) []byte {
+	if canned, ok := s.routes[r.Method+" "+r.Path]; ok {
+		return []byte(canned)
+	}
+	return s.respBody
 }
 
 func (s *stubDoer) Do(_ context.Context, r proton.Request) (*proton.Response, error) {
 	s.reqs = append(s.reqs, r)
-	return &proton.Response{Status: 200, Body: s.respBody}, nil
+	return &proton.Response{Status: 200, Body: s.body(r)}, nil
 }
 
 func (s *stubDoer) Decode(_ context.Context, r proton.Request, out any) error {
 	s.reqs = append(s.reqs, r)
-	if out == nil || s.respBody == nil {
+	body := s.body(r)
+	if out == nil || body == nil {
 		return nil
 	}
-	return json.Unmarshal(s.respBody, out)
+	return json.Unmarshal(body, out)
 }
 
 func (s *stubDoer) last() proton.Request { return s.reqs[len(s.reqs)-1] }
+
+// sent reports whether a request was made, so a test can assert that one was not.
+func (s *stubDoer) sent(method, path string) bool {
+	for _, r := range s.reqs {
+		if r.Method == method && r.Path == path {
+			return true
+		}
+	}
+	return false
+}
 
 // PhotosList must set the Tag param only when a filter is requested, and only
 // to the requested id; a drifted param name or value would silently break the

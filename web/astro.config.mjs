@@ -167,6 +167,7 @@ export default defineConfig({
             "drive/items",
             "drive/trash",
             "drive/photos",
+            "drive/computers",
             "drive/sharing",
             "drive/shared",
             "drive/invitations",

@@ -242,22 +242,19 @@ func TestDriveShareRemoveNotFound(t *testing.T) {
 	}
 }
 
-// An item somebody shared with you is reachable once the invitation is accepted,
-// and this listing is where it is reachable from.
-func TestDriveSharedListsWhatOthersHaveShared(t *testing.T) {
-	// The primary shares a folder with the secondary, which accepts it.
-	folder := "/" + testID() + "-sharedwithme"
-	runOK(t, "drive", "items", "create", folder)
-	cleanupRun(t, fmt.Sprintf("Delete: proton drive items delete %s", folder),
-		"drive", "items", "delete", folder)
-
-	// The invitation this test caused is the one that was not there before it
-	// shared: an invitation names no item, so taking whichever came first would
-	// accept something another test left behind.
+// sharedWithSecondary hands something of the primary's to the second account and
+// waits for it to take it, answering with the item as the second account now
+// sees it.
+//
+// The invitation this causes is the one that was not there before: an invitation
+// names no item, so taking whichever came first would accept something another
+// test left behind.
+func sharedWithSecondary(t *testing.T, path string) map[string]interface{} {
+	t.Helper()
 	before := altInvitationIDs(t)
-	runOK(t, "drive", "items", "share", "add", folder, secondaryEmail())
-	cleanupRun(t, fmt.Sprintf("Revoke member: proton drive items share remove %s %s", folder, secondaryEmail()),
-		"drive", "items", "share", "remove", folder, secondaryEmail())
+	runOK(t, "drive", "items", "share", "add", path, secondaryEmail())
+	cleanupRun(t, fmt.Sprintf("Revoke member: proton drive items share remove %s %s", path, secondaryEmail()),
+		"drive", "items", "share", "remove", path, secondaryEmail())
 
 	var invitationID string
 	waitFor(60*time.Second, 3*time.Second, func() bool {
@@ -273,20 +270,29 @@ func TestDriveSharedListsWhatOthersHaveShared(t *testing.T) {
 		t.Fatal("the second account never saw the invitation")
 	}
 	runOKSecondary(t, "drive", "invitations", "accept", "--", invitationID)
-	cleanupRunSecondary(t, "Leave the share: remove the member from the primary side",
-		"drive", "invitations", "list")
 
-	// It is now reachable, which is the whole point.
-	var found bool
+	want := path[strings.LastIndex(path, "/")+1:]
 	for _, row := range runJSONArraySecondary(t, "drive", "shared", "list") {
 		m, _ := row.(map[string]interface{})
-		if by, _ := m["shared_by"].(string); strings.EqualFold(by, selfEmail()) {
-			found = true
+		by, _ := m["shared_by"].(string)
+		if name, _ := m["name"].(string); name == want && strings.EqualFold(by, selfEmail()) {
+			return m
 		}
 	}
-	if !found {
-		t.Error("after accepting, the shared folder should appear in `drive shared list`")
-	}
+	t.Fatalf("after accepting, %q should appear in `drive shared list`", want)
+	return nil
+}
+
+// An item somebody shared with you is reachable once the invitation is accepted,
+// and this listing is where it is reachable from.
+func TestDriveSharedListsWhatOthersHaveShared(t *testing.T) {
+	// The primary shares a folder with the secondary, which accepts it.
+	folder := "/" + testID() + "-sharedwithme"
+	runOK(t, "drive", "items", "create", folder)
+	cleanupRun(t, fmt.Sprintf("Delete: proton drive items delete %s", folder),
+		"drive", "items", "delete", folder)
+
+	sharedWithSecondary(t, folder)
 
 	// And the primary can see it going the other way.
 	var mine bool
@@ -300,6 +306,69 @@ func TestDriveSharedListsWhatOthersHaveShared(t *testing.T) {
 		t.Error("what the primary shared should appear in `drive sharing list`")
 	}
 	runOK(t, "drive", "items", "share", "remove", folder, secondaryEmail())
+}
+
+// A shared folder is a tree of its own: --shared opens it, / is the folder, and
+// everything inside it is a path from there.
+func TestDriveItemsOpenAFolderSharedWithYou(t *testing.T) {
+	folder := "/" + testID() + "-openfolder"
+	runOK(t, "drive", "items", "create", folder)
+	cleanupRun(t, fmt.Sprintf("Delete: proton drive items delete %s", folder),
+		"drive", "items", "delete", folder)
+	src := filepath.Join(t.TempDir(), "report.txt")
+	writeLocal(t, src, "shared-folder-payload")
+	runOK(t, "drive", "items", "upload", src, folder)
+
+	id, _ := sharedWithSecondary(t, folder)["link_id"].(string)
+
+	var names []string
+	for _, child := range runJSONArraySecondary(t, "drive", "items", "list", "/", "--shared", id) {
+		m, _ := child.(map[string]interface{})
+		name, _ := m["name"].(string)
+		names = append(names, name)
+	}
+	if len(names) != 1 || names[0] != "report.txt" {
+		t.Fatalf("the shared folder lists %v, want [report.txt]", names)
+	}
+
+	out := filepath.Join(t.TempDir(), "downloaded")
+	runOKSecondary(t, "drive", "items", "download", "/report.txt", "--shared", id, "--dest", out)
+	got, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "shared-folder-payload" {
+		t.Errorf("the file inside the shared folder reads %q", got)
+	}
+}
+
+// A shared file is the whole of its tree, so / is the file: it is named by the
+// item rather than by the path, and downloads under its own name.
+func TestDriveItemsOpenAFileSharedWithYou(t *testing.T) {
+	folder := "/" + testID() + "-openfile"
+	runOK(t, "drive", "items", "create", folder)
+	cleanupRun(t, fmt.Sprintf("Delete: proton drive items delete %s", folder),
+		"drive", "items", "delete", folder)
+	src := filepath.Join(t.TempDir(), "quarterly.txt")
+	writeLocal(t, src, "shared-file-payload")
+	runOK(t, "drive", "items", "upload", src, folder)
+
+	id, _ := sharedWithSecondary(t, folder+"/quarterly.txt")["link_id"].(string)
+
+	info := runJSONSecondary(t, "drive", "items", "get", "/", "--shared", id)
+	if info["name"] != "quarterly.txt" || info["type"] != "file" {
+		t.Errorf("/ in a shared file is %v (%v), want quarterly.txt (file)", info["name"], info["type"])
+	}
+
+	dir := t.TempDir()
+	runOKSecondary(t, "drive", "items", "download", "/", "--shared", id, "--dest-dir", dir)
+	got, err := os.ReadFile(filepath.Join(dir, "quarterly.txt"))
+	if err != nil {
+		t.Fatalf("the shared file did not land under its own name: %v", err)
+	}
+	if string(got) != "shared-file-payload" {
+		t.Errorf("the shared file reads %q", got)
+	}
 }
 
 // What somebody may do can be changed without cancelling and re-inviting them,

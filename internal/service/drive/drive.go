@@ -31,14 +31,20 @@ type Context struct {
 	AddrEmail  string
 	VolumeID   string
 	RootLinkID string
+	// Type is the kind of share the tree hangs from, as Proton numbers them.
+	Type int
+	// RootName is what the tree is called: a computer's name, or the name of the
+	// item somebody shared. It is empty for the volumes Proton's own clients
+	// label rather than name, and for a root whose name will not decrypt.
+	RootName string
 
-	// rootLink is the share's root folder, fetched while the share itself was
-	// being fetched. Everything addressed by path starts from it, so resolving the
+	// rootLink is the share's root, fetched while the share itself was being
+	// fetched. Everything addressed by path starts from it, so resolving the
 	// share without it would only mean asking for it a moment later, alone.
 	rootLink *Link
 }
 
-// RootKR is the key ring of the share's root folder.
+// RootKR is the key ring of the share's root.
 //
 // It is not the share key. The share key opens the root link's passphrase; the
 // root's own node key is what the names and passphrases of everything directly
@@ -112,6 +118,7 @@ func (s *Service) unlockShare(ctx context.Context, shareID, rootLinkID, volumeID
 		Key                 string
 		Passphrase          string
 		PassphraseSignature string
+		Type                int
 	}
 	var rootLink *Link
 	var u *keys.Unlocked
@@ -171,15 +178,41 @@ func (s *Service) unlockShare(ctx context.Context, shareID, rootLinkID, volumeID
 		ShareID: shareID, ShareKR: shareKR,
 		AddrKR: addrKR, AddrID: sh.AddressID, AddrEmail: addrEmail,
 		VolumeID: volumeID, RootLinkID: rootLinkID, rootLink: rootLink,
+		Type: sh.Type, RootName: rootName(ctx, shareID, sh.Type, rootLink, shareKR),
 	}, nil
 }
 
+// rootName reads what a tree is called.
+//
+// A root has no parent whose key could hold its name, so the name is sealed to
+// the share key instead. The main volume and the photo volume are labelled by
+// every Proton client rather than named, so what is stored on their roots is not
+// read. A name that will not open leaves the tree unnamed rather than failing:
+// recorded and not counted, because nothing goes missing from an answer - the
+// tree is still listed, still addressable by ID, and the gap is on the screen.
+func rootName(ctx context.Context, shareID string, shareType int, root *Link, shareKR *pgp.KeyRing) string {
+	if shareType == shareTypeMain || shareType == shareTypePhotos || root == nil {
+		return ""
+	}
+	name, err := decryptName(root.Name, shareKR)
+	if err != nil {
+		slog.DebugContext(ctx, "drive: a tree's own name could not be decrypted",
+			"share", shareID, "error", err)
+		return ""
+	}
+	return name
+}
+
 type Link struct {
-	LinkID                  string
-	ParentLinkID            string
-	Type                    int // 1=folder, 2=file
-	Size                    int64
-	Name                    string
+	LinkID       string
+	ParentLinkID string
+	Type         int // 1=folder, 2=file
+	Size         int64
+	Name         string
+	// Hash is the name's lookup hash under the parent folder's hash key, which a
+	// rename hands back so Proton can tell which name it is replacing. A root has
+	// no parent to be hashed under and carries none.
+	Hash                    string
 	EncName                 string
 	MIMEType                string
 	NodeKey                 string
@@ -226,6 +259,19 @@ type Resolved struct {
 	Link *Link
 }
 
+// Describe names what a path resolved to, for a sentence somebody reads: the
+// path they typed, or the tree's own name where that path was the root.
+func (r *Resolved) Describe(path string) string {
+	if strings.Trim(path, "/") == "" && r.Name != "" {
+		return r.Name
+	}
+	return path
+}
+
+// IsRoot reports whether this is the top of the tree it was resolved in, which
+// is the one item with no parent to be named under.
+func (r *Resolved) IsRoot() bool { return r.Link != nil && r.Link.ParentLinkID == "" }
+
 func (s *Service) ResolvePath(ctx context.Context, dc *Context, path string) (*Resolved, error) {
 	st, err := s.resolveTo(ctx, dc, path)
 	if err != nil {
@@ -235,9 +281,22 @@ func (s *Service) ResolvePath(ctx context.Context, dc *Context, path string) (*R
 		return st.at, nil
 	}
 	if !st.at.IsFolder {
-		return nil, fmt.Errorf("%s is not a folder", st.at.Name)
+		return nil, errs.Problemf("%s is not a folder.", st.at.Name)
 	}
 	return nil, &errs.NotFound{Kind: "path", Ref: st.missing[0]}
+}
+
+// ResolveFile resolves a path that has to be a file, which is what a download
+// and every revision operation need and no folder can answer.
+func (s *Service) ResolveFile(ctx context.Context, dc *Context, path string) (*Resolved, error) {
+	res, err := s.ResolvePath(ctx, dc, path)
+	if err != nil {
+		return nil, err
+	}
+	if res.IsFolder {
+		return nil, errs.Problemf("%s is a folder, not a file.", res.Describe(path))
+	}
+	return res, nil
 }
 
 // stopped is where a path ran out: the deepest link that is there, the path it
@@ -259,10 +318,14 @@ func (s *Service) resolveTo(ctx context.Context, dc *Context, path string) (*sto
 	if err != nil {
 		return nil, err
 	}
+	// The root is an item like any other: a computer's is a folder, and one
+	// somebody shared may be a single file, so both come off the link rather than
+	// being assumed.
 	st := &stopped{
 		at: &Resolved{
 			ShareID: dc.ShareID, LinkID: dc.RootLinkID, ParentKR: dc.ShareKR,
-			NodeKR: rootKR, IsFolder: true, Link: dc.rootLink,
+			NodeKR: rootKR, Name: dc.RootName, IsFolder: dc.rootLink.Type == protonFolder,
+			Link: dc.rootLink,
 		},
 		path: "/",
 	}

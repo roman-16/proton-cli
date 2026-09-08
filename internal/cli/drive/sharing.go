@@ -1,6 +1,8 @@
 package drive
 
 import (
+	stdctx "context"
+
 	"github.com/roman-16/proton-cli/internal/cli/kit"
 	drivesvc "github.com/roman-16/proton-cli/internal/service/drive"
 	"github.com/roman-16/proton-cli/internal/ui"
@@ -20,11 +22,12 @@ func shareCmd() *cobra.Command {
 }
 
 func shareGetCmd() *cobra.Command {
-	return &cobra.Command{
+	var t tree
+	c := &cobra.Command{
 		Use:   "get PATH",
 		Short: "Show how a file or folder is shared",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
-			dc, err := context(c)
+			dc, err := t.context(c)
 			if err != nil {
 				return err
 			}
@@ -61,6 +64,8 @@ func shareGetCmd() *cobra.Command {
 			return kit.Show(c, ui.RecordSpec{Object: st, Fields: fields})
 		}),
 	}
+	t.register(c)
+	return c
 }
 
 func access(canEdit bool) string {
@@ -80,6 +85,7 @@ func expiry(at *int64) string {
 func shareLinkCmd() *cobra.Command {
 	var edit bool
 	var expires string
+	var t tree
 	password := kit.LinkPassword()
 	c := &cobra.Command{
 		Use:   "link PATH",
@@ -109,7 +115,7 @@ func shareLinkCmd() *cobra.Command {
 				}
 				opts.SetPassword, opts.CustomPassword = true, custom
 			}
-			dc, err := context(c)
+			dc, err := t.context(c)
 			if err != nil {
 				return err
 			}
@@ -144,15 +150,17 @@ func shareLinkCmd() *cobra.Command {
 	c.Flags().StringVar(&expires, "expires", "",
 		"Stop working after DURATION (e.g. 7d, 2w, 6mo), or never")
 	password.Declare(c)
+	t.register(c)
 	return c
 }
 
 func shareUnlinkCmd() *cobra.Command {
-	return &cobra.Command{
+	var t tree
+	c := &cobra.Command{
 		Use:   "unlink PATH",
 		Short: "Remove the public links for a file or folder",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
-			dc, err := context(c)
+			dc, err := t.context(c)
 			if err != nil {
 				return err
 			}
@@ -169,16 +177,19 @@ func shareUnlinkCmd() *cobra.Command {
 			})
 		}),
 	}
+	t.register(c)
+	return c
 }
 
 func shareAddCmd() *cobra.Command {
 	var edit bool
 	var message string
+	var t tree
 	c := &cobra.Command{
 		Use:   "add PATH EMAIL",
 		Short: "Invite someone to a file or folder",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
-			dc, err := context(c)
+			dc, err := t.context(c)
 			if err != nil {
 				return err
 			}
@@ -192,6 +203,7 @@ func shareAddCmd() *cobra.Command {
 	}
 	c.Flags().BoolVar(&edit, "edit", false, "Allow editing rather than only viewing")
 	c.Flags().StringVar(&message, "message", "", "Note to include in the invitation email")
+	t.register(c)
 	return c
 }
 
@@ -200,6 +212,7 @@ func shareAddCmd() *cobra.Command {
 // them twice.
 func shareUpdateCmd() *cobra.Command {
 	var edit bool
+	var t tree
 	c := &cobra.Command{
 		Use:   "update PATH EMAIL",
 		Short: "Change what somebody may do with a file or folder",
@@ -211,7 +224,7 @@ func shareUpdateCmd() *cobra.Command {
 				return kit.Fail("Nothing to change.").
 					Hint("--edit to allow editing, or --edit=false to restrict to viewing.")
 			}
-			dc, err := context(c)
+			dc, err := t.context(c)
 			if err != nil {
 				return err
 			}
@@ -224,17 +237,19 @@ func shareUpdateCmd() *cobra.Command {
 		}),
 	}
 	c.Flags().BoolVar(&edit, "edit", false, "Allow editing rather than only viewing")
+	t.register(c)
 	return c
 }
 
 // An invitation nobody answered is usually one nobody saw, so it can be sent
 // again rather than cancelled and remade.
 func shareResendCmd() *cobra.Command {
-	return &cobra.Command{
+	var t tree
+	c := &cobra.Command{
 		Use:   "resend PATH EMAIL",
 		Short: "Send an unanswered invitation again",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
-			dc, err := context(c)
+			dc, err := t.context(c)
 			if err != nil {
 				return err
 			}
@@ -246,14 +261,17 @@ func shareResendCmd() *cobra.Command {
 			})
 		}),
 	}
+	t.register(c)
+	return c
 }
 
 func shareRemoveCmd() *cobra.Command {
-	return &cobra.Command{
+	var t tree
+	c := &cobra.Command{
 		Use:   "remove PATH EMAIL",
 		Short: "Revoke someone's access, or cancel their invitation",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
-			dc, err := context(c)
+			dc, err := t.context(c)
 			if err != nil {
 				return err
 			}
@@ -265,6 +283,8 @@ func shareRemoveCmd() *cobra.Command {
 			})
 		}),
 	}
+	t.register(c)
+	return c
 }
 
 // ── invitations sent to you ──
@@ -458,7 +478,7 @@ func sharedItemColumns() []ui.Column[drivesvc.SharedItem] {
 	return []ui.Column[drivesvc.SharedItem]{
 		{Header: "ID", ID: true, Cell: func(i drivesvc.SharedItem) string { return i.LinkID }},
 		{Header: "TYPE", Cell: func(i drivesvc.SharedItem) string { return i.Type }},
-		{Header: "NAME", Flex: true, Cell: func(i drivesvc.SharedItem) string { return i.Name }},
+		{Header: "NAME", Flex: true, Handle: true, Cell: func(i drivesvc.SharedItem) string { return i.Name }},
 		{Header: "SIZE", Right: true, Cell: func(i drivesvc.SharedItem) string {
 			if i.Size == 0 {
 				return ""
@@ -468,18 +488,30 @@ func sharedItemColumns() []ui.Column[drivesvc.SharedItem] {
 	}
 }
 
+// sharedList is the collection --shared names: what other people have granted
+// you, each of which is the top of a tree of its own.
+func sharedList(c *kit.Invocation) *kit.Lookup[drivesvc.SharedItem] {
+	return &kit.Lookup[drivesvc.SharedItem]{
+		Kind:   "shared item",
+		Load:   func(ctx stdctx.Context) ([]drivesvc.SharedItem, error) { return c.App.Drive.SharedWithMe(ctx) },
+		ID:     func(i drivesvc.SharedItem) string { return i.LinkID },
+		Handle: func(i drivesvc.SharedItem) string { return i.Name },
+	}
+}
+
 func sharedCmd() *cobra.Command {
 	c := &cobra.Command{Use: "shared", Short: "Files and folders other people have shared with you"}
 	c.AddCommand(&cobra.Command{
 		Use:   "list",
 		Short: "List what other people have shared with you",
 		Long: "List what other people have shared with you.\n\n" +
-			"These are not in your tree and have no path. Address them by the ID shown\n" +
-			"here, as you would a trashed item or a photo.\n\n" +
+			"These are not in your tree and have no path of their own. To open one, pass\n" +
+			"`--shared REF` to any `items` command: / is then the item itself, and\n" +
+			"anything below it is a path inside it.\n\n" +
 			"An item whose name cannot be decrypted is still listed, so you can still\n" +
-			"act on it.",
+			"act on it by ID.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
-			items, err := c.App.Drive.SharedWithMe(c.Ctx)
+			items, err := sharedList(c).Rows(c.Ctx)
 			if err != nil {
 				return err
 			}

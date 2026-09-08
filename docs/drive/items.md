@@ -22,6 +22,7 @@ proton drive items copy --pattern '*.pdf' --scope /Documents --into /Backup
 | Flag | Description |
 | --- | --- |
 | `--all` | Act on everything in scope, rather than a subset |
+| `--computer string` | Work inside this computer's files, by name or ID |
 | `--into string` | Destination folder |
 | `--larger-than string` | Match files above SIZE (e.g. 100MB, 2GB) |
 | `--newer-than string` | Match files newer than DURATION |
@@ -29,6 +30,7 @@ proton drive items copy --pattern '*.pdf' --scope /Documents --into /Backup
 | `--pattern string` | Match names against a shell glob, e.g. *.tmp |
 | `--recursive` | Descend into subfolders when filtering |
 | `--scope string` | Look only inside this folder (default: the whole drive) |
+| `--shared string` | Work inside an item shared with you, by name or ID |
 | `--smaller-than string` | Match files below SIZE |
 
 ## `create`
@@ -42,6 +44,11 @@ proton drive items create PATH
 ```bash
 proton drive items create /Documents/2026
 ```
+
+| Flag | Description |
+| --- | --- |
+| `--computer string` | Work inside this computer's files, by name or ID |
+| `--shared string` | Work inside an item shared with you, by name or ID |
 
 ## `delete`
 
@@ -59,12 +66,14 @@ proton drive items delete --pattern '*.tmp' --scope /Build --recursive --yes
 | Flag | Description |
 | --- | --- |
 | `--all` | Act on everything in scope, rather than a subset |
+| `--computer string` | Work inside this computer's files, by name or ID |
 | `--larger-than string` | Match files above SIZE (e.g. 100MB, 2GB) |
 | `--newer-than string` | Match files newer than DURATION |
 | `--older-than string` | Match files older than DURATION (e.g. 30d, 2w, 1h) |
 | `--pattern string` | Match names against a shell glob, e.g. *.tmp |
 | `--recursive` | Descend into subfolders when filtering |
 | `--scope string` | Look only inside this folder (default: the whole drive) |
+| `--shared string` | Work inside an item shared with you, by name or ID |
 | `--smaller-than string` | Match files below SIZE |
 
 ## `download`
@@ -78,13 +87,16 @@ proton drive items download PATH
 ```bash
 proton drive items download /Documents/report.pdf --dest-dir .
 proton drive items download /Documents/report.pdf --dest - > report.pdf
+proton drive items download /report.pdf --shared Project --dest-dir .
 ```
 
 | Flag | Description |
 | --- | --- |
+| `--computer string` | Work inside this computer's files, by name or ID |
 | `--dest string` | Write to this path, or - for stdout |
 | `--dest-dir string` | Write into this directory, keeping each item's own name |
 | `--force` | Overwrite a file that already exists |
+| `--shared string` | Work inside an item shared with you, by name or ID |
 
 ## `get`
 
@@ -98,11 +110,18 @@ proton drive items get PATH
 proton drive items get /Documents/report.pdf
 ```
 
+| Flag | Description |
+| --- | --- |
+| `--computer string` | Work inside this computer's files, by name or ID |
+| `--shared string` | Work inside an item shared with you, by name or ID |
+
 ## `list`
 
 List what is in a folder.
 
 Takes the same filters as move, copy, trash and delete, so you can preview a selection here before acting on it. What PATH is here, those commands call --scope.
+
+PATH is in your own files. --computer REF lists inside a computer instead, and --shared REF inside something somebody shared with you, where / is the item itself.
 
 ```
 proton drive items list [PATH]
@@ -111,10 +130,13 @@ proton drive items list [PATH]
 ```bash
 proton drive items list
 proton drive items list /Documents
+proton drive items list / --computer 'Work laptop'
+proton drive items list / --shared Project
 ```
 
 | Flag | Description |
 | --- | --- |
+| `--computer string` | Work inside this computer's files, by name or ID |
 | `--desc` | Reverse the order |
 | `--larger-than string` | Match files above SIZE (e.g. 100MB, 2GB) |
 | `--newer-than string` | Match files newer than DURATION |
@@ -123,6 +145,7 @@ proton drive items list /Documents
 | `--page-size int` | How many items per page; 0 for all of them (default `50`) |
 | `--pattern string` | Match names against a shell glob, e.g. *.tmp |
 | `--recursive` | Descend into subfolders when filtering |
+| `--shared string` | Work inside an item shared with you, by name or ID |
 | `--smaller-than string` | Match files below SIZE |
 | `--sort string` | Order by: name, size, modified (default `name`) |
 
@@ -142,6 +165,7 @@ proton drive items move --pattern '*.log' --scope /Build --recursive --into /Arc
 | Flag | Description |
 | --- | --- |
 | `--all` | Act on everything in scope, rather than a subset |
+| `--computer string` | Work inside this computer's files, by name or ID |
 | `--into string` | Destination folder |
 | `--larger-than string` | Match files above SIZE (e.g. 100MB, 2GB) |
 | `--newer-than string` | Match files newer than DURATION |
@@ -149,6 +173,7 @@ proton drive items move --pattern '*.log' --scope /Build --recursive --into /Arc
 | `--pattern string` | Match names against a shell glob, e.g. *.tmp |
 | `--recursive` | Descend into subfolders when filtering |
 | `--scope string` | Look only inside this folder (default: the whole drive) |
+| `--shared string` | Work inside an item shared with you, by name or ID |
 | `--smaller-than string` | Match files below SIZE |
 
 ## `revisions`
@@ -171,6 +196,11 @@ proton drive items revisions delete PATH REVISION_REF
 proton drive items revisions delete /Documents/report.pdf 5bH2mQxK
 ```
 
+| Flag | Description |
+| --- | --- |
+| `--computer string` | Work inside this computer's files, by name or ID |
+| `--shared string` | Work inside an item shared with you, by name or ID |
+
 ### `revisions download`
 
 Download an earlier version of a file.
@@ -187,9 +217,11 @@ proton drive items revisions download /Documents/report.pdf 5bH2mQxK --dest-dir 
 
 | Flag | Description |
 | --- | --- |
+| `--computer string` | Work inside this computer's files, by name or ID |
 | `--dest string` | Write to this path, or - for stdout |
 | `--dest-dir string` | Write into this directory, keeping each item's own name |
 | `--force` | Overwrite a file that already exists |
+| `--shared string` | Work inside an item shared with you, by name or ID |
 
 ### `revisions list`
 
@@ -203,6 +235,11 @@ proton drive items revisions list PATH
 proton drive items revisions list /Documents/report.pdf
 ```
 
+| Flag | Description |
+| --- | --- |
+| `--computer string` | Work inside this computer's files, by name or ID |
+| `--shared string` | Work inside an item shared with you, by name or ID |
+
 ### `revisions restore`
 
 Restore a file to an earlier version.
@@ -214,6 +251,11 @@ proton drive items revisions restore PATH REVISION_REF
 ```bash
 proton drive items revisions restore /Documents/report.pdf 5bH2mQxK
 ```
+
+| Flag | Description |
+| --- | --- |
+| `--computer string` | Work inside this computer's files, by name or ID |
+| `--shared string` | Work inside an item shared with you, by name or ID |
 
 ## `share`
 
@@ -236,8 +278,10 @@ proton drive items share add /Documents jane@example.com --edit --message 'Have 
 
 | Flag | Description |
 | --- | --- |
+| `--computer string` | Work inside this computer's files, by name or ID |
 | `--edit` | Allow editing rather than only viewing |
 | `--message string` | Note to include in the invitation email |
+| `--shared string` | Work inside an item shared with you, by name or ID |
 
 ### `share get`
 
@@ -250,6 +294,11 @@ proton drive items share get PATH
 ```bash
 proton drive items share get /Documents/report.pdf
 ```
+
+| Flag | Description |
+| --- | --- |
+| `--computer string` | Work inside this computer's files, by name or ID |
+| `--shared string` | Work inside an item shared with you, by name or ID |
 
 ### `share link`
 
@@ -273,10 +322,12 @@ proton drive items share link /Documents --edit
 | Flag | Description |
 | --- | --- |
 | `--clear-link-password` | Remove the public link's password |
+| `--computer string` | Work inside this computer's files, by name or ID |
 | `--edit` | Allow editing rather than only viewing |
 | `--expires string` | Stop working after DURATION (e.g. 7d, 2w, 6mo), or never |
 | `--link-password-file string` | Read the public link's password from a file |
 | `--link-password-stdin` | Read the public link's password from stdin |
+| `--shared string` | Work inside an item shared with you, by name or ID |
 
 ### `share remove`
 
@@ -290,6 +341,11 @@ proton drive items share remove PATH EMAIL
 proton drive items share remove /Documents jane@example.com
 ```
 
+| Flag | Description |
+| --- | --- |
+| `--computer string` | Work inside this computer's files, by name or ID |
+| `--shared string` | Work inside an item shared with you, by name or ID |
+
 ### `share resend`
 
 Send an unanswered invitation again.
@@ -302,6 +358,11 @@ proton drive items share resend PATH EMAIL
 proton drive items share resend /Reports jane@proton.me
 ```
 
+| Flag | Description |
+| --- | --- |
+| `--computer string` | Work inside this computer's files, by name or ID |
+| `--shared string` | Work inside an item shared with you, by name or ID |
+
 ### `share unlink`
 
 Remove the public links for a file or folder.
@@ -313,6 +374,11 @@ proton drive items share unlink PATH
 ```bash
 proton drive items share unlink /Documents/report.pdf
 ```
+
+| Flag | Description |
+| --- | --- |
+| `--computer string` | Work inside this computer's files, by name or ID |
+| `--shared string` | Work inside an item shared with you, by name or ID |
 
 ### `share update`
 
@@ -331,7 +397,9 @@ proton drive items share update /Reports jane@proton.me --edit=false
 
 | Flag | Description |
 | --- | --- |
+| `--computer string` | Work inside this computer's files, by name or ID |
 | `--edit` | Allow editing rather than only viewing |
+| `--shared string` | Work inside an item shared with you, by name or ID |
 
 ## `trash`
 
@@ -350,12 +418,14 @@ proton drive items trash --older-than 1y --scope /Downloads --dry-run
 | Flag | Description |
 | --- | --- |
 | `--all` | Act on everything in scope, rather than a subset |
+| `--computer string` | Work inside this computer's files, by name or ID |
 | `--larger-than string` | Match files above SIZE (e.g. 100MB, 2GB) |
 | `--newer-than string` | Match files newer than DURATION |
 | `--older-than string` | Match files older than DURATION (e.g. 30d, 2w, 1h) |
 | `--pattern string` | Match names against a shell glob, e.g. *.tmp |
 | `--recursive` | Descend into subfolders when filtering |
 | `--scope string` | Look only inside this folder (default: the whole drive) |
+| `--shared string` | Work inside an item shared with you, by name or ID |
 | `--smaller-than string` | Match files below SIZE |
 
 ## `update`
@@ -363,6 +433,8 @@ proton drive items trash --older-than 1y --scope /Downloads --dry-run
 Rename a file or folder.
 
 Renaming is `update --name`; there is no `rename` verb. To put something somewhere else, use `move`.
+
+PATH names something inside a tree, never the tree itself: to rename a computer, use `computers update`.
 
 ```
 proton drive items update PATH
@@ -374,7 +446,9 @@ proton drive items update /Documents/report.pdf --name summary.pdf
 
 | Flag | Description |
 | --- | --- |
+| `--computer string` | Work inside this computer's files, by name or ID |
 | `--name string` | New name, without a path |
+| `--shared string` | Work inside an item shared with you, by name or ID |
 
 ## `upload`
 
@@ -403,8 +477,10 @@ pg_dump mydb | gzip | proton drive items upload - /Backups/db.sql.gz
 
 | Flag | Description |
 | --- | --- |
+| `--computer string` | Work inside this computer's files, by name or ID |
 | `--if-exists string` | What to do when the folder already has that name: rename, replace, skip |
 | `--recursive` | Upload a directory and everything under it |
+| `--shared string` | Work inside an item shared with you, by name or ID |
 
 ---
 

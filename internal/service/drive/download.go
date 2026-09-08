@@ -73,11 +73,12 @@ func (r revision) author() string {
 	return r.SignatureAddress
 }
 
-func (s *Service) Download(ctx context.Context, dc *Context, path string, w io.Writer, opts DownloadOptions) error {
-	res, err := s.resolveFile(ctx, dc, path)
-	if err != nil {
-		return err
-	}
+// Download streams and decrypts what a file holds now.
+//
+// It takes the resolved file rather than a path, because the command already has
+// one: the name the bytes land under on disk is the item's, which is not a thing
+// a path always carries - the root of a shared file is `/`.
+func (s *Service) Download(ctx context.Context, res *Resolved, w io.Writer, opts DownloadOptions) error {
 	return s.downloadFile(ctx, res.ShareID, res.Link, res.NodeKR, activeRevisionID(res.Link), res.Link.Size, w, opts)
 }
 

@@ -690,7 +690,7 @@ func (s *Service) listShares(ctx context.Context) ([]rawShare, map[string]bool, 
 	return r.Shares, mine, nil
 }
 
-// describeShare opens a share and reads the name of what it grants.
+// describeShare opens a share and reads what it grants.
 func (s *Service) describeShare(ctx context.Context, sh rawShare) (*SharedItem, error) {
 	dc, err := s.unlockShare(ctx, sh.ShareID, sh.LinkID, sh.VolumeID)
 	if err != nil {
@@ -700,24 +700,18 @@ func (s *Service) describeShare(ctx context.Context, sh rawShare) (*SharedItem, 
 	if root == nil {
 		return nil, fmt.Errorf("share %s has no root", sh.ShareID)
 	}
-	// A link's name is encrypted to its parent's node key, and the root of a
-	// share granted to you has a parent you cannot open. The share key is what
-	// membership grants, so it is what is tried; where it does not answer, the
-	// name is left empty rather than filled with an apology. An item you can
-	// address by ID is still an item you can act on.
-	name, err := decryptName(root.Name, dc.ShareKR)
-	if err != nil {
-		slog.Debug("drive: could not read a shared item's name",
-			"share", sh.ShareID, "error", err)
-		name = ""
-	}
-	kind := TypeFile
-	if root.Type == 1 {
-		kind = TypeFolder
-	}
 	return &SharedItem{
 		ShareID: sh.ShareID, LinkID: sh.LinkID, VolumeID: sh.VolumeID,
-		Name: name, Type: kind, Size: root.Size,
+		Name: dc.RootName, Type: linkType(root.Type), Size: root.Size,
 		SharedBy: sh.Creator, Created: sh.CreateTime,
 	}, nil
+}
+
+// OpenShared opens what somebody shared with you, so a path can start from it.
+//
+// The item is the top of the tree rather than something in it, which is why it
+// is `/` there: a shared folder holds the paths below it, and a shared file is
+// that path itself.
+func (s *Service) OpenShared(ctx context.Context, item SharedItem) (*Context, error) {
+	return s.unlockShare(ctx, item.ShareID, item.LinkID, item.VolumeID)
 }

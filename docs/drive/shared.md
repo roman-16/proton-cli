@@ -10,9 +10,9 @@ Holds `list`.
 
 List what other people have shared with you.
 
-These are not in your tree and have no path. Address them by the ID shown here, as you would a trashed item or a photo.
+These are not in your tree and have no path of their own. To open one, pass `--shared REF` to any `items` command: / is then the item itself, and anything below it is a path inside it.
 
-An item whose name cannot be decrypted is still listed, so you can still act on it.
+An item whose name cannot be decrypted is still listed, so you can still act on it by ID.
 
 ```
 proton drive shared list

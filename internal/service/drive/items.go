@@ -46,7 +46,7 @@ func (s *Service) List(ctx context.Context, dc *Context, path string) ([]Child, 
 		return nil, err
 	}
 	if !res.IsFolder {
-		return nil, fmt.Errorf("%s is not a folder", path)
+		return nil, errs.Problemf("%s is not a folder.", res.Describe(path))
 	}
 	raw, err := s.listRawChildren(ctx, res.ShareID, res.LinkID)
 	if err != nil {
@@ -71,7 +71,7 @@ func (s *Service) Walk(ctx context.Context, dc *Context, path string) ([]Child, 
 		return nil, err
 	}
 	if !res.IsFolder {
-		return nil, fmt.Errorf("%s is not a folder", path)
+		return nil, errs.Problemf("%s is not a folder.", res.Describe(path))
 	}
 	return s.walk(ctx, res.ShareID, res.LinkID, res.NodeKR, strings.TrimRight(path, "/"))
 }
@@ -249,6 +249,17 @@ func (s *Service) Rename(ctx context.Context, dc *Context, path, newName string)
 		return err
 	}
 	oldHash, _ := lookupHash(strings.ToLower(res.Name), hk)
+	return s.rename(ctx, dc, res, newName, newHash, oldHash)
+}
+
+// rename writes a new name for an item whose place among its siblings the caller
+// has already worked out.
+//
+// A name is unique within its folder, so Proton is told both hashes: the one the
+// new name takes and the one it releases. The root of a tree has no folder to be
+// unique in, which is the whole of the difference between renaming a file and
+// renaming the computer or the share it sits at the top of.
+func (s *Service) rename(ctx context.Context, dc *Context, res *Resolved, newName, newHash, oldHash string) error {
 	encName, err := encryptName(newName, res.ParentKR, dc.AddrKR)
 	if err != nil {
 		return err

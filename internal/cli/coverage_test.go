@@ -101,6 +101,16 @@ var untested = map[string]string{
 	// that does happen to refresh will report this entry as stale.
 	"POST /auth/v4/refresh": "only an expiring session causes one, and a run cannot make its session expire",
 
+	// Everything about a computer. Only the Proton Drive desktop app registers
+	// one - the web client cannot, so neither can this CLI - and no test account
+	// has one for a run to find, which a test cannot arrange and cannot skip over.
+	// What the CLI does with the answers is covered offline instead, by
+	// internal/service/drive/computers_test.go against the shape Proton documents;
+	// what is not covered anywhere is that the live answers have that shape.
+	"GET /drive/devices":         "needs an account with a computer, and only the Proton Drive desktop app makes one",
+	"PUT /drive/devices/{id}":    "the same, and it fires only for a computer named before Proton moved the name onto the root",
+	"DELETE /drive/devices/{id}": "the same, and deleting the one computer an account has cannot be undone by a run",
+
 	// Reading a breach needs an address that has been in one. TestPassBreaches...
 	// asks for the list and stops when every watched address is clean, which is
 	// the good outcome and an untestable one.

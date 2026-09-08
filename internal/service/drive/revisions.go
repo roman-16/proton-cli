@@ -46,7 +46,7 @@ type FileRevision struct {
 }
 
 func (s *Service) RevisionsList(ctx context.Context, dc *Context, path string) ([]Revision, error) {
-	res, err := s.resolveFile(ctx, dc, path)
+	res, err := s.ResolveFile(ctx, dc, path)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func (s *Service) revisions(ctx context.Context, res *Resolved) ([]Revision, err
 // can find is reported the way every other unfound reference is, and a short ID
 // stands for a long one here as it does everywhere else.
 func (s *Service) FindRevision(ctx context.Context, dc *Context, path, r string) (*FileRevision, error) {
-	res, err := s.resolveFile(ctx, dc, path)
+	res, err := s.ResolveFile(ctx, dc, path)
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +111,7 @@ func (s *Service) FindRevision(ctx context.Context, dc *Context, path, r string)
 	if err != nil {
 		return nil, err
 	}
-	return &FileRevision{Revision: rev, File: baseOf(path), res: res}, nil
+	return &FileRevision{Revision: rev, File: res.Describe(baseOf(path)), res: res}, nil
 }
 
 // RevisionRestore makes an earlier version the file's content again. The version
@@ -141,17 +141,4 @@ func (s *Service) RevisionDelete(ctx context.Context, fr *FileRevision) error {
 		Path: fmt.Sprintf("/drive/shares/%s/files/%s/revisions/%s",
 			fr.res.ShareID, fr.res.LinkID, fr.ID),
 	}, nil)
-}
-
-// resolveFile resolves a path that has to be a file, which every revision
-// operation needs and no folder can answer.
-func (s *Service) resolveFile(ctx context.Context, dc *Context, path string) (*Resolved, error) {
-	res, err := s.ResolvePath(ctx, dc, path)
-	if err != nil {
-		return nil, err
-	}
-	if res.IsFolder {
-		return nil, fmt.Errorf("%s is a folder, not a file", path)
-	}
-	return res, nil
 }

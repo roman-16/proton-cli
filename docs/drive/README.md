@@ -2,7 +2,7 @@
 
 Upload, download, share and organize Proton Drive as ordinary paths. Files are encrypted before they leave your machine and decrypted after they arrive, block by block, with your keys.
 
-This page is what people actually do. For every command and flag, see the reference: [items](items.md), [trash](trash.md), [photos](photos.md), [shared](shared.md), [sharing](sharing.md), [invitations](invitations.md), [settings](settings.md).
+This page is what people actually do. For every command and flag, see the reference: [items](items.md), [trash](trash.md), [photos](photos.md), [computers](computers.md), [shared](shared.md), [sharing](sharing.md), [invitations](invitations.md), [settings](settings.md).
 
 ## Look around
 
@@ -137,9 +137,31 @@ proton drive invitations list
 proton drive invitations accept INVITATION_ID
 ```
 
-An item somebody shared with you does not live in your tree, so it has **no path**. Address it by the ID the listing shows.
+An item somebody shared with you does not live in your tree, so it has no path of its own. Open it with `--shared`, naming it by the ID or the name the listing showed:
 
-An item whose name cannot be decrypted is still listed, so you can still act on it.
+```bash
+proton drive items list / --shared Project              # a shared folder
+proton drive items download /report.pdf --shared Project --dest-dir ./downloads/
+proton drive items download / --shared quarterly.pdf    # a shared file is / itself
+```
+
+An item whose name cannot be decrypted is still listed, so you can still act on it by ID.
+
+## Computers
+
+A computer running the Proton Drive desktop app syncs its files to your account, and they are a tree of their own rather than part of your files.
+
+```bash
+proton drive computers list
+proton drive items list / --computer "Work laptop"
+proton drive items download /Documents/report.pdf --computer 7Kd91mQx --dest-dir .
+proton drive computers update "Work laptop" --name "Office PC"
+proton drive computers delete 7Kd91mQx
+```
+
+Every `items` command takes `--computer`, and paths then start at that computer's root. Only the desktop app can add a computer.
+
+`computers delete` stops the syncing and takes the computer off the list. Set it up again by signing the desktop app in on it once more.
 
 ## Photos
 

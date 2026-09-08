@@ -45,6 +45,7 @@ func childColumns() []ui.Column[drivesvc.Child] {
 
 func itemsListCmd() *cobra.Command {
 	var f filters
+	var t tree
 	var page kit.Page
 	var order kit.Order
 	c := &cobra.Command{
@@ -53,9 +54,12 @@ func itemsListCmd() *cobra.Command {
 		Long: "List what is in a folder.\n\n" +
 			"Takes the same filters as move, copy, trash and delete, so you can preview a\n" +
 			"selection here before acting on it. What PATH is here, those commands call\n" +
-			"--scope.",
+			"--scope.\n\n" +
+			"PATH is in your own files. --computer REF lists inside a computer instead,\n" +
+			"and --shared REF inside something somebody shared with you, where / is the\n" +
+			"item itself.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
-			dc, err := context(c)
+			dc, err := t.context(c)
 			if err != nil {
 				return err
 			}
@@ -85,6 +89,7 @@ func itemsListCmd() *cobra.Command {
 		}),
 	}
 	f.registerNarrowing(c.Flags())
+	t.register(c)
 	order.Register(c, "name", "size", "modified")
 	page.Register(c, "items")
 	return c
@@ -125,11 +130,12 @@ func boolInt(b bool) int64 {
 }
 
 func itemsGetCmd() *cobra.Command {
-	return &cobra.Command{
+	var t tree
+	c := &cobra.Command{
 		Use:   "get PATH",
 		Short: "Show a file or folder's details",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
-			dc, err := context(c)
+			dc, err := t.context(c)
 			if err != nil {
 				return err
 			}
@@ -159,12 +165,15 @@ func itemsGetCmd() *cobra.Command {
 			return kit.Show(c, ui.RecordSpec{Object: info, Fields: fields})
 		}),
 	}
+	t.register(c)
+	return c
 }
 
 // ── moving bytes ──
 
 func itemsUploadCmd() *cobra.Command {
 	var recursive bool
+	var t tree
 	ifExists := kit.Enum{
 		Name:   "if-exists",
 		Usage:  "What to do when the folder already has that name",
@@ -182,7 +191,7 @@ func itemsUploadCmd() *cobra.Command {
 			"With --recursive that answer is about the folder the tree lands in.\n\n" +
 			"SRC of - reads standard input, and then DEST has to name the file.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
-			dc, err := context(c)
+			dc, err := t.context(c)
 			if err != nil {
 				return err
 			}
@@ -207,6 +216,7 @@ func itemsUploadCmd() *cobra.Command {
 	}
 	c.Flags().BoolVar(&recursive, "recursive", false, "Upload a directory and everything under it")
 	ifExists.Register(c)
+	t.register(c)
 	return c
 }
 
@@ -401,6 +411,7 @@ func uploadInto(c *kit.Invocation, dc *drivesvc.Context, plan *drivesvc.TreePlan
 
 func itemsDownloadCmd() *cobra.Command {
 	var dest kit.Destination
+	var t tree
 	c := &cobra.Command{
 		Use:   "download PATH",
 		Short: "Download a file",
@@ -408,17 +419,27 @@ func itemsDownloadCmd() *cobra.Command {
 			if err := dest.Validate(true); err != nil {
 				return err
 			}
-			dc, err := context(c)
+			dc, err := t.context(c)
 			if err != nil {
 				return err
 			}
 			src := c.Args[0]
-			name := path.Base(src)
+			// The file is looked for before anything is promised about it, and
+			// what it is called comes off the item rather than off the path: a
+			// shared file is named by the tree it is the whole of.
+			file, err := c.App.Drive.ResolveFile(c.Ctx, dc, src)
+			if err != nil {
+				return err
+			}
+			name := file.Name
+			if name == "" {
+				name = path.Base(src)
+			}
 
 			if dest.Stdout() {
 				// Streaming to stdout means the bar would compete with the
 				// payload's own consumer for the terminal, so it stays off.
-				return c.App.Drive.Download(c.Ctx, dc, src, c.UI().Out, drivesvc.DownloadOptions{
+				return c.App.Drive.Download(c.Ctx, file, c.UI().Out, drivesvc.DownloadOptions{
 					Label: "Downloading " + name, OnSignatureIssue: signatureIssue(c, name),
 				})
 			}
@@ -430,7 +451,7 @@ func itemsDownloadCmd() *cobra.Command {
 				// not leave a plausible-looking file behind, so the bytes land
 				// beside the destination and are moved into place at the end.
 				_, err := dest.Stream(c, name, func(w io.Writer) error {
-					return c.App.Drive.Download(c.Ctx, dc, src, w, drivesvc.DownloadOptions{
+					return c.App.Drive.Download(c.Ctx, file, w, drivesvc.DownloadOptions{
 						Label: "Downloading " + name, Progress: ui.NewProgress(c.UI()),
 						OnSignatureIssue: signatureIssue(c, name),
 					})
@@ -440,6 +461,7 @@ func itemsDownloadCmd() *cobra.Command {
 		}),
 	}
 	dest.Register(c)
+	t.register(c)
 	return c
 }
 
@@ -464,14 +486,21 @@ func signatureIssue(c *kit.Invocation, name string) func(int, string) {
 
 func itemsUpdateCmd() *cobra.Command {
 	var name string
+	var t tree
 	c := &cobra.Command{
 		Use:   "update PATH",
 		Short: "Rename a file or folder",
 		Long: "Rename a file or folder.\n\n" +
 			"Renaming is `update --name`; there is no `rename` verb. To put something\n" +
-			"somewhere else, use `move`.",
+			"somewhere else, use `move`.\n\n" +
+			"PATH names something inside a tree, never the tree itself: to rename a\n" +
+			"computer, use `computers update`.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
-			dc, err := context(c)
+			if strings.Trim(c.Args[0], "/") == "" {
+				return kit.Fail("A tree has no name of its own to change here.").
+					Hint("`" + kit.Program + " drive computers update REF --name NEW_NAME` renames a computer.")
+			}
+			dc, err := t.context(c)
 			if err != nil {
 				return err
 			}
@@ -485,6 +514,7 @@ func itemsUpdateCmd() *cobra.Command {
 	}
 	c.Flags().StringVar(&name, "name", "", "New name, without a path")
 	_ = c.MarkFlagRequired("name")
+	t.register(c)
 	return c
 }
 
@@ -508,12 +538,13 @@ func itemsCopyCmd() *cobra.Command {
 func relocateCmd(use, short string, action ui.Action,
 	apply func(*kit.Invocation, *drivesvc.Context, string, *drivesvc.Resolved) error) *cobra.Command {
 	var f filters
+	var t tree
 	var into string
 	c := &cobra.Command{
 		Use:   use + " [PATH...]",
 		Short: short,
 		RunE: kit.Run([]kit.Step{kit.StepSelection(f.set, filterHint, itemScope)}, func(c *kit.Invocation) error {
-			dc, err := context(c)
+			dc, err := t.context(c)
 			if err != nil {
 				return err
 			}
@@ -543,6 +574,7 @@ func relocateCmd(use, short string, action ui.Action,
 	c.Flags().StringVar(&into, "into", "", "Destination folder")
 	_ = c.MarkFlagRequired("into")
 	f.register(c)
+	t.register(c)
 	return c
 }
 
@@ -556,11 +588,12 @@ func itemsDeleteCmd() *cobra.Command {
 
 func removeCmd(use, short string, action ui.Action, permanent bool) *cobra.Command {
 	var f filters
+	var t tree
 	c := &cobra.Command{
 		Use:   use + " [PATH...]",
 		Short: short,
 		RunE: kit.Run([]kit.Step{kit.StepSelection(f.set, filterHint, itemScope)}, func(c *kit.Invocation) error {
-			dc, err := context(c)
+			dc, err := t.context(c)
 			if err != nil {
 				return err
 			}
@@ -584,6 +617,7 @@ func removeCmd(use, short string, action ui.Action, permanent bool) *cobra.Comma
 		}),
 	}
 	f.register(c)
+	t.register(c)
 	return c
 }
 
@@ -614,11 +648,12 @@ func revisionState(state int) string {
 }
 
 func revisionsListCmd() *cobra.Command {
-	return &cobra.Command{
+	var t tree
+	c := &cobra.Command{
 		Use:   "list PATH",
 		Short: "List a file's earlier versions",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
-			dc, err := context(c)
+			dc, err := t.context(c)
 			if err != nil {
 				return err
 			}
@@ -639,13 +674,15 @@ func revisionsListCmd() *cobra.Command {
 			}, revs)
 		}),
 	}
+	t.register(c)
+	return c
 }
 
 // findRevision resolves the file and the version every PATH REVISION_REF command
 // addresses, so each of them says which version it is about to act on rather than
 // the reference it was handed.
-func findRevision(c *kit.Invocation) (*drivesvc.FileRevision, error) {
-	dc, err := context(c)
+func findRevision(c *kit.Invocation, t *tree) (*drivesvc.FileRevision, error) {
+	dc, err := t.context(c)
 	if err != nil {
 		return nil, err
 	}
@@ -654,6 +691,7 @@ func findRevision(c *kit.Invocation) (*drivesvc.FileRevision, error) {
 
 func revisionsDownloadCmd() *cobra.Command {
 	var dest kit.Destination
+	var t tree
 	c := &cobra.Command{
 		Use:   "download PATH REVISION_REF",
 		Short: "Download an earlier version of a file",
@@ -664,7 +702,7 @@ func revisionsDownloadCmd() *cobra.Command {
 			if err := dest.Validate(true); err != nil {
 				return err
 			}
-			rev, err := findRevision(c)
+			rev, err := findRevision(c, &t)
 			if err != nil {
 				return err
 			}
@@ -691,15 +729,17 @@ func revisionsDownloadCmd() *cobra.Command {
 		}),
 	}
 	dest.Register(c)
+	t.register(c)
 	return c
 }
 
 func revisionsRestoreCmd() *cobra.Command {
-	return &cobra.Command{
+	var t tree
+	c := &cobra.Command{
 		Use:   "restore PATH REVISION_REF",
 		Short: "Restore a file to an earlier version",
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
-			rev, err := findRevision(c)
+			rev, err := findRevision(c, &t)
 			if err != nil {
 				return err
 			}
@@ -711,14 +751,17 @@ func revisionsRestoreCmd() *cobra.Command {
 			})
 		}),
 	}
+	t.register(c)
+	return c
 }
 
 func revisionsDeleteCmd() *cobra.Command {
-	return &cobra.Command{
+	var t tree
+	c := &cobra.Command{
 		Use:   "delete PATH REVISION_REF",
 		Short: "Delete an earlier version permanently",
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
-			rev, err := findRevision(c)
+			rev, err := findRevision(c, &t)
 			if err != nil {
 				return err
 			}
@@ -731,6 +774,8 @@ func revisionsDeleteCmd() *cobra.Command {
 			})
 		}),
 	}
+	t.register(c)
+	return c
 }
 
 // ── creating a folder ──
@@ -739,11 +784,12 @@ func revisionsDeleteCmd() *cobra.Command {
 // `items create`: Drive addresses one collection, and rename, move, trash and
 // delete already treat files and folders alike.
 func itemsCreateCmd() *cobra.Command {
-	return &cobra.Command{
+	var t tree
+	c := &cobra.Command{
 		Use:   "create PATH",
 		Short: "Create a folder, and any missing folder above it",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
-			dc, err := context(c)
+			dc, err := t.context(c)
 			if err != nil {
 				return err
 			}
@@ -766,4 +812,6 @@ func itemsCreateCmd() *cobra.Command {
 			})
 		}),
 	}
+	t.register(c)
+	return c
 }

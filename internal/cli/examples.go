@@ -216,9 +216,16 @@ var examples = map[string][]string{
 	},
 
 	// ── drive ──
+	"proton drive computers list": {"proton drive computers list"},
+	"proton drive computers update": {
+		"proton drive computers update 'Work laptop' --name 'Office PC'",
+	},
+	"proton drive computers delete": {"proton drive computers delete 7Kd91mQx"},
 	"proton drive items list": {
 		"proton drive items list",
 		"proton drive items list /Documents",
+		"proton drive items list / --computer 'Work laptop'",
+		"proton drive items list / --shared Project",
 	},
 	"proton drive items get": {"proton drive items get /Documents/report.pdf"},
 	"proton drive items upload": {
@@ -230,6 +237,7 @@ var examples = map[string][]string{
 	"proton drive items download": {
 		"proton drive items download /Documents/report.pdf --dest-dir .",
 		"proton drive items download /Documents/report.pdf --dest - > report.pdf",
+		"proton drive items download /report.pdf --shared Project --dest-dir .",
 	},
 	"proton drive items update": {"proton drive items update /Documents/report.pdf --name summary.pdf"},
 	"proton drive items move": {

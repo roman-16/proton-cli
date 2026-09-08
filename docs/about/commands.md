@@ -63,6 +63,9 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton contacts keys list`](../contacts/keys.md#list) | List the keys pinned to a contact |
 | [`proton contacts keys pin`](../contacts/keys.md#pin) | Pin a public key so mail to a contact is encrypted to it |
 | [`proton contacts keys unpin`](../contacts/keys.md#unpin) | Remove the keys pinned to a contact |
+| [`proton drive computers delete`](../drive/computers.md#delete) | Remove computers from Drive |
+| [`proton drive computers list`](../drive/computers.md#list) | List the computers syncing to Drive |
+| [`proton drive computers update`](../drive/computers.md#update) | Rename a computer |
 | [`proton drive invitations accept`](../drive/invitations.md#accept) | Accept invitations |
 | [`proton drive invitations decline`](../drive/invitations.md#decline) | Decline invitations |
 | [`proton drive invitations list`](../drive/invitations.md#list) | List invitations waiting for an answer |
