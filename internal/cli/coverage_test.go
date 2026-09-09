@@ -119,22 +119,30 @@ var untested = map[string]string{
 	"POST /mail/v4/messages/{id}/unsubscribe":        "reaching it needs a message from a real mailing list carrying a List-Unsubscribe header, which no seeding can put on these accounts",
 	"GET /calendar/v1/{id}/events/{id}/attendees":    "reaching it needs an event with more attendees than a page holds, which would mean inviting a hundred addresses from these accounts",
 
-	// Setting a forwarding up is a paid feature, and the paid account is the one
-	// account that could - but a forwarding rule on somebody's real mailbox
-	// redirects their mail, and Proton emails the forwardee a link only they can
-	// follow, so the rule sits pending on a real account until somebody notices.
-	// Creating and deleting one is reversible on paper and not in effect, which
-	// is the line the paid rules draw.
-	"POST /mail/v4/forwardings":              "it redirects real mail on a real account, and the invitation cannot be withdrawn from the forwardee's inbox",
-	"DELETE /mail/v4/forwardings/{id}":       "there is nothing to take down, because nothing is set up",
-	"PUT /mail/v4/forwardings/{id}/reinvite": "the same: no pending forwarding to ask about again",
+	// Deleting an address. Proton allows one a year, and the paid account - the
+	// one account that may delete at all - refuses the command outright, so
+	// nothing here spends it. Adding one is reached instead by the run that mints
+	// the fixture address, which is why it is not on this list.
+	"PUT /core/v4/addresses/{id}/delete":          "Proton allows one address deletion a year, and no test may spend it",
+	"GET /core/v4/addresses/allowAddressDeletion": "only deleting an address asks whether the year's allowance is still there",
 
-	// Pausing needs a forwarding the forwardee has accepted, and accepting one
-	// writes an address key and re-signs the Signed Key List - which proton does
-	// not do, by design. So no run of this suite can ever produce an active
-	// forwarding to pause. See docs/help/limits.md.
-	"PUT /mail/v4/forwardings/{id}/pause":  "pausing needs an accepted forwarding, and accepting one is not built",
+	// Everything a forwarding can be told to do, none of which a run can reach.
+	// Proton refuses to set one up from here - see docs/help/limits.md - so no run
+	// produces a forwarding to accept, pause, resume, ask again or take down, and
+	// the accounts hold none of their own. TestMailForwardingSetupIsRefusedByProton
+	// sends the setup on every run and is refused, which exercises the request and,
+	// being a refusal, records nothing.
+	"POST /mail/v4/forwardings":            "Proton refuses a forwarding set up from here, so nothing this sends is ever stored",
+	"DELETE /mail/v4/forwardings/{id}":     "there is no forwarding to take down, because none can be set up",
+	"PUT /mail/v4/forwardings/{id}":        "asking a forwardee again sends the material Proton refuses",
+	"PUT /mail/v4/forwardings/{id}/pause":  "pausing needs a forwarding, and none can be set up",
 	"PUT /mail/v4/forwardings/{id}/resume": "the other half of the same gap",
+
+	// Asking again reaches this endpoint only for a forwardee outside Proton,
+	// whose confirmation email is the only thing there is to send twice. Setting
+	// one of those up is not built - Proton emails the address a link its owner
+	// must follow - so no account the suite signs in has one for a test to find.
+	"PUT /mail/v4/forwardings/{id}/reinvite": "only a forwarding to an address outside Proton reaches it, and no test account has one",
 }
 
 func TestEveryRequestTheCLICanSendIsOneTheSuiteSends(t *testing.T) {

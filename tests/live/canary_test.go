@@ -59,6 +59,7 @@ var collections = []struct {
 	{"folders", []string{"mail", "settings", "folders", "list"}, "id", "name"},
 	{"filters", []string{"mail", "settings", "filters", "list"}, "id", "name"},
 	{"addresses", []string{"mail", "settings", "addresses", "list"}, "id", "name"},
+	{"forwardings", []string{"mail", "settings", "forwarding", "list"}, "id", "to"},
 	{"contacts", []string{"contacts", "list"}, "id", "name"},
 	{"contact groups", []string{"contacts", "groups", "list"}, "id", "name"},
 	{"alias mailboxes", []string{"pass", "settings", "mailboxes", "list"}, "id", "email"},
@@ -164,9 +165,11 @@ func readRows(args []string, idKey, labelKey string) ([]string, bool) {
 // sweepNotices trashes the mail this run caused Proton to send.
 //
 // Sharing something makes Proton write to the owner when the other side answers,
-// and no setting on this end turns that off. So a run clears its own: mail from
-// no-reply@proton.me carrying one of the declared subjects that arrived after the
-// run began, moved to the trash rather than deleted, because it is real mail.
+// and accepting a forwarding does too. No setting on this end turns that off, so
+// a run clears its own: mail from
+// one of the declared senders carrying one of the declared subjects that arrived
+// after the run began, moved to the trash rather than deleted, because it is
+// real mail.
 //
 // It runs before the photograph, so what it clears is not then reported as
 // something the run left behind - and anything it fails to clear stays, and the
@@ -190,9 +193,17 @@ func sweepNotices() {
 
 // sweepOnce trashes the notices that have arrived so far, and says how many.
 func sweepOnce() int {
+	var cleared int
+	for _, sender := range paid.NoticeSenders() {
+		cleared += sweepFrom(sender)
+	}
+	return cleared
+}
+
+func sweepFrom(sender string) int {
 	body, _, code, err := runAs(account.Paid, nil, asJSON([]string{
 		"mail", "messages", "list", "--folder", "all",
-		"--from", "no-reply@proton.me", "--page-size", "50",
+		"--from", sender, "--page-size", "50",
 	})...)
 	if err != nil || code != 0 {
 		return 0

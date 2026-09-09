@@ -2,6 +2,7 @@ package fixture
 
 import (
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -204,22 +205,26 @@ func Free(work string) []Collection {
 	}}
 }
 
-// Paid is what the paid account holds for the suite.
+// Paid is what the paid account holds for the suite: an alias and an address,
+// each made on the first run that needs it and never removed.
 //
-// One alias, made on the first run that needs it and never removed - which is
-// the whole reason it is a fixture rather than something a test makes: an alias
-// address cannot be un-minted, so a test that made its own would spend one of
-// somebody's for every run. Declaring it here means the suite mints at most one,
-// ever.
+// Both are here for the same reason. Neither can be given back - an alias
+// address is spent for good, and Proton allows one address deletion a year - so
+// a test that made its own would take something of somebody's on every run.
+// Declaring them here means the suite mints at most one of each, ever.
 //
-// There is no Remove, so a row that disagrees with this is reported rather than
-// replaced. Deleting the account's alias to make a better one is not a trade the
-// suite gets to make.
+// Neither has a Remove, so a row that disagrees with this is reported rather
+// than replaced. Deleting the account's alias or address to make a better one is
+// not a trade the suite gets to make.
 //
-// The listing is `aliases list` rather than `items list` because it is unpaged:
-// a real account can hold more items than a page, and a fixture that fell off
-// the end of one would be minted again on every run.
-func Paid() []Collection {
+// The alias listing is `aliases list` rather than `items list` because it is
+// unpaged: a real account can hold more items than a page, and a fixture that
+// fell off the end of one would be minted again on every run.
+//
+// home is an address the account already holds, which says what an address of
+// its own may be called: the domain is one Proton has already let it use, and a
+// local part of its own with a suffix is free wherever that domain is.
+func Paid(home string) []Collection {
 	return []Collection{{
 		What:   "Pass alias",
 		List:   []string{"pass", "aliases", "list"},
@@ -230,7 +235,35 @@ func Paid() []Collection {
 			Fields: map[string]string{"type": "alias"},
 			Create: []string{"pass", "aliases", "create", "--prefix", PaidAliasPrefix, "--name", PaidAlias},
 		}},
+	}, {
+		What:   "address",
+		List:   []string{"mail", "settings", "addresses", "list"},
+		Key:    "display_name",
+		IDKeys: []string{"id"},
+		Pins: []Pin{{
+			ID: PaidForwarder,
+			// An address with no key of its own carries no mail, so one that is
+			// there and unfinished is reported rather than forwarded from.
+			Fields: map[string]string{"has_keys": "true"},
+			Create: []string{"mail", "settings", "addresses", "create",
+				ForwarderAddress(home), "--display-name", PaidForwarder},
+		}},
 	}}
+}
+
+// ForwarderAddress is what the paid account's forwarding fixture is called,
+// worked out from an address the account already holds.
+//
+// The domain is that address's, because it is one Proton has already let the
+// account use. The local part is its own with a suffix, which is free on a
+// custom domain and unclaimed on a Proton one - and it never has to be guessed
+// twice, since the fixture is found by its display name.
+func ForwarderAddress(home string) string {
+	local, domain, found := strings.Cut(home, "@")
+	if !found {
+		return ""
+	}
+	return local + "-protoncli-fwd@" + domain
 }
 
 // Today and InDays date the fixture's events, and the window a listing of

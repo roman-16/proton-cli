@@ -94,7 +94,7 @@ Only the newest slice of the inbox is looked at: the rest is somebody's real mai
 
 **What is allowed is what can be put back**, and the photograph is what decides the argument. The auto-reply looked reversible - `autoreply get` reads back everything `set` accepts - and is not: Proton keeps the last message even while it is off and offers no way to clear it, so a run leaves its own text in somebody's real settings for good. Turning it off restores the behaviour and not the state, and the photograph compares the state. So it is refused, and `PUT /mail/v4/settings/autoresponder` is a declared gap rather than a test. Lowering the version-history retention is refused for a blunter reason: Proton discards the revisions and nothing brings them back.
 
-### The one fixture the suite reads and never makes
+### The two fixtures the suite reads and never makes
 
 An alias address **cannot be un-minted**: deleting the item leaves the address spent for good. So `fixture.PaidAlias` names an alias somebody created once by hand, every run hangs contacts off that one and removes them again, and a run that cannot find it says what to run:
 
@@ -104,11 +104,17 @@ the paid account has no Pass alias called "proton-cli fixture", and the suite ne
     proton --profile paid pass aliases create --prefix protoncli --name "proton-cli fixture"
 ```
 
-The name sits outside `fixture.TestPrefix` on purpose: `fixture.Sweep` deletes everything carrying that prefix, and this is the one fixture that must survive.
+`fixture.PaidForwarder` is the second, and it is kept for a related reason: **a forwarding redirects every message arriving at the address it is set on.** Setting one up needs a subscription, so the forwarder has to be the paid account - and pointing it at an address somebody uses would send their mail to a test account for as long as the run lasted, which the photograph cannot see happen. So the suite forwards from an address that exists for this and receives nothing, found by its display name.
+
+It is minted once, by the first run that needs it, and never removed: **Proton allows one address deletion a year**, so an address made per run would spend that allowance and leave nothing to spend it on. `fixture.ForwarderAddress` works out what to call it from an address the account already holds - a custom domain where there is one, because an address there can be removed again, and a local part of its own with a suffix - and `requirePaidFixtures` mints it **before the photograph is taken**, so what it makes is part of the account as the run found it.
+
+Three rules in `tests/rules` hold the suite to this. A function that runs `forwarding create` as the paid account and never asks `paidForwarder` which address may be redirected fails `TestOnlyTheFixtureAddressForwardsOnThePaidAccount`. And a function that **requires** `addresses create` or `aliases create` to succeed as the paid account fails `TestOnlyTheFixtureMintsWhatCannotBeUnminted` - what is forbidden is insisting on the success, not naming the command, because proving that Proton refuses one is worth a test and `runPaid` hands back the exit code instead of demanding a zero. Only `fixture.Ensure` may mint one, which is what makes "once, ever" true.
+
+Both names sit outside `fixture.TestPrefix` on purpose: `fixture.Sweep` deletes everything carrying that prefix, and these are the fixtures that must survive.
 
 ### Mail a run causes Proton to send
 
-Sharing something makes Proton write to the owner when the other side answers, and no setting on this end turns that off. `runAs` counts those the moment it sees an invitation answered, and the run **sweeps its own notices**: mail from `no-reply@proton.me` matching one of `paid.Notices()` that arrived after the run began, moved to the **trash**, never deleted, because it is real mail. The sweep runs before the photograph, so what it clears is not then reported as something the run left behind - and anything it fails to clear stays, and the photograph names it.
+Sharing something makes Proton write to the owner when the other side answers, and accepting a forwarding does too. No setting on this end turns that off, so `runAs` counts those the moment it sees one answered, and the run **sweeps its own notices**: mail from one of `paid.NoticeSenders()` matching one of `paid.Notices()` that arrived after the run began, moved to the **trash**, never deleted, because it is real mail. There is more than one sender - sharing writes from `no-reply@proton.me`, forwarding from `no-reply@mail.proton.me`. The sweep runs before the photograph, so what it clears is not then reported as something the run left behind - and anything it fails to clear stays, and the photograph names it.
 
 Adding a test that makes Proton write to the account means adding its subject to `paid.Notices()`.
 

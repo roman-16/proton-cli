@@ -78,6 +78,11 @@ func runAs(profile string, stdin io.Reader, args ...string) (stdout, stderr stri
 var reauthCommands = [][]string{
 	{"calendar", "settings", "calendars", "delete"},
 	{"mail", "messages", "expire"},
+	{"mail", "settings", "addresses", "create"},
+	{"mail", "settings", "addresses", "delete"},
+	{"mail", "settings", "addresses", "disable"},
+	{"mail", "settings", "addresses", "enable"},
+	{"mail", "settings", "forwarding", "accept"},
 	{"mail", "settings", "autoreply", "disable"},
 	{"mail", "settings", "autoreply", "enable"},
 	{"mail", "settings", "autoreply", "set"},
@@ -116,6 +121,7 @@ func withPassword(a *testAccount, args []string) []string {
 var answeringCommands = [][]string{
 	{"invitations", "accept"},
 	{"invitations", "decline"},
+	{"mail", "settings", "forwarding", "accept"},
 }
 
 func answersInvitation(args []string) bool {

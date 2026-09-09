@@ -49,6 +49,7 @@ golden:
 [doc("Fix and format everything fixable, then lint with no findings allowed")]
 lint:
     gofmt -w .
+    go mod tidy
     nixfmt flake.nix
     just docs
     just web

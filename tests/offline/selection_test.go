@@ -44,6 +44,15 @@ func TestACommandThatDecryptsStillJudgesItsArgumentsFirst(t *testing.T) {
 	}
 }
 
+// An address is a local part and a domain, which is a judgement about the
+// command line and nothing else.
+func TestAnAddressToAddHasToBeAnAddress(t *testing.T) {
+	for _, bad := range []string{"work", "work@", "@example.com", "work@a@b"} {
+		refuses(t, 1, []string{"mail", "settings", "addresses", "create", bad},
+			"not an email address", "work@example.com")
+	}
+}
+
 func TestSendingNeedsSomethingToSend(t *testing.T) {
 	refuses(t, 1, []string{"mail", "messages", "send"}, "required")
 	refuses(t, 1, []string{"mail", "messages", "send", "--subject", "x", "--body", "y"},

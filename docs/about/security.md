@@ -7,12 +7,12 @@ Signing in runs [Secure Remote Password](https://en.wikipedia.org/wiki/Secure_Re
 ## What leaves your machine
 
 - API requests to `https://mail.proton.me/api` over HTTPS, authenticated with your session tokens.
-- Encrypted payloads you asked to create: an encrypted message, an encrypted file block, an encrypted event.
+- Encrypted payloads you asked to create: an encrypted message, an encrypted file block, an encrypted event, and the locked key a forwarding you accepted adds to your address.
 - The SRP proof during login, which does not reveal your password.
 - Opening a public link with `--link` or `--shared` carries your session, so Proton knows which account opened it, and the owner sees one more visit.
 - Once a day, on an install no package manager owns, a request to GitHub asking which release is newest. It carries nothing about you or your account, and `PROTON_NO_UPDATE_CHECK` ends it ([Updating](../install.md#updating)).
 
-**What never leaves:** your password, your second password if you have one, your key password, and your private keys.
+**What never leaves:** your password, your second password if you have one, your key password, and an unlocked private key.
 
 There is no telemetry, and there is nothing to turn off. proton-cli never reports a command you ran, a feature you used, or the fact that you ran it at all. The diagnostic log is written to your disk and read by nobody unless you run `proton report` and paste it somewhere yourself ([Reporting a bug](../help/troubleshooting.md#reporting-a-bug)). What is known about how the tool is used comes from counters the distribution channels publish, and is [on the site](https://proton-cli.lerchster.dev/stats/) in full.
 

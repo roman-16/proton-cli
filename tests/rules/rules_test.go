@@ -8,10 +8,14 @@
 package rules
 
 import (
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -102,32 +106,128 @@ func TestEveryNarrowedRestrictionNamesARealValue(t *testing.T) {
 	}
 }
 
-// Only the fixture mints what cannot be un-minted.
+// Nothing in the suite asks the paid account to mint what cannot be un-minted.
 //
 // paid.FixtureOnly names the commands whose effect on the paid account outlives
-// the run: an alias address cannot be given back, so one made for the life of
-// the account is a cost worth paying and one made per run is not. The fixture
-// brings itself about through fixture.Ensure, so a test naming one of these
-// directly is a test minting its own - which is what this catches, and the only
-// place it can be caught: the run-time check sees a command line, and what makes
-// this wrong is whose command line it is.
+// the run: an alias address cannot be given back, and Proton allows one address
+// deletion a year. The fixture brings those about once and keeps them, so a test
+// that runs one of these and requires it to succeed is a test minting its own.
+//
+// What is forbidden is requiring the success, not naming the command: proving
+// that Proton refuses one is worth a test, and `runPaid` hands back the exit
+// code rather than insisting on zero. A refusal that turned out to be an
+// acceptance would leave something behind, and the photograph is what names it.
 func TestOnlyTheFixtureMintsWhatCannotBeUnminted(t *testing.T) {
-	paidCall := regexp.MustCompile(`run(?:OK)?(?:Stderr)?(?:JSON)?(?:Array)?Paid\(t,\s*((?:"[^"]*"(?:,\s*)?)+)`)
-	word := regexp.MustCompile(`"([^"]*)"`)
 	for _, name := range goFiles(t, liveDir) {
-		for _, call := range paidCall.FindAllStringSubmatch(read(t, filepath.Join(liveDir, name)), -1) {
-			var args []string
-			for _, w := range word.FindAllStringSubmatch(call[1], -1) {
-				args = append(args, w[1])
-			}
+		for _, fn := range functionsIn(t, filepath.Join(liveDir, name)) {
 			for _, r := range paid.FixtureOnly() {
-				if argv.Has(args, r.Command...) {
-					t.Errorf("%s runs %q as the paid account: %s",
-						name, strings.Join(r.Command, " "), r.Why)
+				if !calls(fn, requiresPaidSuccess(r.Command)) {
+					continue
 				}
+				t.Errorf("%s: %s requires %q to succeed as the paid account: %s",
+					name, fn.Name.Name, strings.Join(r.Command, " "), r.Why)
 			}
 		}
 	}
+}
+
+// insistsOnSuccess are the paid runners that fail the test unless the command
+// exits zero. runPaid is not one of them: it answers with the exit code, which
+// is how a refusal is asserted.
+var insistsOnSuccess = regexp.MustCompile(`^runOK(?:Stderr)?Paid$|^runJSON(?:Array)?Paid$`)
+
+func requiresPaidSuccess(command []string) func(*ast.CallExpr) bool {
+	return func(call *ast.CallExpr) bool {
+		name, ok := call.Fun.(*ast.Ident)
+		if !ok || !insistsOnSuccess.MatchString(name.Name) {
+			return false
+		}
+		return argv.Has(literalWords(call), command...)
+	}
+}
+
+// literalWords are the words a call spells out, which is what a rule about a
+// command line can read: an argument built in a variable is not one of them.
+func literalWords(call *ast.CallExpr) []string {
+	var out []string
+	for _, arg := range call.Args {
+		lit, ok := arg.(*ast.BasicLit)
+		if !ok || lit.Kind != token.STRING {
+			continue
+		}
+		if word, err := strconv.Unquote(lit.Value); err == nil {
+			out = append(out, word)
+		}
+	}
+	return out
+}
+
+// A forwarding the paid account sets up leaves the fixture address.
+//
+// A forwarding redirects every message arriving at the address it is set on, and
+// the paid account is somebody's: a test that named one of their own addresses
+// would send their mail to a test account for as long as the run lasted, and
+// the photograph could not see it happen. The address kept for this receives
+// nothing, and `paidForwarder` is the only thing that finds it.
+func TestOnlyTheFixtureAddressForwardsOnThePaidAccount(t *testing.T) {
+	for _, name := range goFiles(t, liveDir) {
+		for _, fn := range functionsIn(t, filepath.Join(liveDir, name)) {
+			if !calls(fn, isPaidForwardingCreate) || calls(fn, isFixtureForwarder) {
+				continue
+			}
+			t.Errorf("%s: %s sets up a forwarding as the paid account and never asks"+
+				" paidForwarder which address may be redirected", name, fn.Name.Name)
+		}
+	}
+}
+
+// paidRunner matches the runners that act as the paid account.
+var paidRunner = regexp.MustCompile(`^run(?:OK)?(?:Stderr)?(?:JSON)?(?:Array)?Paid$`)
+
+// isPaidForwardingCreate reports whether a call sets a forwarding up as the
+// paid account. The address it names may be anything - a variable, a call, a
+// literal - which is exactly what the rule is about, so only the command's own
+// words are read here.
+func isPaidForwardingCreate(call *ast.CallExpr) bool {
+	name, ok := call.Fun.(*ast.Ident)
+	if !ok || !paidRunner.MatchString(name.Name) {
+		return false
+	}
+	return argv.Has(literalWords(call), "mail", "settings", "forwarding", "create")
+}
+
+func isFixtureForwarder(call *ast.CallExpr) bool {
+	name, ok := call.Fun.(*ast.Ident)
+	return ok && name.Name == "paidForwarder"
+}
+
+// functionsIn is every function declared in one file of the suite.
+func functionsIn(t *testing.T, path string) []*ast.FuncDecl {
+	t.Helper()
+	file, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
+	if err != nil {
+		t.Fatalf("parse %s: %v", path, err)
+	}
+	var out []*ast.FuncDecl
+	for _, decl := range file.Decls {
+		if fn, ok := decl.(*ast.FuncDecl); ok && fn.Body != nil {
+			out = append(out, fn)
+		}
+	}
+	return out
+}
+
+// calls reports whether a function makes a call the predicate recognises.
+func calls(fn *ast.FuncDecl, is func(*ast.CallExpr) bool) bool {
+	var found bool
+	ast.Inspect(fn.Body, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if ok && is(call) {
+			found = true
+		}
+		return !found
+	})
+	return found
 }
 
 // Nothing in the live suite starts the binary itself.

@@ -3,6 +3,7 @@ module github.com/roman-16/proton-cli
 go 1.26.5
 
 require (
+	github.com/ProtonMail/go-crypto v1.4.1-proton
 	github.com/ProtonMail/go-mime v0.0.0-20230322103455-7d82a3887f2f
 	github.com/ProtonMail/go-srp v0.0.7
 	github.com/ProtonMail/gopenpgp/v2 v2.10.0-proton
@@ -31,7 +32,6 @@ require (
 require (
 	aead.dev/minisign v0.3.0 // indirect
 	github.com/ProtonMail/bcrypt v0.0.0-20211005172633-e235017c1baf // indirect
-	github.com/ProtonMail/go-crypto v1.4.1-proton // indirect
 	github.com/cloudflare/circl v1.6.5 // indirect
 	github.com/cronokirby/saferith v0.33.0 // indirect
 	github.com/ebitengine/purego v0.10.2 // indirect

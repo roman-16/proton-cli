@@ -8,7 +8,7 @@ A refusal that comes from Proton rather than from proton-cli belongs to [Trouble
 
 **An update cannot be verified offline.** `proton update` checks the download against `checksums.txt` from the same release, and neither is signed. An install from a package manager is verified by the package manager.
 
-**Post-quantum keys are read, never generated.** An account that opted in during Proton's rollout signs in, and mail and shares reach others who opted in. Turning the setting on is done in Proton's own settings.
+**Post-quantum keys are read, never generated.** An account that opted in during Proton's rollout signs in, and mail and shares reach others who opted in. Turning the setting on is done in Proton's own settings, and adding an address to such an account is refused.
 
 **A recurring event needs a zone that can be named.** proton reads one from `TZ`, `/etc/localtime` or `/etc/timezone`, then from your Proton calendar settings. Where none of those answers, a recurring event drifts by an hour when the clocks change. Pass `--zone Europe/Vienna` to be sure.
 
@@ -20,8 +20,9 @@ Each of these has an equivalent in a web client.
 
 | What is missing | What to do instead |
 | --- | --- |
-| Accepting a forwarding somebody sent you | Accept it in the web client. Setting one up, pausing it and taking it down are built |
+| Setting up mail forwarding | Add the forwarding at [account.proton.me](https://account.proton.me). Accepting one sent to you, pausing it, resuming it and taking it down are built |
 | Mail forwarding to a non-Proton address | Proton emails the address a link its owner must follow; finish it there |
+| Turning on the `@pm.me` short domain | Switch it on at [account.proton.me](https://account.proton.me). Adding, disabling and deleting other addresses is built |
 | Turning the Pass [extra password](../pass/README.md#an-extra-password) on or off | Use the Pass app. *Answering* one is built |
 
 proton changes no credentials: the account password, two-factor, the recovery phrase and the Pass extra password are all set at [account.proton.me](https://account.proton.me) or in the Pass app.

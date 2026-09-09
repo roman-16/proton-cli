@@ -105,8 +105,11 @@ func ensurePinned(profile, what, name string) (map[string]any, error) {
 
 // requirePaidFixtures settles what the paid account has to hold already, before
 // the photograph is taken or any test runs.
+//
+// It runs before the photograph so that what it mints is part of the account as
+// the run found it, rather than something the run appears to have left behind.
 func requirePaidFixtures() {
-	for _, c := range fixture.Paid() {
+	for _, c := range fixture.Paid(paidHome()) {
 		for _, p := range c.Pins {
 			if _, err := ensurePinned(account.Paid, c.What, p.ID); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
@@ -116,12 +119,48 @@ func requirePaidFixtures() {
 	}
 }
 
+// paidHome is the address whose domain the suite makes its own address on: one
+// Proton has already let this account use.
+//
+// A custom domain is preferred over a Proton one, because an address there can
+// be removed again - Proton allows one deletion a year on its own domains, so a
+// fixture made there is one nobody can replace cheaply.
+//
+// It is read once. Every fixture lookup consults the declaration, and asking the
+// account about itself each time would spend a request on an answer that cannot
+// change during a run.
+var paidHome = sync.OnceValue(func() string {
+	rows, err := fixture.Rows(suiteRunner, account.Paid, "mail", "settings", "addresses", "list")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "could not read the paid account's addresses: %v\n", err)
+		os.Exit(1)
+	}
+	// Proton's own ADDRESS_TYPE numbers, which a listing carries as they are:
+	// an address on a domain the account added, and the account's first address.
+	const customDomain, original = "3", "1"
+	var fallback string
+	for _, row := range rows {
+		switch fixture.Str(row["type"]) {
+		case customDomain:
+			return fixture.Str(row["email"])
+		case original:
+			fallback = fixture.Str(row["email"])
+		}
+	}
+	if fallback != "" {
+		return fallback
+	}
+	fmt.Fprintln(os.Stderr, "the paid account holds no address to make another beside")
+	os.Exit(1)
+	return ""
+})
+
 // declaredPin finds a pin in the declaration for that account, so a test names
 // what it wants rather than repeating how to make it.
 func declaredPin(profile, what, name string) (fixture.Collection, fixture.Pin, bool) {
 	declared := fixture.Free("")
 	if profile == account.Paid {
-		declared = fixture.Paid()
+		declared = fixture.Paid(paidHome())
 	}
 	for _, c := range declared {
 		if c.What != what {
@@ -158,6 +197,24 @@ func paidAlias(t *testing.T) (ref, address string) {
 	id, _ := row["item_id"].(string)
 	addr, _ := row["alias"].(string)
 	return share + "/" + id, addr
+}
+
+// paidForwarder is the address on the paid account that forwardings are set up
+// from: made once, kept for good.
+//
+// A forwarding redirects every message arriving at the address it is set on, so
+// the suite never sets one on an address the account actually uses. This one
+// exists for the purpose and receives nothing. It is minted once because Proton
+// allows one address deletion a year: an address made per run would spend that
+// allowance and leave nothing to spend it on.
+func paidForwarder(t *testing.T) string {
+	t.Helper()
+	row := pinned(t, account.Paid, "address", fixture.PaidForwarder)
+	email, _ := row["email"].(string)
+	if email == "" {
+		t.Fatalf("the paid account's %q address has no email address", fixture.PaidForwarder)
+	}
+	return email
 }
 
 // ── mail ──

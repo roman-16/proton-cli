@@ -300,6 +300,45 @@ proton mail settings senders forget billing@example.com
 
 A decision applies before the spam filter forms an opinion. Deciding again about the same sender replaces the earlier decision. `forget` lets the filter decide again.
 
+## Accept a forwarding somebody sent you
+
+```bash
+proton mail settings forwarding list
+proton mail settings forwarding accept jane@proton.me
+proton mail settings forwarding decline jane@proton.me
+```
+
+A forwarding is named by the other party's address, in either direction. Only a pending forwarding sent to one of your addresses can be accepted or declined, and accepting needs no plan.
+
+## Forwardings you set up
+
+```bash
+proton mail settings forwarding list
+proton mail settings forwarding disable jane@proton.me
+proton mail settings forwarding enable jane@proton.me
+proton mail settings forwarding delete jane@proton.me
+```
+
+Nothing is forwarded until Jane accepts it, and it stays pending until she does. `disable` stops mail being forwarded and keeps the arrangement; `delete` takes one down in either direction.
+
+Adding a forwarding is done at [account.proton.me](https://account.proton.me) - see [What it can't do](../help/limits.md#not-built-yet).
+
+## Add an address
+
+```bash
+proton mail settings addresses create work@example.com --display-name Work
+proton mail settings addresses list
+proton mail settings addresses disable work@example.com
+proton mail settings addresses enable work@example.com
+proton mail settings addresses delete work@example.com
+```
+
+The address sends and receives as soon as it exists. Its domain has to be one the account can use: a Proton domain, or a custom domain already set up. Adding, disabling and deleting an address needs a paid Mail plan.
+
+Your first Proton address and your short-domain address stay enabled and cannot be deleted. Proton allows one address deletion a year unless the address is on a custom domain, and a deleted address cannot be used again by anyone.
+
+`get` shows whether an address holds a key. One that does not can neither send nor receive; running `create` on it publishes the missing key.
+
 ## Settings
 
 ```bash

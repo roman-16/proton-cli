@@ -60,6 +60,10 @@ func Restrictions() []Restriction {
 		Command: []string{"mail", "messages", "empty"},
 		Why:     "it deletes a whole folder with no listing of what was in it",
 	}, {
+		Command: []string{"mail", "settings", "addresses", "delete"},
+		Why: "Proton allows one address deletion a year, and the address is gone for good" +
+			" - nobody, including its owner, can have it again",
+	}, {
 		Command: []string{"mail", "settings", "autoreply", "disable"},
 		Why:     "it would stop an auto-reply the account owner armed, and the mail that arrives meanwhile goes unanswered",
 	}, {
@@ -96,6 +100,11 @@ func FixtureOnly() []Restriction {
 		Command: []string{"pass", "aliases", "create"},
 		Why: "an alias address cannot be un-minted, so a test that made its own would spend" +
 			" one of somebody's on every run. fixture.PaidAlias is made once and kept",
+	}, {
+		Command: []string{"mail", "settings", "addresses", "create"},
+		Why: "an address cannot be given back - Proton allows one deletion a year - so a test" +
+			" that made its own would spend that allowance. fixture.PaidForwarder is made" +
+			" once and kept",
 	}}
 }
 
@@ -119,17 +128,28 @@ func OffLimits(args []string) string {
 // Notices are the subjects Proton writes to the account about, unprompted, when
 // a test shares something and the other side answers.
 //
-// Nothing on this end turns them off, so a run sweeps its own: mail from
-// no-reply@proton.me carrying one of these subjects that arrived after the run
-// began is moved to the trash, never deleted, because it is real mail. Adding a
-// test that makes Proton write to the account means adding its subject here.
+// Nothing on this end turns them off, so a run sweeps its own: mail from one of
+// NoticeSenders carrying one of these subjects that arrived after the run began
+// is moved to the trash, never deleted, because it is real mail. Adding a test
+// that makes Proton write to the account means adding its subject here.
 func Notices() []string {
 	return []string{
 		"has accepted your invitation",
 		"has declined your invitation",
 		"shared a vault with you",
 		"shared a calendar with you",
+		"Forwarding active",
 	}
+}
+
+// NoticeSenders are the addresses Proton writes those from.
+//
+// There is more than one: sharing writes from the account's own no-reply
+// address, and forwarding writes from Mail's. A sweep that knew only the first
+// left the second sitting in somebody's inbox, which the photograph then
+// reported as something the run had left behind.
+func NoticeSenders() []string {
+	return []string{"no-reply@proton.me", "no-reply@mail.proton.me"}
 }
 
 // A Photograph is what the account held, as one line per thing, by collection.

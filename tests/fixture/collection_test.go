@@ -9,7 +9,7 @@ import (
 // Every collection has to be readable, identifiable and reconcilable, or the
 // accessor that reads it fails somewhere far from the declaration.
 func TestEveryCollectionCanBeReadAndReconciled(t *testing.T) {
-	for _, c := range append(Free("/work"), Paid()...) {
+	for _, c := range append(Free("/work"), Paid("owner@example.com")...) {
 		where := c.What + " " + strings.Join(c.List, " ")
 		if c.What == "" {
 			t.Errorf("%s: no noun to report it by", where)
@@ -31,7 +31,7 @@ func TestEveryCollectionCanBeReadAndReconciled(t *testing.T) {
 
 // Every pin says how it comes about, or nothing can bring it about.
 func TestEveryPinSaysHowItComesAbout(t *testing.T) {
-	for _, c := range append(Free("/work"), Paid()...) {
+	for _, c := range append(Free("/work"), Paid("owner@example.com")...) {
 		for _, p := range c.Pins {
 			if p.ID == "" {
 				t.Errorf("%s: a pin with no name cannot be found", c.What)
@@ -46,7 +46,7 @@ func TestEveryPinSaysHowItComesAbout(t *testing.T) {
 // The fixtures read like somebody's account, and never like the suite's own
 // artifacts - which Sweep deletes.
 func TestNoFixtureIsNamedLikeSomethingTheSuiteSweeps(t *testing.T) {
-	for _, c := range append(Free("/work"), Paid()...) {
+	for _, c := range append(Free("/work"), Paid("owner@example.com")...) {
 		for _, p := range c.Pins {
 			if strings.HasPrefix(p.ID, TestPrefix) {
 				t.Errorf("%s: %s carries the swept prefix, so a run would delete its own fixture", c.What, p.ID)
@@ -58,7 +58,7 @@ func TestNoFixtureIsNamedLikeSomethingTheSuiteSweeps(t *testing.T) {
 			t.Errorf("the %q fixture carries the swept prefix", m.Subject)
 		}
 	}
-	for _, name := range []string{AliasName, PaidAlias} {
+	for _, name := range []string{AliasName, PaidAlias, PaidForwarder} {
 		if strings.HasPrefix(name, TestPrefix) {
 			t.Errorf("the alias %q carries the swept prefix", name)
 		}
@@ -82,24 +82,48 @@ func TestASecretIsNeverAFlagValue(t *testing.T) {
 	}
 }
 
-// The paid account holds exactly one fixture, and it is the alias, because that
-// is the only thing on it the suite may not make for itself.
-func TestThePaidAccountHoldsOnlyTheAlias(t *testing.T) {
-	paid := Paid()
-	if len(paid) != 1 || len(paid[0].Pins) != 1 {
-		t.Fatalf("the paid account declares %d collections", len(paid))
+// The paid account holds two fixtures, an alias and an address, and neither
+// declares a way to remove itself: they are the two things on it that cannot be
+// given back, which is the whole reason they are made once and kept.
+func TestThePaidAccountKeepsWhatItCannotGiveBack(t *testing.T) {
+	paid := Paid("owner@example.com")
+	if len(paid) != 2 {
+		t.Fatalf("the paid account declares %d collections, want the alias and the address", len(paid))
 	}
-	if paid[0].Pins[0].ID != PaidAlias {
-		t.Errorf("the paid fixture is %q", paid[0].Pins[0].ID)
+	want := map[string]bool{PaidAlias: true, PaidForwarder: true}
+	for _, c := range paid {
+		if len(c.Pins) != 1 {
+			t.Errorf("%s declares %d pins, want one", c.What, len(c.Pins))
+			continue
+		}
+		if !want[c.Pins[0].ID] {
+			t.Errorf("the paid account declares a fixture nothing names: %q", c.Pins[0].ID)
+		}
+		delete(want, c.Pins[0].ID)
+		if len(c.Remove) != 0 {
+			t.Errorf("%s declares a way to remove itself, which is exactly what must not happen to it", c.What)
+		}
 	}
-	if len(paid[0].Remove) != 0 {
-		t.Error("the paid fixture declares a way to remove itself, which is exactly what must not happen to it")
+	for id := range want {
+		t.Errorf("the paid account no longer declares %q", id)
 	}
 	// An unpaged listing, because a real account can hold more items than a page
 	// and a fixture that fell off the end of one would be minted again every run.
 	if slices.Contains(paid[0].List, "items") {
 		t.Errorf("the paid alias is looked up with %v, which pages; use the unpaged aliases listing",
 			paid[0].List)
+	}
+}
+
+// The address the suite forwards from is the account's own, with a suffix: a
+// domain Proton has already let it use, and a local part that is free wherever
+// that domain is.
+func TestTheForwarderAddressIsTheAccountsOwnDomain(t *testing.T) {
+	if got := ForwarderAddress("owner@example.com"); got != "owner-protoncli-fwd@example.com" {
+		t.Errorf("ForwarderAddress = %q", got)
+	}
+	if got := ForwarderAddress("nonsense"); got != "" {
+		t.Errorf("ForwarderAddress of something that is not an address = %q, want nothing", got)
 	}
 }
 

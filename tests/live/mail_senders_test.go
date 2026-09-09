@@ -6,10 +6,7 @@ import (
 	"testing"
 )
 
-// Standing decisions about senders, and forwarding.
-//
-// Proton's three lists are one record with a destination on it, so one listing
-// answers "what have I decided about whom".
+// Standing decisions about senders.
 
 // Proton's three lists are one record with a destination on it, so one listing
 // answers "what have I decided about whom".
@@ -64,34 +61,5 @@ func assertSenderGoes(t *testing.T, target, want string) {
 	}
 	if got, _ := rule["goes"].(string); got != want {
 		t.Errorf("%s goes to %q, want %q", target, got, want)
-	}
-}
-
-// Both directions come back as one collection, which is the only part of
-// forwarding these accounts can reach: setting one up is a paid feature, and
-// accepting one is not built. See `untested` in internal/cli/coverage_test.go.
-func TestMailForwardingListsBothDirections(t *testing.T) {
-	rows := runJSONArray(t, "mail", "settings", "forwarding", "list")
-	for _, row := range rows {
-		m, _ := row.(map[string]interface{})
-		switch m["direction"] {
-		case "incoming", "outgoing":
-		default:
-			t.Errorf("a forwarding came back going neither way: %v", m["direction"])
-		}
-	}
-}
-
-// Forwarding to an address outside Proton is refused before anything is
-// derived: Proton emails such an address a link its owner must follow, which no
-// command can answer.
-func TestMailForwardingRefusesAnAddressOutsideProton(t *testing.T) {
-	_, stderr, code := run(t, "mail", "settings", "forwarding", "create", selfEmail(), "nobody@example.com")
-	if code == 0 {
-		t.Fatal("an address outside Proton was accepted")
-	}
-	if !strings.Contains(stderr, "not a Proton address") &&
-		!strings.Contains(stderr, "address does not exist") {
-		t.Errorf("the refusal does not name the address as the problem: %s", truncateOutput(stderr))
 	}
 }

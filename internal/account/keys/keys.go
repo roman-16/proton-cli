@@ -73,6 +73,20 @@ type Address struct {
 	Receive     int
 	Type        int
 	Keys        []Key
+	// SignedKeyList is what Proton publishes as the keys this address has. An
+	// address nothing has ever published one for has none.
+	SignedKeyList *SignedKeyList
+}
+
+// SignedKeyList is the account's own statement of which keys an address holds:
+// the list, and a signature over it by the address's primary key.
+//
+// Proton serves it beside the keys and Key Transparency audits it, so every
+// client that adds a key to an address publishes the list again. Its contents
+// are Data verbatim - a signature is over bytes, not over a reading of them.
+type SignedKeyList struct {
+	Data      string
+	Signature string
 }
 
 // CanSend reports whether Proton permits composing from this address.
@@ -539,7 +553,7 @@ func getUser(ctx context.Context, c *proton.Client) (*User, error) {
 	return &r.User, nil
 }
 
-func getAddresses(ctx context.Context, c *proton.Client) ([]Address, error) {
+func getAddresses(ctx context.Context, c proton.Doer) ([]Address, error) {
 	var r struct{ Addresses []Address }
 	if err := c.Decode(ctx, proton.Request{Method: "GET", Path: "/core/v4/addresses"}, &r); err != nil {
 		return nil, err

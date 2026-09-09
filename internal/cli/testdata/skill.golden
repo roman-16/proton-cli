@@ -151,11 +151,11 @@ One line per group, with the verbs under it. Arguments, flags and examples are i
 - `proton mail messages attachments` - Files attached to a message: download, list
 - `proton mail messages mark` - Set whether messages count as read: read, unread
 - `proton mail settings` - How Mail behaves: get, list, set
-- `proton mail settings addresses` - Your addresses, display names and signatures: get, list, update
+- `proton mail settings addresses` - Your addresses, display names and signatures: create, delete, disable, enable, get, list, update
 - `proton mail settings autoreply` - The automatic reply and its schedule: disable, enable, get, set
 - `proton mail settings filters` - Server-side Sieve filters: apply, create, delete, disable, enable, get, list, reorder, update
 - `proton mail settings folders` - Folders, which a message lives in: create, delete, list, update
-- `proton mail settings forwarding` - Mail forwarded to and from your addresses: create, delete, disable, enable, get, list, resend
+- `proton mail settings forwarding` - Mail forwarded to and from your addresses: accept, create, decline, delete, disable, enable, get, list, resend
 - `proton mail settings labels` - Labels, which a message carries: create, delete, list, update
 - `proton mail settings senders` - Who always reaches the inbox, and who never does: allow, block, forget, list, spam
 

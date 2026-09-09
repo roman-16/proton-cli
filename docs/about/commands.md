@@ -159,6 +159,10 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton mail messages unstar`](../mail/messages.md#unstar) | Remove the star from messages |
 | [`proton mail messages unsubscribe`](../mail/messages.md#unsubscribe) | Ask a mailing list to stop |
 | [`proton mail messages watch`](../mail/messages.md#watch) | Print each message as it arrives |
+| [`proton mail settings addresses create`](../mail/settings.md#addresses-create) | Add an address to the account |
+| [`proton mail settings addresses delete`](../mail/settings.md#addresses-delete) | Delete addresses |
+| [`proton mail settings addresses disable`](../mail/settings.md#addresses-disable) | Stop an address sending and receiving |
+| [`proton mail settings addresses enable`](../mail/settings.md#addresses-enable) | Let a disabled address send and receive again |
 | [`proton mail settings addresses get`](../mail/settings.md#addresses-get) | Show one address, including its signature |
 | [`proton mail settings addresses list`](../mail/settings.md#addresses-list) | List the addresses on the account |
 | [`proton mail settings addresses update`](../mail/settings.md#addresses-update) | Set an address's display name or signature |
@@ -179,7 +183,9 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton mail settings folders delete`](../mail/settings.md#folders-delete) | Delete folders |
 | [`proton mail settings folders list`](../mail/settings.md#folders-list) | List your folders |
 | [`proton mail settings folders update`](../mail/settings.md#folders-update) | Rename or recolor a folder |
+| [`proton mail settings forwarding accept`](../mail/settings.md#forwarding-accept) | Accept forwardings sent to you |
 | [`proton mail settings forwarding create`](../mail/settings.md#forwarding-create) | Forward one of your addresses to another Proton address |
+| [`proton mail settings forwarding decline`](../mail/settings.md#forwarding-decline) | Decline forwardings sent to you |
 | [`proton mail settings forwarding delete`](../mail/settings.md#forwarding-delete) | Stop forwardings, in either direction |
 | [`proton mail settings forwarding disable`](../mail/settings.md#forwarding-disable) | Pause forwardings without taking them down |
 | [`proton mail settings forwarding enable`](../mail/settings.md#forwarding-enable) | Resume paused forwardings |

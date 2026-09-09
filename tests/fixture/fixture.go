@@ -111,6 +111,22 @@ const PaidAlias = "proton-cli fixture"
 // only ever used once.
 const PaidAliasPrefix = "protoncli"
 
+// PaidForwarder is the display name of the address on the paid account that
+// forwardings are set up from: made by the first run that needs it, kept for
+// good.
+//
+// Setting a forwarding up needs a subscription, so the only account that can
+// test it is somebody's real one - and a forwarding redirects every message
+// arriving at the address it is set on. So the suite never touches the account's
+// own addresses: it forwards from one that exists for this and receives nothing.
+// It is made once and never removed, because Proton allows one address deletion
+// a year: an address per run would spend that allowance and leave nothing to
+// spend it on.
+//
+// The name says what it is, because it is sitting in somebody's real account,
+// and it stays outside TestPrefix so a sweep leaves it alone.
+const PaidForwarder = "proton-cli forwarding"
+
 // TestPrefix is the namespace the suite makes its own artifacts under.
 //
 // The suite clears up after itself; a run that was killed cannot, and what it

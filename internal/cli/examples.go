@@ -544,6 +544,13 @@ var examples = map[string][]string{
 		"proton mail settings addresses update me@proton.me --signature - --html",
 		"proton mail settings addresses update me@proton.me --clear-signature",
 	},
+	"proton mail settings addresses create": {
+		"proton mail settings addresses create work@example.com",
+		"proton mail settings addresses create work@example.com --display-name Work",
+	},
+	"proton mail settings addresses enable":  {"proton mail settings addresses enable work@example.com"},
+	"proton mail settings addresses disable": {"proton mail settings addresses disable work@example.com"},
+	"proton mail settings addresses delete":  {"proton mail settings addresses delete work@example.com"},
 	"proton mail settings filters apply": {
 		"proton mail settings filters apply",
 		"proton mail settings filters apply Newsletters",
@@ -587,6 +594,8 @@ var examples = map[string][]string{
 	"proton mail settings forwarding list":    {"proton mail settings forwarding list"},
 	"proton mail settings forwarding get":     {"proton mail settings forwarding get jane@proton.me"},
 	"proton mail settings forwarding create":  {"proton mail settings forwarding create me@proton.me jane@proton.me"},
+	"proton mail settings forwarding accept":  {"proton mail settings forwarding accept jane@proton.me"},
+	"proton mail settings forwarding decline": {"proton mail settings forwarding decline jane@proton.me"},
 	"proton mail settings forwarding enable":  {"proton mail settings forwarding enable jane@proton.me"},
 	"proton mail settings forwarding disable": {"proton mail settings forwarding disable jane@proton.me"},
 	"proton mail settings forwarding resend":  {"proton mail settings forwarding resend jane@proton.me"},

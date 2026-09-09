@@ -18,6 +18,7 @@ These hold across every command. `internal/cli/conformance_test.go` checks most 
 - **A page size is the user's, not Proton's.** `--page-size N` yields N rows whatever the endpoint serves per page, `0` yields everything, and `--limit` caps a bulk verb the same way.
 - **Times are read against one named zone**, settled once per run from `--zone`, `TZ`, the file or the system. A wall-clock reading that names two instants or none is refused with the offset form that settles it.
 - **A listing carries no secret.** Only `items get`, `revisions get`, `links get` and `pass export` decrypt secret fields; a list row is a type that cannot hold one.
+- **The keys of an address that has them are never changed.** proton rotates no key, removes none, and touches no credential. It publishes a key in exactly two places, and both are additions to an address that cannot be worse off for them: the key a forwarder derived, re-locked under the token the address's primary key already uses, re-signing the key list Proton serves with its `Data` unchanged; and the first key of an address being created, whose key list names that one key and can therefore contradict nothing. A new address is read back before the command reports success.
 - **The reference is generated** from the tree, and the guides are written by hand in files of their own, so a page is never half of each.
 
 ## Getting set up

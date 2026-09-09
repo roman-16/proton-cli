@@ -112,7 +112,7 @@ func TestEnsureReplacesARowThatDisagrees(t *testing.T) {
 // that case: its address cannot be re-minted, so deleting it to make a better
 // one is not a trade to make quietly.
 func TestEnsureWillNotDeleteWhatItCannotRemake(t *testing.T) {
-	c := Paid()[0]
+	c := Paid("owner@example.com")[0]
 	r := &recorder{rows: []map[string]any{{"name": PaidAlias, "type": "login"}}}
 	_, err := Ensure(r.run, "paid", c, c.Pins[0], r.rows)
 	if err == nil {
@@ -166,7 +166,7 @@ func TestSweepRemovesOnlyWhatTheSuiteMade(t *testing.T) {
 // would be a request that could only fail.
 func TestSweepDoesNothingWithoutARemoveCommand(t *testing.T) {
 	r := &recorder{}
-	got := Sweep(r.run, "paid", Paid()[0], []map[string]any{{"name": TestPrefix + "1"}})
+	got := Sweep(r.run, "paid", Paid("owner@example.com")[0], []map[string]any{{"name": TestPrefix + "1"}})
 	if len(got) != 0 || len(r.ran) != 0 {
 		t.Errorf("swept %v, ran %v", got, r.ran)
 	}

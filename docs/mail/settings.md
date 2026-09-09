@@ -10,7 +10,103 @@ Holds `addresses`, `autoreply`, `filters`, `folders`, `forwarding`, `get`, `labe
 
 Your addresses, display names and signatures.
 
-Holds `get`, `list` and `update`.
+An address sends and receives mail under its own name. Adding, disabling and deleting one needs a paid Mail plan. Your first Proton address and your short-domain address stay enabled and cannot be deleted.
+
+Holds `create`, `delete`, `disable`, `enable`, `get`, `list` and `update`.
+
+### `addresses create`
+
+Add an address to the account.
+
+EMAIL is the address to add. Its domain has to be one the account can use: a Proton domain, or a custom domain already set up. Adding an address needs a paid Mail plan.
+
+The address sends and receives as soon as it exists. An account that creates post-quantum keys is refused: add the address in a Proton client.
+
+Asks for your password even when you are signed in. With no terminal to ask, pass --password-file or --password-stdin.
+
+```
+proton mail settings addresses create EMAIL
+```
+
+```bash
+proton mail settings addresses create work@example.com
+proton mail settings addresses create work@example.com --display-name Work
+```
+
+| Flag | Description |
+| --- | --- |
+| `--display-name string` | Name recipients see next to the address |
+| `--password-file string` | Read the account password from a file |
+| `--password-stdin` | Read the account password from stdin |
+| `--totp string` | Two-factor code |
+
+### `addresses delete`
+
+Delete addresses.
+
+REF is an address of yours. Proton allows one address deletion a year unless the address is on a custom domain. Your first Proton address, your short-domain address and the account's default address cannot be deleted.
+
+A deleted address cannot be used again, by you or by anybody else.
+
+Asks for your password even when you are signed in. With no terminal to ask, pass --password-file or --password-stdin.
+
+```
+proton mail settings addresses delete REF...
+```
+
+```bash
+proton mail settings addresses delete work@example.com
+```
+
+| Flag | Description |
+| --- | --- |
+| `--password-file string` | Read the account password from a file |
+| `--password-stdin` | Read the account password from stdin |
+| `--totp string` | Two-factor code |
+
+### `addresses disable`
+
+Stop an address sending and receiving.
+
+REF is an address of yours that is enabled. Everything it already holds stays, and enabling it again needs nothing else.
+
+Asks for your password even when you are signed in. With no terminal to ask, pass --password-file or --password-stdin.
+
+```
+proton mail settings addresses disable REF...
+```
+
+```bash
+proton mail settings addresses disable work@example.com
+```
+
+| Flag | Description |
+| --- | --- |
+| `--password-file string` | Read the account password from a file |
+| `--password-stdin` | Read the account password from stdin |
+| `--totp string` | Two-factor code |
+
+### `addresses enable`
+
+Let a disabled address send and receive again.
+
+REF is an address of yours that is disabled.
+
+Asks for your password even when you are signed in. With no terminal to ask, pass --password-file or --password-stdin.
+
+```
+proton mail settings addresses enable REF...
+```
+
+```bash
+proton mail settings addresses enable work@example.com
+```
+
+| Flag | Description |
+| --- | --- |
+| `--password-file string` | Read the account password from a file |
+| `--password-stdin` | Read the account password from stdin |
+| `--totp string` | Two-factor code |
 
 ### `addresses get`
 
@@ -373,17 +469,41 @@ proton mail settings folders update Receipts --notify
 
 Mail forwarded to and from your addresses.
 
-Holds `create`, `delete`, `disable`, `enable`, `get`, `list` and `resend`.
+Outgoing is mail leaving one of your addresses for somebody else's; incoming is mail somebody else sends to you. A forwarding is named by the other party's address.
+
+Holds `accept`, `create`, `decline`, `delete`, `disable`, `enable`, `get`, `list` and `resend`.
+
+### `forwarding accept`
+
+Accept forwardings sent to you.
+
+REF is the forwarder's address, or the forwarding's ID. Only a pending forwarding to one of your addresses can be accepted.
+
+Asks for your password even when you are signed in. With no terminal to ask, pass --password-file or --password-stdin.
+
+```
+proton mail settings forwarding accept REF...
+```
+
+```bash
+proton mail settings forwarding accept jane@proton.me
+```
+
+| Flag | Description |
+| --- | --- |
+| `--password-file string` | Read the account password from a file |
+| `--password-stdin` | Read the account password from stdin |
+| `--totp string` | Two-factor code |
 
 ### `forwarding create`
 
 Forward one of your addresses to another Proton address.
 
-REF is the address of yours mail arrives at, EMAIL is the Proton address it is handed to. Mail stays end-to-end encrypted: a key is derived from your address key so Proton can re-wrap each message for them without reading it.
+REF is the address of yours mail arrives at, EMAIL is the Proton address it is handed to. Mail stays end-to-end encrypted, and nothing is forwarded until they accept it.
 
-Nothing is forwarded until they accept, which they do in a Proton client - accepting one writes a new address key, and proton changes no key material.
+Proton refuses this request from proton: add the forwarding at account.proton.me instead. Accepting one sent to you works here.
 
-Forwarding to an address outside Proton is not built: Proton emails it a link its owner must follow, which no command can answer.
+Forwarding to an address outside Proton is not built.
 
 ```
 proton mail settings forwarding create REF EMAIL
@@ -391,6 +511,20 @@ proton mail settings forwarding create REF EMAIL
 
 ```bash
 proton mail settings forwarding create me@proton.me jane@proton.me
+```
+
+### `forwarding decline`
+
+Decline forwardings sent to you.
+
+REF is the forwarder's address, or the forwarding's ID. Only a pending forwarding to one of your addresses can be declined; the forwarder sees it as rejected.
+
+```
+proton mail settings forwarding decline REF...
+```
+
+```bash
+proton mail settings forwarding decline jane@proton.me
 ```
 
 ### `forwarding delete`
@@ -409,6 +543,8 @@ proton mail settings forwarding delete jane@proton.me
 
 Pause forwardings without taking them down.
 
+REF is a forwarding you set up that is active. Mail stops being forwarded, and resuming it needs nothing from the forwardee.
+
 ```
 proton mail settings forwarding disable REF...
 ```
@@ -420,6 +556,8 @@ proton mail settings forwarding disable jane@proton.me
 ### `forwarding enable`
 
 Resume paused forwardings.
+
+REF is a forwarding you set up that is paused.
 
 ```
 proton mail settings forwarding enable REF...
@@ -445,7 +583,7 @@ proton mail settings forwarding get jane@proton.me
 
 List forwardings in both directions.
 
-Outgoing is mail leaving one of your addresses for somebody else's; incoming is mail somebody else is sending to you. A forwarding is pending until the forwardee accepts it, and outdated once the forwarder's key changes.
+A forwarding is pending until the forwardee accepts it, paused while the forwarder has it disabled, outdated once the forwarder's key changes, and rejected once the forwardee declines it.
 
 ```
 proton mail settings forwarding list
@@ -458,6 +596,8 @@ proton mail settings forwarding list
 ### `forwarding resend`
 
 Ask the forwardee again.
+
+REF is a forwarding you set up that the forwardee declined, or that is outdated. They are offered it again, and it is pending until they accept. A forwarding to an address outside Proton gets its confirmation email sent again instead.
 
 ```
 proton mail settings forwarding resend REF...

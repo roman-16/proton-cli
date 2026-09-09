@@ -127,6 +127,11 @@ These commands ask for your password again even when you are signed in:
 
 - `calendar settings calendars delete`
 - `mail messages expire`
+- `mail settings addresses create`
+- `mail settings addresses delete`
+- `mail settings addresses disable`
+- `mail settings addresses enable`
+- `mail settings forwarding accept`
 - `mail settings autoreply disable`
 - `mail settings autoreply enable`
 - `mail settings autoreply set`

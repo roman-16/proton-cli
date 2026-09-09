@@ -45,9 +45,12 @@ GET /core/v4/auth/scopes
 GET /core/v4/events/latest
 GET /core/v4/keys/all
 GET /core/v4/labels
+GET /core/v4/members/me
 GET /core/v4/settings
 GET /core/v4/users
 GET /core/v5/events/{id}
+GET /domains
+GET /domains/available
 GET /drive/me/settings
 GET /drive/photos/volumes/{id}/albums
 GET /drive/photos/volumes/{id}/albums/{id}/children
@@ -108,7 +111,9 @@ POST /calendar/v1/subscription/validate
 POST /calendar/v1/{id}/keys
 POST /calendar/v1/{id}/members
 POST /contacts/v4/contacts
+POST /core/v4/addresses
 POST /core/v4/auth/info
+POST /core/v4/keys/address
 POST /core/v4/labels
 POST /drive/blocks
 POST /drive/photos/volumes/{id}/albums
@@ -168,6 +173,8 @@ PUT /contacts/v4/contacts/emails/label
 PUT /contacts/v4/contacts/emails/unlabel
 PUT /contacts/v4/contacts/{id}
 PUT /core/v4/addresses/{id}
+PUT /core/v4/addresses/{id}/disable
+PUT /core/v4/addresses/{id}/enable
 PUT /core/v4/labels/{id}
 PUT /core/v4/settings/weekstart
 PUT /core/v4/users/lock
