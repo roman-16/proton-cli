@@ -188,7 +188,8 @@ A run is spent almost entirely **inside invocations of the binary** - measured, 
 ```bash
 just test-report                 # per command: invocations, time, requests, overlap
 just test-report TestCalendar    # or one slice of it
-just coverage                    # re-record which of Proton's API the suite reaches
+just coverage-one TestDrive      # run one slice and add what it reached to the recording
+just coverage                    # re-record the whole of which of Proton's API the suite reaches
 ```
 
 `overlap` is 1.0 for a strict chain and higher when requests were made together. The report ends with **chains worth flattening**: commands with several requests and an overlap near 1.0. That list is the work, in order.
@@ -197,7 +198,7 @@ just coverage                    # re-record which of Proton's API the suite rea
 
 The live suite is the only thing that would notice Proton changing an answer, and only for requests it actually makes. So both halves are written down:
 
-- **what the suite reaches** - `tests/api-coverage.golden`, recorded by `just coverage` from a real run. Only requests Proton **answered** count: an endpoint listed on the strength of a 401 is a gap wearing the clothes of coverage.
+- **what the suite reaches** - `tests/api-coverage.golden`, recorded from a real run. Only requests Proton **answered** count: an endpoint listed on the strength of a 401 is a gap wearing the clothes of coverage. `just coverage-one PATTERN` adds what one slice reached, which is how a change that opened a new endpoint records it; `just coverage` rewrites the file from a full run, which is the only thing that can take a stale line away.
 - **what the CLI can send** - read from the source by `TestEveryRequestTheCLICanSendIsOneTheSuiteSends`, which needs no account and runs in `just test-fast` on every push.
 
 A request the CLI can send that the golden does not hold **fails the build**. Two ways out, both argued in that test's own file: `unreachable` for what no run could do, and `untested` for a gap somebody chose to leave, reported on every run rather than passing quietly. "The accounts do not have the plan for it" is no longer one of them.

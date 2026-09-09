@@ -83,7 +83,7 @@ func (i *PublicLinkInfo) Legacy() bool {
 }
 
 // PublicLinkShare is what proving the password opens: the share holding the
-// link's tree, and where its root is.
+// link's tree, where its root is, and what the link permits whoever opened it.
 type PublicLinkShare struct {
 	ShareKey          string
 	SharePassphrase   string
@@ -91,6 +91,11 @@ type PublicLinkShare struct {
 	VolumeID          string
 	LinkID            string
 	PublicPermissions int
+
+	// Anonymous reports that the link answered with a session of its own, which
+	// Proton does only for a caller it could not recognise: nobody is behind
+	// anything done in this tree, and nothing written there can be attributed.
+	Anonymous bool
 }
 
 // PublicLinkInfo starts the handshake for a link.
@@ -178,6 +183,7 @@ func (c *Client) PublicLinkAuth(ctx context.Context, token string, info *PublicL
 		c.mu.Lock()
 		c.link = &linkSession{uid: r.UID, access: r.AccessToken, token: token, password: password}
 		c.mu.Unlock()
+		r.Share.Anonymous = true
 		c.log.DebugContext(ctx, "the public link opened a session of its own, so nobody is behind this tree",
 			"share", token)
 	}

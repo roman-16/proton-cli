@@ -141,6 +141,10 @@ func (s *Service) PlanFolders(ctx context.Context, dc *Context, fullPath string)
 // ones just generated, so a chain of folders costs one lookup and one request
 // per folder rather than a walk from the root for each.
 func (s *Service) CreateFolders(ctx context.Context, dc *Context, paths []string) error {
+	by, err := s.author(ctx, dc)
+	if err != nil {
+		return err
+	}
 	made := map[string]*folder{}
 	for _, path := range paths {
 		parent, ok := made[dirOf(path)]
@@ -153,7 +157,7 @@ func (s *Service) CreateFolders(ctx context.Context, dc *Context, paths []string
 				return err
 			}
 		}
-		child, err := s.createFolder(ctx, dc, parent, baseOf(path))
+		child, err := s.createFolder(ctx, dc, by, parent, baseOf(path))
 		if err != nil {
 			return err
 		}
@@ -166,7 +170,6 @@ func (s *Service) CreateFolders(ctx context.Context, dc *Context, paths []string
 // keys a child of it needs - the one its name and passphrase are encrypted to,
 // and the one its name is hashed under.
 type folder struct {
-	shareID string
 	linkID  string
 	path    string
 	nodeKR  *pgp.KeyRing
@@ -178,22 +181,20 @@ func folderOf(res *Resolved, path string) (*folder, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &folder{
-		shareID: res.dc.ShareID, linkID: res.LinkID, path: path,
-		nodeKR: res.NodeKR, hashKey: hashKey,
-	}, nil
+	return &folder{linkID: res.LinkID, path: path, nodeKR: res.NodeKR, hashKey: hashKey}, nil
 }
 
-func (s *Service) createFolder(ctx context.Context, dc *Context, parent *folder, name string) (*folder, error) {
+func (s *Service) createFolder(ctx context.Context, dc *Context, by author, parent *folder, name string) (*folder, error) {
 	hash, err := lookupHash(strings.ToLower(name), parent.hashKey)
 	if err != nil {
 		return nil, err
 	}
-	encName, err := encryptName(name, parent.nodeKR, dc.AddrKR)
+	signKR := by.key(parent.nodeKR)
+	encName, err := encryptName(name, parent.nodeKR, signKR)
 	if err != nil {
 		return nil, err
 	}
-	nodeKey, nodePass, nodePassSig, nodePriv, err := genNodeKeys(parent.nodeKR, dc.AddrKR)
+	nodeKey, nodePass, nodePassSig, nodePriv, err := genNodeKeys(parent.nodeKR, signKR)
 	if err != nil {
 		return nil, err
 	}
@@ -205,20 +206,18 @@ func (s *Service) createFolder(ctx context.Context, dc *Context, parent *folder,
 	if err != nil {
 		return nil, err
 	}
+	body := map[string]any{
+		"Name":                    encName,
+		"Hash":                    hash,
+		"ParentLinkID":            parent.linkID,
+		"NodePassphrase":          nodePass,
+		"NodePassphraseSignature": nodePassSig,
+		"NodeKey":                 nodeKey,
+		"NodeHashKey":             hashKeyEnc,
+	}
+	by.attribute(body, dc)
 	var r struct{ Folder struct{ ID string } }
-	err = s.C.Decode(ctx, proton.Request{
-		Method: "POST", Path: "/drive/shares/" + parent.shareID + "/folders",
-		Body: map[string]any{
-			"Name":                    encName,
-			"Hash":                    hash,
-			"ParentLinkID":            parent.linkID,
-			"NodePassphrase":          nodePass,
-			"NodePassphraseSignature": nodePassSig,
-			"SignatureAddress":        dc.AddrEmail,
-			"NodeKey":                 nodeKey,
-			"NodeHashKey":             hashKeyEnc,
-		},
-	}, &r)
+	err = s.C.Decode(ctx, folderRequest(dc, body), &r)
 	if proton.AlreadyExists(err) {
 		return nil, &errs.Exists{Kind: TypeFolder, Name: name, Where: parent.path}
 	}
@@ -226,9 +225,22 @@ func (s *Service) createFolder(ctx context.Context, dc *Context, parent *folder,
 		return nil, err
 	}
 	return &folder{
-		shareID: parent.shareID, linkID: r.Folder.ID, path: join(parent.path, name),
+		linkID: r.Folder.ID, path: join(parent.path, name),
 		nodeKR: nodeKR, hashKey: hashKey,
 	}, nil
+}
+
+// folderRequest makes a folder, of whichever endpoint serves the tree it is
+// going into.
+func folderRequest(dc *Context, body map[string]any) proton.Request {
+	if dc.Public() {
+		return proton.Request{
+			Method: "POST", Path: fmt.Sprintf("/drive/urls/%s/folders", dc.Token), Body: body,
+		}
+	}
+	return proton.Request{
+		Method: "POST", Path: fmt.Sprintf("/drive/shares/%s/folders", dc.ShareID), Body: body,
+	}
 }
 
 func (s *Service) Rename(ctx context.Context, dc *Context, path, newName string) error {

@@ -1,6 +1,8 @@
 package offline
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -182,6 +184,37 @@ func TestOpeningALinkIsNotRefusedForWantOfAnAccount(t *testing.T) {
 	if exited {
 		t.Errorf("the run was over at once rather than reaching for the link\nstderr: %s", truncate(stderr))
 	}
+}
+
+// Uploading into a link is the other thing a link is for, so it is not stopped
+// at the door either: the link's own session is what authorises it, and a run
+// with no account reaches for the link rather than being told to sign in.
+func TestUploadingIntoALinkIsNotRefusedForWantOfAnAccount(t *testing.T) {
+	src := filepath.Join(t.TempDir(), "photo.jpg")
+	if err := os.WriteFile(src, []byte("the bytes"), 0o600); err != nil {
+		t.Fatalf("write the file to upload: %v", err)
+	}
+	args := []string{"drive", "items", "upload", src, "/",
+		"--link", "https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL"}
+	stderr, exited := runBriefly(t, args...)
+	if strings.Contains(stderr, "not signed in") {
+		t.Errorf("uploading into a public link asked for an account\nstderr: %s", truncate(stderr))
+	}
+	if exited {
+		t.Errorf("the run was over at once rather than reaching for the link\nstderr: %s", truncate(stderr))
+	}
+}
+
+// A link takes new files and not new versions of the ones already in it, and
+// which was asked for is on the command line.
+func TestANewRevisionInALinkIsRefused(t *testing.T) {
+	src := filepath.Join(t.TempDir(), "photo.jpg")
+	if err := os.WriteFile(src, []byte("the bytes"), 0o600); err != nil {
+		t.Fatalf("write the file to upload: %v", err)
+	}
+	refuses(t, 1, []string{"drive", "items", "upload", src, "/", "--if-exists", "replace",
+		"--link", "https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL"},
+		"cannot take a new revision", "--if-exists rename")
 }
 
 // The two ways of naming a tree name different trees, so asking for both is a

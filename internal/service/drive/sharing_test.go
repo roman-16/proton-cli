@@ -102,7 +102,7 @@ func TestToShareLink(t *testing.T) {
 // is none.
 func TestAnItemWhoseAuthorsKeyCannotBeReadIsUnverified(t *testing.T) {
 	tree := newPublicTree(t, testURLPassword, "Q3-report.pdf", 2)
-	s, doer := publicService(t, tree, proton.PublicLinkGeneratedPassword, nil)
+	s, doer := publicService(t, tree, proton.PublicLinkGeneratedPassword, nil, nil)
 
 	dc, err := s.OpenLink(context.Background(), LinkURL(testToken, testURLPassword), "")
 	if err != nil {
@@ -126,5 +126,51 @@ func TestRoleLabel(t *testing.T) {
 	}
 	if roleLabel(permEdit) != "editor" {
 		t.Errorf("roleLabel(edit) = %q, want editor", roleLabel(permEdit))
+	}
+}
+
+// What a link permits is part of what an item reached through it is, so it is
+// answered per item rather than looked up again - and an item in your own files
+// was not reached through a link at all.
+func TestAnItemReachedThroughALinkSaysWhatTheLinkPermits(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		permissions int
+		want        string
+	}{
+		{"a link that allows editing", permEdit, "edit"},
+		{"a link that allows viewing only", permView, "view"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tree := newPublicTree(t, testURLPassword, "Q3-report.pdf", 2)
+			tree.share.PublicPermissions = tc.permissions
+			s, _ := publicService(t, tree, proton.PublicLinkGeneratedPassword, nil, nil)
+
+			dc, err := s.OpenLink(context.Background(), LinkURL(testToken, testURLPassword), "")
+			if err != nil {
+				t.Fatalf("OpenLink: %v", err)
+			}
+			info, err := s.Info(context.Background(), dc, "/")
+			if err != nil {
+				t.Fatalf("Info: %v", err)
+			}
+			if info.LinkAccess != tc.want {
+				t.Errorf("LinkAccess = %q, want %q", info.LinkAccess, tc.want)
+			}
+		})
+	}
+
+	tr := newTree(t, shareTypeMain, protonFolder, "")
+	s, _ := tr.service(nil)
+	dc, err := s.unlockShare(context.Background(), testShareID, testRootID, testVolumeID)
+	if err != nil {
+		t.Fatalf("unlockShare: %v", err)
+	}
+	info, err := s.Info(context.Background(), dc, "/")
+	if err != nil {
+		t.Fatalf("Info: %v", err)
+	}
+	if info.LinkAccess != "" {
+		t.Errorf("LinkAccess = %q for an item in your own files", info.LinkAccess)
 	}
 }

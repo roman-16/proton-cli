@@ -216,10 +216,143 @@ func TestDriveSharedAddListOpenAndRemove(t *testing.T) {
 	assertNotContains(t, runOKSecondary(t, "drive", "shared", "list"), token)
 }
 
-// A saved link can be read and not written, and the refusal points at what is
-// wrong rather than at whatever Proton would have said.
-func TestDriveSharedLinkRefusesToBeWrittenTo(t *testing.T) {
-	_, url := sharedLink(t, "readonly", "readonly-payload")
+// A link that allows editing takes new files and new folders, from whoever holds
+// the URL, and what lands there is the owner's to read back.
+func TestDriveSharedLinkTakesUploadsWhenItAllowsEditing(t *testing.T) {
+	folder, url := sharedLink(t, "linkedit", "edit-payload", "--edit")
+
+	root := runJSONSecondary(t, "drive", "items", "get", "/", "--link", url)
+	if root["link_access"] != "edit" {
+		t.Errorf("link_access = %v, want edit", root["link_access"])
+	}
+
+	dir := t.TempDir()
+	src := filepath.Join(dir, "uploaded.txt")
+	writeLocal(t, src, "uploaded-into-a-link")
+	runOKSecondary(t, "drive", "items", "upload", src, "/", "--link", url)
+
+	// The same name again is the question every upload can be asked, and a link
+	// answers it the way your own files do.
+	_, renamed := runOKStderrSecondary(t, "drive", "items", "upload", "--if-exists", "rename",
+		src, "/", "--link", url)
+	assertContains(t, renamed, "uploaded (1).txt")
+
+	inner := filepath.Join(dir, "album", "inner")
+	if err := os.MkdirAll(inner, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	writeLocal(t, filepath.Join(inner, "photo.txt"), "photo-bytes")
+	runOKSecondary(t, "drive", "items", "upload", "--recursive", filepath.Join(dir, "album"), "/", "--link", url)
+	runOKSecondary(t, "drive", "items", "create", "/2026", "--link", url)
+
+	listing := runOK(t, "drive", "items", "list", folder)
+	for _, want := range []string{"uploaded.txt", "uploaded (1).txt", "album", "2026"} {
+		assertContains(t, listing, want)
+	}
+	out := filepath.Join(dir, "roundtrip")
+	runOK(t, "drive", "items", "download", folder+"/album/inner/photo.txt", "--dest", out)
+	got, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "photo-bytes" {
+		t.Errorf("what came back out of the link reads %q, want photo-bytes", got)
+	}
+
+	// Signed in, an upload into somebody's link names the address that made it,
+	// which is what tells the owner who put it there.
+	info := runJSON(t, "drive", "items", "get", folder+"/uploaded.txt")
+	by, _ := info["created_by"].(string)
+	if !strings.EqualFold(by, secondaryEmail()) {
+		t.Errorf("created_by = %q, want the account that uploaded it (%s)", by, secondaryEmail())
+	}
+}
+
+// A link is for people who have no account, and uploading is the other half of
+// that: a profile nobody signed in previews the upload and then makes it.
+//
+// What lands names nobody, because there was nobody to name - which is what the
+// owner sees, and the same thing a browser upload from a signed-out visitor
+// leaves behind.
+func TestDriveSharedLinkTakesUploadsWithoutAnAccount(t *testing.T) {
+	folder, url := sharedLink(t, "linknobody", "nobody-edit", "--edit")
+	nobody := map[string]string{"PROTON_PROFILE": "no-such-" + testID()}
+
+	src := filepath.Join(t.TempDir(), "anonymous.txt")
+	writeLocal(t, src, "anonymous-payload")
+
+	_, stderr, code := runWithEnv(t, nobody, "drive", "items", "upload", src, "/", "--link", url, "--dry-run")
+	if code != 0 {
+		t.Fatalf("previewing an upload into a link with no account exited %d:\n%s", code, truncateOutput(stderr))
+	}
+	assertContains(t, stderr, "would upload")
+	assertNotContains(t, stderr, "not signed in")
+
+	_, stderr, code = runWithEnv(t, nobody, "drive", "items", "upload", src, "/", "--link", url)
+	if code != 0 {
+		t.Fatalf("uploading into a link with no account exited %d:\n%s", code, truncateOutput(stderr))
+	}
+
+	info := runJSON(t, "drive", "items", "get", folder+"/anonymous.txt")
+	if by, named := info["created_by"]; named {
+		t.Errorf("created_by = %v, want nobody named for an upload nobody was behind", by)
+	}
+	if info["signature"] != "anonymous" {
+		t.Errorf("signature = %v, want anonymous", info["signature"])
+	}
+
+	dir := t.TempDir()
+	runOK(t, "drive", "items", "download", folder+"/anonymous.txt", "--dest-dir", dir)
+	got, err := os.ReadFile(filepath.Join(dir, "anonymous.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "anonymous-payload" {
+		t.Errorf("what nobody uploaded reads %q, want anonymous-payload", got)
+	}
+}
+
+// A link that allows viewing only says so before anything is planned, whether it
+// was named by its URL or saved - which is what the owner's own page shows as no
+// way to upload at all.
+func TestDriveSharedLinkThatAllowsViewingRefusesUploads(t *testing.T) {
+	_, url := sharedLink(t, "linkview", "view-payload")
+	token := tokenOf(t, url)
+	src := filepath.Join(t.TempDir(), "note.txt")
+	writeLocal(t, src, "nope")
+
+	info := runJSONSecondary(t, "drive", "items", "get", "/", "--link", url)
+	if info["link_access"] != "view" {
+		t.Errorf("link_access = %v, want view", info["link_access"])
+	}
+
+	_, stderr, code := runSecondary(t, "drive", "items", "upload", src, "/", "--link", url)
+	if code != 1 {
+		t.Errorf("uploading into a view-only link exited %d, want 1", code)
+	}
+	assertContains(t, stderr, "This link allows viewing only")
+	assertContains(t, stderr, "allows editing")
+
+	_, stderr, code = runSecondary(t, "drive", "items", "create", "/2026", "--link", url)
+	if code != 1 {
+		t.Errorf("creating a folder in a view-only link exited %d, want 1", code)
+	}
+	assertContains(t, stderr, "allows viewing only")
+
+	runOKSecondary(t, "drive", "shared", "add", url)
+	cleanupRunSecondary(t, fmt.Sprintf("Forget saved link: proton drive shared remove %s", token),
+		"drive", "shared", "remove", token)
+	_, stderr, code = runSecondary(t, "drive", "items", "upload", src, "/", "--shared", token)
+	if code != 1 {
+		t.Errorf("uploading into a saved view-only link exited %d, want 1", code)
+	}
+	assertContains(t, stderr, "allows viewing only")
+}
+
+// A saved link takes uploads and nothing else: what is already in it belongs to
+// whoever shared it, and Proton serves a link one version of a file.
+func TestDriveSharedLinkRefusesToBeChanged(t *testing.T) {
+	_, url := sharedLink(t, "readonly", "readonly-payload", "--edit")
 	token := tokenOf(t, url)
 
 	runOKSecondary(t, "drive", "shared", "add", url)
@@ -227,15 +360,24 @@ func TestDriveSharedLinkRefusesToBeWrittenTo(t *testing.T) {
 		"drive", "shared", "remove", token)
 
 	src := filepath.Join(t.TempDir(), "note.txt")
-	if err := os.WriteFile(src, []byte("nope"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	_, stderr, code := runSecondary(t, "drive", "items", "upload", src, "/", "--shared", token)
+	writeLocal(t, src, "a-note")
+	runOKSecondary(t, "drive", "items", "upload", src, "/", "--shared", token)
+
+	_, stderr, code := runSecondary(t, "drive", "items", "update", "/payload.txt",
+		"--name", "renamed.txt", "--shared", token)
 	if code != 1 {
-		t.Errorf("uploading into a saved link exited %d, want 1", code)
+		t.Errorf("renaming something in a saved link exited %d, want 1", code)
 	}
 	assertContains(t, stderr, "public link")
-	assertContains(t, stderr, "listed and downloaded")
+	assertContains(t, stderr, "listed, downloaded and uploaded into")
+
+	_, stderr, code = runSecondary(t, "drive", "items", "upload", "--if-exists", "replace",
+		src, "/", "--shared", token)
+	if code != 1 {
+		t.Errorf("writing a new revision through a saved link exited %d, want 1", code)
+	}
+	assertContains(t, stderr, "cannot take a new revision")
+	assertContains(t, stderr, "--if-exists rename")
 }
 
 // Leaving a saved link is refused: a link is not a share anybody is a member of,

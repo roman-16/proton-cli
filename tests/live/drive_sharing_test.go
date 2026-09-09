@@ -407,8 +407,44 @@ func TestDriveShareUpdateChangesWhatAnInviteeMayDo(t *testing.T) {
 	}
 	runOKSecondary(t, "drive", "invitations", "accept", "--", invID)
 
+	// What the role means is what the other side may do, so it is checked by
+	// doing it: an editor writes into what was shared with them, a viewer does
+	// not, and their own listing says which they are.
+	name := strings.TrimPrefix(folder, "/")
+	src := filepath.Join(t.TempDir(), "note.txt")
+	writeLocal(t, src, "editor-payload")
+	if role := sharedRoleSecondary(t, name); role != "editor" {
+		t.Errorf("the second account reports role %q, want editor", role)
+	}
+	runOKSecondary(t, "drive", "items", "upload", src, "/", "--shared", name)
+
 	runOK(t, "drive", "items", "share", "update", folder, secondaryEmail(), "--edit=false")
 	assertContains(t, runOK(t, "drive", "items", "share", "get", folder), "viewer")
+
+	if role := sharedRoleSecondary(t, name); role != "viewer" {
+		t.Errorf("the second account reports role %q, want viewer", role)
+	}
+	_, stderr, code := runSecondary(t, "drive", "items", "upload", src, "/", "--shared", name)
+	if code != 1 {
+		t.Errorf("uploading into a share you may only view exited %d, want 1", code)
+	}
+	assertContains(t, stderr, "for viewing only")
+	assertContains(t, stderr, "allow editing")
+}
+
+// sharedRoleSecondary is what the second account may do with something shared
+// with it, as its own listing of what other people have shared reports it.
+func sharedRoleSecondary(t *testing.T, name string) string {
+	t.Helper()
+	for _, row := range runJSONArraySecondary(t, "drive", "shared", "list") {
+		m, _ := row.(map[string]interface{})
+		if n, _ := m["name"].(string); n == name {
+			role, _ := m["role"].(string)
+			return role
+		}
+	}
+	t.Fatalf("%q should appear in `drive shared list`", name)
+	return ""
 }
 
 // An invitation nobody answered can be sent again; one that was accepted has

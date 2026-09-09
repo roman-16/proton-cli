@@ -166,6 +166,22 @@ test-fast:
 test-one pattern:
     go test ./tests/live/ -v -count=1 -run '{{ pattern }}' -timeout 10m
 
+# What one run reached is added to the recording rather than replacing it: a
+# subset cannot know that a line no longer belongs, so only the full `coverage`
+# takes one away. The merge is byte-wise, which is how Go sorted the file, so a
+# run that reached nothing new leaves it untouched.
+[doc("Run a single test (or a regex) and add what it reached to the recorded API surface")]
+coverage-one pattern:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    trace="${PROTON_CLI_TEST_TRACE:-/tmp/proton-cli-trace.jsonl}"
+    PROTON_CLI_TEST_TRACE="$trace" PROTON_CLI_TEST_TRACE_REQUESTS=1 \
+        go test ./tests/live/ -v -count=1 -run '{{ pattern }}' -timeout 10m
+    reached=$(go run ./scripts/testreport --coverage "$trace")
+    merged=$({ cat tests/api-coverage.golden; printf '%s\n' "$reached"; } | LC_ALL=C sort --unique)
+    printf '%s\n' "$merged" > tests/api-coverage.golden
+    git --no-pager diff --stat tests/api-coverage.golden || true
+
 [doc("Report what the live suite spent its time on, and how deep each command's request graph was")]
 test-report *pattern=".":
     #!/usr/bin/env bash

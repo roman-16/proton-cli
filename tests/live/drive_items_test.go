@@ -445,6 +445,12 @@ func TestDriveItemsUploadIfExistsRenameKeepsBoth(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Which name is free is a question rather than a change, so a preview may ask
+	// it - and then promises the name the file will really land under.
+	_, preview := runOKStderr(t, "drive", "items", "upload", "--if-exists", "rename", "--dry-run", src, folder)
+	assertContains(t, preview, "would upload")
+	assertContains(t, preview, "note (1).txt")
+
 	_, stderr := runOKStderr(t, "drive", "items", "upload", "--if-exists", "rename", src, folder)
 
 	// The number goes before the extension, in brackets, after a space - the same

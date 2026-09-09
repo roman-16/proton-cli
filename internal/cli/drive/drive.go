@@ -7,8 +7,9 @@
 // shortens on a terminal like every other reference.
 //
 // There is more than one tree: your own files, each computer syncing to Drive,
-// and each item somebody shared with you. A path means the same thing in all of
-// them, and which one a command works in is said by --computer or --shared.
+// each item somebody shared with you, and each public link somebody sent you. A
+// path means the same thing in all of them, and which one a command works in is
+// said by --computer, --shared or --link.
 package drive
 
 import (

@@ -302,12 +302,40 @@ func reEncryptSessionKeyTo(armored string, oldKR, newKR *pgp.KeyRing) (string, e
 	return base64.StdEncoding.EncodeToString(kp), nil
 }
 
+// xAttr is a file's own record of itself, sealed to its node key: what the bytes
+// were before they were encrypted and cut into blocks.
+//
+// Proton cannot read it and never fills it in, so it is what one client tells
+// the next - and what a revision has to carry for the endpoints a public link is
+// served under to accept it.
 type xAttr struct {
 	Common struct {
-		ModificationTime string
+		// ModificationTime is when the file was last changed where it came from, in
+		// the form every Proton client writes it. A stream came from nowhere and has
+		// none.
+		ModificationTime string `json:",omitempty"`
 		Size             int64
+		BlockSizes       []int
 		Digests          struct{ SHA1 string }
 	}
+}
+
+// xAttrTime is the shape a modification time is written in: what JavaScript's
+// toISOString produces, which is what every other Proton client reads.
+const xAttrTime = "2006-01-02T15:04:05.000Z07:00"
+
+// encryptXAttr seals a file's record of itself to its node key, signed by
+// whoever wrote the file.
+func encryptXAttr(x xAttr, nodeKR, signKR *pgp.KeyRing) (string, error) {
+	raw, err := json.Marshal(x)
+	if err != nil {
+		return "", err
+	}
+	enc, err := nodeKR.Encrypt(pgp.NewPlainMessageFromString(string(raw)), signKR)
+	if err != nil {
+		return "", err
+	}
+	return enc.GetArmored()
 }
 
 func decryptXAttr(armored string, nodeKR *pgp.KeyRing) (*xAttr, error) {

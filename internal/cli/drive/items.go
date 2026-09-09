@@ -89,7 +89,7 @@ func itemsListCmd() *cobra.Command {
 		}),
 	}
 	f.registerNarrowing(c.Flags())
-	t.registerReadOnly(c)
+	t.register(c, reads)
 	order.Register(c, "name", "size", "modified")
 	page.Register(c, "items")
 	return c
@@ -135,10 +135,9 @@ func itemsGetCmd() *cobra.Command {
 		Use:   "get PATH",
 		Short: "Show a file or folder's details",
 		Long: "Show a file or folder's details.\n\n" +
-			"Reached through a public link, the details include the link itself and, for a\n" +
-			"link saved with `shared add`, the password its owner set on it. A link names\n" +
-			"nobody as the author of what is in it, so Created By is absent and Signature\n" +
-			"reads anonymous.",
+			"Reached through a public link, the details include the link, whether it allows\n" +
+			"editing and, for a link saved with `shared add`, the password its owner set on\n" +
+			"it. Behind a link, Created By is absent and Signature reads anonymous.",
 		RunE: kit.Run([]kit.Step{t.supply}, func(c *kit.Invocation) error {
 			dc, err := t.context(c)
 			if err != nil {
@@ -165,6 +164,7 @@ func itemsGetCmd() *cobra.Command {
 			fields = append(fields,
 				ui.Field{Label: "SHA-1", Value: info.SHA1},
 				ui.Field{Label: "Public Link", Value: info.URL},
+				ui.Field{Label: "Link Access", Value: info.LinkAccess},
 				ui.Field{Label: "Link Password", Value: info.LinkPassword},
 				ui.Field{Label: "Shared", Value: yesNo(info.Shared), Always: true},
 				ui.Field{Label: "ID", Value: info.LinkID, ID: true},
@@ -172,7 +172,7 @@ func itemsGetCmd() *cobra.Command {
 			return kit.Show(c, ui.RecordSpec{Object: info, Fields: fields})
 		}),
 	}
-	t.registerReadOnly(c)
+	t.register(c, reads)
 	return c
 }
 
@@ -190,28 +190,40 @@ func itemsUploadCmd() *cobra.Command {
 		Use:   "upload SRC [DEST]",
 		Short: "Upload a file or directory",
 		Long: "Upload a file or directory.\n\n" +
-			"A name already taken is refused, so nothing is overwritten by accident.\n" +
-			"--if-exists answers instead:\n\n" +
+			"A name already taken is refused. --if-exists answers instead:\n\n" +
 			"  replace  a new revision, keeping the file's history\n" +
 			"  rename   keep both, numbering the one being uploaded\n" +
 			"  skip     leave what is there alone\n\n" +
 			"With --recursive that answer is about the folder the tree lands in.\n\n" +
-			"SRC of - reads standard input, and then DEST has to name the file.",
-		RunE: kit.Run(nil, func(c *kit.Invocation) error {
+			"SRC of - reads standard input, and then DEST has to name the file.\n\n" +
+			"DEST is in your own files. --computer REF uploads into a computer instead,\n" +
+			"--shared REF into something somebody shared with you, and --link URL into a\n" +
+			"public link. In the last two, / is the item itself. A share or a link has to\n" +
+			"allow editing, and a link takes no new revisions: --if-exists replace is\n" +
+			"refused there.",
+		RunE: kit.Run([]kit.Step{t.supply}, func(c *kit.Invocation) error {
+			choice, err := ifExists.Value()
+			if err != nil {
+				return err
+			}
+			onConflict := drivesvc.OnConflict(choice)
+			// A link named by its URL is known to be one before anything is asked of
+			// Proton; one named by --shared turns out to be one when it opens.
+			if onConflict == drivesvc.ConflictReplace && t.link != "" {
+				return noNewRevisions()
+			}
 			dc, err := t.context(c)
 			if err != nil {
 				return err
+			}
+			if onConflict == drivesvc.ConflictReplace && dc.Public() {
+				return noNewRevisions()
 			}
 			src := c.Args[0]
 			dest := "/"
 			if len(c.Args) >= 2 {
 				dest = c.Args[1]
 			}
-			choice, err := ifExists.Value()
-			if err != nil {
-				return err
-			}
-			onConflict := drivesvc.OnConflict(choice)
 			if recursive {
 				if src == "-" {
 					return kit.Fail("--recursive cannot read from standard input.")
@@ -223,14 +235,22 @@ func itemsUploadCmd() *cobra.Command {
 	}
 	c.Flags().BoolVar(&recursive, "recursive", false, "Upload a directory and everything under it")
 	ifExists.Register(c)
-	t.register(c)
+	t.register(c, adds)
 	return c
+}
+
+// noNewRevisions is what a public link answers to --if-exists replace: Proton
+// serves a link the version a file holds now, and nothing there adds another.
+func noNewRevisions() error {
+	return kit.Fail("A public link cannot take a new revision of a file.").
+		Hint("--if-exists rename to keep both, or --if-exists skip to leave it alone.")
 }
 
 func uploadOne(c *kit.Invocation, dc *drivesvc.Context, src, dest string, on drivesvc.OnConflict) error {
 	var r io.Reader
 	var size int64
 	var name string
+	var modified time.Time
 
 	if src == "-" {
 		stdin, err := c.App.Stdin("SRC -")
@@ -263,7 +283,7 @@ func uploadOne(c *kit.Invocation, dc *drivesvc.Context, src, dest string, on dri
 			return err
 		}
 		defer func() { _ = f.Close() }()
-		r, size, name = f, fi.Size(), filepath.Base(src)
+		r, size, name, modified = f, fi.Size(), filepath.Base(src), fi.ModTime()
 	}
 
 	plan, err := c.App.Drive.PlanUpload(c.Ctx, dc, dest, name, on)
@@ -286,7 +306,8 @@ func uploadOne(c *kit.Invocation, dc *drivesvc.Context, src, dest string, on dri
 	}
 	return sayHowToGoAhead(kit.Mutate(c, spec, func() error {
 		return c.App.Drive.Upload(c.Ctx, dc, plan, r, drivesvc.UploadOptions{
-			Label: "Uploading " + plan.Name, Progress: ui.NewProgress(c.UI()), TotalHint: size,
+			Label: "Uploading " + plan.Name, Progress: ui.NewProgress(c.UI()),
+			TotalHint: size, Modified: modified,
 		})
 	}), on)
 }
@@ -412,7 +433,7 @@ func uploadInto(c *kit.Invocation, dc *drivesvc.Context, plan *drivesvc.TreePlan
 	return c.App.Drive.Upload(c.Ctx, dc, filePlan, f, drivesvc.UploadOptions{
 		Label:     "Uploading " + name,
 		Progress:  ui.Batch(ui.NewProgress(c.UI()), index, count),
-		TotalHint: info.Size(),
+		TotalHint: info.Size(), Modified: info.ModTime(),
 	})
 }
 
@@ -472,7 +493,7 @@ func itemsDownloadCmd() *cobra.Command {
 		}),
 	}
 	dest.Register(c)
-	t.registerReadOnly(c)
+	t.register(c, reads)
 	return c
 }
 
@@ -525,7 +546,7 @@ func itemsUpdateCmd() *cobra.Command {
 	}
 	c.Flags().StringVar(&name, "name", "", "New name, without a path")
 	_ = c.MarkFlagRequired("name")
-	t.register(c)
+	t.register(c, changes)
 	return c
 }
 
@@ -585,7 +606,7 @@ func relocateCmd(use, short string, action ui.Action,
 	c.Flags().StringVar(&into, "into", "", "Destination folder")
 	_ = c.MarkFlagRequired("into")
 	f.register(c)
-	t.register(c)
+	t.register(c, changes)
 	return c
 }
 
@@ -628,7 +649,7 @@ func removeCmd(use, short string, action ui.Action, permanent bool) *cobra.Comma
 		}),
 	}
 	f.register(c)
-	t.register(c)
+	t.register(c, changes)
 	return c
 }
 
@@ -685,7 +706,7 @@ func revisionsListCmd() *cobra.Command {
 			}, revs)
 		}),
 	}
-	t.register(c)
+	t.register(c, changes)
 	return c
 }
 
@@ -740,7 +761,7 @@ func revisionsDownloadCmd() *cobra.Command {
 		}),
 	}
 	dest.Register(c)
-	t.register(c)
+	t.register(c, changes)
 	return c
 }
 
@@ -762,7 +783,7 @@ func revisionsRestoreCmd() *cobra.Command {
 			})
 		}),
 	}
-	t.register(c)
+	t.register(c, changes)
 	return c
 }
 
@@ -785,7 +806,7 @@ func revisionsDeleteCmd() *cobra.Command {
 			})
 		}),
 	}
-	t.register(c)
+	t.register(c, changes)
 	return c
 }
 
@@ -799,7 +820,11 @@ func itemsCreateCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "create PATH",
 		Short: "Create a folder, and any missing folder above it",
-		RunE: kit.Run(nil, func(c *kit.Invocation) error {
+		Long: "Create a folder, and any missing folder above it.\n\n" +
+			"PATH is in your own files. --computer REF creates inside a computer instead,\n" +
+			"--shared REF inside something somebody shared with you, and --link URL inside\n" +
+			"a public link. A share or a link has to allow editing.",
+		RunE: kit.Run([]kit.Step{t.supply}, func(c *kit.Invocation) error {
 			dc, err := t.context(c)
 			if err != nil {
 				return err
@@ -823,6 +848,6 @@ func itemsCreateCmd() *cobra.Command {
 			})
 		}),
 	}
-	t.register(c)
+	t.register(c, adds)
 	return c
 }

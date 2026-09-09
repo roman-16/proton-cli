@@ -37,17 +37,23 @@ proton drive items copy --pattern '*.pdf' --scope /Documents --into /Backup
 
 Create a folder, and any missing folder above it.
 
+PATH is in your own files. --computer REF creates inside a computer instead, --shared REF inside something somebody shared with you, and --link URL inside a public link. A share or a link has to allow editing.
+
 ```
 proton drive items create PATH
 ```
 
 ```bash
 proton drive items create /Documents/2026
+proton drive items create /2026 --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL'
 ```
 
 | Flag | Description |
 | --- | --- |
 | `--computer string` | Work inside this computer's files, by name or ID |
+| `--link string` | Work inside a public link somebody sent you, by URL |
+| `--link-password-file string` | Read the public link's password from a file |
+| `--link-password-stdin` | Read the public link's password from stdin |
 | `--shared string` | Work inside an item shared with you, by name or ID |
 
 ## `delete`
@@ -109,7 +115,7 @@ proton drive items download / --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ
 
 Show a file or folder's details.
 
-Reached through a public link, the details include the link itself and, for a link saved with `shared add`, the password its owner set on it. A link names nobody as the author of what is in it, so Created By is absent and Signature reads anonymous.
+Reached through a public link, the details include the link, whether it allows editing and, for a link saved with `shared add`, the password its owner set on it. Behind a link, Created By is absent and Signature reads anonymous.
 
 ```
 proton drive items get PATH
@@ -471,7 +477,7 @@ proton drive items update /Documents/report.pdf --name summary.pdf
 
 Upload a file or directory.
 
-A name already taken is refused, so nothing is overwritten by accident. --if-exists answers instead:
+A name already taken is refused. --if-exists answers instead:
 
   replace  a new revision, keeping the file's history
   rename   keep both, numbering the one being uploaded
@@ -481,6 +487,8 @@ With --recursive that answer is about the folder the tree lands in.
 
 SRC of - reads standard input, and then DEST has to name the file.
 
+DEST is in your own files. --computer REF uploads into a computer instead, --shared REF into something somebody shared with you, and --link URL into a public link. In the last two, / is the item itself. A share or a link has to allow editing, and a link takes no new revisions: --if-exists replace is refused there.
+
 ```
 proton drive items upload SRC [DEST]
 ```
@@ -489,6 +497,7 @@ proton drive items upload SRC [DEST]
 proton drive items upload ./report.pdf /Documents
 proton drive items upload --recursive ./project /Backup
 proton drive items upload --if-exists replace ./report.pdf /Documents
+proton drive items upload ./photo.jpg / --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL'
 pg_dump mydb | gzip | proton drive items upload - /Backups/db.sql.gz
 ```
 
@@ -496,6 +505,9 @@ pg_dump mydb | gzip | proton drive items upload - /Backups/db.sql.gz
 | --- | --- |
 | `--computer string` | Work inside this computer's files, by name or ID |
 | `--if-exists string` | What to do when the folder already has that name: rename, replace, skip |
+| `--link string` | Work inside a public link somebody sent you, by URL |
+| `--link-password-file string` | Read the public link's password from a file |
+| `--link-password-stdin` | Read the public link's password from stdin |
 | `--recursive` | Upload a directory and everything under it |
 | `--shared string` | Work inside an item shared with you, by name or ID |
 

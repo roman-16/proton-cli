@@ -236,6 +236,7 @@ var examples = map[string][]string{
 		"proton drive items upload ./report.pdf /Documents",
 		"proton drive items upload --recursive ./project /Backup",
 		"proton drive items upload --if-exists replace ./report.pdf /Documents",
+		"proton drive items upload ./photo.jpg / --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL'",
 		"pg_dump mydb | gzip | proton drive items upload - /Backups/db.sql.gz",
 	},
 	"proton drive items download": {
@@ -269,6 +270,7 @@ var examples = map[string][]string{
 	"proton drive items revisions delete":   {"proton drive items revisions delete /Documents/report.pdf 5bH2mQxK"},
 	"proton drive items create": {
 		"proton drive items create /Documents/2026",
+		"proton drive items create /2026 --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL'",
 	},
 	"proton drive items share get": {"proton drive items share get /Documents/report.pdf"},
 	"proton drive items share link": {

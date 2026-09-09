@@ -19,8 +19,9 @@ import (
 )
 
 const (
-	permView = 4 // SHARE_URL_PERMISSIONS.VIEWER (READ)
-	permEdit = 6 // EDITOR (READ|WRITE)
+	permView  = 4 // SHARE_URL_PERMISSIONS.VIEWER (READ)
+	permEdit  = 6 // EDITOR (READ|WRITE)
+	permWrite = 2 // the bit that tells the two apart, in a link's grant and in a membership alike
 
 	flagGeneratedPassword          = 2 // GeneratedPasswordIncluded
 	flagCustomAndGeneratedPassword = 3 // CustomPassword | GeneratedPasswordIncluded
@@ -43,9 +44,11 @@ type ItemInfo struct {
 	OriginalSize int64  `json:"original_size_bytes,omitempty"`
 	SHA1         string `json:"sha1,omitempty"`
 	Shared       bool   `json:"shared"`
-	// URL is the public link the item was reached through, and LinkPassword the
-	// one its owner set on it. Both are empty for an item in your own files.
+	// URL is the public link the item was reached through, LinkAccess what that
+	// link permits, and LinkPassword the password its owner set on it. All three
+	// are empty for an item that was not reached through a link.
 	URL          string `json:"url,omitempty"`
+	LinkAccess   string `json:"link_access,omitempty"`
 	LinkPassword string `json:"link_password,omitempty"`
 	LinkID       string `json:"link_id"`
 	ShareID      string `json:"share_id"`
@@ -85,6 +88,15 @@ type LinkOptions struct {
 
 func (o LinkOptions) modifies() bool { return o.SetEdit || o.SetExpiry || o.SetPassword }
 
+// Access is what a public link permits, in the two words every screen and every
+// response says it in.
+func Access(canEdit bool) string {
+	if canEdit {
+		return "edit"
+	}
+	return "view"
+}
+
 type shareURLResp struct {
 	ShareURLID     string
 	ShareID        string
@@ -108,7 +120,7 @@ func (u shareURLResp) toShareLink(generated string) ShareLink {
 		ShareID:     u.ShareID,
 		Token:       u.Token,
 		URL:         url,
-		CanEdit:     u.Permissions&2 != 0,
+		CanEdit:     u.Permissions&permWrite != 0,
 		CreateTime:  u.CreateTime,
 		ExpireTime:  u.ExpirationTime,
 		NumAccesses: u.NumAccesses,
@@ -144,6 +156,7 @@ func (s *Service) Info(ctx context.Context, dc *Context, path string) (*ItemInfo
 		Shared:       dc.Public() || len(link.ShareUrls) > 0,
 		URL:          dc.URL,
 		LinkPassword: dc.LinkPassword,
+		LinkAccess:   linkAccess(dc),
 		LinkID:       res.LinkID,
 		ShareID:      res.dc.ShareID,
 		VolumeID:     dc.VolumeID,
@@ -157,6 +170,15 @@ func (s *Service) Info(ctx context.Context, dc *Context, path string) (*ItemInfo
 	}
 	info.Signature = s.verifyCreator(ctx, dc, res, link)
 	return info, nil
+}
+
+// linkAccess is what the link an item was reached through permits, and nothing
+// at all for an item that was not reached through one.
+func linkAccess(dc *Context) string {
+	if !dc.Public() {
+		return ""
+	}
+	return Access(dc.CanEdit())
 }
 
 func (s *Service) verifyCreator(ctx context.Context, dc *Context, res *Resolved, link *Link) string {
@@ -595,6 +617,9 @@ type SharedItem struct {
 	// SharedBy is the address that granted the access, and is empty for a public
 	// link: a link says nothing about who sent it.
 	SharedBy string `json:"shared_by,omitempty"`
+	// Role is what the grant lets you do with it: a viewer lists and downloads, an
+	// editor uploads as well. It is empty for something of your own.
+	Role string `json:"role,omitempty"`
 	// Token names the public link this is, and URL is that link. Both are empty
 	// for an item somebody shared with you directly.
 	Token string `json:"token,omitempty"`
@@ -607,8 +632,8 @@ type SharedItem struct {
 }
 
 // IsLink reports whether this is a public link somebody sent you rather than a
-// share you are a member of. The two are removed differently and only one of
-// them can be written to, so nothing may assume.
+// share you are a member of. The two are removed differently and what each one
+// permits is its own, so nothing may assume.
 func (i SharedItem) IsLink() bool { return i.Token != "" }
 
 // Ref is what addresses the item on a command line. A link is named by its
@@ -625,8 +650,8 @@ func (i SharedItem) Ref() string {
 //
 // Two things arrive that way and both belong in the one answer: a share you were
 // invited into and accepted, and a public link you saved. They are addressed
-// alike, by `--shared REF`, and differ in what may be done with them - a link
-// can be read and not written - which each item says of itself.
+// alike, by `--shared REF`, and differ in what may be done with them - which
+// each item says of itself, in the role it carries.
 //
 // A share is somebody else's when its creator is not one of your own addresses.
 // The main share, the photos share and the desktop client's device shares are
@@ -744,7 +769,7 @@ func (s *Service) describeShare(ctx context.Context, sh rawShare) (*SharedItem, 
 	return &SharedItem{
 		ShareID: sh.ShareID, LinkID: sh.LinkID, VolumeID: sh.VolumeID,
 		Name: dc.RootName, Type: linkType(root.Type), Size: root.Size,
-		SharedBy: sh.Creator, Created: sh.CreateTime,
+		SharedBy: sh.Creator, Role: grantedRole(dc.Permissions), Created: sh.CreateTime,
 	}, nil
 }
 
@@ -785,6 +810,7 @@ func (s *Service) savedLinks(ctx context.Context) ([]SharedItem, error) {
 				LinkID            string
 				LinkType          int
 				Name              string
+				Permissions       int
 				Size              int64
 				ShareKey          string
 				SharePassphrase   string
@@ -809,7 +835,8 @@ func (s *Service) savedLinks(ctx context.Context) ([]SharedItem, error) {
 	for _, b := range r.Bookmarks {
 		item := SharedItem{
 			Token: b.Token.Token, LinkID: b.Token.LinkID,
-			Type: linkType(b.Token.LinkType), Size: b.Token.Size, Created: b.CreateTime,
+			Type: linkType(b.Token.LinkType), Size: b.Token.Size,
+			Role: grantedRole(b.Token.Permissions), Created: b.CreateTime,
 		}
 		password, err := decryptSavedPassword(u, b.EncryptedUrlPassword)
 		if err != nil {

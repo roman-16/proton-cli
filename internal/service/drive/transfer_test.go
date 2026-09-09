@@ -103,12 +103,8 @@ func TestUploadBlockRetriesTransientThenSucceeds(t *testing.T) {
 	defer srv.Close()
 
 	link := uploadLink{Token: "tok-1", BareURL: srv.URL, created: time.Now()}
-	tok, err := uploadBlock(context.Background(), 1, []byte("data"), link, failRefresh(t))
-	if err != nil {
+	if err := uploadBlock(context.Background(), 1, []byte("data"), link, failRefresh(t)); err != nil {
 		t.Fatalf("uploadBlock: %v", err)
-	}
-	if tok != "tok-1" {
-		t.Errorf("token = %q, want tok-1", tok)
 	}
 	if got := atomic.LoadInt32(&hits); got != 3 {
 		t.Errorf("server hits = %d, want 3", got)
@@ -129,7 +125,7 @@ func TestUploadBlockHonorsRateLimit(t *testing.T) {
 	defer srv.Close()
 
 	link := uploadLink{Token: "t", BareURL: srv.URL, created: time.Now()}
-	if _, err := uploadBlock(context.Background(), 1, []byte("d"), link, failRefresh(t)); err != nil {
+	if err := uploadBlock(context.Background(), 1, []byte("d"), link, failRefresh(t)); err != nil {
 		t.Fatalf("uploadBlock: %v", err)
 	}
 	if got := atomic.LoadInt32(&hits); got != 2 {
@@ -156,12 +152,8 @@ func TestUploadBlockRefreshesOnTokenRejection(t *testing.T) {
 		return uploadLink{Token: "fresh", BareURL: srv.URL, created: time.Now()}, nil
 	}
 	link := uploadLink{Token: "stale", BareURL: srv.URL, created: time.Now()}
-	tok, err := uploadBlock(context.Background(), 7, []byte("d"), link, refresh)
-	if err != nil {
+	if err := uploadBlock(context.Background(), 7, []byte("d"), link, refresh); err != nil {
 		t.Fatalf("uploadBlock: %v", err)
-	}
-	if tok != "fresh" {
-		t.Errorf("token = %q, want fresh (from refreshed link)", tok)
 	}
 	if got := atomic.LoadInt32(&refreshed); got != 1 {
 		t.Errorf("refresh calls = %d, want 1", got)
@@ -187,12 +179,8 @@ func TestUploadBlockProactiveTokenRefresh(t *testing.T) {
 		return uploadLink{Token: "fresh", BareURL: srv.URL, created: time.Now()}, nil
 	}
 	stale := uploadLink{Token: "stale", BareURL: srv.URL, created: time.Now().Add(-2 * blockTokenTTL)}
-	tok, err := uploadBlock(context.Background(), 1, []byte("d"), stale, refresh)
-	if err != nil {
+	if err := uploadBlock(context.Background(), 1, []byte("d"), stale, refresh); err != nil {
 		t.Fatalf("uploadBlock: %v", err)
-	}
-	if tok != "fresh" {
-		t.Errorf("token = %q, want fresh (stale token should be refreshed first)", tok)
 	}
 }
 
@@ -206,7 +194,7 @@ func TestUploadBlockFatalOn4xx(t *testing.T) {
 	defer srv.Close()
 
 	link := uploadLink{Token: "t", BareURL: srv.URL, created: time.Now()}
-	if _, err := uploadBlock(context.Background(), 1, []byte("d"), link, failRefresh(t)); err == nil {
+	if err := uploadBlock(context.Background(), 1, []byte("d"), link, failRefresh(t)); err == nil {
 		t.Fatal("expected an error on HTTP 400")
 	}
 	if got := atomic.LoadInt32(&hits); got != 1 {
@@ -224,7 +212,7 @@ func TestUploadBlockExhaustsRetries(t *testing.T) {
 	defer srv.Close()
 
 	link := uploadLink{Token: "t", BareURL: srv.URL, created: time.Now()}
-	if _, err := uploadBlock(context.Background(), 1, []byte("d"), link, failRefresh(t)); err == nil {
+	if err := uploadBlock(context.Background(), 1, []byte("d"), link, failRefresh(t)); err == nil {
 		t.Fatal("expected an error after exhausting retries")
 	}
 	if got := atomic.LoadInt32(&hits); got != blockMaxRetries+1 {
@@ -248,7 +236,7 @@ func TestUploadBlockRespectsContextCancel(t *testing.T) {
 		cancel()
 	}()
 	link := uploadLink{Token: "t", BareURL: srv.URL, created: time.Now()}
-	_, err := uploadBlock(ctx, 1, []byte("d"), link, failRefresh(t))
+	err := uploadBlock(ctx, 1, []byte("d"), link, failRefresh(t))
 	if !errors.Is(err, context.Canceled) {
 		t.Errorf("err = %v, want context.Canceled", err)
 	}
@@ -278,39 +266,20 @@ func TestDownloadBlockRetriesThenSucceeds(t *testing.T) {
 	}
 }
 
-// TestBuildRevisionCommitOrdersByIndex proves the manifest and BlockList stay
-// index-ordered even though parallel workers record results out of order.
-func TestBuildRevisionCommitOrdersByIndex(t *testing.T) {
-	rawHashByIdx := map[int][]byte{3: {0x03}, 1: {0x01}, 2: {0x02}}
-	tokenByIdx := map[int]string{3: "t3", 1: "t1", 2: "t2"}
-
-	manifest, list, err := buildRevisionCommit(rawHashByIdx, tokenByIdx)
+// TestBuildManifestOrdersByIndex proves the manifest stays index-ordered even
+// though parallel workers record results out of order.
+func TestBuildManifestOrdersByIndex(t *testing.T) {
+	manifest, err := buildManifest(map[int][]byte{3: {0x03}, 1: {0x01}, 2: {0x02}})
 	if err != nil {
-		t.Fatalf("buildRevisionCommit: %v", err)
+		t.Fatalf("buildManifest: %v", err)
 	}
 	if !bytes.Equal(manifest, []byte{0x01, 0x02, 0x03}) {
 		t.Errorf("manifest = %v, want [1 2 3] (hashes in index order)", manifest)
 	}
-	if len(list) != 3 {
-		t.Fatalf("blockList len = %d, want 3", len(list))
-	}
-	for i, want := range []struct {
-		idx int
-		tok string
-	}{{1, "t1"}, {2, "t2"}, {3, "t3"}} {
-		if list[i]["Index"] != want.idx {
-			t.Errorf("list[%d].Index = %v, want %d", i, list[i]["Index"], want.idx)
-		}
-		if list[i]["Token"] != want.tok {
-			t.Errorf("list[%d].Token = %v, want %s", i, list[i]["Token"], want.tok)
-		}
-	}
 }
 
-func TestBuildRevisionCommitDetectsGap(t *testing.T) {
-	rawHashByIdx := map[int][]byte{1: {0x01}, 3: {0x03}} // block 2 missing
-	tokenByIdx := map[int]string{1: "t1", 3: "t3"}
-	if _, _, err := buildRevisionCommit(rawHashByIdx, tokenByIdx); err == nil {
+func TestBuildManifestDetectsGap(t *testing.T) {
+	if _, err := buildManifest(map[int][]byte{1: {0x01}, 3: {0x03}}); err == nil {
 		t.Error("expected an error for a gap in block indices")
 	}
 }
@@ -373,7 +342,8 @@ func TestRequestBlockLinksMayBeAskedAgain(t *testing.T) {
 	d := &seqDoer{steps: []doerStep{
 		{body: `{"UploadLinks":[{"Token":"a","BareURL":"http://x/1"},{"Token":"b","BareURL":"http://x/2"}]}`},
 	}}
-	links, err := New(d, testKeys(nil)).requestBlockLinks(context.Background(), "sh", "lk", "rev", "ad",
+	dc := &Context{ShareID: "sh", AddrID: "ad"}
+	links, err := New(d, testKeys(nil)).requestBlockLinks(context.Background(), dc, "lk", "rev", author{},
 		[]*encBlock{{index: 1}, {index: 2}})
 	if err != nil {
 		t.Fatalf("requestBlockLinks: %v", err)
@@ -390,7 +360,7 @@ func TestRequestBlockLinksCountMismatch(t *testing.T) {
 	d := &seqDoer{steps: []doerStep{
 		{body: `{"UploadLinks":[{"Token":"a","BareURL":"u"}]}`},
 	}}
-	_, err := New(d, testKeys(nil)).requestBlockLinks(context.Background(), "s", "l", "r", "a",
+	_, err := New(d, testKeys(nil)).requestBlockLinks(context.Background(), &Context{ShareID: "s"}, "l", "r", author{},
 		[]*encBlock{{index: 1}, {index: 2}})
 	if err == nil {
 		t.Fatal("expected a count-mismatch error (2 blocks, 1 link)")
@@ -399,7 +369,7 @@ func TestRequestBlockLinksCountMismatch(t *testing.T) {
 
 func TestRequestBlockLinksNonRetryable(t *testing.T) {
 	d := &seqDoer{steps: []doerStep{{err: &proton.APIError{HTTPStatus: 404}}}}
-	_, err := New(d, testKeys(nil)).requestBlockLinks(context.Background(), "s", "l", "r", "a",
+	_, err := New(d, testKeys(nil)).requestBlockLinks(context.Background(), &Context{ShareID: "s"}, "l", "r", author{},
 		[]*encBlock{{index: 1}})
 	if err == nil {
 		t.Fatal("expected an error")
@@ -430,7 +400,7 @@ func TestABlockTransferDoesNotCarryItsTokenToAnotherHost(t *testing.T) {
 
 	shrinkBackoff(t)
 	link := uploadLink{Token: "t", BareURL: srv.URL, created: time.Now()}
-	if _, err := uploadBlock(context.Background(), 1, []byte("d"), link, failRefresh(t)); err == nil {
+	if err := uploadBlock(context.Background(), 1, []byte("d"), link, failRefresh(t)); err == nil {
 		t.Error("a redirect off the origin should fail rather than be followed")
 	}
 	if got := elsewhere.Load(); got != 0 {
@@ -469,7 +439,7 @@ func TestAStorageFailureQuotesNoUrlOrBody(t *testing.T) {
 	defer srv.Close()
 
 	link := uploadLink{Token: "sensitive-token", BareURL: srv.URL, created: time.Now()}
-	_, err := uploadBlock(context.Background(), 3, []byte("d"), link, failRefresh(t))
+	err := uploadBlock(context.Background(), 3, []byte("d"), link, failRefresh(t))
 	if err == nil {
 		t.Fatal("expected an error on HTTP 400")
 	}

@@ -35,7 +35,19 @@ type Invocation struct {
 	// Attempt read it, so an incomplete answer says so without any command having
 	// to check - whether the answer is a listing or a change made on one.
 	tally *skip.Tally
+
+	// linkAuthorised records that the work happens inside a public link opened
+	// without an account. AuthorisedByALink sets it and preview reads it.
+	linkAuthorised bool
 }
+
+// AuthorisedByALink records that what this command does is authorised by a
+// public link it opened without an account.
+//
+// Only the tree a command was pointed at knows that, which is why it says so: a
+// link that merely happens to be open does not make a command writing to the
+// account work with nobody signed in.
+func (c *Invocation) AuthorisedByALink() { c.linkAuthorised = true }
 
 // Incomplete is what this invocation could not show, phrased for whatever is
 // about to render the answer.
@@ -84,9 +96,13 @@ func (c *Invocation) Changed(flag string) bool {
 // Proton the honest claim includes needing an account: it sends no request, so
 // nothing else would ever discover there is nobody signed in. A command that
 // declares OnThisMachine changes the disk and not the account, and would have
-// succeeded signed out, so its preview says so too.
+// succeeded signed out, so its preview says so too - and so does work inside a
+// public link, which the link itself authorises.
 func (c *Invocation) preview(spec *ui.ResultSpec) error {
 	spec.DryRun = true
+	if c.linkAuthorised {
+		return nil
+	}
 	if c.Cmd != nil && c.Cmd.Annotations[OnThisMachine] != "" {
 		return nil
 	}

@@ -26,7 +26,7 @@ proton drive items download /Documents/report.pdf --dest - | less
 
 Uploads show progress on stderr.
 
-**A name already taken is refused**, so nothing is overwritten by accident. `--if-exists` answers the question instead:
+**A name already taken is refused.** `--if-exists` answers instead:
 
 ```bash
 proton drive items upload --if-exists replace ./report.pdf /Documents  # a new revision of it
@@ -53,7 +53,7 @@ proton drive items copy /Documents/report.pdf --into /Archive
 proton drive items create /Documents/2026/Q1/receipts   # makes 2026 and Q1 on the way
 ```
 
-A path names every folder along it, so the ones above the last are made too: `Created 3 folders down to /Documents/2026/Q1/receipts`.
+Every missing folder along the path is made: `Created 3 folders down to /Documents/2026/Q1/receipts`.
 
 The folder you asked for is the exception. A name Drive already holds is refused, as is a path running through a file.
 
@@ -82,7 +82,7 @@ proton drive items delete --larger-than 100MB --scope /Downloads --recursive --d
 
 A filter that matches a folder and the files inside it selects the folder alone. See [Filters and bulk changes](../using/filters.md).
 
-A trashed item has no place in the tree, so it has no path. Address it by the ID its listing showed.
+A trashed item has no path. Address it by the ID its listing showed.
 
 ## Earlier versions
 
@@ -96,7 +96,7 @@ proton drive items revisions restore /Documents/report.pdf 8f3a1c22
 
 `download` reads an old version out and leaves the file alone. `restore` puts one back in place.
 
-Proton restores in the background, so the file changes a moment after the command returns. The version it replaces stays in the history, so a restore can itself be undone.
+The file changes a moment after the command returns. The version it replaces stays in the history, and a restore can itself be undone.
 
 Neither command touches the version the file is at now. Restoring it would do nothing, and deleting it would be deleting the file.
 
@@ -111,7 +111,7 @@ proton drive items share get /Documents/report.pdf     # who has access, plus th
 proton drive items share unlink /Documents/report.pdf
 ```
 
-The password that opens a public link is a secret, so it comes from a file or from standard input rather than from a flag value. Proton allows at most 50 characters.
+The password comes from a file or from standard input, never from a flag value, and is at most 50 characters.
 
 - `--expires never` makes an expiring link permanent.
 - `--clear-link-password` removes the password.
@@ -137,7 +137,7 @@ proton drive invitations list
 proton drive invitations accept INVITATION_ID
 ```
 
-An item somebody shared with you does not live in your tree, so it has no path of its own. Open it with `--shared`, naming it by the ID or the name the listing showed:
+An item somebody shared with you has no path of its own. Open it with `--shared`, naming it by the ID or the name the listing showed:
 
 ```bash
 proton drive items list / --shared Project              # a shared folder
@@ -145,9 +145,11 @@ proton drive items download /report.pdf --shared Project --dest-dir ./downloads/
 proton drive items download / --shared quarterly.pdf    # a shared file is / itself
 ```
 
-`shared leave` gives up an item somebody shared with you. Only a new invitation from them brings it back, so it asks first.
+ROLE in `shared list` is what you may do there: a viewer lists and downloads, an editor uploads and changes things as well.
 
-An item whose name cannot be decrypted is still listed, so you can still act on it by ID.
+`shared leave` gives up an item somebody shared with you. It asks first; only a new invitation from them brings it back.
+
+An item whose name cannot be decrypted is still listed and can be acted on by ID.
 
 ### A link somebody sent you
 
@@ -167,7 +169,17 @@ A link with a password of its own takes it from a file or from standard input, a
 proton drive items download / --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL' --link-password-file /run/secrets/q3-link --dest-dir .
 ```
 
-A link can be listed, shown and downloaded without an account. A link names nobody as the author of what is in it, so `items get` shows no Created By and reports Signature as `anonymous`. Uploading into a link is in [Limits](../help/limits.md).
+A link that allows editing takes new files and folders. `items get /` shows `Link Access: edit` on one:
+
+```bash
+proton drive items upload ./photo.jpg / --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL'
+proton drive items create /2026 --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL'
+proton drive items upload --recursive ./album /2026 --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL'
+```
+
+`--if-exists rename` and `skip` work in a link; `replace` is refused. Nothing already in a link can be renamed, moved or removed from here.
+
+None of this needs an account. Signed in, what you upload names your address as Created By; without an account it names nobody. Behind a link, `items get` shows no Created By and reports Signature as `anonymous`.
 
 Save a link to open it later without the URL or the password. Saving needs an account:
 
@@ -207,7 +219,7 @@ proton drive photos favorite 3Ns8pT2v
 
 Tags are `favorites`, `screenshots`, `videos`, `live-photos`, `motion-photos`, `selfies`, `portraits`, `bursts`, `panoramas` and `raw`.
 
-Photos have no path either, so address them by ID.
+Photos have no path; address them by ID.
 
 ```bash
 proton drive photos albums create --name Holiday

@@ -30,10 +30,19 @@ type PendingInvite struct {
 }
 
 func roleLabel(perms int) string {
-	if perms&2 != 0 {
+	if perms&permWrite != 0 {
 		return "editor"
 	}
 	return "viewer"
+}
+
+// grantedRole is what somebody else's grant lets you do, and nothing at all
+// where there is no grant: a share of your own was not shared with you.
+func grantedRole(permissions int) string {
+	if permissions == 0 {
+		return ""
+	}
+	return roleLabel(permissions)
 }
 
 func (s *Service) ListMembers(ctx context.Context, shareID string) ([]Member, error) {

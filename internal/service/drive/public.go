@@ -101,6 +101,7 @@ func (s *Service) openLink(ctx context.Context, token, urlPassword, customPasswo
 	dc := &Context{
 		Token: token, URL: LinkURL(token, urlPassword), LinkPassword: customPassword,
 		ShareKR: shareKR, VolumeID: share.VolumeID, RootLinkID: root.LinkID, rootLink: root,
+		Permissions: share.PublicPermissions, Anonymous: share.Anonymous,
 		Type: shareTypeStandard,
 	}
 	dc.RootName = rootName(ctx, token, dc.Type, root, shareKR)

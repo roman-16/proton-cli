@@ -164,7 +164,7 @@ var ErrDryRun = errors.New("refusing to change anything under --dry-run")
 // unaffected: a dry run on an expired session still works, which is the
 // difference between a useful preview and an error.
 func (c *Client) dryRunRefuses(req Request) error {
-	if !c.dryRun || readOnlyMethod(req.Method) {
+	if !c.dryRun || req.Reads || readOnlyMethod(req.Method) {
 		return nil
 	}
 	return fmt.Errorf("%w: %s %s", ErrDryRun, strings.ToUpper(req.Method), req.Path)
@@ -295,6 +295,14 @@ type Request struct {
 	// Human-verification state (set by retry logic, not by most callers).
 	HVToken string
 	HVType  string
+
+	// Reads says that this request changes nothing, whatever its method says.
+	//
+	// Proton answers some questions with a POST - whether a name is free is one -
+	// and a preview that could not ask them could not say what the command would
+	// do. It is a claim about the endpoint, so it belongs to the caller that knows
+	// which one it is naming.
+	Reads bool
 
 	// Repeatable says that sending this twice cannot change what the account ends
 	// up in, so a failure that leaves it unclear whether it arrived is worth

@@ -125,7 +125,7 @@ func photosUploadCmd() *cobra.Command {
 				return c.App.Drive.PhotoUpload(c.Ctx, dc, name, f, fi.ModTime().Unix(),
 					drivesvc.UploadOptions{
 						Label: "Uploading " + name, Progress: ui.NewProgress(c.UI()),
-						TotalHint: fi.Size(),
+						TotalHint: fi.Size(), Modified: fi.ModTime(),
 					})
 			})
 		}),

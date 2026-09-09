@@ -187,14 +187,13 @@ func putBlock(ctx context.Context, link uploadLink, data []byte) (status int, re
 
 // uploadBlock uploads one block, retrying transient failures with backoff,
 // honouring 429 Retry-After, and calling refresh for a new link when the
-// storage token is rejected or has aged past its TTL. It returns the token that
-// the successful upload used, which the revision commit records.
-func uploadBlock(ctx context.Context, index int, data []byte, link uploadLink, refresh func(context.Context) (uploadLink, error)) (string, error) {
+// storage token is rejected or has aged past its TTL.
+func uploadBlock(ctx context.Context, index int, data []byte, link uploadLink, refresh func(context.Context) (uploadLink, error)) error {
 	for attempt := 0; ; attempt++ {
 		if time.Since(link.created) > blockTokenTTL {
 			fresh, err := refresh(ctx)
 			if err != nil {
-				return "", err
+				return err
 			}
 			link = fresh
 		}
@@ -204,36 +203,36 @@ func uploadBlock(ctx context.Context, index int, data []byte, link uploadLink, r
 		cancel()
 
 		if err == nil && status >= 200 && status < 300 {
-			return link.Token, nil
+			return nil
 		}
 		if attempt >= blockMaxRetries {
 			if err != nil {
-				return "", fmt.Errorf("upload block %d: %w", index, err)
+				return fmt.Errorf("upload block %d: %w", index, err)
 			}
-			return "", storageFailed(fmt.Sprintf("upload block %d", index), status, nil)
+			return storageFailed(fmt.Sprintf("upload block %d", index), status, nil)
 		}
 
 		switch {
 		case err != nil: // network / timeout
 			if werr := sleepCtx(ctx, backoffDelay(attempt)); werr != nil {
-				return "", werr
+				return werr
 			}
 		case status == http.StatusTooManyRequests:
 			if werr := sleepCtx(ctx, retryAfter(ra, attempt)); werr != nil {
-				return "", werr
+				return werr
 			}
 		case tokenRejected(status): // expired / already-committed token: get a fresh link
 			fresh, rerr := refresh(ctx)
 			if rerr != nil {
-				return "", rerr
+				return rerr
 			}
 			link = fresh
 		case status >= 500:
 			if werr := sleepCtx(ctx, backoffDelay(attempt)); werr != nil {
-				return "", werr
+				return werr
 			}
 		default: // other 4xx: not recoverable
-			return "", storageFailed(fmt.Sprintf("upload block %d", index), status, nil)
+			return storageFailed(fmt.Sprintf("upload block %d", index), status, nil)
 		}
 	}
 }
@@ -311,7 +310,7 @@ func downloadBlock(ctx context.Context, url, token string) ([]byte, error) {
 
 // requestBlockLinks asks the API for upload links for a batch of blocks. The
 // returned links are positional (link i belongs to batch[i]).
-func (s *Service) requestBlockLinks(ctx context.Context, shareID, linkID, revisionID, addrID string, batch []*encBlock) ([]uploadLink, error) {
+func (s *Service) requestBlockLinks(ctx context.Context, dc *Context, linkID, revisionID string, by author, batch []*encBlock) ([]uploadLink, error) {
 	blockList := make([]map[string]any, len(batch))
 	for i, b := range batch {
 		blockList[i] = b.listEntry()
@@ -319,16 +318,7 @@ func (s *Service) requestBlockLinks(ctx context.Context, shareID, linkID, revisi
 	var res struct {
 		UploadLinks []struct{ Token, BareURL string }
 	}
-	// Repeatable: asking a second time hands back a second set of links and
-	// changes nothing else, so a request whose answer was lost is worth making
-	// again rather than failing an upload part way through.
-	err := s.C.Decode(ctx, proton.Request{
-		Method: "POST", Path: "/drive/blocks", Repeatable: true,
-		Body: map[string]any{
-			"AddressID": addrID, "ShareID": shareID,
-			"LinkID": linkID, "RevisionID": revisionID, "BlockList": blockList,
-		},
-	}, &res)
+	err := s.C.Decode(ctx, blockLinksRequest(dc, linkID, revisionID, by, blockList), &res)
 	if err != nil {
 		return nil, err
 	}
@@ -341,4 +331,29 @@ func (s *Service) requestBlockLinks(ctx context.Context, shareID, linkID, revisi
 		links[i] = uploadLink{Token: l.Token, BareURL: l.BareURL, created: now}
 	}
 	return links, nil
+}
+
+// blockLinksRequest asks for somewhere to put a batch of blocks, of whichever
+// endpoint serves the tree the file is in.
+//
+// A share is named along with the address the blocks are written by; a link is
+// the name, and carries whoever wrote them the way everything else about it
+// does.
+//
+// Repeatable: asking a second time hands back a second set of links and changes
+// nothing else, so a request whose answer was lost is worth making again rather
+// than failing an upload part way through.
+func blockLinksRequest(dc *Context, linkID, revisionID string, by author, blockList []map[string]any) proton.Request {
+	body := map[string]any{"LinkID": linkID, "RevisionID": revisionID, "BlockList": blockList}
+	if dc.Public() {
+		by.attribute(body, dc)
+		return proton.Request{
+			Method: "POST", Path: fmt.Sprintf("/drive/urls/%s/blocks", dc.Token),
+			Repeatable: true, Body: body,
+		}
+	}
+	body["AddressID"], body["ShareID"] = dc.AddrID, dc.ShareID
+	return proton.Request{
+		Method: "POST", Path: "/drive/blocks", Repeatable: true, Body: body,
+	}
 }

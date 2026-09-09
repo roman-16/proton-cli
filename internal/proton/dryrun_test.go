@@ -41,6 +41,17 @@ func TestDryRunRefusesEveryRequestThatWouldChangeSomething(t *testing.T) {
 	if len(reached) != 3 {
 		t.Errorf("read-only requests reached the server %d times, want 3", len(reached))
 	}
+
+	// Proton answers some questions with a POST, and a preview that could not ask
+	// them could not say what the command would do.
+	if _, err := c.Do(context.Background(), Request{
+		Method: "POST", Path: "/drive/shares/x/links/y/checkAvailableHashes", Reads: true,
+	}); err != nil {
+		t.Errorf("a POST that only reads was refused under --dry-run: %v", err)
+	}
+	if len(reached) != 4 {
+		t.Errorf("the request that only reads reached the server %d times, want 1", len(reached)-3)
+	}
 }
 
 func TestWithoutDryRunEveryMethodIsSent(t *testing.T) {

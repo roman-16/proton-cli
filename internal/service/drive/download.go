@@ -135,7 +135,7 @@ func (s *Service) downloadFile(ctx context.Context, dc *Context, link *Link, nod
 	prog.Start(size, opts.Label)
 	defer prog.Done()
 
-	author := newBlockAuthor(s, link.SignatureEmail, nodeKR)
+	wrote := newBlockAuthor(s, link.SignatureEmail, nodeKR)
 	for i, b := range rev.Blocks {
 		encData, err := downloadBlock(ctx, b.BareURL, b.Token)
 		if err != nil {
@@ -149,7 +149,7 @@ func (s *Service) downloadFile(ctx context.Context, dc *Context, link *Link, nod
 			return fmt.Errorf("decrypt block %d: %w", b.Index, err)
 		}
 		if opts.OnSignatureIssue != nil {
-			if verdict := author.verify(ctx, dec, b.EncSignature); verdict != "" {
+			if verdict := wrote.verify(ctx, dec, b.EncSignature); verdict != "" {
 				opts.OnSignatureIssue(b.Index, verdict)
 			}
 		}
@@ -310,7 +310,7 @@ func decodeSHA256(encoded string) ([]byte, error) {
 // checked against the hash list the revision came with, so what arrives is what
 // that list describes; the list itself is then Proton's word rather than the
 // author's, which is the one guarantee a link cannot carry.
-func (s *Service) verifyManifest(ctx context.Context, dc *Context, nodeKR *pgp.KeyRing, author string, manifest []byte, signature string) error {
+func (s *Service) verifyManifest(ctx context.Context, dc *Context, nodeKR *pgp.KeyRing, signedBy string, manifest []byte, signature string) error {
 	if dc.Public() {
 		slog.DebugContext(ctx, "drive: a public link serves no manifest signature, so the block hashes are Proton's word",
 			"share", dc.Token)
@@ -320,10 +320,10 @@ func (s *Service) verifyManifest(ctx context.Context, dc *Context, nodeKR *pgp.K
 		return fmt.Errorf("the revision carries no manifest signature, so its content cannot be verified")
 	}
 	verificationKR := nodeKR
-	if author != "" {
-		kr, err := s.addressKeyRing(ctx, author)
+	if signedBy != "" {
+		kr, err := s.addressKeyRing(ctx, signedBy)
 		if err != nil {
-			return fmt.Errorf("load the key of %s, who committed this revision: %w", author, err)
+			return fmt.Errorf("load the key of %s, who committed this revision: %w", signedBy, err)
 		}
 		verificationKR = kr
 	}

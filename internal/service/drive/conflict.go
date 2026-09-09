@@ -73,7 +73,7 @@ func (s *Service) PlanUpload(ctx context.Context, dc *Context, destPath, name st
 		return nil, fmt.Errorf("target folder not found: %w", err)
 	}
 	if !parent.IsFolder {
-		return nil, fmt.Errorf("%s is not a folder", destPath)
+		return nil, errs.Problemf("%s is not a folder.", parent.Describe(destPath))
 	}
 	hashKey, err := hashKeyOf(parent.Link, parent.NodeKR)
 	if err != nil {
@@ -304,11 +304,7 @@ func (s *Service) freeNames(ctx context.Context, parent *Resolved, hashKey []byt
 			hashes = append(hashes, hash)
 		}
 		var r struct{ AvailableHashes []string }
-		if err := s.C.Decode(ctx, proton.Request{
-			Method: "POST",
-			Path:   fmt.Sprintf("/drive/shares/%s/links/%s/checkAvailableHashes", parent.dc.ShareID, parent.LinkID),
-			Body:   map[string]any{"Hashes": hashes},
-		}, &r); err != nil {
+		if err := s.C.Decode(ctx, hashesRequest(parent.dc, parent.LinkID, hashes), &r); err != nil {
 			return available{}, err
 		}
 		isFree := map[string]bool{}
@@ -331,6 +327,39 @@ func (s *Service) freeNames(ctx context.Context, parent *Resolved, hashKey []byt
 // hashBatch is how many candidate names are checked per request, matching the
 // web client's HASH_CHECK_AMOUNT.
 const hashBatch = 10
+
+// hashesRequest asks a folder which of a batch of names are free, of whichever
+// endpoint serves the tree it is in.
+//
+// Reads: it is a POST because the batch of hashes is a body rather than a query,
+// and it changes nothing - so a dry run may ask it, which is what lets a preview
+// promise the name a file would really land under.
+func hashesRequest(dc *Context, parentLinkID string, hashes []string) proton.Request {
+	body := map[string]any{"Hashes": hashes}
+	if dc.Public() {
+		return proton.Request{
+			Method: "POST", Reads: true, Body: body,
+			Path: fmt.Sprintf("/drive/urls/%s/files/%s/checkAvailableHashes", dc.Token, parentLinkID),
+		}
+	}
+	return proton.Request{
+		Method: "POST", Reads: true, Body: body,
+		Path: fmt.Sprintf("/drive/shares/%s/links/%s/checkAvailableHashes", dc.ShareID, parentLinkID),
+	}
+}
+
+// fileRequest opens a file draft, of whichever endpoint serves the tree it is
+// going into.
+func fileRequest(dc *Context, body map[string]any) proton.Request {
+	if dc.Public() {
+		return proton.Request{
+			Method: "POST", Path: fmt.Sprintf("/drive/urls/%s/files", dc.Token), Body: body,
+		}
+	}
+	return proton.Request{
+		Method: "POST", Path: fmt.Sprintf("/drive/shares/%s/files", dc.ShareID), Body: body,
+	}
+}
 
 // numberedName is the name a numbered copy takes, the same string the web client
 // builds (adjustName, packages/drive-store/store/_links/link.ts): the number goes
@@ -371,7 +400,7 @@ func splitName(name string) (base, ext string) {
 // A new file brings its own keys. A new revision of a file that already exists
 // uses that file's keys, because a revision is another version of the same
 // encrypted thing rather than a new one.
-func (s *Service) startRevision(ctx context.Context, dc *Context, plan *UploadPlan, mimeType string) (
+func (s *Service) startRevision(ctx context.Context, dc *Context, plan *UploadPlan, by author, mimeType string) (
 	linkID, revisionID string, sessionKey *pgp.SessionKey, nodeKR *pgp.KeyRing, err error,
 ) {
 	if plan.Revision {
@@ -396,11 +425,12 @@ func (s *Service) startRevision(ctx context.Context, dc *Context, plan *UploadPl
 	}
 
 	parent := plan.parent
-	encName, err := encryptName(plan.Name, parent.NodeKR, dc.AddrKR)
+	signKR := by.key(parent.NodeKR)
+	encName, err := encryptName(plan.Name, parent.NodeKR, signKR)
 	if err != nil {
 		return "", "", nil, nil, err
 	}
-	nodeKey, nodePass, nodePassSig, nodePriv, err := genNodeKeys(parent.NodeKR, dc.AddrKR)
+	nodeKey, nodePass, nodePassSig, nodePriv, err := genNodeKeys(parent.NodeKR, signKR)
 	if err != nil {
 		return "", "", nil, nil, err
 	}
@@ -408,26 +438,24 @@ func (s *Service) startRevision(ctx context.Context, dc *Context, plan *UploadPl
 	if err != nil {
 		return "", "", nil, nil, err
 	}
-	sessionKey, contentKP, contentKPSig, err := genFileKeys(nodeKR, dc.AddrKR)
+	sessionKey, contentKP, contentKPSig, err := genFileKeys(nodeKR)
 	if err != nil {
 		return "", "", nil, nil, err
 	}
+	body := map[string]any{
+		"Name": encName, "Hash": plan.hash,
+		"ParentLinkID":   parent.LinkID,
+		"NodePassphrase": nodePass, "NodePassphraseSignature": nodePassSig,
+		"NodeKey":                   nodeKey,
+		"MIMEType":                  mimeType,
+		"ContentKeyPacket":          contentKP,
+		"ContentKeyPacketSignature": contentKPSig,
+	}
+	by.attribute(body, dc)
 	var created struct {
 		File struct{ ID, RevisionID string }
 	}
-	if err := s.C.Decode(ctx, proton.Request{
-		Method: "POST", Path: "/drive/shares/" + parent.dc.ShareID + "/files",
-		Body: map[string]any{
-			"Name": encName, "Hash": plan.hash,
-			"ParentLinkID":   parent.LinkID,
-			"NodePassphrase": nodePass, "NodePassphraseSignature": nodePassSig,
-			"SignatureAddress":          dc.AddrEmail,
-			"NodeKey":                   nodeKey,
-			"MIMEType":                  mimeType,
-			"ContentKeyPacket":          contentKP,
-			"ContentKeyPacketSignature": contentKPSig,
-		},
-	}, &created); err != nil {
+	if err := s.C.Decode(ctx, fileRequest(dc, body), &created); err != nil {
 		// Proton is the one that knows the name is taken when nobody asked it to
 		// look, so this is where that answer gets its words.
 		if proton.AlreadyExists(err) {

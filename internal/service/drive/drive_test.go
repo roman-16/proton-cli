@@ -32,6 +32,19 @@ type tree struct {
 	link    string
 }
 
+// withMembership is what Proton answers about a share somebody shared with you:
+// your own standing in it, beside the keys that open it.
+func (tr *tree) withMembership(t *testing.T, permissions int) *tree {
+	t.Helper()
+	var sh map[string]any
+	if err := json.Unmarshal([]byte(tr.share), &sh); err != nil {
+		t.Fatalf("read the canned share: %v", err)
+	}
+	sh["Memberships"] = []any{map[string]any{"Permissions": permissions}}
+	tr.share = object(t, sh)
+	return tr
+}
+
 func newTree(t *testing.T, shareType, rootType int, rootName string) *tree {
 	t.Helper()
 	addrKey, err := pgp.GenerateKey("Owner", testAddrMail, "x25519", 0)
@@ -155,6 +168,38 @@ func TestResolveFileRefusesAFolderByName(t *testing.T) {
 	}
 	if want := `Project is a folder, not a file.`; err.Error() != want {
 		t.Errorf("error = %q, want %q", err.Error(), want)
+	}
+}
+
+// What may be written into a tree is what the tree says as it opens, so an
+// upload into one that will not take it is refused before anything is planned.
+//
+// A share of your own carries no membership: it is not somebody's grant, and
+// there is nothing in it to check.
+func TestWhatATreePermitsIsKnownWhenItOpens(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		share   func(*tree) *tree
+		canEdit bool
+		role    string
+	}{
+		{"your own", func(tr *tree) *tree { return tr }, true, ""},
+		{"shared with you for viewing", func(tr *tree) *tree { return tr.withMembership(t, permView) }, false, "viewer"},
+		{"shared with you for editing", func(tr *tree) *tree { return tr.withMembership(t, permEdit) }, true, "editor"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s, _ := tc.share(newTree(t, shareTypeStandard, protonFolder, "Project")).service(nil)
+			dc, err := s.unlockShare(context.Background(), testShareID, testRootID, testVolumeID)
+			if err != nil {
+				t.Fatalf("unlockShare: %v", err)
+			}
+			if dc.CanEdit() != tc.canEdit {
+				t.Errorf("CanEdit = %v, want %v", dc.CanEdit(), tc.canEdit)
+			}
+			if got := grantedRole(dc.Permissions); got != tc.role {
+				t.Errorf("role = %q, want %q", got, tc.role)
+			}
+		})
 	}
 }
 

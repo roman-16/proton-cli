@@ -12,7 +12,7 @@ A refusal that comes from Proton rather than from proton-cli belongs to [Trouble
 
 **A recurring event needs a zone that can be named.** proton reads one from `TZ`, `/etc/localtime` or `/etc/timezone`, then from your Proton calendar settings. Where none of those answers, a recurring event drifts by an hour when the clocks change. Pass `--zone Europe/Vienna` to be sure.
 
-**A Drive filter walks the tree.** `--pattern` and the size and age filters visit every folder under the scope, so over a large tree narrow it with `--scope`.
+**A Drive filter over a large tree is slow.** Narrow it with `--scope`.
 
 ## Not built yet
 
@@ -20,10 +20,10 @@ Each of these has an equivalent in a web client.
 
 | What is missing | What to do instead |
 | --- | --- |
-| Uploading into a public link that allows editing | Open it in a browser |
+| Renaming or deleting what you uploaded into a public link | Open the link in a browser within an hour of the upload |
 | Accepting a forwarding somebody sent you | Accept it in the web client. Setting one up, pausing it and taking it down are built |
 | Mail forwarding to a non-Proton address | Proton emails the address a link its owner must follow; finish it there |
-| Turning the Pass [extra password](../pass/README.md#an-extra-password) on or off | Use the Pass app. *Answering* one, so the commands work, is built |
+| Turning the Pass [extra password](../pass/README.md#an-extra-password) on or off | Use the Pass app. *Answering* one is built |
 
 proton changes no credentials: the account password, two-factor, the recovery phrase and the Pass extra password are all set at [account.proton.me](https://account.proton.me) or in the Pass app.
 

@@ -42,7 +42,7 @@ func shareGetCmd() *cobra.Command {
 			for _, l := range st.Links {
 				fields = append(fields, ui.Field{Label: "Public Link", Value: l.URL})
 				fields = append(fields,
-					ui.Field{Label: "Link Access", Value: access(l.CanEdit)},
+					ui.Field{Label: "Link Access", Value: drivesvc.Access(l.CanEdit)},
 					ui.Field{Label: "Link Expires", Value: expiry(l.ExpireTime), Always: true},
 					ui.Field{Label: "Link Opened", Value: ui.Quantity(l.NumAccesses, "times")},
 				)
@@ -64,15 +64,8 @@ func shareGetCmd() *cobra.Command {
 			return kit.Show(c, ui.RecordSpec{Object: st, Fields: fields})
 		}),
 	}
-	t.register(c)
+	t.register(c, changes)
 	return c
-}
-
-func access(canEdit bool) string {
-	if canEdit {
-		return "edit"
-	}
-	return "view"
 }
 
 func expiry(at *int64) string {
@@ -139,7 +132,7 @@ func shareLinkCmd() *cobra.Command {
 				Object: link,
 				Fields: []ui.Field{
 					{Label: "URL", Value: link.URL},
-					{Label: "Access", Value: access(link.CanEdit)},
+					{Label: "Access", Value: drivesvc.Access(link.CanEdit)},
 					{Label: "Expires", Value: expiry(link.ExpireTime), Always: true},
 					{Label: "Password", Value: link.CustomPassword},
 				},
@@ -150,7 +143,7 @@ func shareLinkCmd() *cobra.Command {
 	c.Flags().StringVar(&expires, "expires", "",
 		"Stop working after DURATION (e.g. 7d, 2w, 6mo), or never")
 	password.Declare(c)
-	t.register(c)
+	t.register(c, changes)
 	return c
 }
 
@@ -177,7 +170,7 @@ func shareUnlinkCmd() *cobra.Command {
 			})
 		}),
 	}
-	t.register(c)
+	t.register(c, changes)
 	return c
 }
 
@@ -203,7 +196,7 @@ func shareAddCmd() *cobra.Command {
 	}
 	c.Flags().BoolVar(&edit, "edit", false, "Allow editing rather than only viewing")
 	c.Flags().StringVar(&message, "message", "", "Note to include in the invitation email")
-	t.register(c)
+	t.register(c, changes)
 	return c
 }
 
@@ -230,14 +223,14 @@ func shareUpdateCmd() *cobra.Command {
 			}
 			return kit.Mutate(c, ui.ResultSpec{
 				Action: ui.Updated, Count: 1, Name: c.Args[1],
-				Detail: "to " + access(edit) + " on " + c.Args[0],
+				Detail: "to " + drivesvc.Access(edit) + " on " + c.Args[0],
 			}, func() error {
 				return c.App.Drive.SetMemberRole(c.Ctx, dc, c.Args[0], c.Args[1], edit)
 			})
 		}),
 	}
 	c.Flags().BoolVar(&edit, "edit", false, "Allow editing rather than only viewing")
-	t.register(c)
+	t.register(c, changes)
 	return c
 }
 
@@ -261,7 +254,7 @@ func shareResendCmd() *cobra.Command {
 			})
 		}),
 	}
-	t.register(c)
+	t.register(c, changes)
 	return c
 }
 
@@ -283,7 +276,7 @@ func shareRemoveCmd() *cobra.Command {
 			})
 		}),
 	}
-	t.register(c)
+	t.register(c, changes)
 	return c
 }
 
@@ -520,22 +513,26 @@ func sharedListCmd() *cobra.Command {
 		Short: "List what other people have shared with you",
 		Long: "List what other people have shared with you.\n\n" +
 			"Items shared with you directly and public links you saved with `shared add`\n" +
-			"are listed together. A saved link shows `public link` under SHARED BY.\n\n" +
+			"are listed together. A saved link shows `public link` under SHARED BY, and\n" +
+			"ROLE is what you may do: a viewer lists and downloads, an editor uploads as\n" +
+			"well.\n\n" +
 			"These are not in your tree and have no path of their own. To open one, pass\n" +
 			"`--shared REF` to any `items` command: / is then the item itself, and\n" +
-			"anything below it is a path inside it. A saved link can only be listed, shown\n" +
-			"and downloaded.\n\n" +
-			"An item whose name cannot be decrypted is still listed, so you can still\n" +
-			"act on it by ID.",
+			"anything below it is a path inside it. Nothing in a saved link can be renamed,\n" +
+			"moved or removed from here.\n\n" +
+			"An item whose name cannot be decrypted is still listed and can be acted on\n" +
+			"by ID.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			items, err := sharedList(c).Rows(c.Ctx)
 			if err != nil {
 				return err
 			}
-			cols := append(sharedItemColumns(), ui.Column[drivesvc.SharedItem]{
-				Header: "SHARED BY", Flex: true,
-				Cell: sharedBy,
-			})
+			cols := append(sharedItemColumns(),
+				ui.Column[drivesvc.SharedItem]{Header: "SHARED BY", Flex: true, Cell: sharedBy},
+				ui.Column[drivesvc.SharedItem]{
+					Header: "ROLE",
+					Cell:   func(i drivesvc.SharedItem) string { return i.Role },
+				})
 			return kit.List(c, ui.TableSpec[drivesvc.SharedItem]{
 				Noun: "items", Columns: cols,
 				Total: ui.Unknown, Page: ui.Unpaged,

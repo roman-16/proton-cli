@@ -15,36 +15,47 @@ import (
 // that is the only name it has - so `/Documents` means the same thing in all of
 // them and nothing has to learn a second notation for a file that happens to be
 // somewhere else.
-//
-// A link is the one tree that can be read and not written, so it is offered only
-// by the commands that read.
 type tree struct {
 	computer string
 	shared   string
 	link     string
 	password *kit.Password
-	readOnly bool
+	relation relation
 }
 
-func (t *tree) register(c *cobra.Command) {
-	t.declare(c)
-	c.MarkFlagsMutuallyExclusive("computer", "shared")
-}
+// relation is what a command needs of the tree it is pointed at: to read it, to
+// put something new in it, or to reach what is already in it - changing an item,
+// or the history and the sharing of one.
+//
+// A public link answers the first always, the second when it allows editing, and
+// the third never: Proton serves a link one version of a file and no way to act
+// on what is under it. So this is what decides which trees a command offers and
+// which it refuses, rather than each command knowing.
+type relation int
 
-// registerReadOnly adds the tree flags to a command that only reads, which is
-// every command a public link can answer.
-func (t *tree) registerReadOnly(c *cobra.Command) {
-	t.declare(c)
-	t.readOnly = true
+const (
+	reads relation = iota
+	adds
+	changes
+)
+
+// askForALinkThatEdits is what to do about a link that allows viewing only:
+// nobody but its owner can widen it.
+const askForALinkThatEdits = "Ask whoever sent it for a link that allows editing."
+
+// register adds the tree flags to a command, by what the command does to a tree.
+func (t *tree) register(c *cobra.Command, r relation) {
+	t.relation = r
+	c.Flags().StringVar(&t.computer, "computer", "", "Work inside this computer's files, by name or ID")
+	c.Flags().StringVar(&t.shared, "shared", "", "Work inside an item shared with you, by name or ID")
+	if r == changes {
+		c.MarkFlagsMutuallyExclusive("computer", "shared")
+		return
+	}
 	t.password = kit.LinkPasswordToOpen()
 	c.Flags().StringVar(&t.link, "link", "", "Work inside a public link somebody sent you, by URL")
 	c.MarkFlagsMutuallyExclusive("computer", "shared", "link")
 	t.password.Declare(c)
-}
-
-func (t *tree) declare(c *cobra.Command) {
-	c.Flags().StringVar(&t.computer, "computer", "", "Work inside this computer's files, by name or ID")
-	c.Flags().StringVar(&t.shared, "shared", "", "Work inside an item shared with you, by name or ID")
 }
 
 // supply claims standard input for the link password before anything else can
@@ -79,19 +90,50 @@ func (t *tree) context(c *kit.Invocation) (*drivesvc.Context, error) {
 		if err != nil {
 			return nil, err
 		}
-		if item.IsLink() && !t.readOnly {
-			return nil, kit.Fail("%q is a public link somebody sent you, which can only be listed and downloaded.",
+		if item.IsLink() && t.relation == changes {
+			return nil, kit.Fail(
+				"%q is a public link somebody sent you, which can only be listed, downloaded and uploaded into.",
 				sharedName(item))
 		}
-		return c.App.Drive.OpenShared(c.Ctx, item)
+		dc, err := c.App.Drive.OpenShared(c.Ctx, item)
+		if err != nil {
+			return nil, err
+		}
+		if t.refused(dc) {
+			if item.IsLink() {
+				return nil, kit.Fail("The link to %q allows viewing only.", sharedName(item)).
+					Hint(askForALinkThatEdits)
+			}
+			return nil, kit.Fail("%q was shared with you for viewing only.", sharedName(item)).
+				Hint("Ask whoever shared it to allow editing.")
+		}
+		return dc, nil
 	case t.link != "":
 		password, err := t.linkPassword()
 		if err != nil {
 			return nil, err
 		}
-		return c.App.Drive.OpenLink(c.Ctx, t.link, password)
+		dc, err := c.App.Drive.OpenLink(c.Ctx, t.link, password)
+		if err != nil {
+			return nil, err
+		}
+		if t.refused(dc) {
+			return nil, kit.Fail("This link allows viewing only.").Hint(askForALinkThatEdits)
+		}
+		if dc.Anonymous {
+			c.AuthorisedByALink()
+		}
+		return dc, nil
 	}
 	return context(c)
+}
+
+// refused reports whether the tree will not take what the command is about to
+// put in it, which is judged as it opens rather than when Proton refuses the
+// first request: what the person who sent the link would see is no way to upload
+// at all.
+func (t *tree) refused(dc *drivesvc.Context) bool {
+	return t.relation != reads && !dc.CanEdit()
 }
 
 // linkPassword is what the link's owner set on it, which is nothing at all for

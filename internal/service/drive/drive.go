@@ -48,6 +48,15 @@ type Context struct {
 	AddrEmail    string
 	VolumeID     string
 	RootLinkID   string
+	// Permissions is what the tree permits whoever opened it, as Proton numbers
+	// them: what a link grants its readers, or what your membership in somebody
+	// else's share grants you. A tree of your own is nobody's to grant and
+	// carries none.
+	Permissions int
+	// Anonymous reports that the tree was opened without an account, which only a
+	// public link can be. Nothing written there can be attributed to anybody, and
+	// nothing about it can be signed with an address key there is none of.
+	Anonymous bool
 	// Type is the kind of share the tree hangs from, as Proton numbers them.
 	Type int
 	// RootName is what the tree is called: a computer's name, or the name of the
@@ -61,13 +70,21 @@ type Context struct {
 	rootLink *Link
 }
 
-// Public reports whether this tree is a public link, which can be read and not
-// written.
+// Public reports whether this tree is a public link.
 //
 // Proton serves a link's tree under the token that names it, in place of the
-// share ID nobody outside the share has, so the two are read through endpoints
-// of their own.
+// share ID nobody outside the share has, so the two are reached through
+// endpoints of their own - for writing as much as for reading.
 func (dc *Context) Public() bool { return dc.Token != "" }
+
+// CanEdit reports whether things may be written into this tree.
+//
+// Your own files are yours to write to. A link and a share somebody shared with
+// you are theirs, and each says what it grants when it opens - which is what
+// lets an upload into one be refused before anything is planned.
+func (dc *Context) CanEdit() bool {
+	return dc.Permissions == 0 || dc.Permissions&permWrite != 0
+}
 
 // handle names the tree in a log record, whichever way it is reached.
 func (dc *Context) handle() string {
@@ -152,6 +169,9 @@ func (s *Service) unlockShare(ctx context.Context, shareID, rootLinkID, volumeID
 		Passphrase          string
 		PassphraseSignature string
 		Type                int
+		// Memberships is your own standing in the share, which Proton sends for a
+		// share somebody shared with you and leaves empty for one of your own.
+		Memberships []struct{ Permissions int }
 	}
 	var rootLink *Link
 	var u *keys.Unlocked
@@ -207,12 +227,73 @@ func (s *Service) unlockShare(ctx context.Context, shareID, rootLinkID, volumeID
 	if err != nil {
 		return nil, err
 	}
-	return &Context{
+	dc := &Context{
 		ShareID: shareID, ShareKR: shareKR,
 		AddrKR: addrKR, AddrID: sh.AddressID, AddrEmail: addrEmail,
 		VolumeID: volumeID, RootLinkID: rootLinkID, rootLink: rootLink,
 		Type: sh.Type, RootName: rootName(ctx, shareID, sh.Type, rootLink, shareKR),
-	}, nil
+	}
+	if len(sh.Memberships) > 0 {
+		dc.Permissions = sh.Memberships[0].Permissions
+	}
+	return dc, nil
+}
+
+// author is who a write is attributed to and signed by: one of the account's
+// addresses, or nobody at all behind a link opened without an account.
+type author struct {
+	kr    *pgp.KeyRing
+	email string
+}
+
+// key is what a write is signed with.
+//
+// A write nobody is behind is signed with the key it hangs from - the parent's
+// for a name or a passphrase, the file's own for its content - which is what
+// Proton's own clients sign an anonymous upload with, and what leaves the
+// signature checkable by everyone who can read the item at all.
+func (a author) key(fallback *pgp.KeyRing) *pgp.KeyRing {
+	if a.kr == nil {
+		return fallback
+	}
+	return a.kr
+}
+
+// attribute names the author in a request body, under whichever name the
+// endpoints serving this tree call it. A write nobody is behind names nobody.
+func (a author) attribute(body map[string]any, dc *Context) {
+	if a.email == "" {
+		return
+	}
+	if dc.Public() {
+		body["SignatureEmail"] = a.email
+		return
+	}
+	body["SignatureAddress"] = a.email
+}
+
+// author is who the run writes into this tree as.
+//
+// A share was opened through one of the account's addresses, and that is the one
+// its writes are signed with. A link was opened through no address at all, so a
+// signed-in caller writes as their primary address - the one Proton's own
+// clients use there - and a caller with no account writes as nobody.
+func (s *Service) author(ctx context.Context, dc *Context) (author, error) {
+	if !dc.Public() {
+		return author{kr: dc.AddrKR, email: dc.AddrEmail}, nil
+	}
+	if dc.Anonymous {
+		return author{}, nil
+	}
+	u, err := s.keys(ctx)
+	if err != nil {
+		return author{}, err
+	}
+	kr, addr, err := u.PrimaryAddr()
+	if err != nil {
+		return author{}, err
+	}
+	return author{kr: kr, email: addr.Email}, nil
 }
 
 // rootName reads what a tree is called.
