@@ -135,7 +135,7 @@ func (s *Service) downloadFile(ctx context.Context, dc *Context, link *Link, nod
 	prog.Start(size, opts.Label)
 	defer prog.Done()
 
-	wrote := newBlockAuthor(s, link.SignatureEmail, nodeKR)
+	wrote := newBlockAuthor(s, dc, link.SignatureEmail, nodeKR)
 	for i, b := range rev.Blocks {
 		encData, err := downloadBlock(ctx, b.BareURL, b.Token)
 		if err != nil {
@@ -176,15 +176,20 @@ type blockAuthor struct {
 	loaded bool
 }
 
-func newBlockAuthor(s *Service, email string, nodeKR *pgp.KeyRing) *blockAuthor {
+// newBlockAuthor takes the address to judge the blocks against, and nobody at
+// all where there is no account to judge with: settling who wrote something
+// means fetching their published key, which only an account may ask for.
+func newBlockAuthor(s *Service, dc *Context, email string, nodeKR *pgp.KeyRing) *blockAuthor {
+	if dc.Anonymous {
+		email = ""
+	}
 	return &blockAuthor{s: s, email: email, nodeKR: nodeKR}
 }
 
 // verify returns "" when there is nothing to report, and the verdict otherwise.
 //
-// A block whose author is not named is nobody's to judge, which is what every
-// block behind a public link is: Proton tells a link's reader what the tree
-// holds and not whose address wrote it.
+// A block whose author is not named is nobody's to judge, which is every block
+// of an upload nobody was signed in for.
 func (a *blockAuthor) verify(ctx context.Context, plain *pgp.PlainMessage, encSignature string) string {
 	if encSignature == "" || a.email == "" {
 		return ""

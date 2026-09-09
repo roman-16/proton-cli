@@ -18,9 +18,12 @@ import (
 // linkInfo and linkShare stand in for the SRP handshake, which is proved against
 // Proton and cannot be canned.
 type stubDoer struct {
-	reqs      []proton.Request
-	respBody  []byte
-	routes    map[string]string
+	reqs     []proton.Request
+	respBody []byte
+	routes   map[string]string
+	// answers is consulted before the canned routes, for an endpoint whose answer
+	// depends on what was asked rather than on which path it was asked of.
+	answers   func(proton.Request) []byte
 	linkInfo  *proton.PublicLinkInfo
 	linkShare *proton.PublicLinkShare
 	proved    string
@@ -44,6 +47,11 @@ func (s *stubDoer) PublicLinkAuth(_ context.Context, token string, _ *proton.Pub
 }
 
 func (s *stubDoer) body(r proton.Request) []byte {
+	if s.answers != nil {
+		if body := s.answers(r); body != nil {
+			return body
+		}
+	}
 	if canned, ok := s.routes[r.Method+" "+r.Path]; ok {
 		return []byte(canned)
 	}

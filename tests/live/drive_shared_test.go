@@ -63,9 +63,9 @@ func TestDriveSharedLinkIsReadableByAnotherAccount(t *testing.T) {
 // a profile nobody signed in lists the tree, downloads from it and shows what it
 // holds.
 //
-// A link names nobody as the author of what is in it, so the signature reads
-// anonymous and nothing is warned about - there is no guarantee here that was
-// lost.
+// A link names nobody as the author of what its owner put there, so the
+// signature reads anonymous and nothing is warned about - there is no guarantee
+// here that was lost.
 func TestDriveSharedLinkOpensWithoutAnAccount(t *testing.T) {
 	_, url := sharedLink(t, "nobody", "nobody-payload")
 	profile := "no-such-" + testID()
@@ -125,10 +125,13 @@ func TestDriveSharedLinkItemDetailsNameTheLink(t *testing.T) {
 	if info["url"] != url {
 		t.Errorf("item reports url %v, want %s", info["url"], url)
 	}
-	// Being signed in buys no more of the story: what a link tells its reader is
-	// the tree, and not whose address wrote what is in it.
+	// Being signed in buys no more of the story about somebody else's file: what a
+	// link tells its reader is the tree, and not whose address put it there.
 	if info["signature"] != "anonymous" {
 		t.Errorf("signature = %v, want anonymous for an item that names no author", info["signature"])
+	}
+	if by, named := info["created_by"]; named {
+		t.Errorf("created_by = %v, want a link to name nobody", by)
 	}
 	if info["shared"] != true {
 		t.Errorf("an item behind a public link reports shared %v, want true", info["shared"])
@@ -349,10 +352,11 @@ func TestDriveSharedLinkThatAllowsViewingRefusesUploads(t *testing.T) {
 	assertContains(t, stderr, "allows viewing only")
 }
 
-// A saved link takes uploads and nothing else: what is already in it belongs to
-// whoever shared it, and Proton serves a link one version of a file.
-func TestDriveSharedLinkRefusesToBeChanged(t *testing.T) {
-	_, url := sharedLink(t, "readonly", "readonly-payload", "--edit")
+// What you uploaded into a saved link is yours to take back, and nothing else in
+// it is: a link serves one version of a file, has no trash, and what its owner
+// put there is theirs.
+func TestDriveSavedLinkGivesBackWhatYouUploadedAndNothingElse(t *testing.T) {
+	folder, url := sharedLink(t, "savedlink", "owner-payload", "--edit")
 	token := tokenOf(t, url)
 
 	runOKSecondary(t, "drive", "shared", "add", url)
@@ -363,13 +367,34 @@ func TestDriveSharedLinkRefusesToBeChanged(t *testing.T) {
 	writeLocal(t, src, "a-note")
 	runOKSecondary(t, "drive", "items", "upload", src, "/", "--shared", token)
 
+	// Your own upload, renamed and then taken back, through the saved link alone.
+	_, renamed := runOKStderrSecondary(t, "drive", "items", "update", "/note.txt",
+		"--name", "kept.txt", "--shared", token)
+	assertContains(t, renamed, "Updated")
+	assertContains(t, runOK(t, "drive", "items", "list", folder), "kept.txt")
+
+	_, deleted := runOKStderrSecondary(t, "drive", "items", "delete", "/kept.txt",
+		"--shared", token, "--yes")
+	assertContains(t, deleted, "Deleted 1 item")
+	assertNotContains(t, runOK(t, "drive", "items", "list", folder), "kept.txt")
+
+	// The owner's own file is not the visitor's to touch.
 	_, stderr, code := runSecondary(t, "drive", "items", "update", "/payload.txt",
 		"--name", "renamed.txt", "--shared", token)
 	if code != 1 {
-		t.Errorf("renaming something in a saved link exited %d, want 1", code)
+		t.Errorf("renaming somebody else's file in a saved link exited %d, want 1", code)
+	}
+	assertContains(t, stderr, "not yours to rename here")
+	assertContains(t, stderr, "what you uploaded yourself")
+
+	// A link has no trash, and the verbs about what is under an item never reach
+	// one - both said as what a link does allow.
+	_, stderr, code = runSecondary(t, "drive", "items", "trash", "/payload.txt", "--shared", token)
+	if code != 1 {
+		t.Errorf("trashing through a saved link exited %d, want 1", code)
 	}
 	assertContains(t, stderr, "public link")
-	assertContains(t, stderr, "listed, downloaded and uploaded into")
+	assertContains(t, stderr, "rename or delete what you uploaded yourself")
 
 	_, stderr, code = runSecondary(t, "drive", "items", "upload", "--if-exists", "replace",
 		src, "/", "--shared", token)
@@ -378,6 +403,112 @@ func TestDriveSharedLinkRefusesToBeChanged(t *testing.T) {
 	}
 	assertContains(t, stderr, "cannot take a new revision")
 	assertContains(t, stderr, "--if-exists rename")
+}
+
+// The link's own visitor takes back what they uploaded, by URL and signed in:
+// the rename and the deletion land where the owner can see them, and a folder
+// goes with everything in it.
+func TestDriveSharedLinkGivesBackYourOwnUploads(t *testing.T) {
+	folder, url := sharedLink(t, "linkmine", "mine-payload", "--edit")
+
+	dir := t.TempDir()
+	src := filepath.Join(dir, "uploaded.txt")
+	writeLocal(t, src, "uploaded-into-a-link")
+	runOKSecondary(t, "drive", "items", "upload", src, "/", "--link", url)
+
+	inner := filepath.Join(dir, "album", "inner")
+	if err := os.MkdirAll(inner, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	writeLocal(t, filepath.Join(inner, "photo.txt"), "photo-bytes")
+	runOKSecondary(t, "drive", "items", "upload", "--recursive", filepath.Join(dir, "album"), "/", "--link", url)
+
+	// What you put into a link is attributed to you where you can see it: your own
+	// upload is the one thing a link names an author for, which is what makes it
+	// yours to take back.
+	mine := runJSONSecondary(t, "drive", "items", "get", "/uploaded.txt", "--link", url)
+	if by, _ := mine["created_by"].(string); !strings.EqualFold(by, secondaryEmail()) {
+		t.Errorf("created_by = %q, want the account that uploaded it (%s)", by, secondaryEmail())
+	}
+	if mine["signature"] != "verified" {
+		t.Errorf("signature = %v, want verified for your own upload", mine["signature"])
+	}
+
+	_, renamed := runOKStderrSecondary(t, "drive", "items", "update", "/uploaded.txt",
+		"--name", "holiday.txt", "--link", url)
+	assertContains(t, renamed, "Updated")
+
+	listing := runOK(t, "drive", "items", "list", folder)
+	assertContains(t, listing, "holiday.txt")
+	assertNotContains(t, listing, "uploaded.txt")
+
+	// A folder means its contents here as everywhere else, and a link has no
+	// trash for either of them to land in.
+	_, deleted := runOKStderrSecondary(t, "drive", "items", "delete", "/holiday.txt", "/album",
+		"--link", url, "--yes")
+	assertContains(t, deleted, "Deleted 2 items")
+
+	listing = runOK(t, "drive", "items", "list", folder)
+	for _, gone := range []string{"holiday.txt", "album"} {
+		assertNotContains(t, listing, gone)
+	}
+	assertContains(t, listing, "payload.txt")
+}
+
+// What is not yours is said before the question rather than after the answer: a
+// bulk delete names what it will not touch, deletes the rest, and exits 0.
+func TestDriveSharedLinkNamesWhatIsNotYoursToDelete(t *testing.T) {
+	folder, url := sharedLink(t, "linktheirs", "theirs-payload", "--edit")
+
+	src := filepath.Join(t.TempDir(), "mine.txt")
+	writeLocal(t, src, "mine")
+	runOKSecondary(t, "drive", "items", "upload", src, "/", "--link", url)
+
+	_, stderr, code := runSecondary(t, "drive", "items", "delete", "/payload.txt", "/mine.txt",
+		"--link", url, "--yes")
+	if code != 0 {
+		t.Fatalf("deleting a mix of yours and theirs exited %d:\n%s", code, truncateOutput(stderr))
+	}
+	assertContains(t, stderr, "/payload.txt is not yours to delete here")
+	assertContains(t, stderr, "Deleted 1 item")
+
+	listing := runOK(t, "drive", "items", "list", folder)
+	assertContains(t, listing, "payload.txt")
+	assertNotContains(t, listing, "mine.txt")
+
+	// Nothing left to delete is an answer rather than a failure.
+	_, nothing, code := runSecondary(t, "drive", "items", "delete", "/payload.txt", "--link", url, "--yes")
+	if code != 0 {
+		t.Fatalf("deleting only what is not yours exited %d:\n%s", code, truncateOutput(nothing))
+	}
+	assertContains(t, nothing, "Nothing to delete")
+}
+
+// Without an account there is nothing to take an upload back with: Proton ties
+// it to the session that made it, and that session ends with the run. The
+// refusal says so before the link is even read for what is in it.
+func TestDriveSharedLinkRefusesToGiveBackWithoutAnAccount(t *testing.T) {
+	_, url := sharedLink(t, "linkanon", "anon-payload", "--edit")
+	nobody := map[string]string{"PROTON_PROFILE": "no-such-" + testID()}
+
+	src := filepath.Join(t.TempDir(), "anonymous.txt")
+	writeLocal(t, src, "anonymous-payload")
+	_, stderr, code := runWithEnv(t, nobody, "drive", "items", "upload", src, "/", "--link", url)
+	if code != 0 {
+		t.Fatalf("uploading into a link with no account exited %d:\n%s", code, truncateOutput(stderr))
+	}
+
+	for _, args := range [][]string{
+		{"drive", "items", "update", "/anonymous.txt", "--name", "renamed.txt", "--link", url},
+		{"drive", "items", "delete", "/anonymous.txt", "--link", url, "--yes"},
+	} {
+		_, stderr, code := runWithEnv(t, nobody, args...)
+		if code != 1 {
+			t.Errorf("%s with no account exited %d, want 1", args[2], code)
+		}
+		assertContains(t, stderr, "Without an account")
+		assertContains(t, stderr, "yours to change for an hour")
+	}
 }
 
 // Leaving a saved link is refused: a link is not a share anybody is a member of,

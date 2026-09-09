@@ -54,6 +54,32 @@ func TestCoveredComparesWholePathSegments(t *testing.T) {
 	}
 }
 
+// What the tree has already refused is not counted in the question: a delete
+// that names five things and can take three asks about three, and the two it
+// will not touch were said before the question was put.
+func TestARefusedItemLeavesTheSelectionBeforeTheQuestion(t *testing.T) {
+	rows := []drivesvc.Child{
+		{LinkID: "mine", Path: "/mine.txt", Type: drivesvc.TypeFile},
+		{LinkID: "theirs", Path: "/theirs.txt", Type: drivesvc.TypeFile},
+		{LinkID: "old", Path: "/old.txt", Type: drivesvc.TypeFile},
+	}
+	refused := []drivesvc.Refused{
+		{Name: "/theirs.txt", LinkID: "theirs", Reason: "is not yours to delete here."},
+		{Name: "/old.txt", LinkID: "old", Reason: "was uploaded more than an hour ago."},
+	}
+	got := withoutRefusedItems(selection(rows), refused)
+
+	if len(got.Rows) != 1 || got.Rows[0].LinkID != "mine" {
+		t.Errorf("kept %v, want only what will really go", paths(got))
+	}
+	if len(got.IDs) != 1 || got.IDs[0] != "mine" {
+		t.Errorf("ids are %v, want the rows' own", got.IDs)
+	}
+	if same := withoutRefusedItems(selection(rows), nil); len(same.Rows) != 3 {
+		t.Errorf("a selection nothing was refused from kept %v", paths(same))
+	}
+}
+
 // A selection of files alone is left exactly as it was.
 func TestASelectionWithNoFoldersIsUntouched(t *testing.T) {
 	rows := []drivesvc.Child{

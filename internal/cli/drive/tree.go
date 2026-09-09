@@ -24,19 +24,20 @@ type tree struct {
 }
 
 // relation is what a command needs of the tree it is pointed at: to read it, to
-// put something new in it, or to reach what is already in it - changing an item,
-// or the history and the sharing of one.
+// put something new in it, to change something in it, or to reach the history
+// and the sharing of what is in it.
 //
-// A public link answers the first always, the second when it allows editing, and
-// the third never: Proton serves a link one version of a file and no way to act
-// on what is under it. So this is what decides which trees a command offers and
-// which it refuses, rather than each command knowing.
+// A public link answers the first always, the second and third when it allows
+// editing, and the fourth never: Proton serves a link one version of a file and
+// no way to act on what is under it. So this is what decides which trees a
+// command offers and which it refuses, rather than each command knowing.
 type relation int
 
 const (
 	reads relation = iota
 	adds
-	changes
+	edits
+	manages
 )
 
 // askForALinkThatEdits is what to do about a link that allows viewing only:
@@ -48,7 +49,7 @@ func (t *tree) register(c *cobra.Command, r relation) {
 	t.relation = r
 	c.Flags().StringVar(&t.computer, "computer", "", "Work inside this computer's files, by name or ID")
 	c.Flags().StringVar(&t.shared, "shared", "", "Work inside an item shared with you, by name or ID")
-	if r == changes {
+	if r == manages {
 		c.MarkFlagsMutuallyExclusive("computer", "shared")
 		return
 	}
@@ -90,9 +91,10 @@ func (t *tree) context(c *kit.Invocation) (*drivesvc.Context, error) {
 		if err != nil {
 			return nil, err
 		}
-		if item.IsLink() && t.relation == changes {
+		if item.IsLink() && t.relation == manages {
 			return nil, kit.Fail(
-				"%q is a public link somebody sent you, which can only be listed, downloaded and uploaded into.",
+				"%q is a public link somebody sent you. In a link you can list, download, "+
+					"upload, and rename or delete what you uploaded yourself.",
 				sharedName(item))
 		}
 		dc, err := c.App.Drive.OpenShared(c.Ctx, item)
@@ -121,6 +123,13 @@ func (t *tree) context(c *kit.Invocation) (*drivesvc.Context, error) {
 			return nil, kit.Fail("This link allows viewing only.").Hint(askForALinkThatEdits)
 		}
 		if dc.Anonymous {
+			// Proton ties what was uploaded into a link to the session that uploaded
+			// it, and a session with no account behind it lasts as long as the run
+			// that opened the link - so the next run is a stranger to its own upload.
+			if t.relation == edits {
+				return nil, kit.Fail("Without an account, what you upload into a link cannot be renamed or deleted afterwards.").
+					Hint("Ask whoever sent the link to do it. Signed in, what you upload is yours to change for an hour.")
+			}
 			c.AuthorisedByALink()
 		}
 		return dc, nil

@@ -59,6 +59,7 @@ GET /drive/shares/{id}/folders/{id}/children
 GET /drive/shares/{id}/links/{id}
 GET /drive/shares/{id}/links/{id}/revisions/{id}/verification
 GET /drive/shares/{id}/urls
+GET /drive/unauth/v2/volumes/{id}/folders/{id}/children
 GET /drive/urls/{id}
 GET /drive/urls/{id}/files/{id}
 GET /drive/urls/{id}/folders/{id}/children
@@ -121,6 +122,8 @@ POST /drive/shares/{id}/folders
 POST /drive/shares/{id}/links/fetch_metadata
 POST /drive/shares/{id}/links/{id}/checkAvailableHashes
 POST /drive/shares/{id}/urls
+POST /drive/unauth/v2/volumes/{id}/links
+POST /drive/unauth/v2/volumes/{id}/remove-mine
 POST /drive/urls/{id}/auth
 POST /drive/urls/{id}/blocks
 POST /drive/urls/{id}/files
@@ -174,6 +177,7 @@ PUT /drive/shares/{id}/files/{id}/revisions/{id}
 PUT /drive/shares/{id}/links/{id}/move
 PUT /drive/shares/{id}/links/{id}/rename
 PUT /drive/shares/{id}/urls/{id}
+PUT /drive/unauth/v2/volumes/{id}/links/{id}/rename
 PUT /drive/urls/{id}/files/{id}/revisions/{id}
 PUT /drive/v2/shares/{id}/invitations/{id}
 PUT /drive/v2/shares/{id}/members/{id}

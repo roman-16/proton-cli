@@ -125,16 +125,18 @@ func TestVerifyManifestAcceptsAPublicLinkWithNoSignature(t *testing.T) {
 	}
 }
 
-// A block whose author is not named is nobody's to judge, and behind a public
-// link that is every block: Proton tells a link's reader what the tree holds and
-// not whose address wrote it. Reaching for a key anyway would spend a request to
-// learn nothing, and warn about a guarantee the link never carried.
-func TestABlockWithNoAuthorNamedIsNotJudged(t *testing.T) {
+// A block whose author is not named is nobody's to judge, and so is every block
+// read without an account: settling who wrote something means fetching their
+// published key, which only an account may ask for. Reaching for it anyway would
+// spend a request to learn nothing, and warn about a guarantee that was never on
+// offer.
+func TestABlockNobodyCanJudgeIsNotJudged(t *testing.T) {
 	block := pgp.NewPlainMessageFromString("block")
 	doer := &stubDoer{}
 	s := New(doer, testKeys(nil))
+	own := &Context{}
 
-	unnamed := newBlockAuthor(s, "", nil)
+	unnamed := newBlockAuthor(s, own, "", nil)
 	if got := unnamed.verify(context.Background(), block, "signature"); got != "" {
 		t.Errorf("verdict = %q, want nothing said about a signature nothing can judge", got)
 	}
@@ -142,7 +144,15 @@ func TestABlockWithNoAuthorNamedIsNotJudged(t *testing.T) {
 		t.Error("a key was asked for on behalf of nobody")
 	}
 
-	named := newBlockAuthor(s, testLinkSigner, nil)
+	withoutAnAccount := newBlockAuthor(s, &Context{Token: "7X2K9M3N1P", Anonymous: true}, testLinkSigner, nil)
+	if got := withoutAnAccount.verify(context.Background(), block, "signature"); got != "" {
+		t.Errorf("verdict = %q, want nothing said where there is no account to judge with", got)
+	}
+	if doer.sent("GET", "/core/v4/keys/all") {
+		t.Error("a key was asked for by a run with no account to ask with")
+	}
+
+	named := newBlockAuthor(s, own, testLinkSigner, nil)
 	if got := named.verify(context.Background(), block, "signature"); got != string(pgphelper.Unverified) {
 		t.Errorf("verdict = %q, want %q for a key that could not be read", got, pgphelper.Unverified)
 	}

@@ -64,7 +64,7 @@ func shareGetCmd() *cobra.Command {
 			return kit.Show(c, ui.RecordSpec{Object: st, Fields: fields})
 		}),
 	}
-	t.register(c, changes)
+	t.register(c, manages)
 	return c
 }
 
@@ -143,7 +143,7 @@ func shareLinkCmd() *cobra.Command {
 	c.Flags().StringVar(&expires, "expires", "",
 		"Stop working after DURATION (e.g. 7d, 2w, 6mo), or never")
 	password.Declare(c)
-	t.register(c, changes)
+	t.register(c, manages)
 	return c
 }
 
@@ -170,7 +170,7 @@ func shareUnlinkCmd() *cobra.Command {
 			})
 		}),
 	}
-	t.register(c, changes)
+	t.register(c, manages)
 	return c
 }
 
@@ -196,7 +196,7 @@ func shareAddCmd() *cobra.Command {
 	}
 	c.Flags().BoolVar(&edit, "edit", false, "Allow editing rather than only viewing")
 	c.Flags().StringVar(&message, "message", "", "Note to include in the invitation email")
-	t.register(c, changes)
+	t.register(c, manages)
 	return c
 }
 
@@ -230,7 +230,7 @@ func shareUpdateCmd() *cobra.Command {
 		}),
 	}
 	c.Flags().BoolVar(&edit, "edit", false, "Allow editing rather than only viewing")
-	t.register(c, changes)
+	t.register(c, manages)
 	return c
 }
 
@@ -254,7 +254,7 @@ func shareResendCmd() *cobra.Command {
 			})
 		}),
 	}
-	t.register(c, changes)
+	t.register(c, manages)
 	return c
 }
 
@@ -276,7 +276,7 @@ func shareRemoveCmd() *cobra.Command {
 			})
 		}),
 	}
-	t.register(c, changes)
+	t.register(c, manages)
 	return c
 }
 
@@ -518,8 +518,9 @@ func sharedListCmd() *cobra.Command {
 			"well.\n\n" +
 			"These are not in your tree and have no path of their own. To open one, pass\n" +
 			"`--shared REF` to any `items` command: / is then the item itself, and\n" +
-			"anything below it is a path inside it. Nothing in a saved link can be renamed,\n" +
-			"moved or removed from here.\n\n" +
+			"anything below it is a path inside it. In a saved link, what you uploaded\n" +
+			"yourself is yours to rename or delete for an hour; nothing else in it can be\n" +
+			"changed from here.\n\n" +
 			"An item whose name cannot be decrypted is still listed and can be acted on\n" +
 			"by ID.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {

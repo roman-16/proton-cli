@@ -145,6 +145,29 @@ func withoutCoveredItems(sel kit.Selection[drivesvc.Child]) kit.Selection[drives
 	return sel
 }
 
+// withoutRefusedItems drops what the tree has already refused to part with, so
+// the count in the question is the number of things that will really go.
+func withoutRefusedItems(sel kit.Selection[drivesvc.Child], refused []drivesvc.Refused) kit.Selection[drivesvc.Child] {
+	if len(refused) == 0 {
+		return sel
+	}
+	staying := make(map[string]bool, len(refused))
+	for _, one := range refused {
+		staying[one.LinkID] = true
+	}
+	rows := make([]drivesvc.Child, 0, len(sel.Rows))
+	ids := make([]string, 0, len(sel.IDs))
+	for _, row := range sel.Rows {
+		if staying[row.LinkID] {
+			continue
+		}
+		rows = append(rows, row)
+		ids = append(ids, row.LinkID)
+	}
+	sel.Rows, sel.IDs = rows, ids
+	return sel
+}
+
 // covered reports whether a path is inside one of the folders.
 func covered(path string, folders []string) bool {
 	for _, folder := range folders {

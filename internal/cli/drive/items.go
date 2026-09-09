@@ -137,7 +137,8 @@ func itemsGetCmd() *cobra.Command {
 		Long: "Show a file or folder's details.\n\n" +
 			"Reached through a public link, the details include the link, whether it allows\n" +
 			"editing and, for a link saved with `shared add`, the password its owner set on\n" +
-			"it. Behind a link, Created By is absent and Signature reads anonymous.",
+			"it. Behind a link, Created By names you on what you uploaded there yourself,\n" +
+			"signed in. Anything else names nobody and Signature reads anonymous.",
 		RunE: kit.Run([]kit.Step{t.supply}, func(c *kit.Invocation) error {
 			dc, err := t.context(c)
 			if err != nil {
@@ -526,8 +527,12 @@ func itemsUpdateCmd() *cobra.Command {
 			"Renaming is `update --name`; there is no `rename` verb. To put something\n" +
 			"somewhere else, use `move`.\n\n" +
 			"PATH names something inside a tree, never the tree itself: to rename a\n" +
-			"computer, use `computers update`.",
-		RunE: kit.Run(nil, func(c *kit.Invocation) error {
+			"computer, use `computers update`.\n\n" +
+			"PATH is in your own files. --computer REF renames inside a computer instead,\n" +
+			"--shared REF inside something somebody shared with you, and --link URL inside\n" +
+			"a public link. In a link, you can rename only what you uploaded yourself,\n" +
+			"signed in, within the last hour.",
+		RunE: kit.Run([]kit.Step{t.supply}, func(c *kit.Invocation) error {
 			if strings.Trim(c.Args[0], "/") == "" {
 				return kit.Fail("A tree has no name of its own to change here.").
 					Hint("`" + kit.Program + " drive computers update REF --name NEW_NAME` renames a computer.")
@@ -546,7 +551,7 @@ func itemsUpdateCmd() *cobra.Command {
 	}
 	c.Flags().StringVar(&name, "name", "", "New name, without a path")
 	_ = c.MarkFlagRequired("name")
-	t.register(c, changes)
+	t.register(c, edits)
 	return c
 }
 
@@ -606,24 +611,19 @@ func relocateCmd(use, short string, action ui.Action,
 	c.Flags().StringVar(&into, "into", "", "Destination folder")
 	_ = c.MarkFlagRequired("into")
 	f.register(c)
-	t.register(c, changes)
+	t.register(c, manages)
 	return c
 }
 
 func itemsTrashCmd() *cobra.Command {
-	return removeCmd("trash", "Move files or folders to the trash", ui.Trashed, false)
-}
-
-func itemsDeleteCmd() *cobra.Command {
-	return removeCmd("delete", "Delete files or folders permanently", ui.Deleted, true)
-}
-
-func removeCmd(use, short string, action ui.Action, permanent bool) *cobra.Command {
 	var f filters
 	var t tree
 	c := &cobra.Command{
-		Use:   use + " [PATH...]",
-		Short: short,
+		Use:   "trash [PATH...]",
+		Short: "Move files or folders to the trash",
+		Long: "Move files or folders to the trash.\n\n" +
+			"A public link has no trash. What you uploaded into one is removed with\n" +
+			"`delete`.",
 		RunE: kit.Run([]kit.Step{kit.StepSelection(f.set, filterHint, itemScope)}, func(c *kit.Invocation) error {
 			dc, err := t.context(c)
 			if err != nil {
@@ -633,23 +633,61 @@ func removeCmd(use, short string, action ui.Action, permanent bool) *cobra.Comma
 			if err != nil {
 				return err
 			}
-			detail := ""
-			if !permanent {
-				detail = "to trash"
-			}
 			return kit.Attempt(c, ui.ResultSpec{
-				Action: action, Kind: "items", Count: sel.Len(), IDs: sel.IDs,
-				Detail: detail, Preview: sel.Preview(),
+				Action: ui.Trashed, Kind: "items", Count: sel.Len(), IDs: sel.IDs,
+				Detail: "to trash", Preview: sel.Preview(),
 			}, func() ([]drivesvc.Refused, error) {
-				if permanent {
-					return c.App.Drive.Delete(c.Ctx, dc, sel.IDs)
-				}
 				return c.App.Drive.Trash(c.Ctx, dc, sel.IDs)
 			})
 		}),
 	}
 	f.register(c)
-	t.register(c, changes)
+	t.register(c, manages)
+	return c
+}
+
+func itemsDeleteCmd() *cobra.Command {
+	var f filters
+	var t tree
+	c := &cobra.Command{
+		Use:   "delete [PATH...]",
+		Short: "Delete files or folders permanently",
+		Long: "Delete files or folders permanently.\n\n" +
+			"PATH is in your own files. --computer REF deletes inside a computer instead,\n" +
+			"--shared REF inside something somebody shared with you, and --link URL inside\n" +
+			"a public link. In a link, you can delete only what you uploaded yourself,\n" +
+			"signed in, within the last hour. A link has no trash.",
+		RunE: kit.Run([]kit.Step{t.supply, kit.StepSelection(f.set, filterHint, itemScope)}, func(c *kit.Invocation) error {
+			dc, err := t.context(c)
+			if err != nil {
+				return err
+			}
+			sel, err := selectItems(c, dc, &f)
+			if err != nil {
+				return err
+			}
+			// What the tree will not part with is settled before the question is
+			// asked, so the count somebody answers is the number of things that will
+			// really go, and the reason is on the screen while there is still
+			// something to decide.
+			plan, err := c.App.Drive.PlanDelete(c.Ctx, dc, sel.Rows)
+			if err != nil {
+				return err
+			}
+			for _, refused := range plan.Refused {
+				c.Warn("%v", refused)
+			}
+			sel = withoutRefusedItems(sel, plan.Refused)
+			return kit.Attempt(c, ui.ResultSpec{
+				Action: ui.Deleted, Kind: "items", Count: sel.Len(), IDs: sel.IDs,
+				Preview: sel.Preview(),
+			}, func() ([]drivesvc.Refused, error) {
+				return c.App.Drive.Delete(c.Ctx, dc, plan)
+			})
+		}),
+	}
+	f.register(c)
+	t.register(c, edits)
 	return c
 }
 
@@ -706,7 +744,7 @@ func revisionsListCmd() *cobra.Command {
 			}, revs)
 		}),
 	}
-	t.register(c, changes)
+	t.register(c, manages)
 	return c
 }
 
@@ -761,7 +799,7 @@ func revisionsDownloadCmd() *cobra.Command {
 		}),
 	}
 	dest.Register(c)
-	t.register(c, changes)
+	t.register(c, manages)
 	return c
 }
 
@@ -783,7 +821,7 @@ func revisionsRestoreCmd() *cobra.Command {
 			})
 		}),
 	}
-	t.register(c, changes)
+	t.register(c, manages)
 	return c
 }
 
@@ -806,7 +844,7 @@ func revisionsDeleteCmd() *cobra.Command {
 			})
 		}),
 	}
-	t.register(c, changes)
+	t.register(c, manages)
 	return c
 }
 

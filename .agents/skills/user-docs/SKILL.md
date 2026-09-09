@@ -30,7 +30,7 @@ Each kind serves one need and may contain only what serves it.
 | Guide | `docs/<app>/README.md`, `docs/using/*.md` | Tasks, one heading each, in the order people meet them: the command, then the constraint that would surprise them | The full flag list (link the reference), reasons |
 | Reference | `Long`, flag usage, examples | Every flag, its values, its default, how it fails; two or more examples | Instruction, argument, anything true of another command too |
 | Troubleshooting | `docs/help/troubleshooting.md` | A symptom as the heading, the message as the reader sees it, then the fix | Explanations of what went on inside |
-| Limits | `docs/help/limits.md` | What is missing and what to do instead | Why it is missing |
+| Limits | `docs/help/limits.md` | A command a web client has and `proton` does not, and what to do instead | Why it is missing, or a gap that is not `proton`'s to close |
 | FAQ | `docs/about/faq.md` | Questions somebody asks before installing, answered in a paragraph with a link | Anything a guide owns |
 | Security | `docs/about/security.md` | What leaves the machine, what is on disk, how to reduce risk | Cryptographic design, key hierarchies |
 
@@ -71,6 +71,7 @@ Delete these on sight, in a page you are writing and in one you are editing:
 - **Rationale.** Any clause after "because", "which is why", "so that", "the alternative was". State the constraint; drop the argument. `A filter that matches a folder and the files inside it selects the folder alone.` needs no second half.
 - **Proton internals.** "Proton serves 150 rows", "Proton guards this endpoint", "as in the web client", "Proton's own wordlist". Keep the sentence only if it tells the reader what to do: `Only another Proton account can be invited.`
 - **History.** "used to", "no longer", "now also", "previously". Write what is.
+- **A gap that is not the tool's.** The docs cover what `proton` can and cannot do beside the web clients, and nothing else. Something no CLI is in a position to do - a workflow that lives in a browser session, an action only the phone app performs, a decision Proton makes about an account - is not a limit, not a caveat and not a note. It gets no row in Limits and no sentence anywhere. Where `proton` refuses it, the refusal on screen is the whole of what the reader is told.
 - **Self-reference and filler.** "This page describes", "note that", "simply", "easily", "just", "please".
 - **The author's voice.** No "we". The reader is "you"; the tool is `proton`.
 

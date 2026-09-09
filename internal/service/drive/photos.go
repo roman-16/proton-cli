@@ -404,7 +404,7 @@ func (s *Service) AlbumRemovePhotos(ctx context.Context, dc *Context, albumLinkI
 // the file tree's trash under another volume ID.
 func (s *Service) PhotosDelete(ctx context.Context, dc *Context, linkIDs []string, permanent bool) ([]Refused, error) {
 	if permanent {
-		return s.Delete(ctx, dc, linkIDs)
+		return s.Delete(ctx, dc, removing(linkIDs))
 	}
 	return s.Trash(ctx, dc, linkIDs)
 }

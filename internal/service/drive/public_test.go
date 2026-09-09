@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	srp "github.com/ProtonMail/go-srp"
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
@@ -78,8 +79,21 @@ type publicTree struct {
 	root  string
 	// rootKR is the key ring of what the link points at, which is what the names
 	// and passphrases of everything written directly into it are signed with when
-	// nobody is behind the writing.
-	rootKR *pgp.KeyRing
+	// nobody is behind the writing. rootHashKey is what those names are hashed
+	// under.
+	rootKR      *pgp.KeyRing
+	rootHashKey []byte
+	// children is what each folder of the tree holds and items is what each of
+	// those is, which are the two answers a link's tree is read through.
+	children map[string][]string
+	items    map[string]map[string]any
+	// keys are the folders inside the link, which hold what is sealed to them.
+	keys map[string]folderKeys
+}
+
+type folderKeys struct {
+	nodeKR  *pgp.KeyRing
+	hashKey []byte
 }
 
 func newPublicTree(t *testing.T, password, rootName string, rootType int) *publicTree {
@@ -123,7 +137,7 @@ func newPublicTree(t *testing.T, password, rootName string, rootType int) *publi
 	if err != nil {
 		t.Fatalf("root key ring: %v", err)
 	}
-	_, rootHashKey, err := genNodeHashKey(rootKR, rootKR)
+	rootHashKey, armouredRootHashKey, err := genNodeHashKey(rootKR, rootKR)
 	if err != nil {
 		t.Fatalf("generate the root's hash key: %v", err)
 	}
@@ -140,10 +154,160 @@ func newPublicTree(t *testing.T, password, rootName string, rootType int) *publi
 		root: object(t, map[string]any{"Token": map[string]any{
 			"Token": testToken, "LinkID": testRootID, "LinkType": rootType, "Name": encName,
 			"NodeKey": rootKey, "NodePassphrase": rootPass, "NodePassphraseSignature": rootPassSig,
-			"NodeHashKey":    rootHashKey,
+			"NodeHashKey":    armouredRootHashKey,
 			"SignatureEmail": testLinkSigner, "ContentKeyPacket": "", "Size": 1234,
 		}}),
-		rootKR: rootKR,
+		rootKR: rootKR, rootHashKey: rootHashKey,
+		children: map[string][]string{},
+		items:    map[string]map[string]any{},
+		keys:     map[string]folderKeys{},
+	}
+}
+
+// The identifiers what is behind a link is named by.
+const (
+	testFileID   = "file-1"
+	testFolderID = "folder-1"
+)
+
+// uploadedJustNow is when something was put into a link, for a test about
+// anything other than the hour Proton allows it to be taken back in.
+func uploadedJustNow() int64 { return time.Now().Add(-time.Minute).Unix() }
+
+// hold puts items into a folder of the link's tree, sealing their names and
+// keys to it, and hands the first of them back so a test can put things inside
+// it in turn.
+func (p *publicTree) hold(t *testing.T, parent string, items ...map[string]any) map[string]any {
+	t.Helper()
+	parentKR, hashKey := p.rootKR, p.rootHashKey
+	if parent != testRootID {
+		parentKR, hashKey = p.keyOf(t, parent)
+	}
+	for _, item := range items {
+		link := item["Link"].(map[string]any)
+		link["ParentLinkID"] = parent
+		p.seal(t, item, parentKR, hashKey)
+		id := link["LinkID"].(string)
+		p.children[parent] = append(p.children[parent], id)
+		p.items[id] = item
+	}
+	return items[0]
+}
+
+// file is one file behind a link, in the shape the endpoints serving one answer
+// with: the item, and the version it holds.
+func uploadedFile(name, uploadedBy string, at int64) map[string]any {
+	details := uploadedItem(name, uploadedBy, at, testFileID, 2)
+	details["File"] = map[string]any{
+		"ContentKeyPacket": "", "MediaType": "image/jpeg",
+		"ActiveRevision": map[string]any{"RevisionID": "rev-1", "EncryptedSize": 4096},
+	}
+	return details
+}
+
+// folder is one folder behind a link. What it holds is sealed to it, so its own
+// keys are made when it is put into the tree.
+func uploadedFolder(name, uploadedBy string, at int64) map[string]any {
+	details := uploadedItem(name, uploadedBy, at, testFolderID, protonFolder)
+	details["Folder"] = map[string]any{}
+	return details
+}
+
+func uploadedItem(name, uploadedBy string, at int64, linkID string, linkType int) map[string]any {
+	return map[string]any{"Link": map[string]any{
+		"LinkID": linkID, "Type": linkType, "CreateTime": at, "ModifyTime": at,
+		"SignatureEmail": uploadedBy, "name": name,
+	}}
+}
+
+// seal gives an item the keys and the name it would have inside the folder it
+// was put in: a name sealed to that folder, hashed under its hash key, and a
+// node key the folder opens.
+func (p *publicTree) seal(t *testing.T, details map[string]any, parentKR *pgp.KeyRing, hashKey []byte) {
+	t.Helper()
+	link := details["Link"].(map[string]any)
+	name := link["name"].(string)
+	delete(link, "name")
+
+	nodeKey, nodePass, nodePassSig, nodePriv, err := genNodeKeys(parentKR, parentKR)
+	if err != nil {
+		t.Fatalf("generate a node key: %v", err)
+	}
+	encName, err := encryptName(name, parentKR, parentKR)
+	if err != nil {
+		t.Fatalf("encrypt a name: %v", err)
+	}
+	hash, err := lookupHash(strings.ToLower(name), hashKey)
+	if err != nil {
+		t.Fatalf("hash a name: %v", err)
+	}
+	link["NodeKey"], link["NodePassphrase"], link["NodePassphraseSignature"] = nodeKey, nodePass, nodePassSig
+	link["Name"], link["NameHash"] = encName, hash
+
+	if _, isFolder := details["Folder"]; !isFolder {
+		return
+	}
+	nodeKR, err := pgp.NewKeyRing(nodePriv)
+	if err != nil {
+		t.Fatalf("node key ring: %v", err)
+	}
+	ownHashKey, armoured, err := genNodeHashKey(nodeKR, nodeKR)
+	if err != nil {
+		t.Fatalf("generate a hash key: %v", err)
+	}
+	details["Folder"] = map[string]any{"NodeHashKey": armoured}
+	p.keys[link["LinkID"].(string)] = folderKeys{nodeKR: nodeKR, hashKey: ownHashKey}
+}
+
+// keyOf is what a folder inside the link opens with, which is what the names of
+// everything inside it are sealed to.
+func (p *publicTree) keyOf(t *testing.T, linkID string) (*pgp.KeyRing, []byte) {
+	t.Helper()
+	keys, ok := p.keys[linkID]
+	if !ok {
+		t.Fatalf("%s is not a folder of this link", linkID)
+	}
+	return keys.nodeKR, keys.hashKey
+}
+
+// answers serves the two endpoints a link's tree is read through. Neither can be
+// canned per path: what a folder holds, and what those items are, are questions
+// about whatever the test put in the tree.
+func (p *publicTree) answers(t *testing.T) func(proton.Request) []byte {
+	t.Helper()
+	folders := "/drive/unauth/v2/volumes/" + testVolumeID + "/folders/"
+	return func(r proton.Request) []byte {
+		switch {
+		case r.Method == "GET" && strings.HasPrefix(r.Path, folders):
+			parent := strings.TrimSuffix(strings.TrimPrefix(r.Path, folders), "/children")
+			return []byte(object(t, map[string]any{"LinkIDs": p.children[parent], "More": false}))
+		case r.Method == "POST" && r.Path == "/drive/unauth/v2/volumes/"+testVolumeID+"/links":
+			asked, _ := r.Body.(map[string]any)["LinkIDs"].([]string)
+			wanted := make([]map[string]any, 0, len(asked))
+			for _, id := range asked {
+				wanted = append(wanted, p.items[id])
+			}
+			return []byte(object(t, map[string]any{"Links": wanted}))
+		}
+		return nil
+	}
+}
+
+// signedInAs is the key hierarchy of somebody holding one address, which is what
+// decides whether an item behind a link is theirs to take back.
+func signedInAs(t *testing.T, email string) *keys.Unlocked {
+	t.Helper()
+	addrKey, err := pgp.GenerateKey("Owner", email, "x25519", 0)
+	if err != nil {
+		t.Fatalf("generate an address key: %v", err)
+	}
+	addrKR, err := pgp.NewKeyRing(addrKey)
+	if err != nil {
+		t.Fatalf("address key ring: %v", err)
+	}
+	return &keys.Unlocked{
+		AddrKRs:   map[string]*pgp.KeyRing{testAddrID: addrKR},
+		Addresses: []keys.Address{{ID: testAddrID, Email: email}},
 	}
 }
 
@@ -161,6 +325,7 @@ func publicService(t *testing.T, tree *publicTree, flags int, u *keys.Unlocked, 
 	tree.share.Anonymous = u == nil
 	doer := &stubDoer{
 		routes:    routes,
+		answers:   tree.answers(t),
 		linkInfo:  &proton.PublicLinkInfo{Flags: flags, VendorType: proton.PublicLinkDrive},
 		linkShare: tree.share,
 	}
@@ -238,21 +403,29 @@ func TestALinkToAnotherProtonProductIsRefused(t *testing.T) {
 	}
 }
 
-// Everything read inside a link goes to the endpoints Proton serves a token
-// under, because nobody outside the share has the share ID the others use.
-func TestALinkIsReadThroughItsToken(t *testing.T) {
+// A link is opened by the token that names it and read through the endpoints
+// that answer without an account, and never through a share ID nobody outside
+// the share has.
+func TestALinkIsOpenedByTokenAndReadWithoutAnAccount(t *testing.T) {
 	tree := newPublicTree(t, testURLPassword, "Project", protonFolder)
-	s, doer := publicService(t, tree, proton.PublicLinkGeneratedPassword, nil, map[string]string{
-		"GET /drive/urls/" + testToken + "/folders/" + testRootID + "/children": `{"Links":[]}`,
-	})
+	s, doer := publicService(t, tree, proton.PublicLinkGeneratedPassword, nil, nil)
+	tree.hold(t, testRootID, uploadedFile("photo.jpg", testLinkSigner, uploadedJustNow()))
 
 	dc, err := s.OpenLink(context.Background(), LinkURL(testToken, testURLPassword), "")
 	if err != nil {
 		t.Fatalf("OpenLink: %v", err)
 	}
-	if _, err := s.List(context.Background(), dc, "/"); err != nil {
+	children, err := s.List(context.Background(), dc, "/")
+	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
+	if len(children) != 1 || children[0].Name != "photo.jpg" || children[0].Type != TypeFile {
+		t.Fatalf("the link's tree listed as %+v", children)
+	}
+	if children[0].Size != 4096 {
+		t.Errorf("size = %d, want the size of the version the file holds", children[0].Size)
+	}
+
 	var paths []string
 	for _, req := range doer.reqs {
 		paths = append(paths, req.Method+" "+req.Path)
@@ -261,7 +434,8 @@ func TestALinkIsReadThroughItsToken(t *testing.T) {
 		"GET /drive/urls/" + testToken + "/info",
 		"POST /drive/urls/" + testToken + "/auth",
 		"GET /drive/urls/" + testToken,
-		"GET /drive/urls/" + testToken + "/folders/" + testRootID + "/children",
+		"GET /drive/unauth/v2/volumes/" + testVolumeID + "/folders/" + testRootID + "/children",
+		"POST /drive/unauth/v2/volumes/" + testVolumeID + "/links",
 	} {
 		if !containsString(paths, want) {
 			t.Errorf("%s was never sent; sent %v", want, paths)
@@ -271,6 +445,208 @@ func TestALinkIsReadThroughItsToken(t *testing.T) {
 		if strings.Contains(req.Path, "/drive/shares/") {
 			t.Errorf("a public link asked about a share it has no ID for: %s", req.Path)
 		}
+	}
+}
+
+// What a link's reader is told about an item includes who uploaded it, which is
+// what decides whether they may take it back.
+func TestALinksTreeNamesWhoUploadedWhat(t *testing.T) {
+	tree := newPublicTree(t, testURLPassword, "Project", protonFolder)
+	s, _ := publicService(t, tree, proton.PublicLinkGeneratedPassword, signedInAs(t, testLinkSigner), nil)
+	tree.hold(t, testRootID, uploadedFile("photo.jpg", testLinkSigner, uploadedJustNow()))
+
+	dc, err := s.OpenLink(context.Background(), LinkURL(testToken, testURLPassword), "")
+	if err != nil {
+		t.Fatalf("OpenLink: %v", err)
+	}
+	res, err := s.ResolvePath(context.Background(), dc, "/photo.jpg")
+	if err != nil {
+		t.Fatalf("ResolvePath: %v", err)
+	}
+	if res.Link.SignatureEmail != testLinkSigner {
+		t.Errorf("the item names %q as its uploader, want %s", res.Link.SignatureEmail, testLinkSigner)
+	}
+	if res.Parent == nil || res.Parent.LinkID != testRootID {
+		t.Error("the item does not carry the folder it was found in, which a rename hashes under")
+	}
+}
+
+// An upload nobody finished is not an item: it holds no version to read, name or
+// count, and Proton's own clients leave one out of a listing too.
+func TestAnUnfinishedUploadIsNotListedInALink(t *testing.T) {
+	tree := newPublicTree(t, testURLPassword, "Project", protonFolder)
+	draft := uploadedFile("half-sent.jpg", testLinkSigner, uploadedJustNow())
+	draft["File"].(map[string]any)["ActiveRevision"] = nil
+	s, _ := publicService(t, tree, proton.PublicLinkGeneratedPassword, nil, nil)
+	tree.hold(t, testRootID, draft)
+
+	dc, err := s.OpenLink(context.Background(), LinkURL(testToken, testURLPassword), "")
+	if err != nil {
+		t.Fatalf("OpenLink: %v", err)
+	}
+	children, err := s.List(context.Background(), dc, "/")
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(children) != 0 {
+		t.Errorf("a draft was listed as an item: %+v", children)
+	}
+}
+
+// A link takes back only what this account put there, and only while it is new.
+// Both are judged from the listing, before anything is asked of Proton.
+func TestALinkOnlyGivesBackYourOwnRecentUploads(t *testing.T) {
+	anHourAndAHalfAgo := time.Now().Add(-90 * time.Minute).Unix()
+	for _, tc := range []struct {
+		name       string
+		uploadedBy string
+		at         int64
+		want       string
+	}{
+		{name: "somebody else's", uploadedBy: "stranger@proton.me", at: uploadedJustNow(),
+			want: "/photo.jpg is not yours to rename here."},
+		{name: "nobody's", uploadedBy: "", at: uploadedJustNow(),
+			want: "/photo.jpg is not yours to rename here."},
+		{name: "yours, an hour and a half ago", uploadedBy: testAddrMail, at: anHourAndAHalfAgo,
+			want: "/photo.jpg was uploaded more than an hour ago, so it is not yours to rename any more."},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tree := newPublicTree(t, testURLPassword, "Project", protonFolder)
+			s, doer := publicService(t, tree, proton.PublicLinkGeneratedPassword, signedInAs(t, testAddrMail), nil)
+			tree.hold(t, testRootID, uploadedFile("photo.jpg", tc.uploadedBy, tc.at))
+
+			dc, err := s.OpenLink(context.Background(), LinkURL(testToken, testURLPassword), "")
+			if err != nil {
+				t.Fatalf("OpenLink: %v", err)
+			}
+			err = s.Rename(context.Background(), dc, "/photo.jpg", "holiday.jpg")
+			if err == nil || err.Error() != tc.want {
+				t.Fatalf("Rename refused with %v, want %q", err, tc.want)
+			}
+			if doer.sent("PUT", "/drive/unauth/v2/volumes/"+testVolumeID+"/links/"+testFileID+"/rename") {
+				t.Error("a rename Proton would refuse was sent anyway")
+			}
+		})
+	}
+}
+
+// Renaming your own recent upload goes to the link's own endpoint, signed by the
+// address that put it there and naming both hashes: the one the new name takes
+// and the one it releases.
+func TestRenamingYourOwnUploadInALinkNamesBothHashes(t *testing.T) {
+	tree := newPublicTree(t, testURLPassword, "Project", protonFolder)
+	s, doer := publicService(t, tree, proton.PublicLinkGeneratedPassword, signedInAs(t, testAddrMail), nil)
+	tree.hold(t, testRootID, uploadedFile("photo.jpg", testAddrMail, uploadedJustNow()))
+
+	dc, err := s.OpenLink(context.Background(), LinkURL(testToken, testURLPassword), "")
+	if err != nil {
+		t.Fatalf("OpenLink: %v", err)
+	}
+	if err := s.Rename(context.Background(), dc, "/photo.jpg", "holiday.jpg"); err != nil {
+		t.Fatalf("Rename: %v", err)
+	}
+	req := doer.last()
+	if req.Method != "PUT" || req.Path != "/drive/unauth/v2/volumes/"+testVolumeID+"/links/"+testFileID+"/rename" {
+		t.Fatalf("the rename went to %s %s", req.Method, req.Path)
+	}
+	body, ok := req.Body.(map[string]any)
+	if !ok {
+		t.Fatalf("the rename carried %T", req.Body)
+	}
+	if body["NameSignatureEmail"] != testAddrMail {
+		t.Errorf("the new name is signed by %v, want %s", body["NameSignatureEmail"], testAddrMail)
+	}
+	if body["Hash"] == "" || body["OriginalHash"] == "" || body["Hash"] == body["OriginalHash"] {
+		t.Errorf("the rename names hashes %v and %v", body["Hash"], body["OriginalHash"])
+	}
+	name, err := decryptName(body["Name"].(string), tree.rootKR)
+	if err != nil || name != "holiday.jpg" {
+		t.Errorf("the new name reads %q (%v), and is sealed to the folder it sits in", name, err)
+	}
+}
+
+// Deleting in a link is deleting for good, and a folder means its contents: what
+// is inside is given back in a round of its own, before the folder holding it.
+func TestDeletingAFolderInALinkGivesBackItsContentsFirst(t *testing.T) {
+	tree := newPublicTree(t, testURLPassword, "Project", protonFolder)
+	s, doer := publicService(t, tree, proton.PublicLinkGeneratedPassword, signedInAs(t, testAddrMail), nil)
+	tree.hold(t, testRootID, uploadedFolder("album", testAddrMail, uploadedJustNow()))
+	tree.hold(t, testFolderID, uploadedFile("photo.jpg", testAddrMail, uploadedJustNow()))
+
+	dc, err := s.OpenLink(context.Background(), LinkURL(testToken, testURLPassword), "")
+	if err != nil {
+		t.Fatalf("OpenLink: %v", err)
+	}
+	plan, err := s.PlanDelete(context.Background(), dc, []Child{{LinkID: testFolderID, Path: "/album", Type: TypeFolder}})
+	if err != nil {
+		t.Fatalf("PlanDelete: %v", err)
+	}
+	if len(plan.Refused) != 0 {
+		t.Fatalf("your own recent upload was refused: %v", plan.Refused)
+	}
+	if got := plan.deep; len(got) != 2 || got[0][0] != testFolderID || got[1][0] != testFileID {
+		t.Fatalf("the removal names %v, want the folder above what is inside it", got)
+	}
+	if _, err := s.Delete(context.Background(), dc, plan); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+
+	// One round per depth, from the bottom: a request that named a folder and
+	// what is in it together would be refused for the folder that is not empty
+	// yet, however the two were ordered inside it.
+	var removals [][]string
+	for _, req := range doer.reqs {
+		if req.Path != "/drive/unauth/v2/volumes/"+testVolumeID+"/remove-mine" {
+			continue
+		}
+		named, _ := req.Body.(map[string]any)["LinkIDs"].([]string)
+		removals = append(removals, named)
+	}
+	if len(removals) != 2 {
+		t.Fatalf("the deletion went out in %d requests, want one per depth: %v", len(removals), removals)
+	}
+	if len(removals[0]) != 1 || removals[0][0] != testFileID {
+		t.Errorf("the first request named %v, want what is inside the folder", removals[0])
+	}
+	if len(removals[1]) != 1 || removals[1][0] != testFolderID {
+		t.Errorf("the second request named %v, want the folder", removals[1])
+	}
+	if doer.sent("POST", "/drive/v2/volumes/"+testVolumeID+"/trash_multiple") {
+		t.Error("a link has no trash, but something was trashed on the way")
+	}
+}
+
+// A folder holding something this account did not upload is refused whole: the
+// refusal is about the thing that was chosen, not about a file nobody named, and
+// it comes before the question rather than after the answer.
+func TestDeletingAFolderHoldingSomebodyElsesUploadIsRefused(t *testing.T) {
+	tree := newPublicTree(t, testURLPassword, "Project", protonFolder)
+	s, doer := publicService(t, tree, proton.PublicLinkGeneratedPassword, signedInAs(t, testAddrMail), nil)
+	tree.hold(t, testRootID, uploadedFolder("album", testAddrMail, uploadedJustNow()))
+	tree.hold(t, testFolderID, uploadedFile("photo.jpg", "stranger@proton.me", uploadedJustNow()))
+
+	dc, err := s.OpenLink(context.Background(), LinkURL(testToken, testURLPassword), "")
+	if err != nil {
+		t.Fatalf("OpenLink: %v", err)
+	}
+	plan, err := s.PlanDelete(context.Background(), dc, []Child{{LinkID: testFolderID, Path: "/album", Type: TypeFolder}})
+	if err != nil {
+		t.Fatalf("PlanDelete: %v", err)
+	}
+	if len(plan.deep) != 0 {
+		t.Errorf("a refused folder still named %v to remove", plan.deep)
+	}
+	if len(plan.Refused) != 1 {
+		t.Fatalf("the refusals are %v, want one about the folder that was chosen", plan.Refused)
+	}
+	said := plan.Refused[0].String()
+	want := "/album holds something that is not yours to delete. " +
+		"In a link you can delete only what you uploaded yourself, within an hour of uploading it."
+	if said != want {
+		t.Errorf("the refusal reads %q, want %q", said, want)
+	}
+	if doer.sent("POST", "/drive/unauth/v2/volumes/"+testVolumeID+"/remove-mine") {
+		t.Error("a deletion was sent for something judged unremovable")
 	}
 }
 
@@ -299,7 +675,6 @@ func linkUpload(t *testing.T, tree *publicTree, u *keys.Unlocked) (*Service, *st
 		"VerificationCode": base64.StdEncoding.EncodeToString([]byte("verify-these-bytes")),
 	})
 	return publicService(t, tree, proton.PublicLinkGeneratedPassword, u, map[string]string{
-		"GET /drive/urls/" + testToken + "/folders/" + testRootID + "/children":            `{"Links":[]}`,
 		"POST /drive/urls/" + testToken + "/files":                                         `{"File":{"ID":"file-1","RevisionID":"rev-1"}}`,
 		"GET /drive/urls/" + testToken + "/links/file-1/revisions/rev-1/verification":      verification,
 		"POST /drive/urls/" + testToken + "/blocks":                                        object(t, map[string]any{"UploadLinks": []any{map[string]any{"Token": "block-token", "BareURL": storage.URL}}}),

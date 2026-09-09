@@ -47,7 +47,7 @@ List what other people have shared with you.
 
 Items shared with you directly and public links you saved with `shared add` are listed together. A saved link shows `public link` under SHARED BY, and ROLE is what you may do: a viewer lists and downloads, an editor uploads as well.
 
-These are not in your tree and have no path of their own. To open one, pass `--shared REF` to any `items` command: / is then the item itself, and anything below it is a path inside it. Nothing in a saved link can be renamed, moved or removed from here.
+These are not in your tree and have no path of their own. To open one, pass `--shared REF` to any `items` command: / is then the item itself, and anything below it is a path inside it. In a saved link, what you uploaded yourself is yours to rename or delete for an hour; nothing else in it can be changed from here.
 
 An item whose name cannot be decrypted is still listed and can be acted on by ID.
 

@@ -177,9 +177,18 @@ proton drive items create /2026 --link 'https://drive.proton.me/urls/7X2K9M3N1P#
 proton drive items upload --recursive ./album /2026 --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL'
 ```
 
-`--if-exists rename` and `skip` work in a link; `replace` is refused. Nothing already in a link can be renamed, moved or removed from here.
+`--if-exists rename` and `skip` work in a link; `replace` is refused.
 
-None of this needs an account. Signed in, what you upload names your address as Created By; without an account it names nobody. Behind a link, `items get` shows no Created By and reports Signature as `anonymous`.
+What you uploaded is yours to rename or delete for an hour:
+
+```bash
+proton drive items update /photo.jpg --name holiday.jpg --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL'
+proton drive items delete /photo.jpg --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL'
+```
+
+Deleting is permanent: a link has no trash, and a folder goes with everything in it. `delete` names what is not yours before it asks. Nothing else in a link can be changed from here.
+
+None of this needs an account. Signed in, what you upload names your address as Created By. Without an account it names nobody and cannot be changed afterwards. Behind a link, `items get` names nobody for anything you did not upload yourself, and reports Signature as `anonymous`.
 
 Save a link to open it later without the URL or the password. Saving needs an account:
 

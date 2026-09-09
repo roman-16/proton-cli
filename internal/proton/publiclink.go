@@ -35,13 +35,17 @@ type linkSession struct {
 
 // covers reports whether a request is about this link.
 //
-// Proton serves a link's tree under the token that names it, in place of the
-// share ID nobody outside the share has - so a request that names the link is
-// the whole of what the link's session is granted, and everything else is about
-// the account whether or not a link is open.
+// Proton serves a link's tree two ways, and both are the link's rather than the
+// account's: under the token that names it, in place of the share ID nobody
+// outside the share has, and under the prefix that answers without an account at
+// all. Everything else is about the account whether or not a link is open.
 func (s linkSession) covers(req Request) bool {
-	return strings.Contains(req.Path, "/urls/"+s.token)
+	return strings.Contains(req.Path, "/urls/"+s.token) || strings.HasPrefix(req.Path, unauthenticated)
 }
+
+// unauthenticated is where Proton serves what a public link permits: the same
+// endpoints as the account's, answered for whoever holds the link.
+const unauthenticated = "/drive/unauth/"
 
 // Public link flags, as Proton numbers them. A link made today carries a
 // generated password in its URL and, when its owner set one, a second password

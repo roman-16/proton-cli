@@ -375,7 +375,11 @@ type Resolved struct {
 	// dc is the tree the path was resolved in. A resolved item means nothing
 	// outside it - its keys came from that tree, and so does the address every
 	// request about it is sent to.
-	dc       *Context
+	dc *Context
+	// Parent is the folder the walk found it in, and is nothing at all for the top
+	// of a tree. A rename hashes the new name under the parent's key, and the walk
+	// that found the item was holding it.
+	Parent   *Resolved
 	LinkID   string
 	ParentKR *pgp.KeyRing
 	NodeKR   *pgp.KeyRing
@@ -492,7 +496,7 @@ func (s *Service) childNamed(ctx context.Context, dc *Context, parent *Resolved,
 			return nil, fmt.Errorf("unlock %s: %w", name, err)
 		}
 		return &Resolved{
-			dc: dc, LinkID: child.LinkID,
+			dc: dc, Parent: parent, LinkID: child.LinkID,
 			ParentKR: parent.NodeKR, NodeKR: childKR, Name: name,
 			IsFolder: child.Type == protonFolder, Link: &child,
 		}, nil
@@ -514,18 +518,27 @@ func components(path string) []string {
 // batch that succeeded as a whole can still have refused some of what it named.
 const linkBatch = 50
 
-// Refused is one item Proton would not act on, and why.
+// Refused is one item that will not be acted on, and why.
 //
 // A count is a promise, so a bulk verb that was refused part of what it asked
 // for names the part rather than reporting the number it hoped for.
 type Refused struct {
+	// Name is what the caller called it, and is set where the refusal came before
+	// anything was sent and the item still had a path. Reason then finishes the
+	// sentence Name starts, because a warning is shown with nothing beside it.
+	Name   string `json:"name,omitempty"`
 	LinkID string `json:"link_id"`
 	Reason string `json:"reason"`
 }
 
-// String names what was refused. A trashed item has no path to name it by, so
-// the ID is what a reader has to go on.
-func (r Refused) String() string { return fmt.Sprintf("Refused %s: %s", r.LinkID, r.Reason) }
+// String says what was refused. A refusal Proton made names the link ID: by then
+// the item may have no path left to name it by.
+func (r Refused) String() string {
+	if r.Name != "" {
+		return fmt.Sprintf("%s %s", r.Name, r.Reason)
+	}
+	return fmt.Sprintf("Refused %s: %s", r.LinkID, r.Reason)
+}
 
 // linkBatches acts on many links a batch at a time, collecting what Proton
 // refused. request builds the call for one batch, because the endpoints differ
@@ -575,32 +588,156 @@ func (s *Service) getLink(ctx context.Context, shareID, linkID string) (*Link, e
 // childrenPageSize is how many links one listing of a folder asks for.
 const childrenPageSize = 150
 
+// listRawChildren reads what a folder holds, of whichever endpoints serve the
+// tree it is in.
 func (s *Service) listRawChildren(ctx context.Context, dc *Context, linkID string) ([]Link, error) {
+	if dc.Public() {
+		return s.linkChildren(ctx, dc, linkID)
+	}
 	return proton.All(ctx, func(ctx context.Context, page int) ([]Link, bool, error) {
 		q := url.Values{}
 		q.Set("Page", fmt.Sprintf("%d", page))
 		q.Set("PageSize", fmt.Sprintf("%d", childrenPageSize))
-		req := childrenRequest(dc, linkID)
-		req.Query = q
 		var r struct{ Links []Link }
-		if err := s.C.Decode(ctx, req, &r); err != nil {
+		if err := s.C.Decode(ctx, proton.Request{
+			Method: "GET", Query: q,
+			Path: fmt.Sprintf("/drive/shares/%s/folders/%s/children", dc.ShareID, linkID),
+		}, &r); err != nil {
 			return nil, false, err
 		}
 		return r.Links, proton.Full(r.Links, childrenPageSize), nil
 	})
 }
 
-// childrenRequest asks a folder what is in it, of whichever endpoint serves the
-// tree it is in.
-func childrenRequest(dc *Context, linkID string) proton.Request {
-	if dc.Public() {
-		return proton.Request{
-			Method: "GET", Path: fmt.Sprintf("/drive/urls/%s/folders/%s/children", dc.Token, linkID),
+// linkDetailsBatch is how many items one reading of a link's tree asks about,
+// matching API_NODES_BATCH_SIZE in Proton's Drive SDK.
+const linkDetailsBatch = 100
+
+// linkChildren reads what a folder behind a public link holds.
+//
+// A link's tree is served under the volume rather than the share, and in two
+// steps: the folder answers with the IDs of what is in it, and those are read
+// back in batches. It is the second answer that carries the address of whoever
+// uploaded each item, which is what makes a link's tree something its reader can
+// be told about rather than a list of anonymous names.
+func (s *Service) linkChildren(ctx context.Context, dc *Context, linkID string) ([]Link, error) {
+	ids, err := s.linkChildIDs(ctx, dc, linkID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Link, 0, len(ids))
+	for _, batch := range chunk(ids, linkDetailsBatch) {
+		var r struct{ Links []linkDetails }
+		if err := s.C.Decode(ctx, proton.Request{
+			Method: "POST", Reads: true,
+			Path: fmt.Sprintf("/drive/unauth/v2/volumes/%s/links", dc.VolumeID),
+			Body: map[string]any{"LinkIDs": batch},
+		}, &r); err != nil {
+			return nil, err
+		}
+		for _, details := range r.Links {
+			link, finished := details.link()
+			if !finished {
+				// Recorded and not counted: an upload nobody finished is not an item,
+				// and Proton's own clients leave one out of a listing too.
+				slog.DebugContext(ctx, "drive: an unfinished upload is not listed",
+					"link", details.Link.LinkID, "parent", linkID)
+				continue
+			}
+			out = append(out, link)
 		}
 	}
-	return proton.Request{
-		Method: "GET", Path: fmt.Sprintf("/drive/shares/%s/folders/%s/children", dc.ShareID, linkID),
+	return out, nil
+}
+
+// linkChildIDs names what is in a folder behind a public link, a page at a time.
+func (s *Service) linkChildIDs(ctx context.Context, dc *Context, linkID string) ([]string, error) {
+	// The endpoint hands back the anchor its next answer starts from.
+	anchor := ""
+	return proton.All(ctx, func(ctx context.Context, _ int) ([]string, bool, error) {
+		req := proton.Request{
+			Method: "GET",
+			Path:   fmt.Sprintf("/drive/unauth/v2/volumes/%s/folders/%s/children", dc.VolumeID, linkID),
+		}
+		if anchor != "" {
+			req.Query = proton.Query("AnchorID", anchor)
+		}
+		var r struct {
+			LinkIDs  []string
+			AnchorID string
+			More     bool
+		}
+		if err := s.C.Decode(ctx, req, &r); err != nil {
+			return nil, false, err
+		}
+		anchor = r.AnchorID
+		return r.LinkIDs, r.More && r.AnchorID != "", nil
+	})
+}
+
+// linkDetails is what one item behind a public link is answered as: the item,
+// and whichever of the two shapes it takes.
+type linkDetails struct {
+	Link struct {
+		LinkID                  string
+		ParentLinkID            string
+		Type                    int
+		CreateTime              int64
+		ModifyTime              int64
+		TrashTime               int64
+		Name                    string
+		NameHash                string
+		NodeKey                 string
+		NodePassphrase          string
+		NodePassphraseSignature string
+		SignatureEmail          string
 	}
+	Folder *struct {
+		NodeHashKey string
+		XAttr       string
+	}
+	File *struct {
+		ContentKeyPacket string
+		MediaType        string
+		ActiveRevision   *struct {
+			RevisionID    string
+			EncryptedSize int64
+			XAttr         string
+		}
+	}
+	Sharing *struct{ ShareURLID string }
+}
+
+// link is the record the rest of Drive reads, and nothing at all for a file no
+// upload ever finished: a draft holds no version to read, name or count.
+func (d linkDetails) link() (Link, bool) {
+	l := Link{
+		LinkID: d.Link.LinkID, ParentLinkID: d.Link.ParentLinkID, Type: d.Link.Type,
+		Name: d.Link.Name, Hash: d.Link.NameHash, NodeKey: d.Link.NodeKey,
+		NodePassphrase: d.Link.NodePassphrase, NodePassphraseSignature: d.Link.NodePassphraseSignature,
+		SignatureEmail: d.Link.SignatureEmail, CreateTime: d.Link.CreateTime,
+		ModifyTime: d.Link.ModifyTime, Trashed: d.Link.TrashTime,
+	}
+	if d.Sharing != nil && d.Sharing.ShareURLID != "" {
+		l.ShareUrls = []struct{ ShareURLID string }{{ShareURLID: d.Sharing.ShareURLID}}
+	}
+	switch {
+	case d.Folder != nil:
+		l.FolderProperties = &FolderProperties{NodeHashKey: d.Folder.NodeHashKey}
+		l.XAttr = d.Folder.XAttr
+	case d.File == nil:
+		// Anything else is listed as what it says it is. Nothing goes missing that
+		// way, and what cannot be done with it is refused where it is asked for.
+	case d.File.ActiveRevision == nil:
+		return Link{}, false
+	default:
+		l.MIMEType = d.File.MediaType
+		l.Size = d.File.ActiveRevision.EncryptedSize
+		l.XAttr = d.File.ActiveRevision.XAttr
+		l.FileProperties = &FileProperties{ContentKeyPacket: d.File.ContentKeyPacket}
+		l.FileProperties.ActiveRevision.ID = d.File.ActiveRevision.RevisionID
+	}
+	return l, true
 }
 
 func dirOf(path string) string {

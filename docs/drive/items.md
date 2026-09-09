@@ -60,6 +60,8 @@ proton drive items create /2026 --link 'https://drive.proton.me/urls/7X2K9M3N1P#
 
 Delete files or folders permanently.
 
+PATH is in your own files. --computer REF deletes inside a computer instead, --shared REF inside something somebody shared with you, and --link URL inside a public link. In a link, you can delete only what you uploaded yourself, signed in, within the last hour. A link has no trash.
+
 ```
 proton drive items delete [PATH...]
 ```
@@ -67,6 +69,7 @@ proton drive items delete [PATH...]
 ```bash
 proton drive items delete /Documents/report.pdf
 proton drive items delete --pattern '*.tmp' --scope /Build --recursive --yes
+proton drive items delete /photo.jpg --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL'
 ```
 
 | Flag | Description |
@@ -74,6 +77,9 @@ proton drive items delete --pattern '*.tmp' --scope /Build --recursive --yes
 | `--all` | Act on everything in scope, rather than a subset |
 | `--computer string` | Work inside this computer's files, by name or ID |
 | `--larger-than string` | Match files above SIZE (e.g. 100MB, 2GB) |
+| `--link string` | Work inside a public link somebody sent you, by URL |
+| `--link-password-file string` | Read the public link's password from a file |
+| `--link-password-stdin` | Read the public link's password from stdin |
 | `--newer-than string` | Match files newer than DURATION |
 | `--older-than string` | Match files older than DURATION (e.g. 30d, 2w, 1h) |
 | `--pattern string` | Match names against a shell glob, e.g. *.tmp |
@@ -115,7 +121,7 @@ proton drive items download / --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ
 
 Show a file or folder's details.
 
-Reached through a public link, the details include the link, whether it allows editing and, for a link saved with `shared add`, the password its owner set on it. Behind a link, Created By is absent and Signature reads anonymous.
+Reached through a public link, the details include the link, whether it allows editing and, for a link saved with `shared add`, the password its owner set on it. Behind a link, Created By names you on what you uploaded there yourself, signed in. Anything else names nobody and Signature reads anonymous.
 
 ```
 proton drive items get PATH
@@ -428,6 +434,8 @@ proton drive items share update /Reports jane@proton.me --edit=false
 
 Move files or folders to the trash.
 
+A public link has no trash. What you uploaded into one is removed with `delete`.
+
 ```
 proton drive items trash [PATH...]
 ```
@@ -459,17 +467,23 @@ Renaming is `update --name`; there is no `rename` verb. To put something somewhe
 
 PATH names something inside a tree, never the tree itself: to rename a computer, use `computers update`.
 
+PATH is in your own files. --computer REF renames inside a computer instead, --shared REF inside something somebody shared with you, and --link URL inside a public link. In a link, you can rename only what you uploaded yourself, signed in, within the last hour.
+
 ```
 proton drive items update PATH
 ```
 
 ```bash
 proton drive items update /Documents/report.pdf --name summary.pdf
+proton drive items update /photo.jpg --name holiday.jpg --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL'
 ```
 
 | Flag | Description |
 | --- | --- |
 | `--computer string` | Work inside this computer's files, by name or ID |
+| `--link string` | Work inside a public link somebody sent you, by URL |
+| `--link-password-file string` | Read the public link's password from a file |
+| `--link-password-stdin` | Read the public link's password from stdin |
 | `--name string` | New name, without a path |
 | `--shared string` | Work inside an item shared with you, by name or ID |
 

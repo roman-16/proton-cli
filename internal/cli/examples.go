@@ -246,7 +246,10 @@ var examples = map[string][]string{
 		"proton drive items download / --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL' --dest-dir .",
 		"proton drive items download / --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL' --link-password-file /run/secrets/q3-link --dest-dir .",
 	},
-	"proton drive items update": {"proton drive items update /Documents/report.pdf --name summary.pdf"},
+	"proton drive items update": {
+		"proton drive items update /Documents/report.pdf --name summary.pdf",
+		"proton drive items update /photo.jpg --name holiday.jpg --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL'",
+	},
 	"proton drive items move": {
 		"proton drive items move /Documents/report.pdf --into /Archive",
 		"proton drive items move --pattern '*.log' --scope /Build --recursive --into /Archive",
@@ -263,6 +266,7 @@ var examples = map[string][]string{
 	"proton drive items delete": {
 		"proton drive items delete /Documents/report.pdf",
 		"proton drive items delete --pattern '*.tmp' --scope /Build --recursive --yes",
+		"proton drive items delete /photo.jpg --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL'",
 	},
 	"proton drive items revisions list":     {"proton drive items revisions list /Documents/report.pdf"},
 	"proton drive items revisions restore":  {"proton drive items revisions restore /Documents/report.pdf 5bH2mQxK"},
