@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -62,6 +63,53 @@ func TestDoIdentityHeadersHonorOverrides(t *testing.T) {
 	}
 	if got := h.Get("x-pm-appversion"); got != "external-proton_cli@9.9.9-beta" {
 		t.Errorf("x-pm-appversion = %q, want external-proton_cli@9.9.9-beta", got)
+	}
+}
+
+// The clock everything this build dates is dated by comes off the responses,
+// because a key dated by a machine whose clock is out is a key Proton refuses.
+func TestNowFollowsWhatProtonDatedItsAnswer(t *testing.T) {
+	served := time.Now().Add(-48 * time.Hour).Truncate(time.Second)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Date", served.UTC().Format(http.TimeFormat))
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"Code":1000}`))
+	}))
+	t.Cleanup(srv.Close)
+	c := New(Options{BaseURL: srv.URL})
+
+	if before := c.Now(); time.Until(before).Abs() > time.Second {
+		t.Errorf("before anything was asked the clock reads %s, want this machine's", before)
+	}
+	if _, err := c.Do(context.Background(), Request{Method: "GET", Path: "/test"}); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if got := c.Now(); got.Sub(served).Abs() > time.Minute {
+		t.Errorf("the clock reads %s, want Proton's at %s", got, served)
+	}
+}
+
+// An answer that says nothing about the time leaves this machine's clock in
+// charge, and says so in the log: it is the difference between a key dated by a
+// clock somebody else keeps right and one dated by this.
+func TestNowKeepsThisMachinesClockWhenAnAnswerIsUndated(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header()["Date"] = nil
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"Code":1000}`))
+	}))
+	t.Cleanup(srv.Close)
+	var records strings.Builder
+	c := New(Options{BaseURL: srv.URL, Logger: slog.New(slog.NewTextHandler(&records, &slog.HandlerOptions{Level: slog.LevelDebug}))})
+
+	if _, err := c.Do(context.Background(), Request{Method: "GET", Path: "/test"}); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if got := c.Now(); time.Until(got).Abs() > time.Second {
+		t.Errorf("the clock reads %s, want this machine's", got)
+	}
+	if !strings.Contains(records.String(), "reason=undated") {
+		t.Errorf("the log does not say the answer was undated:\n%s", records.String())
 	}
 }
 

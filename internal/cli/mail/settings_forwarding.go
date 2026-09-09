@@ -49,15 +49,20 @@ func forwardingCmd() *cobra.Command {
 			action: ui.Declined,
 			takes:  answerable("decline", "declined"),
 			apply: func(ctx context.Context, m *mailsvc.Service, f mailsvc.Forwarding) error {
-				return m.ForwardingDelete(ctx, f.ID)
+				return m.ForwardingDelete(ctx, f)
 			},
 		}),
 		forwardingVerbCmd(forwardingVerb{
-			use:    "delete",
-			short:  "Stop forwardings, in either direction",
+			use:   "delete",
+			short: "Stop forwardings, in either direction",
+			long: "REF is a forwarding in either direction. Taking down the last forwarding\n" +
+				"from one of your addresses to an address outside Proton turns end-to-end\n" +
+				"encryption for it back on, and asks for your password to do it. With no\n" +
+				"terminal to ask, pass --password-file or --password-stdin.",
 			action: ui.Deleted,
+			reason: "turn end-to-end encryption back on",
 			apply: func(ctx context.Context, m *mailsvc.Service, f mailsvc.Forwarding) error {
-				return m.ForwardingDelete(ctx, f.ID)
+				return m.ForwardingDelete(ctx, f)
 			},
 		}),
 		forwardingVerbCmd(forwardingVerb{
@@ -179,30 +184,58 @@ func forwardingGetCmd() *cobra.Command {
 }
 
 func forwardingCreateCmd() *cobra.Command {
-	return &cobra.Command{
+	var reauth kit.Reauth
+	c := &cobra.Command{
 		Use:   "create REF EMAIL",
-		Short: "Forward one of your addresses to another Proton address",
-		Long: "Forward one of your addresses to another Proton address.\n\n" +
-			"REF is the address of yours mail arrives at, EMAIL is the Proton address it\n" +
-			"is handed to. Mail stays end-to-end encrypted, and nothing is forwarded until\n" +
-			"they accept it.\n\n" +
-			"Proton refuses this request from " + kit.Program + ": add the forwarding at\n" +
-			"account.proton.me instead. Accepting one sent to you works here.\n\n" +
-			"Forwarding to an address outside Proton is not built.",
+		Short: "Forward one of your addresses to another address",
+		Long: "Forward one of your addresses to another address.\n\n" +
+			"REF is the address of yours mail arrives at, EMAIL is where it is handed to.\n" +
+			"Needs a paid Mail plan, and nothing is forwarded until they accept it: a\n" +
+			"Proton address in its Proton client or with `forwarding accept`, an address\n" +
+			"outside Proton by following the link Proton emails it.\n\n" +
+			"To a Proton address, mail stays end-to-end encrypted. To an address outside\n" +
+			"Proton, end-to-end encryption for REF is turned off until the last such\n" +
+			"forwarding from it is deleted, and your password is asked for to turn it\n" +
+			"off. With no terminal to ask, pass --password-file or --password-stdin.",
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
+			if err := reauth.Supply(c); err != nil {
+				return err
+			}
 			from, err := c.App.Mail.ResolveAddress(c.Ctx, c.Args[0])
 			if err != nil {
 				return err
 			}
-			to := c.Args[1]
+			// What kind of forwarding it would be is settled before the mutation,
+			// because it decides what the person is agreeing to: a dry run of one
+			// that gives up the address's encryption has to say so.
+			offer, err := c.App.Mail.ForwardingOffer(c.Ctx, from.Email, c.Args[1])
+			if err != nil {
+				return err
+			}
 			return kit.Create(c, ui.ResultSpec{
-				Action: ui.Created, Kind: "forwardings", Name: to,
-				Detail: "from " + from.Email + ", once they accept it",
+				Action: ui.Created, Kind: "forwardings", Name: offer.To,
+				Detail: offered(offer),
 			}, func() (string, error) {
-				return c.App.Mail.ForwardingCreate(c.Ctx, from.Email, to)
+				// Nothing here arranges the elevation: the client does it when the
+				// server asks, and drops the scope again afterwards. All this owes
+				// the user is a reason for the prompt.
+				ctx := app.WithScopeReason(c.Ctx, "turn end-to-end encryption off")
+				return c.App.Mail.ForwardingCreate(ctx, offer)
 			})
 		}),
 	}
+	reauth.Declare(c)
+	return c
+}
+
+// offered says what the person is about to arrange, in the one sentence that has
+// to serve both the dry run and the result.
+func offered(o *mailsvc.ForwardingOffer) string {
+	if o.Encrypted {
+		return "from " + o.From + ", once they accept it"
+	}
+	return "from " + o.From + ", once they confirm it by email, with end-to-end encryption for " +
+		o.From + " turned off"
 }
 
 // forwardingVerb is one of the things that can be done to forwardings already

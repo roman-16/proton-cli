@@ -125,24 +125,6 @@ var untested = map[string]string{
 	// the fixture address, which is why it is not on this list.
 	"PUT /core/v4/addresses/{id}/delete":          "Proton allows one address deletion a year, and no test may spend it",
 	"GET /core/v4/addresses/allowAddressDeletion": "only deleting an address asks whether the year's allowance is still there",
-
-	// Everything a forwarding can be told to do, none of which a run can reach.
-	// Proton refuses to set one up from here - see docs/help/limits.md - so no run
-	// produces a forwarding to accept, pause, resume, ask again or take down, and
-	// the accounts hold none of their own. TestMailForwardingSetupIsRefusedByProton
-	// sends the setup on every run and is refused, which exercises the request and,
-	// being a refusal, records nothing.
-	"POST /mail/v4/forwardings":            "Proton refuses a forwarding set up from here, so nothing this sends is ever stored",
-	"DELETE /mail/v4/forwardings/{id}":     "there is no forwarding to take down, because none can be set up",
-	"PUT /mail/v4/forwardings/{id}":        "asking a forwardee again sends the material Proton refuses",
-	"PUT /mail/v4/forwardings/{id}/pause":  "pausing needs a forwarding, and none can be set up",
-	"PUT /mail/v4/forwardings/{id}/resume": "the other half of the same gap",
-
-	// Asking again reaches this endpoint only for a forwardee outside Proton,
-	// whose confirmation email is the only thing there is to send twice. Setting
-	// one of those up is not built - Proton emails the address a link its owner
-	// must follow - so no account the suite signs in has one for a test to find.
-	"PUT /mail/v4/forwardings/{id}/reinvite": "only a forwarding to an address outside Proton reaches it, and no test account has one",
 }
 
 func TestEveryRequestTheCLICanSendIsOneTheSuiteSends(t *testing.T) {

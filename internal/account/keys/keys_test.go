@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ProtonMail/go-srp"
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
@@ -516,7 +517,7 @@ func TestUnlockDoesNotCountAnAddressThatStayedShut(t *testing.T) {
 		{ID: "dead", Email: "old@proton.me", Keys: []Key{{ID: "dead-key", PrivateKey: lockedKey(t, "dead", "another passphrase"), Active: 1}}},
 		{ID: "live", Email: "me@proton.me", Keys: []Key{{ID: "live-key", PrivateKey: lockedKey(t, "live", "the passphrase"), Active: 1}}},
 	}
-	u, err := open(ctx, user, addrs, "the passphrase")
+	u, err := open(ctx, time.Now, user, addrs, "the passphrase")
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}

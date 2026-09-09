@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
@@ -15,26 +16,34 @@ import (
 	"github.com/roman-16/proton-cli/internal/proton"
 )
 
-// Forwarding hands every message arriving at one of your addresses to another
-// Proton account, and keeps it end-to-end encrypted on the way.
+// Forwarding hands every message arriving at one of your addresses to somebody
+// else, and keeps it end-to-end encrypted on the way wherever it can.
 //
-// The mechanism is OpenPGP proxy re-encryption: a forwardee key is derived from
-// the forwarder's, together with a proxy parameter per encryption subkey that
-// lets Proton's servers re-wrap a message's session key from one to the other
-// without ever holding either plaintext. Proton's own tags of go-crypto carry
-// the primitive; the upstream releases do not.
+// To another Proton account it can. The mechanism is OpenPGP proxy
+// re-encryption: a forwardee key is derived from the forwarder's, together with
+// a proxy parameter per encryption subkey that lets Proton's servers re-wrap a
+// message's session key from one to the other without ever holding either
+// plaintext. Proton's own tags of go-crypto carry the primitive; the upstream
+// releases do not.
+//
+// To an address outside Proton it cannot: there is no key to derive from and
+// nobody to derive one for, so the forwarder's address gives up its own
+// end-to-end encryption for as long as the arrangement lasts, and Proton emails
+// the forwardee a link to follow.
 //
 // Both ends are here. Setting one up derives that material and sends it;
 // accepting one opens the material somebody sent, re-locks the key under this
 // account's own passphrase and publishes it as a key of the address - which is
 // the only key proton ever writes, and one it did not make.
 
-// Forwarding types, from Proton's ForwardingType. Only the internal encrypted
-// one can be set up here: forwarding to an address outside Proton turns the
-// address's encryption off and needs the forwardee to answer an email, which a
-// command can start and never finish. One that already exists is still listed,
-// and asking its forwardee again is still sending that email.
-const forwardingInternalEncrypted = 1
+// Forwarding types, from Proton's ForwardingType. Which of the two a forwarding
+// is follows from the forwardee: another Proton account has a key to derive
+// from, and an address outside Proton has none, so what is arranged for it is
+// the unencrypted kind and the address's own encryption comes off.
+const (
+	forwardingInternalEncrypted = 1
+	forwardingExternalPlain     = 2
+)
 
 // Forwarding states, from Proton's ForwardingState.
 const (
@@ -163,64 +172,139 @@ func (s *Service) ForwardingsList(ctx context.Context) ([]Forwarding, error) {
 	return out, nil
 }
 
-// ForwardingCreate asks another Proton account to take mail arriving at one of
-// your addresses.
+// ForwardingOffer is what setting a forwarding up would arrange, judged before
+// anything is sent.
 //
-// Nothing is forwarded until they accept: what this sends is the derived key,
-// sealed under a passphrase only they can open, and the proxy parameters Proton
-// needs to re-wrap each message.
-func (s *Service) ForwardingCreate(ctx context.Context, forwarder, forwardee string) (string, error) {
+// What kind it is decides both halves of the answer - what the request carries,
+// and what the person is told they are about to do - so it is settled once, in
+// front of the mutation, rather than discovered inside it. Encrypted is the
+// whole of the difference: a forwardee with a Proton key is handed a key derived
+// for them, and one without has the address's own encryption turned off so
+// Proton can hand them mail at all.
+type ForwardingOffer struct {
+	From      string
+	To        string
+	Encrypted bool
+
+	// What creating it needs, carried from the judgement that resolved it: the
+	// address as Proton holds it, and the forwardee's published key where there
+	// is one.
+	address     keys.Address
+	forwardeeKR *pgp.KeyRing
+}
+
+// ForwardingOffer works out what forwarding one address to another would be.
+//
+// Everything that can refuse before anything moves refuses here: the plan the
+// account is on, an address that is not the account's, an address forwarding to
+// itself, and a key this build cannot derive from.
+func (s *Service) ForwardingOffer(ctx context.Context, forwarder, forwardee string) (*ForwardingOffer, error) {
+	u, err := s.keys(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !u.PaidMail {
+		return nil, errs.Problemf("Setting up a forwarding needs a paid Mail plan.")
+	}
+	from, err := s.forwarderAddress(u, forwarder)
+	if err != nil {
+		return nil, err
+	}
+	if strings.EqualFold(from.Email, forwardee) {
+		return nil, errs.Problemf("An address cannot forward to itself.")
+	}
+	forwardeeKR, err := keys.Published(ctx, s.C, forwardee)
+	if err != nil {
+		return nil, err
+	}
+	if forwardeeKR != nil {
+		if _, err := forwardingEntity(u, from); err != nil {
+			return nil, err
+		}
+	}
+	return &ForwardingOffer{
+		From: from.Email, To: forwardee, Encrypted: forwardeeKR != nil,
+		address: from, forwardeeKR: forwardeeKR,
+	}, nil
+}
+
+// ForwardingCreate asks somebody to take mail arriving at one of your
+// addresses, and hands back the ID Proton files the arrangement under.
+//
+// Nothing is forwarded until they accept. For another Proton account, what this
+// sends is the derived key, sealed under a passphrase only they can open, and
+// the proxy parameters Proton needs to re-wrap each message; for an address
+// outside Proton, Proton emails its owner a link to follow.
+func (s *Service) ForwardingCreate(ctx context.Context, offer *ForwardingOffer) (string, error) {
 	u, err := s.keys(ctx)
 	if err != nil {
 		return "", err
 	}
-	from, err := s.forwarderAddress(u, forwarder)
+	if !offer.Encrypted {
+		return s.createPlain(ctx, u, offer)
+	}
+	material, err := s.forwardingMaterial(ctx, u, offer.address, offer.To, offer.forwardeeKR)
 	if err != nil {
 		return "", err
 	}
-	if strings.EqualFold(from.Email, forwardee) {
-		return "", errs.Problemf("An address cannot forward to itself.")
-	}
-	material, err := s.forwardingMaterial(ctx, u, from, forwardee)
-	if err != nil {
-		return "", err
-	}
+	return s.postForwarding(ctx, map[string]any{
+		"Type":                forwardingInternalEncrypted,
+		"ForwarderAddressID":  offer.address.ID,
+		"ForwardeeEmail":      material.forwardee,
+		"ForwardeePrivateKey": material.privateKey,
+		"ActivationToken":     material.activationToken,
+		"ProxyInstances":      material.proxyInstances,
+		// No filter: every message arriving at the address is forwarded, which
+		// is what the web client's form produces when no condition is added.
+		"Tree":    nil,
+		"Version": sieveVersion,
+	})
+}
 
+// createPlain arranges a forwarding to an address outside Proton.
+//
+// Proton will not carry mail to an address it holds no key for while the
+// forwarder's own mail is end-to-end encrypted, so that comes off first and the
+// request follows - the order Proton's own clients use. A request that then
+// fails would leave the address unencrypted for nothing, so it is put back.
+func (s *Service) createPlain(
+	ctx context.Context, u *keys.Unlocked, offer *ForwardingOffer,
+) (string, error) {
+	var turnedOff bool
+	if keys.EndToEnd(offer.address.Flags) {
+		if err := u.SetEncryption(ctx, s.C, offer.address, false); err != nil {
+			return "", err
+		}
+		turnedOff = true
+	}
+	id, err := s.postForwarding(ctx, map[string]any{
+		"Type":               forwardingExternalPlain,
+		"ForwarderAddressID": offer.address.ID,
+		"ForwardeeEmail":     offer.To,
+		"Tree":               nil,
+		"Version":            sieveVersion,
+	})
+	if err != nil && turnedOff {
+		if back := u.SetEncryption(ctx, s.C, offer.address, true); back != nil {
+			slog.WarnContext(ctx, fmt.Sprintf(
+				"The forwarding was not set up, and end-to-end encryption for %s could not be "+
+					"turned back on. Turn it on again in Proton's settings for that address.",
+				offer.address.Email), "error", back.Error())
+		}
+	}
+	return id, err
+}
+
+func (s *Service) postForwarding(ctx context.Context, body map[string]any) (string, error) {
 	var r struct {
 		OutgoingAddressForwarding apiForwarding
 	}
 	if err := s.C.Decode(ctx, proton.Request{
-		Method: "POST", Path: "/mail/v4/forwardings",
-		Body: map[string]any{
-			"Type":                forwardingInternalEncrypted,
-			"ForwarderAddressID":  from.ID,
-			"ForwardeeEmail":      material.forwardee,
-			"ForwardeePrivateKey": material.privateKey,
-			"ActivationToken":     material.activationToken,
-			"ProxyInstances":      material.proxyInstances,
-			// No filter: every message arriving at the address is forwarded, which
-			// is what the web client's form produces when no condition is added.
-			"Tree":    nil,
-			"Version": sieveVersion,
-		},
+		Method: "POST", Path: "/mail/v4/forwardings", Body: body,
 	}, &r); err != nil {
-		return "", refusedSetup(err)
+		return "", err
 	}
 	return r.OutgoingAddressForwarding.ID, nil
-}
-
-// refusedSetup says where a forwarding can be set up, for the request Proton
-// will not take from here.
-//
-// Everything the request carries has been held against what Proton's own client
-// sends for the same forwarder and forwardee - the derived key, the sealed
-// passphrase, the proxy parameters, every field of the body - and is the same;
-// Proton takes theirs and refuses this. Its own answer is left saying whatever
-// it says, because it is the only account of the refusal anybody has.
-func refusedSetup(err error) error {
-	return errs.Problemf("%s", err).
-		Hint("Proton takes a forwarding set up in its own clients: add it at account.proton.me",
-			"accepting one sent to you works here")
 }
 
 // ForwardingAccept publishes the keys somebody derived for one of your
@@ -351,24 +435,35 @@ func (s *Service) forwarderAddress(u *keys.Unlocked, email string) (keys.Address
 		Hint("`proton mail settings addresses list` shows them")
 }
 
-// forwardingEntity is the address's primary key, as go-crypto sees it.
+// forwardingEntity is the key a forwarding is derived from: the one the address
+// writes with, as go-crypto sees it.
 //
-// Deriving forwarding material reaches below gopenpgp: the proxy parameters come
-// out of the raw entity, one per encryption subkey.
-func forwardingEntity(u *keys.Unlocked, addressID string) (*openpgp.Entity, error) {
-	kr, ok := u.AddrKR(addressID)
-	if !ok {
-		return nil, errs.Problemf("That address has no key that opened.")
+// Which key that is matters. An address holds every key it has ever had, and a
+// forwardee key derived from a retired one would be derived from a key Proton no
+// longer re-wraps anything with - so it is the address's primary, and not
+// whichever of them happened to unlock first. A post-quantum primary is refused:
+// the scheme derives from an ECC key, and the repair is demoting a key, which is
+// not something proton does to keys it did not make.
+//
+// Deriving reaches below gopenpgp: the proxy parameters come out of the raw
+// entity, one per encryption subkey.
+func forwardingEntity(u *keys.Unlocked, addr keys.Address) (*openpgp.Entity, error) {
+	primary, err := u.PrimaryKeys(addr)
+	if err != nil {
+		return nil, err
 	}
-	all := kr.GetKeys()
-	if len(all) == 0 {
-		return nil, errs.Problemf("That address has no key that opened.")
+	for _, key := range primary {
+		entity := key.GetEntity()
+		if entity == nil || entity.PrimaryKey == nil || entity.PrivateKey == nil {
+			return nil, errs.Problemf("The key of %s is not one a forwarding can be derived from.", addr.Email)
+		}
+		if entity.PrimaryKey.Version != 4 {
+			return nil, errs.Unsupportedf(
+				"The primary key of %s is post-quantum, which cannot be forwarded from.", addr.Email).
+				Hint("set the forwarding up in a Proton client")
+		}
 	}
-	entity := all[0].GetEntity()
-	if entity == nil || entity.PrivateKey == nil {
-		return nil, errs.Problemf("That address's key is not one this can forward from.")
-	}
-	return entity, nil
+	return primary[0].GetEntity(), nil
 }
 
 // forwardingMaterial is everything a forwarding request carries that had to be
@@ -395,17 +490,8 @@ type forwardingMaterial struct {
 // and would not want to, since what makes a forwarding outdated is the key it
 // was derived from changing.
 func (s *Service) forwardingMaterial(
-	ctx context.Context, u *keys.Unlocked, from keys.Address, forwardee string,
+	ctx context.Context, u *keys.Unlocked, from keys.Address, forwardee string, forwardeeKR *pgp.KeyRing,
 ) (*forwardingMaterial, error) {
-	forwardeeKR, err := keys.Published(ctx, s.C, forwardee)
-	if err != nil {
-		return nil, err
-	}
-	if forwardeeKR == nil {
-		return nil, errs.Problemf(
-			"%s is not a Proton address, so mail cannot be forwarded to it end-to-end.", forwardee).
-			Hint("Proton emails an address outside Proton a link its owner must follow, which no command can answer")
-	}
 	// The address as their own key spells it, not as it was typed: Proton's
 	// addresses answer to more spellings than they are stored under, and a key
 	// named after the wrong one is a key Proton refuses.
@@ -413,11 +499,11 @@ func (s *Service) forwardingMaterial(
 	if named == "" {
 		named = forwardee
 	}
-	entity, err := forwardingEntity(u, from.ID)
+	entity, err := forwardingEntity(u, from)
 	if err != nil {
 		return nil, err
 	}
-	derived, err := deriveForwarding(entity, named)
+	derived, err := deriveForwarding(entity, named, u.Generation())
 	if err != nil {
 		return nil, err
 	}
@@ -461,17 +547,17 @@ type derivedKey struct {
 // Not strict: a forwarder holding an encryption subkey of an algorithm the
 // scheme cannot proxy still forwards through the ones it can, which is what the
 // web client does. A key with none at all fails, and says so.
-func deriveForwarding(forwarder *openpgp.Entity, forwardee string) (*derivedKey, error) {
+func deriveForwarding(
+	forwarder *openpgp.Entity, forwardee string, config *packet.Config,
+) (*derivedKey, error) {
 	raw := make([]byte, 32)
 	if _, err := rand.Read(raw); err != nil {
 		return nil, err
 	}
 	passphrase := hex.EncodeToString(raw)
 
-	// A configuration of its own, because the derivation writes the algorithm and
-	// curve it insists on into whatever it is handed.
 	derived, instances, err := forwarder.NewForwardingEntity(
-		forwardee, "", forwardee, &packet.Config{}, false)
+		forwardee, "", forwardee, config, false)
 	if err != nil {
 		return nil, errs.Problemf("The key for that address cannot be forwarded from: %v", err).
 			Hint("Proton derives a forwarding key from an ECC encryption key, which older keys are not")
@@ -480,7 +566,7 @@ func deriveForwarding(forwarder *openpgp.Entity, forwardee string) (*derivedKey,
 		return nil, errs.Problemf("The key for that address has nothing to forward from.").
 			Hint("it holds no encryption subkey a forwarding key can be derived from")
 	}
-	if err := forwardOnly(derived); err != nil {
+	if err := forwardOnly(derived, config); err != nil {
 		return nil, err
 	}
 
@@ -488,11 +574,7 @@ func deriveForwarding(forwarder *openpgp.Entity, forwardee string) (*derivedKey,
 	if err != nil {
 		return nil, err
 	}
-	locked, err := key.Lock([]byte(passphrase))
-	if err != nil {
-		return nil, err
-	}
-	armored, err := locked.Armor()
+	armored, err := keys.LockAndArmor(key, []byte(passphrase))
 	if err != nil {
 		return nil, err
 	}
@@ -511,7 +593,7 @@ func deriveForwarding(forwarder *openpgp.Entity, forwardee string) (*derivedKey,
 // secret-sharing scheme, which is a fair description of what forwarding does and
 // is not what the accounts on the other side of it write. A key that says more
 // about itself than theirs do is a key they did not make.
-func forwardOnly(derived *openpgp.Entity) error {
+func forwardOnly(derived *openpgp.Entity, config *packet.Config) error {
 	for _, sub := range derived.Subkeys {
 		if sub.Sig == nil || !sub.Sig.FlagForward {
 			continue
@@ -519,7 +601,7 @@ func forwardOnly(derived *openpgp.Entity) error {
 		sub.Sig.FlagSplitKey = false
 		// The flags live in what binds the subkey to the key, so changing them
 		// means signing that again.
-		if err := sub.Sig.SignKey(sub.PublicKey, derived.PrivateKey, &packet.Config{}); err != nil {
+		if err := sub.Sig.SignKey(sub.PublicKey, derived.PrivateKey, config); err != nil {
 			return fmt.Errorf("sign the forwarding key's encryption subkey: %w", err)
 		}
 	}
@@ -542,14 +624,66 @@ func sealPassphrase(passphrase string, forwarderKR, forwardeeKR *pgp.KeyRing) (s
 	if err != nil {
 		return "", err
 	}
-	return msg.GetArmored()
+	// No armour headers, for the reason a key carries none: what Proton's clients
+	// send carries none.
+	return msg.GetArmoredWithCustomHeaders("", "")
 }
 
 // ForwardingDelete removes an arrangement in either direction.
-func (s *Service) ForwardingDelete(ctx context.Context, id string) error {
-	return s.C.Decode(ctx, proton.Request{
-		Method: "DELETE", Path: "/mail/v4/forwardings/" + id,
-	}, nil)
+//
+// Taking down the last forwarding to an address outside Proton is what makes the
+// forwarder's own address end-to-end encrypted again: the reason it was off was
+// this arrangement, and nothing else here turns it back on.
+func (s *Service) ForwardingDelete(ctx context.Context, f Forwarding) error {
+	if err := s.C.Decode(ctx, proton.Request{
+		Method: "DELETE", Path: "/mail/v4/forwardings/" + f.ID,
+	}, nil); err != nil {
+		return err
+	}
+	// The forwarding is down either way, and saying otherwise would send somebody
+	// looking for one that is no longer there. What is left of the failure is a
+	// sentence about the address, which is the thing they can still act on.
+	if err := s.restoreEncryption(ctx, f); err != nil {
+		slog.WarnContext(ctx, fmt.Sprintf(
+			"The forwarding is down, and end-to-end encryption for %s could not be turned back "+
+				"on. Turn it on again in Proton's settings for that address.", f.From),
+			"error", err.Error())
+	}
+	return nil
+}
+
+// restoreEncryption turns end-to-end encryption back on for the address a
+// deleted forwarding left it off for.
+//
+// Everything has to hold: the forwarding was one this account set up, it was the
+// unencrypted kind, it was the last of those from that address, the address is
+// actually unencrypted, and its domain points its mail at Proton - an address
+// whose domain does not cannot be encrypted at all. Anything else and the state
+// Proton holds is the right one, so nothing is written.
+func (s *Service) restoreEncryption(ctx context.Context, f Forwarding) error {
+	if f.Direction != DirectionOutgoing || f.Encrypted || f.addressID == "" {
+		return nil
+	}
+	u, err := s.keys(ctx)
+	if err != nil {
+		return err
+	}
+	addr, ok := addressByID(u, f.addressID)
+	if !ok || keys.EndToEnd(addr.Flags) || !addr.ProtonMX {
+		return nil
+	}
+	remaining, err := s.ForwardingsList(ctx)
+	if err != nil {
+		return err
+	}
+	for _, other := range remaining {
+		if other.Direction == DirectionOutgoing && !other.Encrypted && other.addressID == f.addressID {
+			return nil
+		}
+	}
+	slog.DebugContext(ctx, "forwarding: turning end-to-end encryption back on for the address it was off for",
+		"kind", "forwarding", "ref", f.ID)
+	return u.SetEncryption(ctx, s.C, addr, true)
 }
 
 // ForwardingPause stops mail being forwarded without taking the arrangement
@@ -593,19 +727,25 @@ func (s *Service) renewForwarding(ctx context.Context, f Forwarding) error {
 	if err != nil {
 		return err
 	}
-	material, err := s.forwardingMaterial(ctx, u, from, f.To)
+	forwardeeKR, err := keys.Published(ctx, s.C, f.To)
 	if err != nil {
 		return err
 	}
-	if err := s.C.Decode(ctx, proton.Request{
+	if forwardeeKR == nil {
+		return errs.Problemf(
+			"Proton no longer publishes a key for %s, so it cannot be offered the forwarding again.", f.To).
+			Hint("`proton mail settings forwarding delete " + f.To + "` takes it down")
+	}
+	material, err := s.forwardingMaterial(ctx, u, from, f.To, forwardeeKR)
+	if err != nil {
+		return err
+	}
+	return s.C.Decode(ctx, proton.Request{
 		Method: "PUT", Path: "/mail/v4/forwardings/" + f.ID,
 		Body: map[string]any{
 			"ForwardeePrivateKey": material.privateKey,
 			"ActivationToken":     material.activationToken,
 			"ProxyInstances":      material.proxyInstances,
 		},
-	}, nil); err != nil {
-		return refusedSetup(err)
-	}
-	return nil
+	}, nil)
 }

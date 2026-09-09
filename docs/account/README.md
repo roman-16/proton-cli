@@ -132,6 +132,8 @@ These commands ask for your password again even when you are signed in:
 - `mail settings addresses disable`
 - `mail settings addresses enable`
 - `mail settings forwarding accept`
+- `mail settings forwarding create`
+- `mail settings forwarding delete`
 - `mail settings autoreply disable`
 - `mail settings autoreply enable`
 - `mail settings autoreply set`

@@ -300,6 +300,31 @@ proton mail settings senders forget billing@example.com
 
 A decision applies before the spam filter forms an opinion. Deciding again about the same sender replaces the earlier decision. `forget` lets the filter decide again.
 
+## Forward one of your addresses
+
+```bash
+proton mail settings forwarding create me@proton.me jane@proton.me
+proton mail settings forwarding create me@proton.me jane@example.com
+proton mail settings forwarding list
+```
+
+Setting one up needs a paid Mail plan. Nothing is forwarded until the other side accepts. A Proton address accepts in its Proton client or with `forwarding accept`; an address outside Proton follows the link Proton emails it.
+
+Forwarding to an address outside Proton turns off end-to-end encryption for your address. It comes back on when the last such forwarding from that address is deleted. `proton mail settings addresses get me@proton.me` shows whether it is on.
+
+**Setting up that kind asks for your password**, and so does the `delete` that turns encryption back on. With no terminal, pass `--password-file` or `--password-stdin`. The other commands that do this are listed in [Account](../account/README.md#commands-that-ask-for-the-password-again).
+
+## Change or stop a forwarding you set up
+
+```bash
+proton mail settings forwarding disable jane@proton.me
+proton mail settings forwarding enable jane@proton.me
+proton mail settings forwarding resend jane@proton.me
+proton mail settings forwarding delete jane@proton.me
+```
+
+`disable` stops mail being forwarded and keeps the arrangement. `resend` offers it again to a forwardee who declined it, or whose material your key change left outdated. `delete` takes one down in either direction.
+
 ## Accept a forwarding somebody sent you
 
 ```bash
@@ -309,19 +334,6 @@ proton mail settings forwarding decline jane@proton.me
 ```
 
 A forwarding is named by the other party's address, in either direction. Only a pending forwarding sent to one of your addresses can be accepted or declined, and accepting needs no plan.
-
-## Forwardings you set up
-
-```bash
-proton mail settings forwarding list
-proton mail settings forwarding disable jane@proton.me
-proton mail settings forwarding enable jane@proton.me
-proton mail settings forwarding delete jane@proton.me
-```
-
-Nothing is forwarded until Jane accepts it, and it stays pending until she does. `disable` stops mail being forwarded and keeps the arrangement; `delete` takes one down in either direction.
-
-Adding a forwarding is done at [account.proton.me](https://account.proton.me) - see [What it can't do](../help/limits.md#not-built-yet).
 
 ## Add an address
 

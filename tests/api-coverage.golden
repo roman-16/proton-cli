@@ -13,6 +13,7 @@ DELETE /drive/v2/urls/{id}/bookmark
 DELETE /drive/volumes/{id}/trash
 DELETE /mail/v4/attachments/{id}
 DELETE /mail/v4/filters/{id}
+DELETE /mail/v4/forwardings/{id}
 DELETE /mail/v4/messages/empty
 DELETE /pass/v1/invite/{id}
 DELETE /pass/v1/public_link/{id}
@@ -145,6 +146,7 @@ POST /drive/volumes/{id}/links/{id}/copy
 POST /drive/volumes/{id}/shares
 POST /mail/v4/attachments
 POST /mail/v4/filters
+POST /mail/v4/forwardings
 POST /mail/v4/incomingdefaults
 POST /mail/v4/messages
 POST /mail/v4/messages/apply-filters
@@ -175,6 +177,7 @@ PUT /contacts/v4/contacts/{id}
 PUT /core/v4/addresses/{id}
 PUT /core/v4/addresses/{id}/disable
 PUT /core/v4/addresses/{id}/enable
+PUT /core/v4/addresses/{id}/encryption
 PUT /core/v4/labels/{id}
 PUT /core/v4/settings/weekstart
 PUT /core/v4/users/lock
@@ -200,6 +203,10 @@ PUT /mail/v4/filters/order
 PUT /mail/v4/filters/{id}
 PUT /mail/v4/filters/{id}/disable
 PUT /mail/v4/filters/{id}/enable
+PUT /mail/v4/forwardings/{id}
+PUT /mail/v4/forwardings/{id}/pause
+PUT /mail/v4/forwardings/{id}/reinvite
+PUT /mail/v4/forwardings/{id}/resume
 PUT /mail/v4/incomingdefaults/delete
 PUT /mail/v4/messages/delete
 PUT /mail/v4/messages/expire

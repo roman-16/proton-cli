@@ -117,6 +117,44 @@ func requirePaidFixtures() {
 			}
 		}
 	}
+	sweepForwardings()
+}
+
+// sweepForwardings takes down whatever a run that did not come back left
+// forwarding from the fixture address.
+//
+// A forwarding carries no name of its own, so fixture.Sweep cannot find one by
+// the prefix everything else is found by - and the photograph cannot either,
+// since one that was already there before the run is one it will still see
+// after. What makes this safe is the address: it exists for the suite, receives
+// nothing, and nothing but a test ever forwards from it. Deleting the last
+// forwarding to somewhere outside Proton is also what turns the address's own
+// encryption back on, which is the state every test here starts from.
+func sweepForwardings() {
+	forwarder, err := ensurePinned(account.Paid, "address", fixture.PaidForwarder)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		os.Exit(1)
+	}
+	address := fixture.Str(forwarder["email"])
+	list, err := fixture.Rows(suiteRunner, account.Paid, "mail", "settings", "forwarding", "list")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "could not read the paid account's forwardings: %v\n", err)
+		os.Exit(1)
+	}
+	for _, row := range list {
+		if fixture.Str(row["direction"]) != "outgoing" || fixture.Str(row["from"]) != address {
+			continue
+		}
+		id := fixture.Str(row["id"])
+		if _, err := suiteRunner(account.Paid,
+			"--yes", "mail", "settings", "forwarding", "delete", "--", id); err != nil {
+			fmt.Fprintf(os.Stderr, "a forwarding an earlier run left from %s could not be taken down: %v\n",
+				address, err)
+			os.Exit(1)
+		}
+		fmt.Fprintf(os.Stderr, "took down the forwarding an earlier run left from %s\n", address)
+	}
 }
 
 // paidHome is the address whose domain the suite makes its own address on: one

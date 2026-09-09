@@ -99,6 +99,7 @@ type Client struct {
 	uid           string
 	acc           string
 	ref           string
+	offset        time.Duration // this machine's clock against Proton's, from the last response
 	link          *linkSession
 	encKeyBlob    string // persisted (salted key password encrypted with the server-held client key)
 	profile       string
@@ -725,7 +726,42 @@ func (c *Client) doOnce(ctx context.Context, req Request) (*Response, error) {
 	c.log.Debug("api request",
 		"method", req.Method, "path", req.Path, "status", resp.StatusCode,
 		"bytes", len(buf), "duration_ms", time.Since(start).Milliseconds())
+	c.observeTime(resp.Header.Get("Date"))
 	return &Response{Status: resp.StatusCode, Body: buf, retryHeader: resp.Header.Get("Retry-After")}, nil
+}
+
+// observeTime learns Proton's clock from what a response was dated.
+//
+// A response that does not say leaves the machine's own clock in charge, which
+// is worth a line: it is the difference between a key this account will hold
+// for years being dated by a clock somebody else keeps right and by one that
+// may be days out.
+func (c *Client) observeTime(header string) {
+	if header == "" {
+		c.log.Debug("api clock", "reason", "undated")
+		return
+	}
+	served, err := http.ParseTime(header)
+	if err != nil {
+		c.log.Debug("api clock", "reason", "unreadable", "error", err)
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.offset = time.Until(served)
+}
+
+// Now is the time as Proton keeps it, and this machine's until a response has
+// said otherwise.
+//
+// It is what everything this build writes a date into is dated by. A key is the
+// reason: Proton refuses one dated in the future, and a signature made under a
+// key is read against the key's own creation time, so a machine whose clock
+// runs fast would write keys nobody accepts and signatures nothing verifies.
+func (c *Client) Now() time.Time {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return time.Now().Add(c.offset)
 }
 
 func encodeBody(b any) (io.Reader, error) {

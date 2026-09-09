@@ -139,6 +139,7 @@ func Notices() []string {
 		"shared a vault with you",
 		"shared a calendar with you",
 		"Forwarding active",
+		"Forwarding request declined",
 	}
 }
 

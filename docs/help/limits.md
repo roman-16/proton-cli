@@ -20,8 +20,6 @@ Each of these has an equivalent in a web client.
 
 | What is missing | What to do instead |
 | --- | --- |
-| Setting up mail forwarding | Add the forwarding at [account.proton.me](https://account.proton.me). Accepting one sent to you, pausing it, resuming it and taking it down are built |
-| Mail forwarding to a non-Proton address | Proton emails the address a link its owner must follow; finish it there |
 | Turning on the `@pm.me` short domain | Switch it on at [account.proton.me](https://account.proton.me). Adding, disabling and deleting other addresses is built |
 | Turning the Pass [extra password](../pass/README.md#an-extra-password) on or off | Use the Pass app. *Answering* one is built |
 

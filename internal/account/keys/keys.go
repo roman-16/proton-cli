@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/ProtonMail/go-srp"
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
@@ -22,6 +23,12 @@ type Unlocked struct {
 	UserKR    *pgp.KeyRing
 	AddrKRs   map[string]*pgp.KeyRing
 	Addresses []Address
+	// PaidMail says whether the account's plan includes Mail, which is what
+	// Proton gates setting up a forwarding behind.
+	PaidMail bool
+	// Now is the time as Proton keeps it, which is what every key and signature
+	// this build writes is dated by. Nil falls back to this machine's clock.
+	Now func() time.Time
 }
 
 // Get hands back the unlocked hierarchy, fetching it the first time it is asked
@@ -56,7 +63,16 @@ type User struct {
 	ID   string
 	Name string
 	Keys []Key
+	// Subscribed is which products the account's plan covers, one bit each.
+	Subscribed int
 }
+
+// productMail is the bit of Subscribed that says the plan covers Mail. Mirrors
+// PRODUCT_BIT.MAIL in WebClients (packages/shared/lib/constants.ts).
+const productMail = 1
+
+// paidMail reports whether the account's plan covers Mail.
+func (u User) paidMail() bool { return u.Subscribed&productMail != 0 }
 
 // Address mirrors the fields of /core/v4/addresses the CLI needs. Order,
 // Status, Send and Receive drive sender selection: Proton only allows sending
@@ -73,10 +89,36 @@ type Address struct {
 	Receive     int
 	Type        int
 	Keys        []Key
+	// Flags is what Proton holds about how mail to this address is protected:
+	// whether it is end-to-end encrypted, and whether a signature is expected on
+	// what arrives.
+	Flags int
+	// ProtonMX says whether the address's domain points its mail at Proton,
+	// which is what decides whether end-to-end encryption can be on at all.
+	ProtonMX bool
 	// SignedKeyList is what Proton publishes as the keys this address has. An
 	// address nothing has ever published one for has none.
 	SignedKeyList *SignedKeyList
 }
+
+// What an address's Flags say about it. Mirrors ADDRESS_FLAGS in WebClients
+// (packages/shared/lib/constants.ts).
+const (
+	addressEncryptionOff   = 1 << 4
+	addressExpectSignedOff = 1 << 5
+)
+
+// EndToEnd reports whether mail arriving at an address with these flags is
+// end-to-end encrypted.
+//
+// It is off for an address that forwards to somewhere outside Proton, since a
+// forwardee who holds no Proton key cannot be handed anything only they can
+// read.
+func EndToEnd(flags int) bool { return flags&addressEncryptionOff == 0 }
+
+// ExpectsSigned reports whether Proton expects mail arriving at an address with
+// these flags to be signed.
+func ExpectsSigned(flags int) bool { return flags&addressExpectSignedOff == 0 }
 
 // SignedKeyList is the account's own statement of which keys an address holds:
 // the list, and a signature over it by the address's primary key.
@@ -159,7 +201,7 @@ func Unlock(ctx context.Context, c *proton.Client, ask KeyPassword) (*Unlocked, 
 	}
 
 	if sealed != "" {
-		u, err := open(ctx, user, addrs, sealed)
+		u, err := open(ctx, c.Now, user, addrs, sealed)
 		if err == nil {
 			return u, nil
 		}
@@ -185,7 +227,7 @@ func Unlock(ctx context.Context, c *proton.Client, ask KeyPassword) (*Unlocked, 
 	if err != nil {
 		return nil, err
 	}
-	u, err := open(ctx, user, addrs, d.pass)
+	u, err := open(ctx, c.Now, user, addrs, d.pass)
 	if err != nil {
 		if errors.Is(err, errWrongKeyPass) {
 			return nil, wrongSecret(d.twoPassword)
@@ -216,7 +258,7 @@ func Unlock(ctx context.Context, c *proton.Client, ask KeyPassword) (*Unlocked, 
 // for it. What it hides is whatever was sealed to it, and that is counted where
 // it fails to open - the item, the share, the card - so counting the address as
 // well would say a listing is short when it is whole.
-func open(ctx context.Context, user *User, addrs []Address, skp string) (*Unlocked, error) {
+func open(ctx context.Context, now func() time.Time, user *User, addrs []Address, skp string) (*Unlocked, error) {
 	userKR, err := unlockKeyRing(ctx, user.Keys, []byte(skp), nil)
 	if err != nil {
 		return nil, errWrongKeyPass
@@ -248,7 +290,10 @@ func open(ctx context.Context, user *User, addrs []Address, skp string) (*Unlock
 	if len(addrKRs) == 0 {
 		return nil, shape
 	}
-	return &Unlocked{UserKR: userKR, AddrKRs: addrKRs, Addresses: addrs}, nil
+	return &Unlocked{
+		UserKR: userKR, AddrKRs: addrKRs, Addresses: addrs,
+		PaidMail: user.paidMail(), Now: now,
+	}, nil
 }
 
 // unopenable is the account's shape when the user keys opened and not one

@@ -497,13 +497,11 @@ proton mail settings forwarding accept jane@proton.me
 
 ### `forwarding create`
 
-Forward one of your addresses to another Proton address.
+Forward one of your addresses to another address.
 
-REF is the address of yours mail arrives at, EMAIL is the Proton address it is handed to. Mail stays end-to-end encrypted, and nothing is forwarded until they accept it.
+REF is the address of yours mail arrives at, EMAIL is where it is handed to. Needs a paid Mail plan, and nothing is forwarded until they accept it: a Proton address in its Proton client or with `forwarding accept`, an address outside Proton by following the link Proton emails it.
 
-Proton refuses this request from proton: add the forwarding at account.proton.me instead. Accepting one sent to you works here.
-
-Forwarding to an address outside Proton is not built.
+To a Proton address, mail stays end-to-end encrypted. To an address outside Proton, end-to-end encryption for REF is turned off until the last such forwarding from it is deleted, and your password is asked for to turn it off. With no terminal to ask, pass --password-file or --password-stdin.
 
 ```
 proton mail settings forwarding create REF EMAIL
@@ -511,7 +509,14 @@ proton mail settings forwarding create REF EMAIL
 
 ```bash
 proton mail settings forwarding create me@proton.me jane@proton.me
+proton mail settings forwarding create me@proton.me jane@example.com
 ```
+
+| Flag | Description |
+| --- | --- |
+| `--password-file string` | Read the account password from a file |
+| `--password-stdin` | Read the account password from stdin |
+| `--totp string` | Two-factor code |
 
 ### `forwarding decline`
 
@@ -531,6 +536,8 @@ proton mail settings forwarding decline jane@proton.me
 
 Stop forwardings, in either direction.
 
+REF is a forwarding in either direction. Taking down the last forwarding from one of your addresses to an address outside Proton turns end-to-end encryption for it back on, and asks for your password to do it. With no terminal to ask, pass --password-file or --password-stdin.
+
 ```
 proton mail settings forwarding delete REF...
 ```
@@ -538,6 +545,12 @@ proton mail settings forwarding delete REF...
 ```bash
 proton mail settings forwarding delete jane@proton.me
 ```
+
+| Flag | Description |
+| --- | --- |
+| `--password-file string` | Read the account password from a file |
+| `--password-stdin` | Read the account password from stdin |
+| `--totp string` | Two-factor code |
 
 ### `forwarding disable`
 

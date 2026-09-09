@@ -83,6 +83,8 @@ var reauthCommands = [][]string{
 	{"mail", "settings", "addresses", "disable"},
 	{"mail", "settings", "addresses", "enable"},
 	{"mail", "settings", "forwarding", "accept"},
+	{"mail", "settings", "forwarding", "create"},
+	{"mail", "settings", "forwarding", "delete"},
 	{"mail", "settings", "autoreply", "disable"},
 	{"mail", "settings", "autoreply", "enable"},
 	{"mail", "settings", "autoreply", "set"},
@@ -112,8 +114,8 @@ func withPassword(a *testAccount, args []string) []string {
 }
 
 // answeringCommands are the commands that make Proton write to whoever offered
-// something. Answering an invitation is the whole set: the owner is told, by
-// mail, and nothing on this end turns that off.
+// something. Answering is the whole set: the offerer is told, by mail, whichever
+// way it was answered, and nothing on this end turns that off.
 //
 // It is recognised from the args in the one place a command is run, so no test
 // has to remember that what it just did will land in somebody's inbox a moment
@@ -122,6 +124,7 @@ var answeringCommands = [][]string{
 	{"invitations", "accept"},
 	{"invitations", "decline"},
 	{"mail", "settings", "forwarding", "accept"},
+	{"mail", "settings", "forwarding", "decline"},
 }
 
 func answersInvitation(args []string) bool {

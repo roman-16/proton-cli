@@ -69,6 +69,7 @@ func addressesGetCmd() *cobra.Command {
 					{Label: "Status", Value: addressStatus(*a), Always: true},
 					{Label: "Keys", Value: addressKeys(*a), Always: true},
 					{Label: "Can Send", Value: yesNo(a.CanSend()), Always: true},
+					{Label: "End-to-end", Value: yesNo(a.EndToEnd), Always: true},
 					{Label: "Signature", Value: signature, Always: true},
 					{Label: "ID", Value: a.ID, ID: true},
 				},

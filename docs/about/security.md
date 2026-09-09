@@ -7,7 +7,7 @@ Signing in runs [Secure Remote Password](https://en.wikipedia.org/wiki/Secure_Re
 ## What leaves your machine
 
 - API requests to `https://mail.proton.me/api` over HTTPS, authenticated with your session tokens.
-- Encrypted payloads you asked to create: an encrypted message, an encrypted file block, an encrypted event, and the locked key a forwarding you accepted adds to your address.
+- Encrypted payloads you asked to create: an encrypted message, an encrypted file block, an encrypted event, the locked key a forwarding you accepted adds to your address, and the locked key a forwarding you set up derives for the other address, whose passphrase only that address can open.
 - The SRP proof during login, which does not reveal your password.
 - Opening a public link with `--link` or `--shared` carries your session, so Proton knows which account opened it, and the owner sees one more visit.
 - Once a day, on an install no package manager owns, a request to GitHub asking which release is newest. It carries nothing about you or your account, and `PROTON_NO_UPDATE_CHECK` ends it ([Updating](../install.md#updating)).

@@ -184,7 +184,7 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton mail settings folders list`](../mail/settings.md#folders-list) | List your folders |
 | [`proton mail settings folders update`](../mail/settings.md#folders-update) | Rename or recolor a folder |
 | [`proton mail settings forwarding accept`](../mail/settings.md#forwarding-accept) | Accept forwardings sent to you |
-| [`proton mail settings forwarding create`](../mail/settings.md#forwarding-create) | Forward one of your addresses to another Proton address |
+| [`proton mail settings forwarding create`](../mail/settings.md#forwarding-create) | Forward one of your addresses to another address |
 | [`proton mail settings forwarding decline`](../mail/settings.md#forwarding-decline) | Decline forwardings sent to you |
 | [`proton mail settings forwarding delete`](../mail/settings.md#forwarding-delete) | Stop forwardings, in either direction |
 | [`proton mail settings forwarding disable`](../mail/settings.md#forwarding-disable) | Pause forwardings without taking them down |

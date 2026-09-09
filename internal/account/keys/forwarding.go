@@ -36,13 +36,9 @@ func (u *Unlocked) AddForwardingKey(
 	if err != nil {
 		return "", fmt.Errorf("open the primary address key's token: %w", err)
 	}
-	locked, err := key.Lock(token)
+	armored, err := LockAndArmor(key, token)
 	if err != nil {
 		return "", fmt.Errorf("lock the forwarding key under the address's token: %w", err)
-	}
-	armored, err := locked.Armor()
-	if err != nil {
-		return "", err
 	}
 	skl, err := u.republishKeyList(addr)
 	if err != nil {
@@ -114,6 +110,28 @@ func (u *Unlocked) republishKeyList(addr Address) (SignedKeyList, error) {
 		return SignedKeyList{}, err
 	}
 	return SignedKeyList{Data: addr.SignedKeyList.Data, Signature: signature}, nil
+}
+
+// PrimaryKeys are the keys an address writes with: its primary records, as they
+// opened.
+//
+// There is one, except on an account that keeps a post-quantum key beside the
+// ordinary one. Which of them a caller may use is the caller's to judge - a
+// forwarding can only be derived from the v4 key - so all of them come back.
+func (u *Unlocked) PrimaryKeys(addr Address) ([]*pgp.Key, error) {
+	held, err := addressKeys(addr)
+	if err != nil {
+		return nil, err
+	}
+	kr, ok := u.AddrKR(addr.ID)
+	if !ok {
+		return nil, errs.Problemf("The keys for %s did not open.", addr.Email)
+	}
+	primary := primarySigners(held, kr)
+	if len(primary) == 0 {
+		return nil, errs.Problemf("%s has no active primary key that opened.", addr.Email)
+	}
+	return primary, nil
 }
 
 // primarySigners are the address's primary keys that opened, matched to their

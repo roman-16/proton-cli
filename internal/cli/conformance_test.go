@@ -976,6 +976,8 @@ func TestReauthCommandsAreDeclared(t *testing.T) {
 		"proton mail settings autoreply enable",
 		"proton mail settings autoreply set",
 		"proton mail settings forwarding accept",
+		"proton mail settings forwarding create",
+		"proton mail settings forwarding delete",
 	}
 	leaves, _ := partition(t)
 	var got []string

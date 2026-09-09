@@ -15,7 +15,9 @@ import (
 // package says about somebody's keys that other clients will believe. Two rules
 // follow, and everything here is one of them: a list is only composed where
 // there is nothing to contradict, and a list that already exists is signed
-// again with its bytes untouched.
+// again with its bytes untouched - except that turning end-to-end encryption on
+// or off flips the one flag bit on every entry that Proton's clients flip, and
+// nothing else about it.
 
 // sklSigningContext is the notation Proton's clients sign a key list under,
 // which is what stops a signature over one being read as a signature over
@@ -27,6 +29,11 @@ const sklSigningContext = "key-transparency.key-list"
 // obsolete nor compromised. Mirrors getDefaultKeyFlags in WebClients for an
 // address with end-to-end encryption on, which is every address this creates.
 const mailKeyFlags = 3
+
+// keyEncryptionOff is the bit an entry carries when mail arriving at the
+// address cannot be encrypted to that key. Mirrors KEY_FLAG.FLAG_EMAIL_NO_ENCRYPT
+// in WebClients (packages/shared/lib/constants.ts).
+const keyEncryptionOff = 4
 
 // keyListEntry is one key as a key list names it. The field order is the order
 // Proton's clients write, since the list is stored as the text that was signed.
@@ -83,6 +90,36 @@ func signKeyList(data string, signers []*pgp.Key) (string, error) {
 		packets = append(packets, signature.GetBinary()...)
 	}
 	return pgp.NewPGPSignature(packets).GetArmored()
+}
+
+// withEncryption is the published list saying that mail to the address is
+// end-to-end encrypted, or that it is not.
+//
+// It is the one thing here that rewrites a list rather than re-signing it, and
+// it rewrites exactly what Proton's own clients rewrite: one flag bit, on every
+// entry. No key is added, removed or reordered, so the list still names the keys
+// the address holds; the whole of what it says differently is whether what
+// arrives can be encrypted to them.
+func withEncryption(data string, on bool) (string, error) {
+	var items []keyListEntry
+	if err := json.Unmarshal([]byte(data), &items); err != nil {
+		return "", fmt.Errorf("read the published key list: %w", err)
+	}
+	if len(items) == 0 {
+		return "", fmt.Errorf("the published key list names no key")
+	}
+	for i := range items {
+		if on {
+			items[i].Flags &^= keyEncryptionOff
+			continue
+		}
+		items[i].Flags |= keyEncryptionOff
+	}
+	out, err := json.Marshal(items)
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
 }
 
 // addressKey is one of an address's active key records, read far enough to be

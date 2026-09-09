@@ -47,6 +47,9 @@ type Address struct {
 	// is inert - it cannot send, cannot receive, and nothing can be encrypted to
 	// it - which no other field of an enabled address shows.
 	HasKeys bool `json:"has_keys"`
+	// EndToEnd says whether mail arriving here is end-to-end encrypted. It is off
+	// for an address that forwards to somewhere outside Proton.
+	EndToEnd bool `json:"end_to_end"`
 }
 
 // CanSend reports whether Proton permits composing from this address.
@@ -71,6 +74,7 @@ type rawAddress struct {
 	Send        int
 	Receive     int
 	HasKeys     int
+	Flags       int
 }
 
 func (s *Service) AddressesList(ctx context.Context) ([]Address, error) {
@@ -84,6 +88,7 @@ func (s *Service) AddressesList(ctx context.Context) ([]Address, error) {
 			ID: a.ID, Email: a.Email, DisplayName: a.DisplayName, Signature: a.Signature,
 			Type: a.Type, Status: a.Status, Order: a.Order,
 			Send: a.Send, Receive: a.Receive, HasKeys: a.HasKeys != 0,
+			EndToEnd: keys.EndToEnd(a.Flags),
 		})
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Order < out[j].Order })

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/ProtonMail/go-crypto/openpgp/ecdh"
 	"github.com/ProtonMail/go-crypto/openpgp/packet"
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
@@ -24,11 +25,6 @@ import (
 // knows Proton holds a key it can open and a list it composed.
 //
 // Keys an address already has are never touched, here or anywhere.
-
-// keyType is what an address key is generated as: an EdDSA primary with a
-// Curve25519 encryption subkey, which is what Proton's clients make and what
-// forwarding derives from.
-const keyType = "x25519"
 
 // NewAddressKey generates the first key of an address, publishes it, and hands
 // back the ID Proton files it under.
@@ -50,13 +46,9 @@ func (u *Unlocked) NewAddressKey(ctx context.Context, c proton.Doer, addr Addres
 	if err != nil {
 		return "", err
 	}
-	locked, err := key.Lock([]byte(token.passphrase))
+	armored, err := LockAndArmor(key, []byte(token.passphrase))
 	if err != nil {
 		return "", fmt.Errorf("lock the new address key: %w", err)
-	}
-	armored, err := locked.Armor()
-	if err != nil {
-		return "", err
 	}
 	data, err := composeKeyList(key)
 	if err != nil {
@@ -84,15 +76,16 @@ func (u *Unlocked) NewAddressKey(ctx context.Context, c proton.Doer, addr Addres
 // generateAddressKey makes the key an address is given: the key this account's
 // other addresses already hold, generated fresh.
 //
-// Everything about its shape is settled except one thing OpenPGP leaves to
-// whoever generates the key - how its encryption subkey turns a shared secret
+// Generation settles everything about its shape except one thing OpenPGP leaves
+// to whoever generates the key - how its encryption subkey turns a shared secret
 // into a key-encryption key. Two implementations of the same standard pick
 // differently, so a key generated here would carry a choice no other client of
 // this account has ever written, and a key that is unlike the account's own is
-// refused where one is read as Proton expects to have written it. So the choice
+// refused where one is read as Proton expects to have written it. So that choice
 // is not made here at all: it is copied from a key Proton made.
 func (u *Unlocked) generateAddressKey(ctx context.Context, email string) (*pgp.Key, error) {
-	generated, err := pgp.GenerateKey(email, email, keyType, 0)
+	config := u.Generation()
+	entity, err := openpgp.NewEntity(email, "", email, config)
 	if err != nil {
 		return nil, fmt.Errorf("generate a key for the address: %w", err)
 	}
@@ -102,10 +95,9 @@ func (u *Unlocked) generateAddressKey(ctx context.Context, email string) (*pgp.K
 		// this is what says why its key may not read like the account's others.
 		slog.DebugContext(ctx, "keys: no key of the account's own to take the key derivation from",
 			"addresses", len(u.Addresses))
-		return generated, nil
+		return pgp.NewKeyFromEntity(entity)
 	}
 
-	entity := generated.GetEntity()
 	for i, sub := range entity.Subkeys {
 		if sub.PublicKey.PubKeyAlgo != packet.PubKeyAlgoECDH {
 			continue
@@ -115,7 +107,7 @@ func (u *Unlocked) generateAddressKey(ctx context.Context, email string) (*pgp.K
 		}
 		// The subkey's fingerprint moved with its key derivation, so what binds it
 		// to the key has to be signed again.
-		if err := sub.Sig.SignKey(sub.PublicKey, entity.PrivateKey, &packet.Config{}); err != nil {
+		if err := sub.Sig.SignKey(sub.PublicKey, entity.PrivateKey, config); err != nil {
 			return nil, fmt.Errorf("sign the encryption subkey: %w", err)
 		}
 		entity.Subkeys[i] = sub

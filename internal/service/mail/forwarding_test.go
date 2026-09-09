@@ -2,11 +2,16 @@ package mail
 
 import (
 	"context"
+	"crypto"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/ProtonMail/go-crypto/openpgp"
+	"github.com/ProtonMail/go-crypto/openpgp/packet"
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
 	"github.com/roman-16/proton-cli/internal/account/keys"
 	"github.com/roman-16/proton-cli/internal/proton"
@@ -33,7 +38,14 @@ type party struct {
 
 func newParty(t *testing.T, email string) *party {
 	t.Helper()
-	userKey := freshKey(t, "user")
+	return newPartyAt(t, email, time.Now)
+}
+
+// newPartyAt is one account whose keys are dated by a clock the test names,
+// which is how what a key was written under can be read back off it.
+func newPartyAt(t *testing.T, email string, now func() time.Time) *party {
+	t.Helper()
+	userKey := freshKeyAt(t, "user", now)
 	userKR, err := pgp.NewKeyRing(userKey)
 	if err != nil {
 		t.Fatalf("NewKeyRing: %v", err)
@@ -41,13 +53,14 @@ func newParty(t *testing.T, email string) *party {
 	token := "the-address-key-token-of-" + email
 	sealed, signature := sealedToken(t, userKR, token)
 
-	addrKey := freshKey(t, email)
+	addrKey := freshKeyAt(t, email, now)
 	addrKR, err := pgp.NewKeyRing(addrKey)
 	if err != nil {
 		t.Fatalf("NewKeyRing: %v", err)
 	}
 	addr := keys.Address{
 		ID: "address-of-" + email, Email: email, Status: 1, Send: 1, Receive: 1,
+		ProtonMX: true,
 		Keys: []keys.Key{{
 			ID: "key-of-" + email, PrivateKey: armoredLocked(t, addrKey, token),
 			Token: sealed, Signature: signature, Primary: 1, Active: 1,
@@ -59,7 +72,8 @@ func newParty(t *testing.T, email string) *party {
 	return &party{
 		unlocked: &keys.Unlocked{
 			UserKR: userKR, Addresses: []keys.Address{addr},
-			AddrKRs: map[string]*pgp.KeyRing{addr.ID: addrKR},
+			AddrKRs:  map[string]*pgp.KeyRing{addr.ID: addrKR},
+			PaidMail: true, Now: now,
 		},
 		addr:  addr,
 		kr:    addrKR,
@@ -69,9 +83,20 @@ func newParty(t *testing.T, email string) *party {
 
 func freshKey(t *testing.T, name string) *pgp.Key {
 	t.Helper()
-	key, err := pgp.GenerateKey(name, name, "x25519", 0)
+	return freshKeyAt(t, name, time.Now)
+}
+
+// freshKeyAt is a key of the shape this build writes, dated by a clock the test
+// names - which is what makes an account whose keys are older than the run.
+func freshKeyAt(t *testing.T, name string, now func() time.Time) *pgp.Key {
+	t.Helper()
+	entity, err := openpgp.NewEntity(name, "", name, (&keys.Unlocked{Now: now}).Generation())
 	if err != nil {
 		t.Fatalf("generate a key for %s: %v", name, err)
+	}
+	key, err := pgp.NewKeyFromEntity(entity)
+	if err != nil {
+		t.Fatalf("read the key for %s: %v", name, err)
 	}
 	return key
 }
@@ -109,12 +134,20 @@ func sealedToken(t *testing.T, userKR *pgp.KeyRing, token string) (sealed, signa
 	return sealed, signature
 }
 
-func publishedKeyList(t *testing.T, key *pgp.Key) string {
+func publishedKeyList(t *testing.T, held ...*pgp.Key) string {
 	t.Helper()
-	data, err := json.Marshal([]map[string]any{{
-		"Primary": 1, "Flags": 3,
-		"Fingerprint": key.GetFingerprint(), "SHA256Fingerprints": key.GetSHA256Fingerprints(),
-	}})
+	var items []map[string]any
+	for i, key := range held {
+		primary := 0
+		if i == 0 {
+			primary = 1
+		}
+		items = append(items, map[string]any{
+			"Primary": primary, "Flags": 3,
+			"Fingerprint": key.GetFingerprint(), "SHA256Fingerprints": key.GetSHA256Fingerprints(),
+		})
+	}
+	data, err := json.Marshal(items)
 	if err != nil {
 		t.Fatalf("marshal the key list: %v", err)
 	}
@@ -135,10 +168,17 @@ func publicArmor(t *testing.T, kr *pgp.KeyRing) string {
 }
 
 // forwardingAPI answers the requests both ends of a forwarding make: what
-// Proton publishes for an address, and the writes each end sends.
+// Proton publishes for an address, what forwardings it already holds, and the
+// writes each end sends.
 type forwardingAPI struct {
 	published map[string]string
-	requests  []proton.Request
+	// outgoing is what the account already forwards, for the tests about what
+	// deleting one of several means.
+	outgoing []apiForwarding
+	// refuse names the paths Proton turns down, so a half-finished run can be
+	// watched putting itself back.
+	refuse   map[string]bool
+	requests []proton.Request
 }
 
 func (a *forwardingAPI) Do(_ context.Context, req proton.Request) (*proton.Response, error) {
@@ -148,8 +188,13 @@ func (a *forwardingAPI) Do(_ context.Context, req proton.Request) (*proton.Respo
 
 func (a *forwardingAPI) Decode(_ context.Context, req proton.Request, out any) error {
 	a.requests = append(a.requests, req)
+	if a.refuse[req.Path] {
+		return &proton.APIError{HTTPStatus: 422, Code: 2001, Message: "Proton says no"}
+	}
 	answer := `{"Code":1000}`
 	switch req.Path {
+	case "/core/v4/addresses":
+		answer = `{"Code":1000,"Addresses":[]}`
 	case "/core/v4/keys/all":
 		armored, ok := a.published[strings.ToLower(req.Query.Get("Email"))]
 		if !ok {
@@ -158,6 +203,16 @@ func (a *forwardingAPI) Decode(_ context.Context, req proton.Request, out any) e
 		answer = fmt.Sprintf(`{"Code":1000,"Address":{"Keys":[{"PublicKey":%q,"Primary":1}]}}`, armored)
 	case "/core/v4/keys/address":
 		answer = `{"Code":1000,"Key":{"ID":"published-key"}}`
+	case "/mail/v4/forwardings":
+		answer = `{"Code":1000,"OutgoingAddressForwarding":{"ID":"new-forwarding"}}`
+	case "/mail/v4/forwardings/outgoing":
+		listing, err := json.Marshal(map[string]any{"OutgoingAddressForwardings": a.outgoing})
+		if err != nil {
+			return err
+		}
+		answer = string(listing)
+	case "/mail/v4/forwardings/incoming":
+		answer = `{"Code":1000,"IncomingAddressForwardings":[]}`
 	}
 	if out == nil {
 		return nil
@@ -175,6 +230,17 @@ func (a *forwardingAPI) sent(method, path string) []proton.Request {
 	return out
 }
 
+// order is where one request came in the run, or -1, for the tests whose
+// subject is which of two happened first.
+func (a *forwardingAPI) order(method, path string) int {
+	for i, req := range a.requests {
+		if req.Method == method && req.Path == path {
+			return i
+		}
+	}
+	return -1
+}
+
 func serviceFor(p *party, api *forwardingAPI) *Service {
 	return New(api, func(context.Context) (*keys.Unlocked, error) { return p.unlocked, nil })
 }
@@ -184,7 +250,7 @@ func serviceFor(p *party, api *forwardingAPI) *Service {
 func offered(t *testing.T, forwarder, forwardee *party, signAs *pgp.KeyRing, addressed string) apiForwardingKey {
 	t.Helper()
 	entity := forwarder.kr.GetKeys()[0].GetEntity()
-	derived, err := deriveForwarding(entity, addressed)
+	derived, err := deriveForwarding(entity, addressed, forwarder.unlocked.Generation())
 	if err != nil {
 		t.Fatalf("derive the forwarding key: %v", err)
 	}
@@ -373,7 +439,7 @@ func TestForwardingMaterialCarriesWhatARequestNeeds(t *testing.T) {
 	api := &forwardingAPI{published: map[string]string{forwardeeEmail: publicArmor(t, forwardee.kr)}}
 
 	material, err := serviceFor(forwarder, api).forwardingMaterial(
-		context.Background(), forwarder.unlocked, forwarder.addr, forwardeeEmail)
+		context.Background(), forwarder.unlocked, forwarder.addr, forwardeeEmail, forwardee.kr)
 	if err != nil {
 		t.Fatalf("forwardingMaterial: %v", err)
 	}
@@ -390,20 +456,175 @@ func TestForwardingMaterialCarriesWhatARequestNeeds(t *testing.T) {
 	}
 }
 
-// An address with no Proton key on the other end is refused where the material
-// would be derived, so the same sentence answers setting one up and asking
-// again.
-func TestForwardingMaterialRefusesAnAddressOutsideProton(t *testing.T) {
+// Which kind of forwarding it would be is what the forwardee decides, and it is
+// settled before anything is sent: a Proton address has a key to derive from,
+// and an address outside Proton has none.
+func TestForwardingOfferReadsTheKindOffTheForwardee(t *testing.T) {
+	forwarder, forwardee := newParty(t, forwarderEmail), newParty(t, forwardeeEmail)
+	api := &forwardingAPI{published: map[string]string{forwardeeEmail: publicArmor(t, forwardee.kr)}}
+	svc := serviceFor(forwarder, api)
+
+	for _, want := range []struct {
+		to        string
+		encrypted bool
+	}{{forwardeeEmail, true}, {"somebody@example.com", false}} {
+		offer, err := svc.ForwardingOffer(context.Background(), forwarderEmail, want.to)
+		if err != nil {
+			t.Fatalf("ForwardingOffer(%s): %v", want.to, err)
+		}
+		if offer.Encrypted != want.encrypted {
+			t.Errorf("forwarding to %s reads as encrypted=%v, want %v", want.to, offer.Encrypted, want.encrypted)
+		}
+		if len(api.sent("POST", "/mail/v4/forwardings")) != 0 {
+			t.Fatal("judging what a forwarding would be set one up")
+		}
+	}
+}
+
+// The plan is Proton's to gate and this account's to be asked about, so a free
+// account is refused before its address is touched.
+func TestForwardingOfferRefusesAnAccountWithoutPaidMail(t *testing.T) {
 	forwarder := newParty(t, forwarderEmail)
+	forwarder.unlocked.PaidMail = false
 	api := &forwardingAPI{}
 
-	_, err := serviceFor(forwarder, api).forwardingMaterial(
-		context.Background(), forwarder.unlocked, forwarder.addr, "somebody@example.com")
+	_, err := serviceFor(forwarder, api).ForwardingOffer(
+		context.Background(), forwarderEmail, "somebody@example.com")
 	if err == nil {
-		t.Fatal("an address outside Proton was forwarded to end-to-end")
+		t.Fatal("a free account was allowed to set a forwarding up")
 	}
-	if !strings.Contains(err.Error(), "not a Proton address") {
-		t.Errorf("the refusal does not name the address as the problem: %v", err)
+	if !strings.Contains(err.Error(), "paid Mail plan") {
+		t.Errorf("the refusal does not name the plan as the problem: %v", err)
+	}
+	if len(api.requests) != 0 {
+		t.Errorf("sent %d requests for an account that may not forward at all", len(api.requests))
+	}
+}
+
+// An address forwarding to somewhere outside Proton gives up its own end-to-end
+// encryption, and the order is what makes that safe to watch: encryption comes
+// off, then the arrangement is asked for.
+func TestForwardingCreateTurnsEncryptionOffForAnAddressOutsideProton(t *testing.T) {
+	forwarder := newParty(t, forwarderEmail)
+	api := &forwardingAPI{}
+	svc := serviceFor(forwarder, api)
+
+	offer, err := svc.ForwardingOffer(context.Background(), forwarderEmail, "somebody@example.com")
+	if err != nil {
+		t.Fatalf("ForwardingOffer: %v", err)
+	}
+	if _, err := svc.ForwardingCreate(context.Background(), offer); err != nil {
+		t.Fatalf("ForwardingCreate: %v", err)
+	}
+
+	encryption := api.order("PUT", "/core/v4/addresses/"+forwarder.addr.ID+"/encryption")
+	setup := api.order("POST", "/mail/v4/forwardings")
+	if encryption < 0 || setup < 0 || encryption > setup {
+		t.Fatalf("encryption came off at %d and the forwarding was asked for at %d", encryption, setup)
+	}
+	off, _ := api.requests[encryption].Body.(map[string]any)
+	if off["Encrypt"] != 0 {
+		t.Errorf("the address was left encrypted: %v", off["Encrypt"])
+	}
+	if off["Sign"] != 1 {
+		t.Errorf("whether a signature is expected was changed as well: %v", off["Sign"])
+	}
+	listed, _ := off["SignedKeyList"].(map[string]string)
+	if !strings.Contains(listed["Data"], `"Flags":7`) {
+		t.Errorf("the published key list does not say the address is unencrypted: %s", listed["Data"])
+	}
+	body, _ := api.requests[setup].Body.(map[string]any)
+	if body["Type"] != forwardingExternalPlain {
+		t.Errorf("the forwarding was set up as type %v, want the unencrypted kind", body["Type"])
+	}
+	for _, field := range []string{"ActivationToken", "ForwardeePrivateKey", "ProxyInstances"} {
+		if _, ok := body[field]; ok {
+			t.Errorf("the request carries %s for a forwardee that holds no key", field)
+		}
+	}
+}
+
+// A request Proton refuses would otherwise leave the address unencrypted for
+// nothing, so what was turned off is turned back on.
+func TestForwardingCreateTurnsEncryptionBackOnWhenProtonRefuses(t *testing.T) {
+	forwarder := newParty(t, forwarderEmail)
+	api := &forwardingAPI{refuse: map[string]bool{"/mail/v4/forwardings": true}}
+	svc := serviceFor(forwarder, api)
+
+	offer, err := svc.ForwardingOffer(context.Background(), forwarderEmail, "somebody@example.com")
+	if err != nil {
+		t.Fatalf("ForwardingOffer: %v", err)
+	}
+	if _, err := svc.ForwardingCreate(context.Background(), offer); err == nil {
+		t.Fatal("a refused forwarding was reported as set up")
+	}
+
+	writes := api.sent("PUT", "/core/v4/addresses/"+forwarder.addr.ID+"/encryption")
+	if len(writes) != 2 {
+		t.Fatalf("the address's encryption was written %d times, want it off and back on", len(writes))
+	}
+	back, _ := writes[1].Body.(map[string]any)
+	if back["Encrypt"] != 1 {
+		t.Errorf("the address was left unencrypted after the refusal: %v", back["Encrypt"])
+	}
+}
+
+// Taking down the last forwarding to an address outside Proton is what makes the
+// forwarder's address end-to-end encrypted again.
+func TestForwardingDeleteTurnsEncryptionBackOn(t *testing.T) {
+	forwarder := newParty(t, forwarderEmail)
+	forwarder.unlocked.Addresses[0].Flags = 16
+	api := &forwardingAPI{}
+	f := Forwarding{
+		ID: "forwarding-id", Direction: DirectionOutgoing, From: forwarderEmail, To: "somebody@example.com",
+		State: StateActive, Encrypted: false, addressID: forwarder.addr.ID,
+	}
+
+	if err := serviceFor(forwarder, api).ForwardingDelete(context.Background(), f); err != nil {
+		t.Fatalf("ForwardingDelete: %v", err)
+	}
+
+	writes := api.sent("PUT", "/core/v4/addresses/"+forwarder.addr.ID+"/encryption")
+	if len(writes) != 1 {
+		t.Fatalf("the address's encryption was written %d times, want it turned back on", len(writes))
+	}
+	body, _ := writes[0].Body.(map[string]any)
+	if body["Encrypt"] != 1 {
+		t.Errorf("the address was left unencrypted: %v", body["Encrypt"])
+	}
+	listed, _ := body["SignedKeyList"].(map[string]string)
+	if !strings.Contains(listed["Data"], `"Flags":3`) {
+		t.Errorf("the published key list does not say the address is encrypted again: %s", listed["Data"])
+	}
+}
+
+// Only that one deletion does. A forwarding to another Proton account never
+// turned encryption off, one sent to you is not this account's to change, and an
+// address that still forwards somewhere outside Proton still needs it off.
+func TestForwardingDeleteLeavesEncryptionAloneOtherwise(t *testing.T) {
+	forwarder := newParty(t, forwarderEmail)
+	forwarder.unlocked.Addresses[0].Flags = 16
+	addressID := forwarder.addr.ID
+	for _, f := range []Forwarding{{
+		ID: "encrypted", Direction: DirectionOutgoing, From: forwarderEmail, To: forwardeeEmail,
+		State: StateActive, Encrypted: true, addressID: addressID,
+	}, {
+		ID: "incoming", Direction: DirectionIncoming, From: forwardeeEmail, To: forwarderEmail,
+		State: StatePending, Encrypted: false, addressID: addressID,
+	}, {
+		ID: "one-of-two", Direction: DirectionOutgoing, From: forwarderEmail, To: "somebody@example.com",
+		State: StateActive, Encrypted: false, addressID: addressID,
+	}} {
+		api := &forwardingAPI{outgoing: []apiForwarding{{
+			ID: "the-other-one", Type: forwardingExternalPlain, ForwarderAddressID: addressID,
+			ForwardeeEmail: "somebody-else@example.com",
+		}}}
+		if err := serviceFor(forwarder, api).ForwardingDelete(context.Background(), f); err != nil {
+			t.Fatalf("ForwardingDelete(%s): %v", f.ID, err)
+		}
+		if writes := api.sent("PUT", "/core/v4/addresses/"+addressID+"/encryption"); len(writes) != 0 {
+			t.Errorf("deleting the %s forwarding wrote the address's encryption", f.ID)
+		}
 	}
 }
 
@@ -413,15 +634,7 @@ func TestForwardingMaterialRefusesAnAddressOutsideProton(t *testing.T) {
 func TestDerivedForwardingKeySaysOnlyThatItForwards(t *testing.T) {
 	forwarder := newParty(t, forwarderEmail)
 
-	derived, err := deriveForwarding(forwarder.kr.GetKeys()[0].GetEntity(), forwardeeEmail)
-	if err != nil {
-		t.Fatalf("deriveForwarding: %v", err)
-	}
-	// Read back as it is sent, since that is the only form anybody else sees.
-	key, err := pgp.NewKeyFromArmored(derived.armoredKey)
-	if err != nil {
-		t.Fatalf("the derived key is not readable armour: %v", err)
-	}
+	key := derivedKeyOf(t, forwarder, forwardeeEmail)
 	if !key.IsForwardingKey() {
 		t.Fatal("the derived key does not read as a forwarding key")
 	}
@@ -441,4 +654,105 @@ func TestDerivedForwardingKeySaysOnlyThatItForwards(t *testing.T) {
 	if forwarding == 0 {
 		t.Error("the derived key carries no subkey for forwarded communications")
 	}
+}
+
+// The rest of what a key says about itself is not the scheme's to choose, and
+// Proton refuses a key that chose differently from its own clients: what a
+// signature is hashed with, what the key says it prefers, and what it is dated
+// by. All three are read back off the key as it is sent.
+func TestDerivedForwardingKeyIsShapedLikeAProtonKey(t *testing.T) {
+	dated := time.Now().Add(-72 * time.Hour).Truncate(time.Second)
+	forwarder := newPartyAt(t, forwarderEmail, func() time.Time { return dated })
+
+	key := derivedKeyOf(t, forwarder, forwardeeEmail)
+	entity := key.GetEntity()
+	if got := entity.PrimaryKey.CreationTime; !got.Equal(dated) {
+		t.Errorf("the derived key is dated %s, want Proton's clock at %s", got, dated)
+	}
+	identity := entity.PrimaryIdentity()
+	if identity == nil || identity.SelfSignature == nil {
+		t.Fatal("the derived key carries no self-signature to read")
+	}
+	for what, sig := range map[string]*packet.Signature{
+		"the key's own signature": identity.SelfSignature,
+		"the subkey binding":      forwardingBinding(t, entity),
+	} {
+		if sig.Hash != crypto.SHA512 {
+			t.Errorf("%s is hashed with %v, want SHA-512 as Proton's clients write", what, sig.Hash)
+		}
+	}
+	if got := identity.SelfSignature.PreferredHash; !slices.Equal(got, []uint8{10, 8}) {
+		t.Errorf("the derived key prefers hashes %v, want SHA-512 then SHA-256", got)
+	}
+	if got := identity.SelfSignature.PreferredSymmetric; !slices.Equal(got, []uint8{9, 7}) {
+		t.Errorf("the derived key prefers ciphers %v, want AES-256 then AES-128", got)
+	}
+	if strings.Contains(armoredKeyOf(t, forwarder, forwardeeEmail), "Comment:") {
+		t.Error("the derived key is armoured with headers, which Proton's clients do not write")
+	}
+}
+
+// A forwarding is derived from the key the address writes with, not from
+// whichever of its keys happened to unlock first: the server re-wraps with the
+// primary, so a key derived from a retired one would forward nothing.
+func TestDerivedForwardingKeyComesFromThePrimaryKey(t *testing.T) {
+	forwarder := newParty(t, forwarderEmail)
+	retired := freshKey(t, "retired")
+	primary := forwarder.kr.GetKeys()[0]
+	if err := forwarder.kr.AddKey(retired); err != nil {
+		t.Fatalf("add the retired key to the ring: %v", err)
+	}
+	// Proton serves the records in its own order, and the ring holds the keys in
+	// whichever order they opened; only the record says which is primary.
+	addr := &forwarder.unlocked.Addresses[0]
+	addr.Keys = append([]keys.Key{{
+		ID: "retired-key", PrivateKey: armoredLocked(t, retired, forwarder.token),
+		Primary: 0, Active: 1,
+	}}, addr.Keys...)
+	addr.SignedKeyList = &keys.SignedKeyList{
+		Data: publishedKeyList(t, primary, retired), Signature: "the signature Proton holds",
+	}
+
+	entity, err := forwardingEntity(forwarder.unlocked, *addr)
+	if err != nil {
+		t.Fatalf("forwardingEntity: %v", err)
+	}
+	if got := entity.PrimaryKey.KeyIdString(); got != primary.GetEntity().PrimaryKey.KeyIdString() {
+		t.Errorf("the forwarding would be derived from %s, want the address's primary key", got)
+	}
+}
+
+// derivedKeyOf is a forwardee key as anybody else receives it: read back from
+// the armour, which is the only form that leaves this process.
+func derivedKeyOf(t *testing.T, forwarder *party, forwardee string) *pgp.Key {
+	t.Helper()
+	key, err := pgp.NewKeyFromArmored(armoredKeyOf(t, forwarder, forwardee))
+	if err != nil {
+		t.Fatalf("the derived key is not readable armour: %v", err)
+	}
+	return key
+}
+
+func armoredKeyOf(t *testing.T, forwarder *party, forwardee string) string {
+	t.Helper()
+	derived, err := deriveForwarding(
+		forwarder.kr.GetKeys()[0].GetEntity(), forwardee, forwarder.unlocked.Generation())
+	if err != nil {
+		t.Fatalf("deriveForwarding: %v", err)
+	}
+	return derived.armoredKey
+}
+
+// forwardingBinding is what binds the derived key's encryption subkey to it,
+// which is the second signature the key carries and the other place its shape
+// shows.
+func forwardingBinding(t *testing.T, entity *openpgp.Entity) *packet.Signature {
+	t.Helper()
+	for _, sub := range entity.Subkeys {
+		if sub.Sig != nil && sub.Sig.FlagForward {
+			return sub.Sig
+		}
+	}
+	t.Fatal("the derived key carries no subkey for forwarded communications")
+	return nil
 }
