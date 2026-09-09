@@ -1015,15 +1015,22 @@ func TestOnlySigningInTakesTheSecondPassword(t *testing.T) {
 	}
 }
 
-// The Pass extra password belongs to signing in too, for a different reason.
+// The Pass extra password is taken by signing in and by the two commands whose
+// subject it is.
 //
-// Any Pass command can be the one that finds the session without the scope it
-// buys, so the flag could be argued onto every one of them. It is on none: the
-// scope lasts as long as the session, so a command that offered the flag would be
-// offering a secret to hand over again for something already held - and the one
-// run that cannot be asked for it is the one that signs in.
-func TestOnlySigningInTakesTheExtraPassword(t *testing.T) {
-	want := []string{"proton account login"}
+// Any Pass command can be the one that finds the session without the scope the
+// extra password buys, so the flags could be argued onto every one of them. They
+// are on none: the scope lasts as long as the session, so a command that offered
+// them would be offering a secret to hand over again for something already held -
+// and the one run that cannot be asked for it is the one that signs in. Turning
+// the extra password on or off is the other case, where the secret is not a toll
+// on the way to something else but the thing being changed.
+func TestExtraPasswordCommandsAreDeclared(t *testing.T) {
+	want := []string{
+		"proton account login",
+		"proton pass settings extra-password disable",
+		"proton pass settings extra-password enable",
+	}
 	leaves, _ := partition(t)
 	var got []string
 	for _, c := range leaves {

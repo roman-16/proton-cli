@@ -2,9 +2,12 @@ package app
 
 import (
 	"bytes"
+	"errors"
+	"io"
 	"strings"
 	"testing"
 
+	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/ui"
 )
 
@@ -74,5 +77,82 @@ func TestTheKeyIsOfferedOnlyWhereItIsAChoice(t *testing.T) {
 	}
 	if got := said(false, ""); got != "" {
 		t.Errorf("prompt = %q, want nothing said where there is no choice", got)
+	}
+}
+
+// The extra password is the one secret this CLI takes rather than reads back, so
+// a typed one is asked for twice and a mistyped one is refused. What arrived from
+// a file was typed somewhere it can be read again, so it is taken as it is.
+func TestChoosingAnExtraPasswordAsksTwice(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		typed   string
+		noInput bool
+		want    string
+		refused string
+	}{
+		{name: "the same password twice", typed: "correct horse\ncorrect horse\n", want: "correct horse"},
+		{name: "two different passwords", typed: "correct horse\ncorrect house\n", refused: "differ"},
+		{name: "nothing to ask", noInput: true, refused: "required to protect Pass"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var out bytes.Buffer
+			creds := newCredentials(ui.New(ui.Options{
+				Format: ui.FormatText, Err: &out, Out: &out,
+				In: strings.NewReader(tc.typed), NoInput: tc.noInput,
+			}), "")
+
+			got, err := creds.ChooseExtraPassword()
+			if tc.refused != "" {
+				if err == nil {
+					t.Fatalf("ChooseExtraPassword = %q, want a refusal", got)
+				}
+				if !strings.Contains(err.Error(), tc.refused) {
+					t.Errorf("err = %v, want one saying %q", err, tc.refused)
+				}
+				return
+			}
+			if err != nil || got != tc.want {
+				t.Fatalf("ChooseExtraPassword = %q, %v; want %q", got, err, tc.want)
+			}
+			// Asked once per run: the command reads it before the state check and
+			// again when the change goes ahead.
+			if again, err := creds.ChooseExtraPassword(); err != nil || again != tc.want {
+				t.Errorf("asked a second time = %q, %v; want the first answer", again, err)
+			}
+		})
+	}
+}
+
+// A password from a file is not confirmed, and the remedy a run without one is
+// given names the flags the command actually offers.
+func TestAnExtraPasswordFromAFlagIsTakenAsItIs(t *testing.T) {
+	var out bytes.Buffer
+	creds := newCredentials(ui.New(ui.Options{
+		Format: ui.FormatText, Err: &out, Out: &out, In: strings.NewReader(""), NoInput: true,
+	}), "")
+	creds.stdinOwner = func(string) (io.Reader, error) { return strings.NewReader("correct horse\n"), nil }
+	if err := creds.SupplyExtraPassword("", true); err != nil {
+		t.Fatalf("SupplyExtraPassword: %v", err)
+	}
+
+	got, err := creds.ChooseExtraPassword()
+	if err != nil || got != "correct horse" {
+		t.Fatalf("ChooseExtraPassword = %q, %v; want the value on stdin", got, err)
+	}
+
+	declared := newCredentials(ui.New(ui.Options{
+		Format: ui.FormatText, Err: &out, Out: &out, NoInput: true,
+	}), "")
+	if err := declared.SupplyExtraPassword("", false); err != nil {
+		t.Fatalf("SupplyExtraPassword: %v", err)
+	}
+	_, err = declared.ChooseExtraPassword()
+	var hinter errs.Hinter
+	if !errors.As(err, &hinter) {
+		t.Fatalf("err = %v, want one that says what to do next", err)
+	}
+	if !strings.Contains(strings.Join(hinter.Hints(), " "), "--extra-password-file") {
+		t.Errorf("hints = %v, want the flag this command takes", hinter.Hints())
 	}
 }

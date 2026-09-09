@@ -171,6 +171,7 @@ One line per group, with the verbs under it. Arguments, flags and examples are i
 - `proton pass items share` - Who else can open an item: add, get, remove, update
 - `proton pass links` - Links that show an item to somebody without an account: create, get, list, revoke
 - `proton pass settings domains` - The domains an alias can be made on: list
+- `proton pass settings extra-password` - The extra password Pass can be protected with: disable, enable, get
 - `proton pass settings mailboxes` - The addresses your aliases forward to: create, delete, list, resend, update, verify
 - `proton pass shared` - Items other people have shared with you: list
 - `proton pass sharing` - Items you have shared with other people: list

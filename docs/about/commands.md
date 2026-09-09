@@ -244,6 +244,9 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton pass generate`](../pass/pass.md#generate) | Make a password |
 | [`proton pass import`](../pass/pass.md#import) | Read a Proton Pass archive back in |
 | [`proton pass settings domains list`](../pass/settings.md#domains-list) | List the domains an alias can be made on |
+| [`proton pass settings extra-password disable`](../pass/settings.md#extra-password-disable) | Remove the extra password from Pass |
+| [`proton pass settings extra-password enable`](../pass/settings.md#extra-password-enable) | Protect Pass with an extra password |
+| [`proton pass settings extra-password get`](../pass/settings.md#extra-password-get) | Show whether Pass has an extra password |
 | [`proton pass settings mailboxes create`](../pass/settings.md#mailboxes-create) | Add an address for aliases to forward to |
 | [`proton pass settings mailboxes delete`](../pass/settings.md#mailboxes-delete) | Remove an address aliases forward to |
 | [`proton pass settings mailboxes list`](../pass/settings.md#mailboxes-list) | List the addresses your aliases forward to |

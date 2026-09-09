@@ -12,13 +12,14 @@ import (
 
 // What Pass keeps on the account rather than in a vault.
 //
-// Both of these are what an alias is made of: the mailboxes it can arrive in and
-// the domains it can be made on. Pass only offers them in its settings, which is
-// where they hang here.
+// Two of these are what an alias is made of: the mailboxes it can arrive in and
+// the domains it can be made on. The third is the password Pass itself can be
+// put behind. Pass only offers any of them in its settings, which is where they
+// hang here.
 
 func settingsCmd() *cobra.Command {
 	c := &cobra.Command{Use: "settings", Short: "Pass settings"}
-	c.AddCommand(mailboxesCmd(), domainsCmd())
+	c.AddCommand(domainsCmd(), extraPasswordCmd(), mailboxesCmd())
 	return c
 }
 

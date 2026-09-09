@@ -387,11 +387,11 @@ func (a *App) unlockPass(ctx context.Context) error {
 	if !a.Creds.ExtraPasswordOffered() {
 		return nil
 	}
-	scopes, err := a.API.Scopes(ctx)
+	reaches, err := a.ReachesPass(ctx)
 	if err != nil {
 		return err
 	}
-	if slices.Contains(scopes, string(proton.ScopePass)) {
+	if reaches {
 		a.UI.Note("This account has no Pass extra password, so nothing needed the one you gave.")
 		return nil
 	}
@@ -399,6 +399,26 @@ func (a *App) unlockPass(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	return a.UnlockPass(ctx, extra)
+}
+
+// ReachesPass reports whether this session may reach Pass as it stands.
+//
+// The session is asked what it holds rather than the account what it has,
+// because the scope is the thing that decides: Proton withholds it from a session
+// that has not proved an extra password, and grants it for the life of one that
+// has.
+func (a *App) ReachesPass(ctx context.Context) (bool, error) {
+	scopes, err := proton.Scopes(ctx, a.API)
+	if err != nil {
+		return false, err
+	}
+	return slices.Contains(scopes, string(proton.ScopePass)), nil
+}
+
+// UnlockPass proves an extra password to this session, so what follows reaches
+// Pass and so the saved session does too.
+func (a *App) UnlockPass(ctx context.Context, extra string) error {
 	return a.API.Elevate(ctx, proton.ScopePass, proton.ScopeCredentials{Password: []byte(extra)})
 }
 

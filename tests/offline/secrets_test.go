@@ -89,6 +89,14 @@ func TestAPasswordSetOnSomethingIsJudgedBeforeTheNetwork(t *testing.T) {
 		"--body", "text"}
 	refuses(t, 1, append(send, "--eo-password-file", tooShort), "at least 8 characters")
 	refuses(t, 1, append(send, "--eo-password-file", empty), "is empty")
+
+	// The extra password protecting Pass is the same rule about the account's own
+	// secret: a password nobody can read back is the one worth refusing early, and
+	// the account it would go on is not consulted to know that.
+	enable := []string{"pass", "settings", "extra-password", "enable"}
+	refuses(t, 1, append(enable, "--extra-password-file", filepath.Join(dir, "nope")), "Could not read")
+	refuses(t, 1, append(enable, "--extra-password-file", empty), "is empty")
+	refuses(t, 1, append(enable, "--extra-password-file", tooShort), "at least eight characters")
 }
 
 // Standard input has one reader, and the way out of a collision is the file the

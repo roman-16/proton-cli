@@ -529,21 +529,11 @@ func (s *Service) buildPasswordFields(ctx context.Context, dc *Context, sk *pgp.
 	if err != nil {
 		return nil, err
 	}
-	var mod struct{ Modulus, ModulusID string }
-	if err := s.C.Decode(ctx, proton.Request{Method: "GET", Path: "/core/v4/auth/modulus"}, &mod); err != nil {
-		return nil, err
-	}
-	// SRP salt is 10 bytes: hashPasswordVersion3 appends the 6-byte "proton"
-	// suffix to fill bcrypt's 16-byte salt slot.
-	urlSalt := make([]byte, 10)
-	if _, err := rand.Read(urlSalt); err != nil {
-		return nil, err
-	}
-	auth, err := srp.NewAuthForVerifier([]byte(fullPassword), mod.Modulus, urlSalt)
+	modulus, err := proton.FetchModulus(ctx, s.C)
 	if err != nil {
 		return nil, err
 	}
-	verifier, err := auth.GenerateVerifier(2048)
+	v, err := modulus.Verifier([]byte(fullPassword))
 	if err != nil {
 		return nil, err
 	}
@@ -551,9 +541,9 @@ func (s *Service) buildPasswordFields(ctx context.Context, dc *Context, sk *pgp.
 		SharePassphraseKeyPacket: base64.StdEncoding.EncodeToString(kp),
 		SharePasswordSalt:        base64.StdEncoding.EncodeToString(shareSalt),
 		Password:                 armPass,
-		SRPModulusID:             mod.ModulusID,
-		SRPVerifier:              base64.StdEncoding.EncodeToString(verifier),
-		UrlPasswordSalt:          base64.StdEncoding.EncodeToString(urlSalt),
+		SRPModulusID:             v.ModulusID,
+		SRPVerifier:              v.Value,
+		UrlPasswordSalt:          v.Salt,
 	}, nil
 }
 

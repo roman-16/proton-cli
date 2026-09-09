@@ -202,9 +202,10 @@ func (c *Client) Relock(ctx context.Context) {
 	}
 }
 
-// Scopes returns the scopes the session currently holds, for reporting what a
-// saved session can actually do.
-func (c *Client) Scopes(ctx context.Context) ([]string, error) {
+// Scopes returns the scopes the session currently holds: what a saved session
+// can actually do, and the one question that can be asked before a guarded
+// endpoint refuses.
+func Scopes(ctx context.Context, c Doer) ([]string, error) {
 	var r struct{ Scopes []string }
 	if err := c.Decode(ctx, Request{Method: "GET", Path: scopesPath}, &r); err != nil {
 		return nil, err

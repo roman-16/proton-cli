@@ -599,37 +599,3 @@ func TestPassExportWithAPassphrase(t *testing.T) {
 	}
 	assertContains(t, stderr, "passphrase")
 }
-
-// The secondary account's Pass is protected with an extra password, which is how
-// this suite covers the feature at all: the sign-in TestMain performs hands it
-// over, and Proton then lets that session reach Pass.
-//
-// What a run can check is that outcome, not the exchange behind it. Proton grants
-// the scope for the life of the session and offers nothing that takes it back, so
-// the exchange happens once per session - see `unreachable` in
-// internal/cli/coverage_test.go, which says so and why.
-//
-// The first assertion is the one that earns the test: it fails if the account is
-// ever left without an extra password, because the coverage would otherwise be
-// gone with nothing saying so.
-func TestPassExtraPasswordProtectsTheSecondaryAccount(t *testing.T) {
-	srp := runJSONSecondary(t, "api", "GET", "/pass/v1/user/srp")
-	if has, _ := srp["HasSRP"].(bool); !has {
-		t.Fatal("the secondary account has no extra password, so nothing here covers unlocking Pass with one")
-	}
-
-	scopes := runJSONSecondary(t, "api", "GET", "/core/v4/auth/scopes")
-	held, _ := scopes["Scopes"].([]interface{})
-	unlocked := false
-	for _, s := range held {
-		if name, _ := s.(string); name == "pass" {
-			unlocked = true
-		}
-	}
-	if !unlocked {
-		t.Errorf("the session holds %v, and none of it is the Pass scope the extra password buys", held)
-	}
-
-	// And what the scope is for.
-	assertContains(t, runOKSecondary(t, "pass", "vaults", "list"), "ID")
-}

@@ -13,6 +13,7 @@ import (
 	"github.com/roman-16/proton-cli/internal/account/session"
 	"github.com/roman-16/proton-cli/internal/cli/kit"
 	"github.com/roman-16/proton-cli/internal/profile"
+	"github.com/roman-16/proton-cli/internal/proton"
 	acctsvc "github.com/roman-16/proton-cli/internal/service/account"
 	"github.com/roman-16/proton-cli/internal/ui"
 	"github.com/roman-16/proton-cli/internal/units"
@@ -64,7 +65,7 @@ func getCmd() *cobra.Command {
 			}
 			// Scopes are informative rather than essential: an account whose
 			// session cannot list them is still worth reporting.
-			if scopes, err := c.App.API.Scopes(c.Ctx); err == nil {
+			if scopes, err := proton.Scopes(c.Ctx, c.App.API); err == nil {
 				st.Scopes = scopes
 			} else {
 				// Recorded and not counted: the field is omitted, which reads as

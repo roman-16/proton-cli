@@ -82,6 +82,14 @@ func Restrictions() []Restriction {
 	}, {
 		Command: []string{"pass", "import"},
 		Why:     "it adds a copy of everything an archive holds, and finding the copies again means a filter over real data",
+	}, {
+		Command: []string{"pass", "settings", "extra-password", "disable"},
+		Why: "it signs the owner out of Proton on every device they have, and only they can sign" +
+			" back in",
+	}, {
+		Command: []string{"pass", "settings", "extra-password", "enable"},
+		Why: "it puts a password only the run knows in front of somebody's Pass, and signs their" +
+			" other devices out of it",
 	}}
 }
 

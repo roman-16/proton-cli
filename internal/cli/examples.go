@@ -684,6 +684,17 @@ var examples = map[string][]string{
 	"proton pass settings domains list": {
 		"proton pass settings domains list",
 	},
+	"proton pass settings extra-password get": {
+		"proton pass settings extra-password get",
+	},
+	"proton pass settings extra-password enable": {
+		"proton pass settings extra-password enable",
+		"proton pass settings extra-password enable --extra-password-file /run/secrets/proton-pass",
+	},
+	"proton pass settings extra-password disable": {
+		"proton pass settings extra-password disable",
+		"proton pass settings extra-password disable --extra-password-file /run/secrets/proton-pass",
+	},
 	"proton pass settings mailboxes list": {
 		"proton pass settings mailboxes list",
 	},

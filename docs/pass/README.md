@@ -269,7 +269,19 @@ A `pass` command that needs it and finds nobody to ask says so and names that fl
 
 A few wrong answers end the session, so read a refusal rather than retrying blindly.
 
-Turning the extra password on or off is not something proton does. See [What it can't do](../help/limits.md).
+### Turn the extra password on or off
+
+```bash
+proton pass settings extra-password get
+proton pass settings extra-password enable
+proton pass settings extra-password disable
+```
+
+`enable` asks for the password twice, or reads it once from `--extra-password-file` or `--extra-password-stdin`. It needs at least eight characters. Keep it safe: without it nothing opens Pass, on any device. Your other devices ask for it the next time they open Pass, and this session goes on working.
+
+`disable` asks for the password first. Pass then opens with your account password alone, on every device, and this session goes on working.
+
+To change it, turn it off and on again.
 
 ## History and breaches
 

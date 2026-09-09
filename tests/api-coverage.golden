@@ -23,6 +23,7 @@ DELETE /pass/v1/share/{id}/item
 DELETE /pass/v1/share/{id}/item/{id}/pin
 DELETE /pass/v1/share/{id}/user/{id}
 DELETE /pass/v1/user/alias/mailbox/{n}
+DELETE /pass/v1/user/srp
 DELETE /pass/v1/vault/{id}
 GET /auth/v4/sessions
 GET /auth/v4/sessions/local/key
@@ -107,6 +108,8 @@ GET /pass/v1/share/{id}/user
 GET /pass/v1/share/{id}/user/item/{id}
 GET /pass/v1/user/alias/domain
 GET /pass/v1/user/alias/mailbox
+GET /pass/v1/user/srp
+GET /pass/v1/user/srp/info
 GET /settings/calendar
 POST /calendar/v1
 POST /calendar/v1/subscription/validate
@@ -164,6 +167,8 @@ POST /pass/v1/share/{id}/item/untrash
 POST /pass/v1/share/{id}/item/{id}/pin
 POST /pass/v1/share/{id}/item/{id}/public_link
 POST /pass/v1/user/alias/mailbox
+POST /pass/v1/user/srp
+POST /pass/v1/user/srp/auth
 POST /pass/v1/vault
 PUT /calendar/v1/{id}/events/sync
 PUT /calendar/v1/{id}/events/{id}/attendees/{id}

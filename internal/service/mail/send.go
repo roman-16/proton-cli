@@ -43,16 +43,16 @@ func (s *Service) SendDraft(ctx context.Context, d *Draft, del Delivery) error {
 		return err
 	}
 
-	var eoModulus, eoModulusID string
+	var eoModulus proton.Modulus
 	if hasEO {
-		if eoModulus, eoModulusID, err = s.fetchModulus(ctx); err != nil {
+		if eoModulus, err = proton.FetchModulus(ctx, s.C); err != nil {
 			return err
 		}
 	}
 
 	var packages []map[string]any
 	if needBody {
-		pkgs, err := s.buildBodyPackages(c, del, d.Attachments, plans, eoModulus, eoModulusID)
+		pkgs, err := s.buildBodyPackages(c, del, d.Attachments, plans, eoModulus)
 		if err != nil {
 			return err
 		}

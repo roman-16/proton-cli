@@ -29,8 +29,6 @@ const (
 	// defaultEOExpirationSeconds mirrors DEFAULT_EO_EXPIRATION_DAYS (28 days):
 	// Proton always attaches an expiration to encrypted-for-outside messages.
 	defaultEOExpirationSeconds = 28 * 24 * 60 * 60
-	// srpAuthVersion is Proton's current SRP verifier version.
-	srpAuthVersion = 4
 )
 
 // sendScheme is how a single recipient's copy is packaged.

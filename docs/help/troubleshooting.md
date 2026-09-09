@@ -203,6 +203,8 @@ proton account login --user "$ACCOUNT" --password-file "$CRED" \
 
 It is not your Proton account password, and it is not the second password of a two-password account.
 
+Turning it on or off is covered by [Pass](../pass/README.md#turn-the-extra-password-on-or-off).
+
 ## A change I just made does not show up
 
 A change reaches `list` a few seconds late: a message you just sent may not appear yet, and one you just deleted may still be listed.

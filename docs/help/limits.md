@@ -20,9 +20,11 @@ Each of these has an equivalent in a web client.
 
 | What is missing | What to do instead |
 | --- | --- |
-| Turning the Pass [extra password](../pass/README.md#an-extra-password) on or off | Use the Pass app. *Answering* one is built |
+| Custom domains for aliases, and which domain is the default | Use the Pass app. `proton pass settings domains list` shows them |
+| Syncing SimpleLogin aliases into Pass | Use the Pass app |
+| Pass access tokens | Use the Pass app |
 
-proton changes no credentials: the account password, two-factor, the recovery phrase and the Pass extra password are all set at [account.proton.me](https://account.proton.me) or in the Pass app.
+proton changes no account credential: the account password, two-factor and the recovery phrase are all set at [account.proton.me](https://account.proton.me).
 
 ## Out of scope
 

@@ -66,15 +66,12 @@ func (ch extraPasswordChallenge) check() error {
 	return nil
 }
 
-// unlockPass proves the extra password, so the session may reach Pass.
+// ProveExtraPassword answers Proton's challenge with the extra password.
 //
-// The tokens are renewed afterwards, which is what Proton's own Pass CLI does and
-// what carries the scope into the session file: a later run then reaches Pass
-// without asking for anything. It goes through the guarded renewal rather than
-// refreshing directly, because a refresh token is single-use - and a session
-// another process has already renewed is taken up instead of spent again.
-func (c *Client) unlockPass(ctx context.Context, password []byte) error {
-	_, spent, _ := c.Tokens()
+// It is what the scope is bought with, and it is also how a change to the extra
+// password itself is authorised: Proton wants the current one proved before it
+// will take one off, the same as its own clients do.
+func (c *Client) ProveExtraPassword(ctx context.Context, password []byte) error {
 	// The pair is the unit that gets another go, as at sign-in: a challenge is
 	// spent by the attempt that answered it, so a second attempt needs a second
 	// challenge.
@@ -87,7 +84,19 @@ func (c *Client) unlockPass(ctx context.Context, password []byte) error {
 			}
 			return c.proveExtraPassword(ctx, challenge, password)
 		})
-	if err != nil {
+	return err
+}
+
+// unlockPass proves the extra password, so the session may reach Pass.
+//
+// The tokens are renewed afterwards, which is what Proton's own Pass CLI does and
+// what carries the scope into the session file: a later run then reaches Pass
+// without asking for anything. It goes through the guarded renewal rather than
+// refreshing directly, because a refresh token is single-use - and a session
+// another process has already renewed is taken up instead of spent again.
+func (c *Client) unlockPass(ctx context.Context, password []byte) error {
+	_, spent, _ := c.Tokens()
+	if err := c.ProveExtraPassword(ctx, password); err != nil {
 		return err
 	}
 	if err := c.renewSession(ctx, spent); err != nil {

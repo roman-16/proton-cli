@@ -77,6 +77,7 @@ var settingsPages = [][]string{
 	{"drive", "settings", "get"},
 	{"mail", "settings", "autoreply", "get"},
 	{"mail", "settings", "get"},
+	{"pass", "settings", "extra-password", "get"},
 }
 
 // photographPaid records the account before any test runs.

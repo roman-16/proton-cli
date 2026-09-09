@@ -58,18 +58,6 @@ var unreachable = map[string]string{
 
 	"POST /auth/v4/sessions": "only a first sign-in creates one, and no test signs out to force another",
 	"POST /core/v4/auth/2fa": "no test account has two-factor enabled, so nothing is ever asked for a code",
-
-	// Proving the Pass extra password. The secondary account has one, and the
-	// sign-in the suite performs answers it - but Proton grants the scope for the
-	// life of the session and offers nothing that takes it back, so the exchange
-	// happens on the run that first meets it and never again. Forcing a second one
-	// means a session of its own, and Proton answers a fresh sign-in from an
-	// unattended run with a CAPTCHA that only a person can solve.
-	// TestPassExtraPasswordProtectsTheSecondaryAccount checks the outcome instead;
-	// the exchange itself is covered by internal/proton/extrapassword_test.go,
-	// against go-srp's own server.
-	"GET /pass/v1/user/srp/info":  "a session needs the extra password once, and only a person can start another session",
-	"POST /pass/v1/user/srp/auth": "the other half of the same exchange",
 }
 
 // untested are the requests a run could make and does not. Each is a gap somebody

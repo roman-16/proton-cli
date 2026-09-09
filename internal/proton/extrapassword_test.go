@@ -1,7 +1,6 @@
 package proton
 
 import (
-	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -27,8 +26,6 @@ const signedTestModulus = "-----BEGIN PGP SIGNED MESSAGE-----\nHash: SHA256\n\n"
 	"wl4EARYIABAFAlwB1j0JEDUFhcTpUY8mAAB02wD5AOhMNS/K6/nvaeRhTr5n\niDGMalQccYlb58XzUEhqf3sBAOcTsz0fP3PVdMQYBbqcBl9Y6LGIG9DF4B4H\nZeLCoyYN\n=cAxM\n" +
 	"-----END PGP SIGNATURE-----\n"
 
-const srpBits = 2048
-
 // extraPasswordServer is Proton's half of the exchange: it holds the verifier a
 // client wrote when the extra password was set, and answers a challenge and a
 // proof against it.
@@ -41,19 +38,19 @@ type extraPasswordServer struct {
 	refreshed int
 }
 
+// newExtraPasswordServer stands one up against a verifier this package built,
+// which is the round trip: what registering an extra password writes is what
+// proving one is checked against, and a mistake in either half shows up as the
+// other half refusing a password that was right.
 func newExtraPasswordServer(t *testing.T, password string) *extraPasswordServer {
 	t.Helper()
-	salt := make([]byte, 10)
-	if _, err := rand.Read(salt); err != nil {
-		t.Fatalf("salt: %v", err)
-	}
-	auth, err := srp.NewAuthForVerifier([]byte(password), signedTestModulus, salt)
-	if err != nil {
-		t.Fatalf("verifier setup: %v", err)
-	}
-	verifier, err := auth.GenerateVerifier(srpBits)
+	stored, err := Modulus{ID: "modulus-id", Value: signedTestModulus}.Verifier([]byte(password))
 	if err != nil {
 		t.Fatalf("verifier: %v", err)
+	}
+	verifier, err := base64.StdEncoding.DecodeString(stored.Value)
+	if err != nil {
+		t.Fatalf("verifier decode: %v", err)
 	}
 	server, err := srp.NewServerFromSigned(signedTestModulus, verifier, srpBits)
 	if err != nil {
@@ -74,8 +71,8 @@ func newExtraPasswordServer(t *testing.T, password string) *extraPasswordServer 
 					"Modulus":         signedTestModulus,
 					"ServerEphemeral": base64.StdEncoding.EncodeToString(ephemeral),
 					"SrpSessionID":    "srp-session",
-					"SrpSalt":         base64.StdEncoding.EncodeToString(salt),
-					"Version":         4,
+					"SrpSalt":         stored.Salt,
+					"Version":         stored.Version,
 				},
 			})
 		case extraPasswordAuthPath:
@@ -143,6 +140,23 @@ func TestUnlockingPassProvesTheExtraPasswordAndKeepsTheSession(t *testing.T) {
 	}
 	if persisted == 0 {
 		t.Error("the renewed session was never persisted, so the next run would ask again")
+	}
+}
+
+// Proving the extra password is also what authorises a change to the extra
+// password itself, and that use has no session to carry the scope into: the
+// session is about to end. So the exchange stands on its own, and spends no
+// refresh token on a session nothing will use again.
+func TestProvingTheExtraPasswordRenewsNothingOnItsOwn(t *testing.T) {
+	srv := newExtraPasswordServer(t, "correct horse")
+	c := New(Options{BaseURL: srv.URL, Logger: slog.New(slog.DiscardHandler)})
+	c.SetTokens("uid", "stale-token", "refresh-token")
+
+	if err := c.ProveExtraPassword(t.Context(), []byte("correct horse")); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if srv.refreshed != 0 {
+		t.Errorf("the session was renewed %d times, want not at all", srv.refreshed)
 	}
 }
 

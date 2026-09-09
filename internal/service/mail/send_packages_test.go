@@ -8,6 +8,7 @@ import (
 
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
 	"github.com/roman-16/proton-cli/internal/account/keys"
+	"github.com/roman-16/proton-cli/internal/proton"
 )
 
 // testKeyRing generates a throwaway key pair, returning the ring and its armored
@@ -131,7 +132,7 @@ func TestBuildBodyPackagesSplitsPerScheme(t *testing.T) {
 		{email: "clear@example.com", scheme: schemeClear},
 	}
 
-	pkgs, err := New(nil, testKeys(nil)).buildBodyPackages(c, Delivery{}, nil, plans, "", "")
+	pkgs, err := New(nil, testKeys(nil)).buildBodyPackages(c, Delivery{}, nil, plans, proton.Modulus{})
 	if err != nil {
 		t.Fatalf("buildBodyPackages: %v", err)
 	}

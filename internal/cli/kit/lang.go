@@ -199,16 +199,17 @@ var Mutating = map[string]bool{
 // The value is the page, not a boolean, so the entry carries its own reason and
 // a new collection cannot be filed here without someone having looked.
 var SettingsPages = map[string]string{
-	"calendar settings calendars": "Calendars",
-	"mail settings addresses":     "Identity and addresses",
-	"mail settings autoreply":     "Forward and auto-reply",
-	"mail settings filters":       "Filters",
-	"mail settings forwarding":    "Forward and auto-reply",
-	"mail settings folders":       "Folders and labels",
-	"mail settings labels":        "Folders and labels",
-	"mail settings senders":       "Spam, block, and allow lists",
-	"pass settings domains":       "Aliases",
-	"pass settings mailboxes":     "Aliases",
+	"calendar settings calendars":  "Calendars",
+	"mail settings addresses":      "Identity and addresses",
+	"mail settings autoreply":      "Forward and auto-reply",
+	"mail settings filters":        "Filters",
+	"mail settings forwarding":     "Forward and auto-reply",
+	"mail settings folders":        "Folders and labels",
+	"mail settings labels":         "Folders and labels",
+	"mail settings senders":        "Spam, block, and allow lists",
+	"pass settings domains":        "Aliases",
+	"pass settings extra-password": "Security",
+	"pass settings mailboxes":      "Aliases",
 }
 
 // Placeholder is one argument name: what it stands for, and where the things it

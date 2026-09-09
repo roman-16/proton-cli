@@ -110,7 +110,11 @@ const (
 	// labelExtraPassword is what protects Pass and nothing else. Every Proton
 	// client calls it the extra password, so this one does too.
 	labelExtraPassword = "Extra password"
-	labelTOTP          = "Two-factor code"
+	// labelConfirm asks for a secret a second time, for the one secret this CLI
+	// chooses rather than reads back: a hidden prompt shows nothing, and a typo
+	// in an extra password is not something anybody can put right afterwards.
+	labelConfirm = "Confirm"
+	labelTOTP    = "Two-factor code"
 	// labelSecurityKeyPIN is the PIN of the key itself, which is set on the key
 	// and known only to it. It is never the account password, and a key counts
 	// wrong answers, so it is worth being unmistakable about which is wanted.
@@ -196,10 +200,11 @@ func (c *Credentials) SupplySecondPassword(file string, stdin bool) error {
 }
 
 // SupplyExtraPassword records where the password protecting Pass may be read
-// from. Only signing in declares it, because that is where the scope it buys is
-// worth having: Proton grants it for the life of the session.
+// from. Signing in declares it for the scope it buys, and turning it on or off
+// declares it because it is the subject.
 func (c *Credentials) SupplyExtraPassword(file string, stdin bool) error {
 	c.extra.source.file = file
+	c.extra.source.declared = true
 	if !stdin {
 		return nil
 	}
@@ -219,23 +224,65 @@ func (c *Credentials) ExtraPasswordOffered() bool {
 
 // ExtraPassword returns the password Pass is protected with, asking for it if
 // there is somebody to ask.
-//
-// The remedy names signing in with the flag rather than the flag alone: a Pass
-// command does not offer one, and the scope this buys lasts as long as the
-// session, so handing it over once at sign-in is what an unattended run does.
 func (c *Credentials) ExtraPassword() (string, error) {
 	if c.extra.have {
 		return c.extra.value, nil
 	}
 	v, err := c.read(c.extra.source, labelExtraPassword,
 		errs.Problemf("Pass is protected with an extra password, and there is nobody here to ask.").
-			Hint("proton account login --extra-password-file FILE",
-				"or run this in a terminal").Exit(2))
+			Hint(extraPasswordHint(c.extra.source)...).Exit(2))
 	if err != nil {
 		return "", err
 	}
 	c.extra.value, c.extra.have = v, true
 	return v, nil
+}
+
+// ChooseExtraPassword returns an extra password to protect Pass with, which is
+// the one secret this CLI takes rather than reads back.
+//
+// A typed one is asked for twice. Nothing echoes it, nothing stores it, and an
+// account whose Pass is protected with a password nobody knows cannot be put
+// right - so a mistyped one is worth catching here rather than never.
+func (c *Credentials) ChooseExtraPassword() (string, error) {
+	if c.extra.have {
+		return c.extra.value, nil
+	}
+	missing := errs.Problemf("An extra password is required to protect Pass with one.").
+		Hint(extraPasswordHint(c.extra.source)...)
+	typed := !c.ExtraPasswordOffered()
+	if typed && c.ui.CanPrompt() {
+		c.ui.Instruct("Choose at least eight characters and keep them safe: " +
+			"without them nothing opens Pass, on any device.")
+	}
+	v, err := c.read(c.extra.source, labelExtraPassword, missing)
+	if err != nil {
+		return "", err
+	}
+	if typed {
+		again, err := c.ask(labelConfirm, true, missing)
+		if err != nil {
+			return "", err
+		}
+		if again != v {
+			return "", errs.Problemf("The two extra passwords differ.")
+		}
+	}
+	c.extra.value, c.extra.have = v, true
+	return v, nil
+}
+
+// extraPasswordHint says how to hand the extra password over without a terminal.
+//
+// A command that takes the flags names them. Any other Pass command can be the
+// one that finds the session locked, and none of them offers a flag - so what
+// that run needs is a sign-in that carries the password, which buys the scope for
+// the life of the session.
+func extraPasswordHint(src passwordSource) []string {
+	if src.declared {
+		return []string{"pass --extra-password-file, or run this in a terminal"}
+	}
+	return []string{"proton account login --extra-password-file FILE", "or run this in a terminal"}
 }
 
 // User returns the account email.
@@ -397,7 +444,7 @@ func (c *Credentials) prefersSecurityKey(alsoTOTP bool) bool {
 func (c *Credentials) prompter() *ui.Prompter {
 	if c.prompt == nil {
 		c.prompt = c.ui.Ask(labelEmail, labelPassword, labelSecondPassword,
-			labelExtraPassword, labelTOTP, labelSecurityKeyPIN, labelPassphrase)
+			labelExtraPassword, labelConfirm, labelTOTP, labelSecurityKeyPIN, labelPassphrase)
 	}
 	return c.prompt
 }

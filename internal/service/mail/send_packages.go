@@ -6,12 +6,13 @@ import (
 	"fmt"
 
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	"github.com/roman-16/proton-cli/internal/proton"
 )
 
 // buildBodyPackages encrypts the body once under a shared session key and
 // returns up to three packages (internal, encrypted-for-outside, cleartext) that
 // reference it, keyed per recipient scheme.
-func (s *Service) buildBodyPackages(c Content, del Delivery, atts []*draftAttachment, plans []plannedRecipient, eoModulus, eoModulusID string) ([]map[string]any, error) {
+func (s *Service) buildBodyPackages(c Content, del Delivery, atts []*draftAttachment, plans []plannedRecipient, eoModulus proton.Modulus) ([]map[string]any, error) {
 	sessionKey, err := pgp.GenerateSessionKey()
 	if err != nil {
 		return nil, err
@@ -52,7 +53,7 @@ func (s *Service) buildBodyPackages(c Content, del Delivery, atts []*draftAttach
 			}
 			internalAddrs[p.email] = addr
 		case schemeEO:
-			addr, err := eoAddress(sessionKey, del.EOPassword, del.EOPasswordHint, atts, eoModulus, eoModulusID)
+			addr, err := eoAddress(sessionKey, del.EOPassword, del.EOPasswordHint, atts, eoModulus)
 			if err != nil {
 				return nil, err
 			}
