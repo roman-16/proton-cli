@@ -125,6 +125,13 @@ var untested = map[string]string{
 	// the fixture address, which is why it is not on this list.
 	"PUT /core/v4/addresses/{id}/delete":          "Proton allows one address deletion a year, and no test may spend it",
 	"GET /core/v4/addresses/allowAddressDeletion": "only deleting an address asks whether the year's allowance is still there",
+
+	// Turning on the short-domain address. An account has one for its lifetime
+	// and the paid account's is already on, so the only account a run could turn
+	// one on for is a free one, which Proton does not let have it. The refusal on
+	// each side is tested instead: the free plan is refused before the request,
+	// and the paid account is told the address is already there.
+	"POST /core/v4/addresses/setup": "the short domain is turned on once in an account's life, and every test account is past that moment",
 }
 
 func TestEveryRequestTheCLICanSendIsOneTheSuiteSends(t *testing.T) {

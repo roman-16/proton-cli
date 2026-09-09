@@ -12,13 +12,15 @@ Your addresses, display names and signatures.
 
 An address sends and receives mail under its own name. Adding, disabling and deleting one needs a paid Mail plan. Your first Proton address and your short-domain address stay enabled and cannot be deleted.
 
-Holds `create`, `delete`, `disable`, `enable`, `get`, `list` and `update`.
+Holds `create`, `delete`, `disable`, `enable`, `get`, `list`, `reorder` and `update`.
 
 ### `addresses create`
 
 Add an address to the account.
 
 EMAIL is the address to add. Its domain has to be one the account can use: a Proton domain, or a custom domain already set up. Adding an address needs a paid Mail plan.
+
+Your short-domain address is your username at pm.me. It takes the signature of your default address, and its display name unless you pass --display-name. Once it exists it cannot be disabled or deleted.
 
 The address sends and receives as soon as it exists. An account that creates post-quantum keys is refused: add the address in a Proton client.
 
@@ -31,6 +33,7 @@ proton mail settings addresses create EMAIL
 ```bash
 proton mail settings addresses create work@example.com
 proton mail settings addresses create work@example.com --display-name Work
+proton mail settings addresses create alice@pm.me
 ```
 
 | Flag | Description |
@@ -130,6 +133,23 @@ proton mail settings addresses list
 
 ```bash
 proton mail settings addresses list
+```
+
+### `addresses reorder`
+
+Make an address the default, or set their order.
+
+The first address is the default: mail leaves from it when no --from is given. Name the addresses that should come first, in order; the rest keep the order they are in.
+
+A disabled or external address, or one that cannot send or receive, cannot be the default.
+
+```
+proton mail settings addresses reorder REF...
+```
+
+```bash
+proton mail settings addresses reorder alice@pm.me
+proton mail settings addresses reorder alice@pm.me work@example.com alice@proton.me
 ```
 
 ### `addresses update`

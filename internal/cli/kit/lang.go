@@ -91,7 +91,7 @@ var Verbs = map[string]string{
 	"expire":      "make something delete itself later",
 	"unsubscribe": "ask a mailing list to stop",
 	"apply":       "run existing rules over what is already here",
-	"reorder":     "set the order things run in",
+	"reorder":     "set the order things are kept in",
 	"snooze":      "take something out of the inbox until later",
 	"unsnooze":    "bring something back to the inbox early",
 	"decline":     "refuse an invitation",

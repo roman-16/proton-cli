@@ -547,6 +547,11 @@ var examples = map[string][]string{
 	"proton mail settings addresses create": {
 		"proton mail settings addresses create work@example.com",
 		"proton mail settings addresses create work@example.com --display-name Work",
+		"proton mail settings addresses create alice@pm.me",
+	},
+	"proton mail settings addresses reorder": {
+		"proton mail settings addresses reorder alice@pm.me",
+		"proton mail settings addresses reorder alice@pm.me work@example.com alice@proton.me",
 	},
 	"proton mail settings addresses enable":  {"proton mail settings addresses enable work@example.com"},
 	"proton mail settings addresses disable": {"proton mail settings addresses disable work@example.com"},

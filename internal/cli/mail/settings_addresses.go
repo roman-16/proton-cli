@@ -24,7 +24,7 @@ func addressesCmd() *cobra.Command {
 	}
 	c.AddCommand(
 		addressesListCmd(), addressesGetCmd(), addressesCreateCmd(), addressesUpdateCmd(),
-		addressesEnableCmd(), addressesDisableCmd(), addressesDeleteCmd(),
+		addressesReorderCmd(), addressesEnableCmd(), addressesDisableCmd(), addressesDeleteCmd(),
 	)
 	return c
 }
@@ -146,6 +146,9 @@ func addressesCreateCmd() *cobra.Command {
 			"EMAIL is the address to add. Its domain has to be one the account can use: a\n" +
 			"Proton domain, or a custom domain already set up. Adding an address needs a\n" +
 			"paid Mail plan.\n\n" +
+			"Your short-domain address is your username at pm.me. It takes the signature\n" +
+			"of your default address, and its display name unless you pass --display-name.\n" +
+			"Once it exists it cannot be disabled or deleted.\n\n" +
 			"The address sends and receives as soon as it exists. An account that creates\n" +
 			"post-quantum keys is refused: add the address in a Proton client.\n\n" +
 			"Asks for your password even when you are signed in. With no terminal to ask,\n" +
@@ -267,6 +270,103 @@ func addressesDeleteCmd() *cobra.Command {
 			return m.AddressDelete(ctx, a)
 		},
 	})
+}
+
+// The default address is a position rather than a field: it is whichever
+// address comes first, so making one the default and sorting them all are the
+// same change.
+func addressesReorderCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "reorder REF...",
+		Short: "Make an address the default, or set their order",
+		Long: "Make an address the default, or set their order.\n\n" +
+			"The first address is the default: mail leaves from it when no --from is\n" +
+			"given. Name the addresses that should come first, in order; the rest keep\n" +
+			"the order they are in.\n\n" +
+			"A disabled or external address, or one that cannot send or receive, cannot\n" +
+			"be the default.",
+		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
+			list := addressList(c)
+			all, err := list.Rows(c.Ctx)
+			if err != nil {
+				return err
+			}
+			sel, err := kit.SelectFrom(c, "addresses", addressColumns(), list)
+			if err != nil {
+				return err
+			}
+			if err := defaultTakes(sel.Rows[0]); err != nil {
+				return err
+			}
+			order := reordered(all, sel.Rows)
+			if err := reorderTakes(all, order, sel.Rows); err != nil {
+				return err
+			}
+			ids := addressIDs(order)
+			return kit.Mutate(c, ui.ResultSpec{
+				Action: ui.Reordered, Kind: "addresses", Count: len(ids), IDs: ids,
+				Detail:  "with " + order[0].Email + " as the default",
+				Preview: kit.Preview("addresses", addressColumns(), order),
+			}, func() error {
+				return c.App.Mail.AddressesReorder(c.Ctx, ids)
+			})
+		}),
+	}
+}
+
+// reordered puts the named addresses first, in the order they were named, and
+// leaves the rest where they are.
+func reordered(all, named []mailsvc.Address) []mailsvc.Address {
+	first := make(map[string]bool, len(named))
+	for _, a := range named {
+		first[a.ID] = true
+	}
+	order := make([]mailsvc.Address, 0, len(all))
+	order = append(order, named...)
+	for _, a := range all {
+		if !first[a.ID] {
+			order = append(order, a)
+		}
+	}
+	return order
+}
+
+// reorderTakes admits an order that is a change, and refuses one the account is
+// already in rather than reporting a change nobody made.
+func reorderTakes(all, order, named []mailsvc.Address) error {
+	for i := range order {
+		if order[i].ID != all[i].ID {
+			return nil
+		}
+	}
+	if len(named) == 1 {
+		return errs.Problemf("%s is already the default address.", named[0].Email)
+	}
+	return errs.Problemf("The addresses are already in that order.")
+}
+
+// defaultTakes admits the address a reorder would make the default, or says why
+// Proton would not send from it.
+func defaultTakes(a mailsvc.Address) error {
+	switch {
+	case a.Status == mailsvc.StatusDisabled:
+		return errs.Problemf("%s is disabled, and a disabled address cannot be the default.", a.Email)
+	case a.Type == mailsvc.TypeExternal:
+		return errs.Problemf("%s is an external address, which cannot be the default.", a.Email)
+	case a.Receive == 0:
+		return errs.Problemf("%s cannot receive mail, so it cannot be the default.", a.Email)
+	case a.Send == 0:
+		return errs.Problemf("%s is receive-only, so it cannot be the default.", a.Email)
+	}
+	return nil
+}
+
+func addressIDs(addrs []mailsvc.Address) []string {
+	ids := make([]string, 0, len(addrs))
+	for _, a := range addrs {
+		ids = append(ids, a.ID)
+	}
+	return ids
 }
 
 func enableTakes(a mailsvc.Address) error {

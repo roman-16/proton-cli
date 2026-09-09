@@ -52,6 +52,7 @@ GET /core/v4/users
 GET /core/v5/events/{id}
 GET /domains
 GET /domains/available
+GET /domains/premium
 GET /drive/me/settings
 GET /drive/photos/volumes/{id}/albums
 GET /drive/photos/volumes/{id}/albums/{id}/children
@@ -174,6 +175,7 @@ PUT /contacts/v4/contacts/delete
 PUT /contacts/v4/contacts/emails/label
 PUT /contacts/v4/contacts/emails/unlabel
 PUT /contacts/v4/contacts/{id}
+PUT /core/v4/addresses/order
 PUT /core/v4/addresses/{id}
 PUT /core/v4/addresses/{id}/disable
 PUT /core/v4/addresses/{id}/enable

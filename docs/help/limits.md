@@ -20,7 +20,6 @@ Each of these has an equivalent in a web client.
 
 | What is missing | What to do instead |
 | --- | --- |
-| Turning on the `@pm.me` short domain | Switch it on at [account.proton.me](https://account.proton.me). Adding, disabling and deleting other addresses is built |
 | Turning the Pass [extra password](../pass/README.md#an-extra-password) on or off | Use the Pass app. *Answering* one is built |
 
 proton changes no credentials: the account password, two-factor, the recovery phrase and the Pass extra password are all set at [account.proton.me](https://account.proton.me) or in the Pass app.

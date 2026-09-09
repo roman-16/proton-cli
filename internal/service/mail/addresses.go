@@ -131,6 +131,11 @@ func (s *Service) ResolveAddress(ctx context.Context, r string) (*Address, error
 // exists without a key - what an interrupted run leaves - is given one instead
 // of being refused, so the command that makes an address is also the one that
 // finishes it.
+//
+// The account's own name on one of Proton's short domains is its short-domain
+// address, which Proton sets up through a door of its own. Which door to walk
+// through is decided here rather than asked of the user: the address they typed
+// says which one it is.
 func (s *Service) AddressCreate(ctx context.Context, local, domain, displayName string) (string, error) {
 	u, err := s.keys(ctx)
 	if err != nil {
@@ -146,9 +151,15 @@ func (s *Service) AddressCreate(ctx context.Context, local, domain, displayName 
 	email := local + "@" + domain
 	if existing, ok := addressByEmail(u, email); ok {
 		if len(existing.Keys) > 0 {
-			return "", &errs.Exists{Kind: "address", Name: existing.Email}
+			return "", &errs.Exists{Kind: "address", Name: existing.Email, Where: "this account"}
 		}
-		return u.NewAddressKey(ctx, s.C, existing)
+		if _, err := u.NewAddressKey(ctx, s.C, existing); err != nil {
+			return "", err
+		}
+		return existing.ID, nil
+	}
+	if s.isShortDomain(ctx, u, local, domain) {
+		return s.shortDomainAddress(ctx, u, domain, displayName)
 	}
 
 	member, err := s.selfMember(ctx)
@@ -167,9 +178,93 @@ func (s *Service) AddressCreate(ctx context.Context, local, domain, displayName 
 			"DisplayName": displayName,
 		},
 	}, &created); err != nil {
-		return "", s.orUnusableDomain(ctx, domain, err)
+		return "", s.orUnusableDomain(ctx, u, domain, err)
 	}
-	return u.NewAddressKey(ctx, s.C, keys.Address{ID: created.Address.ID, Email: created.Address.Email})
+	if _, err := u.NewAddressKey(ctx, s.C, keys.Address{
+		ID: created.Address.ID, Email: created.Address.Email,
+	}); err != nil {
+		return "", err
+	}
+	return created.Address.ID, nil
+}
+
+// isShortDomain reports whether the address being added is the account's
+// short-domain one, which is its own name on one of Proton's short domains.
+//
+// The domains are only asked for once the name matches, so an ordinary address
+// costs nothing. A question that cannot be answered is answered no: the address
+// is then added the ordinary way, and Proton says what it thinks of that.
+func (s *Service) isShortDomain(ctx context.Context, u *keys.Unlocked, local, domain string) bool {
+	if u.Username == "" || !strings.EqualFold(local, u.Username) {
+		return false
+	}
+	short, err := s.premiumDomains(ctx)
+	if err != nil {
+		// Recorded and not counted: the address is added the ordinary way, and
+		// this is what says why a short-domain address may have been.
+		slog.DebugContext(ctx, "addresses: the short domains could not be read", "error", err.Error())
+		return false
+	}
+	return containsFold(short, domain)
+}
+
+// shortDomainAddress turns on the account's short-domain address.
+//
+// Proton fixes its local part to the account's name, so only the domain is
+// asked for; what a person would otherwise have to retype - the display name
+// and the signature - is taken from the default address. A plan without Mail is
+// refused here rather than at Proton, because there is nothing else to try.
+func (s *Service) shortDomainAddress(ctx context.Context, u *keys.Unlocked, domain, displayName string) (string, error) {
+	if !u.PaidMail {
+		return "", errs.Problemf("Turning on %s@%s needs a paid Mail plan.", u.Username, domain)
+	}
+	fallback := defaultAddress(u)
+	if displayName == "" {
+		displayName = fallback.DisplayName
+	}
+	var created struct {
+		Address rawAddress
+	}
+	if err := s.C.Decode(ctx, proton.Request{
+		Method: "POST", Path: "/core/v4/addresses/setup",
+		Body: map[string]any{
+			"Domain":      domain,
+			"DisplayName": displayName,
+			"Signature":   fallback.Signature,
+		},
+	}, &created); err != nil {
+		return "", err
+	}
+	if _, err := u.NewAddressKey(ctx, s.C, keys.Address{
+		ID: created.Address.ID, Email: created.Address.Email,
+	}); err != nil {
+		return "", err
+	}
+	return created.Address.ID, nil
+}
+
+// AddressesReorder writes the order the account keeps its addresses in.
+//
+// The first is the default: the address mail leaves from when none is named,
+// and the one Proton shows first. There is no field saying so, which is why
+// making an address the default is the same request as sorting them all.
+func (s *Service) AddressesReorder(ctx context.Context, ids []string) error {
+	return s.C.Decode(ctx, proton.Request{
+		Method: "PUT", Path: "/core/v4/addresses/order",
+		Body: map[string]any{"AddressIDs": ids},
+	}, nil)
+}
+
+// defaultAddress is the address the account sends from unless told otherwise,
+// which is the first one Proton keeps.
+func defaultAddress(u *keys.Unlocked) keys.Address {
+	var first keys.Address
+	for i, a := range u.Addresses {
+		if i == 0 || a.Order < first.Order {
+			first = a
+		}
+	}
+	return first
 }
 
 // selfMember is who an address belongs to.
@@ -198,26 +293,25 @@ func (s *Service) selfMember(ctx context.Context) (string, error) {
 // create has already failed, and only to name what the address could have been.
 // A domain that is on the list is somebody else's problem, and Proton's own
 // sentence is left to say what it is.
-func (s *Service) orUnusableDomain(ctx context.Context, domain string, refusal error) error {
-	usable, err := s.usableDomains(ctx)
+func (s *Service) orUnusableDomain(ctx context.Context, u *keys.Unlocked, domain string, refusal error) error {
+	usable, err := s.usableDomains(ctx, u.PaidMail)
 	if err != nil {
 		// Recorded and not counted: Proton's own refusal is on the screen either
 		// way, and this line is what says why it was not improved on.
 		slog.DebugContext(ctx, "addresses: the usable domains could not be read", "error", err.Error())
 		return refusal
 	}
-	for _, d := range usable {
-		if strings.EqualFold(d, domain) {
-			return refusal
-		}
+	if containsFold(usable, domain) {
+		return refusal
 	}
 	return errs.Problemf("This account cannot add an address on %s.", domain).
 		Hint(strings.Join(usable, ", "))
 }
 
-// usableDomains are the domains an address may be added on: Proton's own, and
-// the account's custom ones that are ready to carry mail.
-func (s *Service) usableDomains(ctx context.Context) ([]string, error) {
+// usableDomains are the domains an address may be added on: Proton's own, the
+// account's custom ones that are ready to carry mail, and - on a plan with Mail
+// - Proton's short domains.
+func (s *Service) usableDomains(ctx context.Context, paidMail bool) ([]string, error) {
 	var protonOwn struct{ Domains []string }
 	if err := s.C.Decode(ctx, proton.Request{Method: "GET", Path: "/domains/available"}, &protonOwn); err != nil {
 		return nil, err
@@ -239,7 +333,33 @@ func (s *Service) usableDomains(ctx context.Context) ([]string, error) {
 			out = append(out, d.DomainName)
 		}
 	}
-	return out, nil
+	if !paidMail {
+		return out, nil
+	}
+	short, err := s.premiumDomains(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return append(out, short...), nil
+}
+
+// premiumDomains are the short domains Proton offers, which a plan with Mail
+// may put one address on: its own name, and nothing else.
+func (s *Service) premiumDomains(ctx context.Context) ([]string, error) {
+	var r struct{ Domains []string }
+	if err := s.C.Decode(ctx, proton.Request{Method: "GET", Path: "/domains/premium"}, &r); err != nil {
+		return nil, err
+	}
+	return r.Domains, nil
+}
+
+func containsFold(values []string, want string) bool {
+	for _, v := range values {
+		if strings.EqualFold(v, want) {
+			return true
+		}
+	}
+	return false
 }
 
 // AddressDisable stops an address sending and receiving, and keeps everything

@@ -165,6 +165,7 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton mail settings addresses enable`](../mail/settings.md#addresses-enable) | Let a disabled address send and receive again |
 | [`proton mail settings addresses get`](../mail/settings.md#addresses-get) | Show one address, including its signature |
 | [`proton mail settings addresses list`](../mail/settings.md#addresses-list) | List the addresses on the account |
+| [`proton mail settings addresses reorder`](../mail/settings.md#addresses-reorder) | Make an address the default, or set their order |
 | [`proton mail settings addresses update`](../mail/settings.md#addresses-update) | Set an address's display name or signature |
 | [`proton mail settings autoreply disable`](../mail/settings.md#autoreply-disable) | Turn the auto-reply off, keeping its schedule |
 | [`proton mail settings autoreply enable`](../mail/settings.md#autoreply-enable) | Turn the auto-reply on, keeping its schedule |

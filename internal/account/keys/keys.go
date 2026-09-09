@@ -26,6 +26,9 @@ type Unlocked struct {
 	// PaidMail says whether the account's plan includes Mail, which is what
 	// Proton gates setting up a forwarding behind.
 	PaidMail bool
+	// Username is what the account signs in as, and the local part Proton fixes
+	// its short-domain address to.
+	Username string
 	// Now is the time as Proton keeps it, which is what every key and signature
 	// this build writes is dated by. Nil falls back to this machine's clock.
 	Now func() time.Time
@@ -292,7 +295,7 @@ func open(ctx context.Context, now func() time.Time, user *User, addrs []Address
 	}
 	return &Unlocked{
 		UserKR: userKR, AddrKRs: addrKRs, Addresses: addrs,
-		PaidMail: user.paidMail(), Now: now,
+		PaidMail: user.paidMail(), Username: user.Name, Now: now,
 	}, nil
 }
 

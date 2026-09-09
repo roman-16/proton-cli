@@ -3,6 +3,7 @@ package live
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -118,6 +119,90 @@ func TestMailSettingsAddressesReportEachKind(t *testing.T) {
 	}
 }
 
+// The short-domain address is the account's own name on pm.me, and turning it
+// on needs a paid Mail plan. The refusal names the address, which is what tells
+// it from the one an account without the plan gets for any address at all.
+func TestMailSettingsAddressesRefuseTheShortDomainWithoutAPaidPlan(t *testing.T) {
+	before := len(runJSONArray(t, "mail", "settings", "addresses", "list"))
+	username, _, _ := strings.Cut(selfEmail(), "@")
+
+	_, stderr, code := run(t, "mail", "settings", "addresses", "create", username+"@pm.me")
+	if code != 1 {
+		t.Fatalf("turning on the short domain exited %d: %s", code, truncateOutput(stderr))
+	}
+	if !strings.Contains(stderr, "Turning on "+username+"@pm.me needs a paid Mail plan") {
+		t.Errorf("the refusal does not name the short-domain address: %s", truncateOutput(stderr))
+	}
+	if after := len(runJSONArray(t, "mail", "settings", "addresses", "list")); after != before {
+		t.Errorf("the account holds %d addresses, it held %d before a refused create", after, before)
+	}
+}
+
+// A short-domain address that is already on is reported as the address it is,
+// and nothing is set up a second time: an account has one for its lifetime.
+func TestMailSettingsAddressesRefuseAShortDomainThatIsAlreadyOn(t *testing.T) {
+	address := paidAddressOfKind(t, addressPremium)
+	if address == "" {
+		t.Fatal("the paid account has no short-domain address")
+	}
+	before := len(runJSONArrayPaid(t, "mail", "settings", "addresses", "list"))
+
+	_, stderr, code := runPaid(t, "mail", "settings", "addresses", "create", address)
+	if code != 4 {
+		t.Fatalf("turning on a short domain that is on exited %d: %s", code, truncateOutput(stderr))
+	}
+	if !strings.Contains(stderr, address) {
+		t.Errorf("the refusal does not name the address: %s", truncateOutput(stderr))
+	}
+	if after := len(runJSONArrayPaid(t, "mail", "settings", "addresses", "list")); after != before {
+		t.Errorf("the account holds %d addresses, it held %d before a refused create", after, before)
+	}
+}
+
+// The default address is the first one, so making one the default is a reorder.
+// The account is put back in the order the run found it in.
+func TestMailSettingsAddressesReorderMakesAnAddressTheDefault(t *testing.T) {
+	address := paidForwarder(t)
+	before := paidAddressOrder(t)
+	if len(before) < 2 {
+		t.Fatal("the paid account holds one address, so there is no order to set")
+	}
+	if before[0] == address {
+		t.Fatalf("%s is already the default address, so a run before this one did not"+
+			" put the order back", address)
+	}
+
+	runOKPaid(t, "mail", "settings", "addresses", "reorder", address)
+	cleanup(t, "Restore the address order: proton --profile paid mail settings addresses reorder "+
+		strings.Join(before, " "), func() error {
+		if slices.Equal(paidAddressOrder(t), before) {
+			return nil
+		}
+		args := append([]string{"mail", "settings", "addresses", "reorder"}, before...)
+		if _, stderr, code, err := runAs(account.Paid, nil, args...); err != nil || code != 0 {
+			return fmt.Errorf("exit %d: %v %s", code, err, strings.TrimSpace(stderr))
+		}
+		return nil
+	})
+	if got := paidAddressOrder(t); got[0] != address {
+		t.Errorf("the default address is %s, want %s", got[0], address)
+	}
+
+	runOKPaid(t, append([]string{"mail", "settings", "addresses", "reorder"}, before...)...)
+	if got := paidAddressOrder(t); !slices.Equal(got, before) {
+		t.Errorf("the addresses came back in the order %v, want %v", got, before)
+	}
+}
+
+// An order the account is already in is refused from the listing, so a reorder
+// that would change nothing sends nothing.
+func TestMailSettingsAddressesRefuseAReorderThatChangesNothing(t *testing.T) {
+	_, stderr, code := run(t, "mail", "settings", "addresses", "reorder", selfEmail())
+	if code != 1 || !strings.Contains(stderr, "already the default address") {
+		t.Errorf("reordering the default address to the front exited %d: %s", code, truncateOutput(stderr))
+	}
+}
+
 // Turning an address off and on again is the whole of what a run may do to one,
 // and the fixture address is the only one it may do it to.
 func TestMailSettingsAddressesTurnTheFixtureAddressOffAndOn(t *testing.T) {
@@ -139,6 +224,13 @@ func TestMailSettingsAddressesTurnTheFixtureAddressOffAndOn(t *testing.T) {
 			return nil
 		})
 	assertAddressStatus(t, address, "disabled")
+
+	// Proton sends from the first address, so an address that is off cannot be
+	// the one it sends from. The row says so, and nothing is written.
+	_, stderr, code := runPaid(t, "mail", "settings", "addresses", "reorder", address)
+	if code != 1 || !strings.Contains(stderr, "cannot be the default") {
+		t.Errorf("making a disabled address the default exited %d: %s", code, truncateOutput(stderr))
+	}
 
 	runOKPaid(t, "mail", "settings", "addresses", "enable", address)
 	assertAddressStatus(t, address, "active")
@@ -237,6 +329,32 @@ func ownAddressOfKind(t *testing.T, kind float64) string {
 		}
 	}
 	return ""
+}
+
+// paidAddressOfKind is the same on the paid account.
+func paidAddressOfKind(t *testing.T, kind float64) string {
+	t.Helper()
+	for _, row := range runJSONArrayPaid(t, "mail", "settings", "addresses", "list") {
+		a, _ := row.(map[string]interface{})
+		if got, _ := a["type"].(float64); got == kind {
+			email, _ := a["email"].(string)
+			return email
+		}
+	}
+	return ""
+}
+
+// paidAddressOrder is the paid account's addresses as it keeps them, the
+// default first.
+func paidAddressOrder(t *testing.T) []string {
+	t.Helper()
+	var order []string
+	for _, row := range runJSONArrayPaid(t, "mail", "settings", "addresses", "list") {
+		a, _ := row.(map[string]interface{})
+		email, _ := a["email"].(string)
+		order = append(order, email)
+	}
+	return order
 }
 
 func assertAddressStatus(t *testing.T, address, want string) {

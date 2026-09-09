@@ -148,7 +148,20 @@ type Exists struct {
 func (e *Exists) Hints() []string { return e.Answers }
 
 func (e *Exists) Error() string {
-	return fmt.Sprintf("%s already has a %s called %q.", e.Where, e.Kind, e.Name)
+	return fmt.Sprintf("%s already has %s called %q.", e.Where, indefinite(e.Kind), e.Name)
+}
+
+// indefinite puts the article a noun takes in front of it, so what is in the
+// way reads as a sentence whatever it is called.
+func indefinite(noun string) string {
+	if noun == "" {
+		return noun
+	}
+	switch noun[0] {
+	case 'a', 'e', 'i', 'o', 'u':
+		return "an " + noun
+	}
+	return "a " + noun
 }
 func (e *Exists) ExitCode() int { return 4 }
 

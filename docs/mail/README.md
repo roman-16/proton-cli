@@ -351,6 +351,23 @@ Your first Proton address and your short-domain address stay enabled and cannot 
 
 `get` shows whether an address holds a key. One that does not can neither send nor receive; running `create` on it publishes the missing key.
 
+## Turn on your @pm.me address
+
+```bash
+proton mail settings addresses create alice@pm.me
+```
+
+Your short-domain address is your username at `pm.me`: the local part of the address `addresses list` shows as `original`. It needs a paid Mail plan, takes the display name and signature of your default address, and once on cannot be disabled or deleted. Any other address on `pm.me` counts towards your address limit.
+
+## Make another address the default
+
+```bash
+proton mail settings addresses reorder alice@pm.me
+proton mail settings addresses reorder alice@pm.me work@example.com alice@proton.me
+```
+
+The first address is the default: `addresses list` shows it first, and mail leaves from it when no `--from` is given. Name the addresses that should come first, in order; the rest keep the order they are in. A disabled or external address, or one that cannot send or receive, cannot be the default.
+
 ## Settings
 
 ```bash
