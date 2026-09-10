@@ -116,29 +116,29 @@ func (s *Service) calendarBootstrap(ctx context.Context, calendarID string) (*bo
 // Proton reports a calendar's members as the ones belonging to whoever asked, so
 // there is normally one; matching it to an address of ours is what the web client
 // does too (getMemberAndAddress, packages/shared/lib/calendar/members.ts).
-func ourMember(members []member, u *keys.Unlocked) (member, *pgp.KeyRing, bool) {
+func ourMember(members []member, u *keys.Unlocked) (member, keys.Rings, bool) {
 	for _, m := range members {
-		if kr, ok := u.AddrKR(m.AddressID); ok {
-			return m, kr, true
+		if rings, ok := u.AddrRings(m.AddressID); ok {
+			return m, rings, true
 		}
 	}
-	return member{}, nil, false
+	return member{}, keys.Rings{}, false
 }
 
 // addressKeyRing is the key ring for one of our own addresses, when we hold it.
 // An event invited to an address whose keys will not open is left encrypted
 // rather than refused, which is what the caller's readErr already says.
-func (s *Service) addressKeyRing(ctx context.Context, addressID string) (*pgp.KeyRing, bool) {
+func (s *Service) addressKeyRing(ctx context.Context, addressID string) (keys.Rings, bool) {
 	u, err := s.keys(ctx)
 	if err != nil {
-		return nil, false
+		return keys.Rings{}, false
 	}
-	return u.AddrKR(addressID)
+	return u.AddrRings(addressID)
 }
 
 type calKeys struct {
 	calKR    *pgp.KeyRing
-	addrKR   *pgp.KeyRing
+	addr     keys.Rings
 	memberID string
 	email    string
 	// addressID is the address this membership belongs to. Sharing names it, so
@@ -163,7 +163,7 @@ func (s *Service) unlockCalendar(ctx context.Context, calendarID string) (*calKe
 		if err != nil {
 			return nil, err
 		}
-		me, addrKR, ok := ourMember(b.Members, u)
+		me, addr, ok := ourMember(b.Members, u)
 		if !ok {
 			return nil, fmt.Errorf("no matching address key for calendar %s", calendarID)
 		}
@@ -182,11 +182,11 @@ func (s *Service) unlockCalendar(ctx context.Context, calendarID string) (*calKe
 			if err != nil {
 				return nil, err
 			}
-			dec, err := addrKR.Decrypt(msg, nil, pgp.GetUnixTime())
+			dec, err := addr.Read.Decrypt(msg, nil, pgp.GetUnixTime())
 			if err != nil {
 				return nil, fmt.Errorf("decrypt calendar passphrase: %w", err)
 			}
-			if err := addrKR.VerifyDetached(dec, sig, pgp.GetUnixTime()); err != nil {
+			if err := addr.Read.VerifyDetached(dec, sig, pgp.GetUnixTime()); err != nil {
 				return nil, err
 			}
 			calPass = dec.GetBinary()
@@ -194,7 +194,7 @@ func (s *Service) unlockCalendar(ctx context.Context, calendarID string) (*calKe
 			// where the passphrase is already being opened rather than by
 			// decrypting the same message a second time later.
 			if split, err := msg.SplitMessage(); err == nil {
-				passphraseKey, _ = addrKR.DecryptSessionKey(split.GetBinaryKeyPacket())
+				passphraseKey, _ = addr.Read.DecryptSessionKey(split.GetBinaryKeyPacket())
 			}
 			break
 		}
@@ -223,7 +223,7 @@ func (s *Service) unlockCalendar(ctx context.Context, calendarID string) (*calKe
 			return nil, fmt.Errorf("none of this calendar's %d keys could be unlocked", len(b.Keys))
 		}
 		return &calKeys{
-			calKR: calKR, addrKR: addrKR, memberID: me.ID, email: me.Email,
+			calKR: calKR, addr: addr, memberID: me.ID, email: me.Email,
 			addressID: me.AddressID, passphraseKey: passphraseKey,
 		}, nil
 	})

@@ -100,13 +100,13 @@ func (s *Service) AttachmentDownload(ctx context.Context, msgID, attID string) (
 	if keyPackets == "" {
 		return nil, "", &errs.NotFound{Kind: "attachment", Ref: attID}
 	}
-	addrKR, ok := u.AddrKR(r.Message.AddressID)
+	rings, ok := u.AddrRings(r.Message.AddressID)
 	if !ok {
-		kr, _, err := u.FirstAddr()
+		first, _, err := u.FirstAddr()
 		if err != nil {
 			return nil, "", err
 		}
-		addrKR = kr
+		rings = first
 	}
 	resp, err := s.C.Do(ctx, proton.Request{Method: "GET", Path: "/mail/v4/attachments/" + attID})
 	if err != nil {
@@ -117,7 +117,7 @@ func (s *Service) AttachmentDownload(ctx context.Context, msgID, attID string) (
 		return nil, "", fmt.Errorf("decode key packets: %w", err)
 	}
 	split := pgp.NewPGPSplitMessage(kp, resp.Body)
-	dec, err := addrKR.Decrypt(split.GetPGPMessage(), nil, 0)
+	dec, err := rings.Read.Decrypt(split.GetPGPMessage(), nil, 0)
 	if err != nil {
 		return nil, "", fmt.Errorf("decrypt attachment: %w", err)
 	}

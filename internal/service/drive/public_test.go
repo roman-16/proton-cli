@@ -306,7 +306,7 @@ func signedInAs(t *testing.T, email string) *keys.Unlocked {
 		t.Fatalf("address key ring: %v", err)
 	}
 	return &keys.Unlocked{
-		AddrKRs:   map[string]*pgp.KeyRing{testAddrID: addrKR},
+		AddrKRs:   map[string]keys.Rings{testAddrID: {Read: addrKR, Write: addrKR}},
 		Addresses: []keys.Address{{ID: testAddrID, Email: email}},
 	}
 }
@@ -818,7 +818,7 @@ func TestWritingIntoALinkSignedInNamesYourAddress(t *testing.T) {
 		t.Fatalf("address key ring: %v", err)
 	}
 	u := &keys.Unlocked{
-		AddrKRs:   map[string]*pgp.KeyRing{testAddrID: addrKR},
+		AddrKRs:   map[string]keys.Rings{testAddrID: {Read: addrKR, Write: addrKR}},
 		Addresses: []keys.Address{{ID: testAddrID, Email: testAddrMail}},
 	}
 	tree := newPublicTree(t, testURLPassword, "Project", protonFolder)

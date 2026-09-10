@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/ProtonMail/go-srp"
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
 	"github.com/roman-16/proton-cli/internal/account/localkey"
@@ -25,10 +26,10 @@ import (
 )
 
 func unlocked(addrs ...Address) *Unlocked {
-	u := &Unlocked{Addresses: addrs, AddrKRs: map[string]*pgp.KeyRing{}}
+	u := &Unlocked{Addresses: addrs, AddrKRs: map[string]Rings{}}
 	for _, a := range addrs {
 		if len(a.Keys) > 0 {
-			u.AddrKRs[a.ID] = &pgp.KeyRing{}
+			u.AddrKRs[a.ID] = Rings{Read: &pgp.KeyRing{}, Write: &pgp.KeyRing{}}
 		}
 	}
 	return u
@@ -41,12 +42,12 @@ func TestFirstAddrSkipsAddressesWithoutKeys(t *testing.T) {
 		Address{ID: "locked", Email: "locked@example.com"},
 		Address{ID: "open", Email: "open@example.com", DisplayName: "Open", Keys: withKey},
 	)
-	kr, addr, err := u.FirstAddr()
+	rings, addr, err := u.FirstAddr()
 	if err != nil {
 		t.Fatalf("FirstAddr: %v", err)
 	}
-	if kr == nil {
-		t.Error("FirstAddr returned a nil key ring")
+	if rings.Read == nil || rings.Write == nil {
+		t.Error("FirstAddr returned a ring that is not there")
 	}
 	if addr.ID != "open" || addr.DisplayName != "Open" {
 		t.Errorf("FirstAddr = %+v, want the address whose keys unlocked", addr)
@@ -490,15 +491,15 @@ func TestUnlockDoesNotCountAKeyThatStayedShut(t *testing.T) {
 	slog.SetDefault(slog.New(slog.NewTextHandler(&records, &slog.HandlerOptions{Level: slog.LevelDebug})))
 	t.Cleanup(func() { slog.SetDefault(restore) })
 
-	kr, err := unlockKeyRing(ctx, []Key{
+	rings, err := unlockKeyRing(ctx, []Key{
 		{ID: "retired", PrivateKey: lockedKey(t, "retired", "an old passphrase"), Active: 0},
 		{ID: "current", PrivateKey: lockedKey(t, "current", "the passphrase"), Active: 1, Primary: 1},
 	}, []byte("the passphrase"), nil)
 	if err != nil {
 		t.Fatalf("unlockKeyRing: %v", err)
 	}
-	if kr.CountEntities() != 1 {
-		t.Errorf("the ring holds %d keys, want the one that opened", kr.CountEntities())
+	if rings.Read.CountEntities() != 1 {
+		t.Errorf("the ring holds %d keys, want the one that opened", rings.Read.CountEntities())
 	}
 	if tally.Count() != 0 {
 		t.Errorf("%d things were counted as unshowable, want none: the ring opened", tally.Count())
@@ -788,4 +789,93 @@ func armoredPublicKey(t *testing.T, name string) string {
 		t.Fatalf("armor %s key: %v", name, err)
 	}
 	return armored
+}
+
+// An address holds keys it cannot write with. Proton publishes a forwarding key
+// onto the address it forwards to, and that key carries no encryption subkey at
+// all - so an address that has ever accepted a forwarding would encrypt nothing
+// if what it writes with were every key it holds.
+func TestAKeyThatCannotEncryptDoesNotStopTheAddressEncrypting(t *testing.T) {
+	ctx, _ := skip.With(context.Background())
+	rings, err := unlockKeyRing(ctx, []Key{
+		{ID: "primary", PrivateKey: lockedKey(t, "primary", "the passphrase"), Active: 1, Primary: 1},
+		{ID: "forwarding", PrivateKey: signOnlyKey(t, "forwarding", "the passphrase"), Active: 1},
+	}, []byte("the passphrase"), nil)
+	if err != nil {
+		t.Fatalf("unlockKeyRing: %v", err)
+	}
+
+	if _, err := rings.Write.Encrypt(pgp.NewPlainMessageFromString("out"), nil); err != nil {
+		t.Errorf("the address cannot encrypt: %v", err)
+	}
+	if _, err := rings.Read.Encrypt(pgp.NewPlainMessageFromString("out"), nil); err == nil {
+		t.Error("every key the address holds encrypted, so this test no longer proves what it says")
+	}
+}
+
+// The other half of the split: what arrived under a key the address has since
+// stopped writing with still opens, so reading keeps every key that unlocked.
+func TestReadingGoesUnderEveryKeyThatOpened(t *testing.T) {
+	ctx, _ := skip.With(context.Background())
+	retired := lockedKey(t, "retired", "the passphrase")
+	rings, err := unlockKeyRing(ctx, []Key{
+		{ID: "primary", PrivateKey: lockedKey(t, "primary", "the passphrase"), Active: 1, Primary: 1},
+		{ID: "retired", PrivateKey: retired, Active: 1},
+	}, []byte("the passphrase"), nil)
+	if err != nil {
+		t.Fatalf("unlockKeyRing: %v", err)
+	}
+
+	sealed, err := ringOf(t, retired, "the passphrase").Encrypt(pgp.NewPlainMessageFromString("what arrived"), nil)
+	if err != nil {
+		t.Fatalf("seal to the retired key: %v", err)
+	}
+	opened, err := rings.Read.Decrypt(sealed, nil, pgp.GetUnixTime())
+	if err != nil {
+		t.Fatalf("what was sealed to the retired key did not open: %v", err)
+	}
+	if opened.GetString() != "what arrived" {
+		t.Errorf("opened %q, want what was sealed", opened.GetString())
+	}
+	if rings.Write.CountEntities() != 1 {
+		t.Errorf("the writing ring holds %d keys, want the primary alone", rings.Write.CountEntities())
+	}
+}
+
+// signOnlyKey is a key with no encryption subkey, which is the shape Proton
+// publishes a forwarding key in.
+func signOnlyKey(t *testing.T, name, passphrase string) string {
+	t.Helper()
+	entity, err := openpgp.NewEntity(name, "", name+"@example.invalid", (&Unlocked{}).Generation())
+	if err != nil {
+		t.Fatalf("generate %s key: %v", name, err)
+	}
+	entity.Subkeys = nil
+	key, err := pgp.NewKeyFromEntity(entity)
+	if err != nil {
+		t.Fatalf("read %s key: %v", name, err)
+	}
+	armored, err := LockAndArmor(key, []byte(passphrase))
+	if err != nil {
+		t.Fatalf("lock %s key: %v", name, err)
+	}
+	return armored
+}
+
+// ringOf unlocks one armoured key into a ring of its own.
+func ringOf(t *testing.T, armored, passphrase string) *pgp.KeyRing {
+	t.Helper()
+	locked, err := pgp.NewKeyFromArmored(armored)
+	if err != nil {
+		t.Fatalf("read the key: %v", err)
+	}
+	key, err := locked.Unlock([]byte(passphrase))
+	if err != nil {
+		t.Fatalf("unlock the key: %v", err)
+	}
+	kr, err := pgp.NewKeyRing(key)
+	if err != nil {
+		t.Fatalf("ring: %v", err)
+	}
+	return kr
 }

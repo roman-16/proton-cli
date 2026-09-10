@@ -167,7 +167,7 @@ func TestVaultCreateSealsTheKeyToThePrimaryUserKeyAlone(t *testing.T) {
 	u := &keys.Unlocked{
 		UserKR:    users,
 		Addresses: []keys.Address{{ID: "addr", Email: "me@proton.me"}},
-		AddrKRs:   map[string]*pgp.KeyRing{"addr": ring(t, "me")},
+		AddrKRs:   map[string]keys.Rings{"addr": {Read: ring(t, "me"), Write: ring(t, "me")}},
 	}
 	d := &capturingDoer{}
 	if _, err := New(d, testKeys(u)).VaultCreate(context.Background(), "Work"); err != nil {

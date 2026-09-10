@@ -101,7 +101,7 @@ func (s *Service) CalendarShare(ctx context.Context, calendarID, email string, c
 	if err != nil {
 		return fmt.Errorf("encrypt the passphrase key for %s: %w", email, err)
 	}
-	signature, err := ck.addrKR.SignDetachedWithContext(
+	signature, err := ck.addr.Write.SignDetachedWithContext(
 		pgp.NewPlainMessage(ck.passphraseKey.Key),
 		pgp.NewSigningContext(shareInviteContext, true),
 	)
@@ -286,7 +286,7 @@ type rawInvitation struct {
 // address's own key, which is how Proton knows the offer reached somebody who
 // could actually read it.
 func (s *Service) CalendarInvitationAccept(ctx context.Context, invitationID string) error {
-	invite, addrKR, addressID, err := s.findInvitation(ctx, invitationID)
+	invite, addr, addressID, err := s.findInvitation(ctx, invitationID)
 	if err != nil {
 		return err
 	}
@@ -295,11 +295,11 @@ func (s *Service) CalendarInvitationAccept(ctx context.Context, invitationID str
 	if err != nil {
 		return err
 	}
-	passphrase, err := addrKR.Decrypt(msg, nil, pgp.GetUnixTime())
+	passphrase, err := addr.Read.Decrypt(msg, nil, pgp.GetUnixTime())
 	if err != nil {
 		return fmt.Errorf("open the calendar's passphrase: %w", err)
 	}
-	signature, err := addrKR.SignDetached(pgp.NewPlainMessageFromString(passphrase.GetString()))
+	signature, err := addr.Write.SignDetached(pgp.NewPlainMessageFromString(passphrase.GetString()))
 	if err != nil {
 		return err
 	}
@@ -330,18 +330,18 @@ func (s *Service) CalendarInvitationDecline(ctx context.Context, invitationID st
 // findInvitation reads one invitation whole, with the keys of the address it was
 // sent to. Both answers come from the same lookup, because an invitation to an
 // address this account does not hold is one it cannot answer either way.
-func (s *Service) findInvitation(ctx context.Context, invitationID string) (rawInvitation, *pgp.KeyRing, string, error) {
+func (s *Service) findInvitation(ctx context.Context, invitationID string) (rawInvitation, keys.Rings, string, error) {
 	var r struct {
 		Invitations []rawInvitation
 	}
 	if err := s.C.Decode(ctx, proton.Request{
 		Method: "GET", Path: "/calendar/v1/invitations",
 	}, &r); err != nil {
-		return rawInvitation{}, nil, "", err
+		return rawInvitation{}, keys.Rings{}, "", err
 	}
 	u, err := s.keys(ctx)
 	if err != nil {
-		return rawInvitation{}, nil, "", err
+		return rawInvitation{}, keys.Rings{}, "", err
 	}
 	for _, i := range r.Invitations {
 		if i.CalendarInvitationID != invitationID {
@@ -351,15 +351,15 @@ func (s *Service) findInvitation(ctx context.Context, invitationID string) (rawI
 			if !strings.EqualFold(a.Email, i.Email) {
 				continue
 			}
-			kr, ok := u.AddrKR(a.ID)
+			rings, ok := u.AddrRings(a.ID)
 			if !ok {
-				return rawInvitation{}, nil, "", errs.Problemf(
+				return rawInvitation{}, keys.Rings{}, "", errs.Problemf(
 					"The keys for %s will not open, so that invitation cannot be answered.", a.Email)
 			}
-			return i, kr, a.ID, nil
+			return i, rings, a.ID, nil
 		}
-		return rawInvitation{}, nil, "", errs.Problemf(
+		return rawInvitation{}, keys.Rings{}, "", errs.Problemf(
 			"That invitation was sent to %s, which is not an address on this account.", i.Email)
 	}
-	return rawInvitation{}, nil, "", &errs.NotFound{Kind: "invitation", Ref: invitationID}
+	return rawInvitation{}, keys.Rings{}, "", &errs.NotFound{Kind: "invitation", Ref: invitationID}
 }

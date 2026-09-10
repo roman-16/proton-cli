@@ -26,13 +26,13 @@ func testSender() *Sender {
 // unlockedWith builds an Unlocked whose every address has an (empty) key ring, so
 // sender selection sees them all as usable.
 func unlockedWith(addrs ...keys.Address) *keys.Unlocked {
-	krs := map[string]*pgp.KeyRing{}
+	krs := map[string]keys.Rings{}
 	for _, a := range addrs {
 		kr, err := pgp.NewKeyRing(nil)
 		if err != nil {
 			panic(err)
 		}
-		krs[a.ID] = kr
+		krs[a.ID] = keys.Rings{Read: kr, Write: kr}
 	}
 	return &keys.Unlocked{AddrKRs: krs, Addresses: addrs}
 }
@@ -268,7 +268,7 @@ func hierarchy(t *testing.T, addrs ...keys.Address) keys.Get {
 	if err != nil {
 		t.Fatalf("NewKeyRing: %v", err)
 	}
-	u := &keys.Unlocked{UserKR: userKR, Addresses: addrs, AddrKRs: map[string]*pgp.KeyRing{}}
+	u := &keys.Unlocked{UserKR: userKR, Addresses: addrs, AddrKRs: map[string]keys.Rings{}}
 	return func(context.Context) (*keys.Unlocked, error) { return u, nil }
 }
 

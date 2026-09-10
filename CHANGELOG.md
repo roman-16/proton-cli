@@ -6,6 +6,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 Adding a version section here is what publishes a release, so this file is the one place a version is decided: see [Releases](CONTRIBUTING.md#releases). Versions that shipped before this file existed are on the [releases page](https://github.com/roman-16/proton-cli/releases).
 
+## [3.7.0] - 2026-09-10
+
+### Added
+
+- `drive items list`, `get` and `download` take `--link URL`, opening a public link somebody sent you - with no Proton account at all, if you have none. `drive shared add` keeps a link so `--shared REF` opens it later, and `shared remove` forgets one.
+- `--computer NAME` works inside a computer syncing through the Drive desktop app, and `--shared REF` inside an item somebody shared with you. A path still means what it always meant; the flag says which tree it is in.
+- `drive items upload` and `items create` take `--link` and `--shared`, putting a file or folder into somebody's link. Signed in, the upload names your address; with no account it names nobody. A link that allows viewing only says so before anything is planned, and `--if-exists replace` is refused there because a link takes no new revisions.
+- `drive items update` and `items delete` work inside a link on what you uploaded there yourself, for an hour, signed in. A link has no trash, so a folder goes with everything in it.
+- `drive shared leave` gives up an item somebody shared with you directly. Only a new invitation brings it back.
+- `mail settings addresses create`, `disable`, `enable` and `delete`. A new address is given its first key; the keys of an address that has them are never touched. Proton asks for your password, so they take `--password-file` and `--password-stdin`.
+- `mail settings addresses create alice@pm.me` turns on the account's short-domain address, and `addresses reorder` makes an address the default - name the ones that should come first, and the rest keep their order.
+- `mail settings forwarding accept` and `decline` answer a forwarding somebody sent you, and `delete`, `disable`, `enable` and `resend` handle one in either direction.
+- `pass settings extra-password get`, `enable` and `disable`, which the Pass app offers under Settings. Enabling stores a verifier and never the password; disabling proves the current one first.
+
+### Changed
+
+- Forwarding one of your addresses outside Proton costs that address its end-to-end encryption. `forwarding create` says so before it acts, and taking the last one down turns encryption back on.
+- Every file uploaded to Drive now carries its own encrypted record of itself - size, block sizes, modification time and SHA-1 - so uploads report a checksum and other clients show the real modification date.
+- A command that is waiting shows a sign of life on stderr after a tenth of a second, taken back by the first byte of the answer, so one that has printed nothing no longer looks hung.
+- A wait for Proton to answer, or to stop rate limiting, is a sentence with the delay in it rather than a log record.
+- A wrong number of arguments is refused by the name the usage line shows, with a working example to copy.
+- `proton help <command>` shows the screen `--help` shows, and `--help` after a word the command tree does not hold is refused rather than answering with the parent's.
+- Reading `-` from a terminal says so and names the key that ends it, and a second Ctrl-C ends a run that did not stop on the first.
+- `drive shared list` says what each row lets you do, and `drive items get` says whether a link allows editing and names you on your own uploads into one. An item read through a link reports no author, which is all Proton serves there.
+
+### Fixed
+
+- Sending mail and creating Drive share links from an address that has ever accepted a forwarding. Everything leaving the address was encrypted to every key it holds, and a forwarding key carries no encryption key at all, so the send failed outright and told you to file a report. Affects any account whose address holds one, however the forwarding was accepted.
+- `mail settings forwarding create` was refused by Proton every time. The key it published was not shaped like the ones Proton's own clients write.
+- A session refresh that never reached Proton exits `5` rather than telling you to sign in again over a network that was down.
+- A dry run of `drive items upload --if-exists` failed as a bug, and an upload destination that turns out to be a file now reads as a mistake rather than a bug.
+- Six `settings set` examples in `--help` named keys that do not exist, mail `signature` and drive `revision-retention` among them.
+
 ## [3.6.0] - 2026-09-07
 
 ### Changed

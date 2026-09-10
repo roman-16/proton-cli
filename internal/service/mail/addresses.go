@@ -7,7 +7,6 @@ import (
 	"sort"
 	"strings"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
 	"github.com/roman-16/proton-cli/internal/account/keys"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
@@ -439,10 +438,10 @@ func (s *Service) AddressUpdate(ctx context.Context, id string, displayName, sig
 // ── sender selection ──
 
 // Sender is a resolved sending identity: which address a message goes out from,
-// and the unlocked key ring that signs and encrypts it.
+// and the unlocked rings that read what it already holds and write what leaves.
 type Sender struct {
 	Address keys.Address
-	KR      *pgp.KeyRing
+	Keys    keys.Rings
 }
 
 // SenderRequest describes how to pick a sending address. Explicit is the user's
@@ -469,7 +468,7 @@ func (s *Service) ResolveSender(ctx context.Context, req SenderRequest) (*Sender
 func resolveSender(u *keys.Unlocked, req SenderRequest) (*Sender, error) {
 	sendable := make([]keys.Address, 0, len(u.Addresses))
 	for _, a := range u.Addresses {
-		if _, ok := u.AddrKR(a.ID); ok && a.CanSend() {
+		if _, ok := u.AddrRings(a.ID); ok && a.CanSend() {
 			sendable = append(sendable, a)
 		}
 	}
@@ -477,14 +476,14 @@ func resolveSender(u *keys.Unlocked, req SenderRequest) (*Sender, error) {
 	if len(sendable) == 0 {
 		// Every address is disabled or its keys would not unlock; fall back to
 		// whatever did unlock so single-address edge cases still send.
-		kr, addr, err := u.FirstAddr()
+		rings, addr, err := u.FirstAddr()
 		if err != nil {
 			return nil, err
 		}
 		if req.Explicit != "" {
 			return nil, unknownSender(req.Explicit, []keys.Address{addr})
 		}
-		return &Sender{Address: addr, KR: kr}, nil
+		return &Sender{Address: addr, Keys: rings}, nil
 	}
 
 	if req.Explicit != "" {
@@ -556,11 +555,11 @@ func plusAliasBase(email string) string {
 }
 
 func withKeyRing(u *keys.Unlocked, a keys.Address) (*Sender, error) {
-	kr, ok := u.AddrKR(a.ID)
+	rings, ok := u.AddrRings(a.ID)
 	if !ok {
 		return nil, fmt.Errorf("no unlocked key for address %s", a.Email)
 	}
-	return &Sender{Address: a, KR: kr}, nil
+	return &Sender{Address: a, Keys: rings}, nil
 }
 
 // unknownSender reports a --from that matches none of the account's sendable

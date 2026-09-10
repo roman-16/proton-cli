@@ -86,7 +86,7 @@ func newTree(t *testing.T, shareType, rootType int, rootName string) *tree {
 
 func (tr *tree) keys() keys.Get {
 	return testKeys(&keys.Unlocked{
-		AddrKRs:   map[string]*pgp.KeyRing{testAddrID: tr.addrKR},
+		AddrKRs:   map[string]keys.Rings{testAddrID: {Read: tr.addrKR, Write: tr.addrKR}},
 		Addresses: []keys.Address{{ID: testAddrID, Email: testAddrMail}},
 	})
 }

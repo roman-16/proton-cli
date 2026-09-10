@@ -98,7 +98,7 @@ func (s *Service) CalendarCreate(ctx context.Context, name, color, url string) (
 	if err != nil {
 		return "", err
 	}
-	addrKR, addr, err := u.PrimaryAddr()
+	addrRings, addr, err := u.PrimaryAddr()
 	if err != nil {
 		return "", err
 	}
@@ -120,7 +120,7 @@ func (s *Service) CalendarCreate(ctx context.Context, name, color, url string) (
 
 	// A freshly created calendar has no keys; provision them (setupCalendar)
 	// so the calendar can hold events and accept member updates.
-	payload, err := pgphelper.GenerateCalendarKey(addrKR)
+	payload, err := pgphelper.GenerateCalendarKey(addrRings.Write)
 	if err != nil {
 		return "", fmt.Errorf("generate calendar key: %w", err)
 	}

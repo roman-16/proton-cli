@@ -131,15 +131,15 @@ func (s *Service) Answer(ctx context.Context, parentID string, spec AnswerSpec) 
 // decrypt is quoted as its ciphertext rather than failing the reply, matching the
 // web client, which quotes the raw body on a decryption error.
 func (s *Service) decryptForQuote(ctx context.Context, u *keys.Unlocked, raw *rawMessage) (string, error) {
-	kr, ok := u.AddrKR(raw.AddressID)
+	rings, ok := u.AddrRings(raw.AddressID)
 	if !ok {
 		first, _, err := u.FirstAddr()
 		if err != nil {
 			return "", err
 		}
-		kr = first
+		rings = first
 	}
-	body, _, err := decryptBody(raw.Body, kr, nil)
+	body, _, err := decryptBody(raw.Body, rings.Read, nil)
 	if err != nil {
 		return raw.Body, nil
 	}

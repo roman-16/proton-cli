@@ -41,7 +41,7 @@ func TestBuildInlinePackageFlattensHTMLAndWrapsKeys(t *testing.T) {
 	atts := []*draftAttachment{{ID: "att-1", SessionKey: attSK}}
 
 	c := Content{
-		From: &Sender{Address: keys.Address{Email: "snd@proton.me"}, KR: sndKR},
+		From: &Sender{Address: keys.Address{Email: "snd@proton.me"}, Keys: keys.Rings{Read: sndKR, Write: sndKR}},
 		Body: "<p>hello <b>world</b></p>", HTML: true,
 	}
 	plans := []plannedRecipient{{email: "bob@ext.com", scheme: schemeExternalInline, armoredKey: recPub}}
@@ -107,7 +107,7 @@ func TestBuildInlinePackageFlattensHTMLAndWrapsKeys(t *testing.T) {
 
 func TestBuildInlinePackageIsSkippedWithoutInlineRecipients(t *testing.T) {
 	sndKR, _ := testKeyRing(t, "snd", "snd@proton.me")
-	c := Content{From: &Sender{KR: sndKR}, Body: "hi"}
+	c := Content{From: &Sender{Keys: keys.Rings{Read: sndKR, Write: sndKR}}, Body: "hi"}
 	plans := []plannedRecipient{{email: "a@proton.me", scheme: schemeInternal}}
 
 	_, ok, err := New(nil, testKeys(nil)).buildInlinePackage(c, nil, plans)
@@ -124,7 +124,7 @@ func TestBuildBodyPackagesSplitsPerScheme(t *testing.T) {
 	sndKR, _ := testKeyRing(t, "snd", "snd@proton.me")
 
 	c := Content{
-		From: &Sender{Address: keys.Address{Email: "snd@proton.me"}, KR: sndKR},
+		From: &Sender{Address: keys.Address{Email: "snd@proton.me"}, Keys: keys.Rings{Read: sndKR, Write: sndKR}},
 		Body: "hello",
 	}
 	plans := []plannedRecipient{

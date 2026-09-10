@@ -109,7 +109,7 @@ func prepareBody(c *Content) (string, error) {
 	if err := assignInlineContentIDs(c); err != nil {
 		return "", err
 	}
-	enc, err := c.From.KR.Encrypt(pgp.NewPlainMessageFromString(c.Body), c.From.KR)
+	enc, err := c.From.Keys.Write.Encrypt(pgp.NewPlainMessageFromString(c.Body), c.From.Keys.Write)
 	if err != nil {
 		return "", fmt.Errorf("encrypt draft: %w", err)
 	}
@@ -179,14 +179,14 @@ func (s *Service) DraftCreate(ctx context.Context, c Content) (*Draft, error) {
 	// exist on this message.
 	d := &Draft{ID: resp.Message.ID, Content: c}
 	for _, a := range resp.Message.Attachments {
-		att, err := draftAttachmentFrom(c.From.KR, a)
+		att, err := draftAttachmentFrom(c.From.Keys.Read, a)
 		if err != nil {
 			s.discard(ctx, d.ID)
 			return nil, err
 		}
 		d.Attachments = append(d.Attachments, att)
 	}
-	uploaded, err := s.uploadAttachments(ctx, c.From.KR, d.ID, c.Attach)
+	uploaded, err := s.uploadAttachments(ctx, c.From.Keys.Write, d.ID, c.Attach)
 	if err != nil {
 		// A half-built draft is worse than none: drop it so the caller's error is
 		// the only thing left behind.
@@ -211,7 +211,7 @@ func (s *Service) DraftUpdate(ctx context.Context, id string, c Content) (*Draft
 	}, nil); err != nil {
 		return nil, err
 	}
-	if _, err := s.uploadAttachments(ctx, c.From.KR, id, c.Attach); err != nil {
+	if _, err := s.uploadAttachments(ctx, c.From.Keys.Write, id, c.Attach); err != nil {
 		return nil, err
 	}
 	// Re-read so the returned draft carries every attachment, pre-existing and
@@ -230,11 +230,11 @@ func (s *Service) DraftLoad(ctx context.Context, id string) (*Draft, error) {
 	if err != nil {
 		return nil, err
 	}
-	kr, ok := u.AddrKR(raw.AddressID)
+	rings, ok := u.AddrRings(raw.AddressID)
 	if !ok {
-		kr = sender.KR
+		rings = sender.Keys
 	}
-	body, _, err := decryptBody(raw.Body, kr, nil)
+	body, _, err := decryptBody(raw.Body, rings.Read, nil)
 	if err != nil {
 		return nil, fmt.Errorf("decrypt draft: %w", err)
 	}
@@ -251,7 +251,7 @@ func (s *Service) DraftLoad(ctx context.Context, id string) (*Draft, error) {
 		},
 	}
 	for _, a := range raw.Attachments {
-		att, err := draftAttachmentFrom(kr, a)
+		att, err := draftAttachmentFrom(rings.Read, a)
 		if err != nil {
 			// A key we cannot unwrap must not stop the draft being read; sending
 			// it reports the problem instead.
@@ -289,17 +289,17 @@ func (s *Service) rekeyCarried(u *keys.Unlocked, c Content) (map[string]string, 
 	if len(c.Carry) == 0 {
 		return nil, nil
 	}
-	parentKR, ok := u.AddrKR(c.ParentAddressID)
+	parentRings, ok := u.AddrRings(c.ParentAddressID)
 	if !ok {
-		parentKR = c.From.KR
+		parentRings = c.From.Keys
 	}
 	packets := make(map[string]string, len(c.Carry))
 	for _, a := range c.Carry {
-		sk, err := decodeSessionKey(parentKR, a.KeyPackets)
+		sk, err := decodeSessionKey(parentRings.Read, a.KeyPackets)
 		if err != nil {
 			return nil, fmt.Errorf("carry attachment %s: %w", a.Name, err)
 		}
-		wrapped, err := c.From.KR.EncryptSessionKey(sk)
+		wrapped, err := c.From.Keys.Write.EncryptSessionKey(sk)
 		if err != nil {
 			return nil, fmt.Errorf("carry attachment %s: %w", a.Name, err)
 		}

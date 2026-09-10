@@ -181,7 +181,7 @@ func (s *Service) invite(ctx context.Context, shareID, itemID, email, access str
 	if err != nil {
 		return err
 	}
-	addrKR, _, err := u.PrimaryAddr()
+	addrRings, _, err := u.PrimaryAddr()
 	if err != nil {
 		return err
 	}
@@ -199,7 +199,7 @@ func (s *Service) invite(ctx context.Context, shareID, itemID, email, access str
 	sealedKeys := make([]map[string]any, 0, len(rotations))
 	for _, rotation := range rotations {
 		sealed, err := inviteeKR.EncryptWithContext(
-			pgp.NewPlainMessage(keys[rotation]), addrKR,
+			pgp.NewPlainMessage(keys[rotation]), addrRings.Write,
 			pgp.NewSigningContext(inviteContext, true),
 		)
 		if err != nil {
@@ -417,7 +417,7 @@ func (s *Service) inviterKeys(ctx context.Context, email string) (*pgp.KeyRing, 
 // nothing. This is the one place an offered key is opened, so the preview and
 // the acceptance cannot come to disagree about who sent it.
 func (s *Service) openInviteKey(i rawUserInvite, u *keys.Unlocked, inviter *pgp.KeyRing, rotation int) ([]byte, error) {
-	addrKR, ok := u.AddrKR(i.InvitedAddressID)
+	addrRings, ok := u.AddrRings(i.InvitedAddressID)
 	if !ok {
 		return nil, fmt.Errorf("no key for the address this was sent to")
 	}
@@ -429,7 +429,7 @@ func (s *Service) openInviteKey(i rawUserInvite, u *keys.Unlocked, inviter *pgp.
 		if err != nil {
 			return nil, err
 		}
-		opened, err := addrKR.DecryptWithContext(pgp.NewPGPMessage(raw), inviter, pgp.GetUnixTime(),
+		opened, err := addrRings.Read.DecryptWithContext(pgp.NewPGPMessage(raw), inviter, pgp.GetUnixTime(),
 			pgp.NewVerificationContext(inviteContext, true, 0))
 		if err != nil {
 			var unsigned pgp.SignatureVerificationError
@@ -456,7 +456,7 @@ func (s *Service) InviteAccept(ctx context.Context, token string) error {
 	if err != nil {
 		return err
 	}
-	if _, ok := u.AddrKR(invite.InvitedAddressID); !ok {
+	if _, ok := u.AddrRings(invite.InvitedAddressID); !ok {
 		return errs.Problemf("The keys for %s will not open, so that offer cannot be taken.", invite.InvitedEmail)
 	}
 	inviter, err := s.inviterKeys(ctx, invite.InviterEmail)

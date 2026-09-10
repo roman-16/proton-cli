@@ -445,11 +445,11 @@ func (s *Service) Move(ctx context.Context, dc *Context, sourcePath string, dst 
 	if err != nil {
 		return err
 	}
-	encName, err := reEncryptName(src.Link.Name, src.Name, src.ParentKR, dst.NodeKR, dc.AddrKR)
+	encName, err := reEncryptName(src.Link.Name, src.Name, src.ParentKR, dst.NodeKR, dc.Addr.Write)
 	if err != nil {
 		return err
 	}
-	newPass, _, err := reEncryptNodePassphrase(src.Link, src.ParentKR, dst.NodeKR, dc.AddrKR)
+	newPass, _, err := reEncryptNodePassphrase(src.Link, src.ParentKR, dst.NodeKR, dc.Addr.Write)
 	if err != nil {
 		return fmt.Errorf("re-encrypt passphrase: %w", err)
 	}
@@ -478,11 +478,11 @@ func (s *Service) Copy(ctx context.Context, dc *Context, sourcePath string, dst 
 	if err != nil {
 		return err
 	}
-	encName, err := reEncryptName(src.Link.Name, src.Name, src.ParentKR, dst.NodeKR, dc.AddrKR)
+	encName, err := reEncryptName(src.Link.Name, src.Name, src.ParentKR, dst.NodeKR, dc.Addr.Write)
 	if err != nil {
 		return err
 	}
-	newPass, _, err := reEncryptNodePassphrase(src.Link, src.ParentKR, dst.NodeKR, dc.AddrKR)
+	newPass, _, err := reEncryptNodePassphrase(src.Link, src.ParentKR, dst.NodeKR, dc.Addr.Write)
 	if err != nil {
 		return fmt.Errorf("re-encrypt passphrase: %w", err)
 	}
@@ -629,7 +629,7 @@ func (s *Service) removable(ctx context.Context, dc *Context, res *Resolved) (le
 		return nil, "", err
 	}
 	for _, child := range children {
-		childKR, err := unlockNode(&child, res.NodeKR, dc.AddrKR)
+		childKR, err := unlockNode(&child, res.NodeKR, dc.Addr.Read)
 		if err != nil {
 			return nil, "", fmt.Errorf("unlock %s: %w", child.LinkID, err)
 		}

@@ -68,7 +68,6 @@ GET /drive/shares/{id}/urls
 GET /drive/unauth/v2/volumes/{id}/folders/{id}/children
 GET /drive/urls/{id}
 GET /drive/urls/{id}/files/{id}
-GET /drive/urls/{id}/folders/{id}/children
 GET /drive/urls/{id}/info
 GET /drive/urls/{id}/links/{id}/revisions/{id}/verification
 GET /drive/v2/shared-bookmarks

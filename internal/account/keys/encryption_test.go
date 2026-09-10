@@ -36,7 +36,7 @@ func encrypting(t *testing.T) (*Unlocked, Address, *encryptionAPI) {
 		SignedKeyList: &SignedKeyList{Data: data, Signature: "the signature Proton holds"},
 	}
 	return &Unlocked{
-		UserKR: kr, Addresses: []Address{addr}, AddrKRs: map[string]*pgp.KeyRing{addr.ID: kr},
+		UserKR: kr, Addresses: []Address{addr}, AddrKRs: map[string]Rings{addr.ID: {Read: kr, Write: kr}},
 	}, addr, &encryptionAPI{}
 }
 
@@ -138,7 +138,7 @@ func TestSetEncryptionSignsTheListItPublishes(t *testing.T) {
 	}
 
 	skl, _ := api.body(t)["SignedKeyList"].(map[string]string)
-	assertKeyListSignature(t, u.AddrKRs[addr.ID].GetKeys()[0], skl["Data"], skl["Signature"])
+	assertKeyListSignature(t, u.AddrKRs[addr.ID].Write.GetKeys()[0], skl["Data"], skl["Signature"])
 }
 
 // A list that does not describe the address is not one to re-publish under a

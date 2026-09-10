@@ -35,15 +35,15 @@ func (s *Service) Export(ctx context.Context, id string, withAttachments bool) (
 	if err != nil {
 		return nil, nil, err
 	}
-	kr, ok := u.AddrKR(raw.AddressID)
+	rings, ok := u.AddrRings(raw.AddressID)
 	if !ok {
 		first, _, err := u.FirstAddr()
 		if err != nil {
 			return nil, nil, err
 		}
-		kr = first
+		rings = first
 	}
-	body, _, err := decryptBody(raw.Body, kr, nil)
+	body, _, err := decryptBody(raw.Body, rings.Read, nil)
 	if err != nil {
 		// Keep the ciphertext rather than losing the message; the header block
 		// still identifies it.
@@ -53,7 +53,7 @@ func (s *Service) Export(ctx context.Context, id string, withAttachments bool) (
 	var parts []mimePart
 	if withAttachments {
 		for _, a := range raw.Attachments {
-			sk, err := decodeSessionKey(kr, a.KeyPackets)
+			sk, err := decodeSessionKey(rings.Read, a.KeyPackets)
 			if err != nil {
 				return nil, nil, fmt.Errorf("attachment %s: %w", a.Name, err)
 			}

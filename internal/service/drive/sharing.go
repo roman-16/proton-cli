@@ -193,7 +193,7 @@ func (s *Service) verifyCreator(ctx context.Context, dc *Context, res *Resolved,
 	if err != nil {
 		return "unknown"
 	}
-	verKR := dc.AddrKR
+	verKR := dc.Addr.Read
 	if link.SignatureEmail != dc.AddrEmail {
 		kr, err := s.addressKeyRing(ctx, link.SignatureEmail)
 		if err != nil {
@@ -410,7 +410,7 @@ func (s *Service) shareForLink(ctx context.Context, dc *Context, res *Resolved) 
 }
 
 func (s *Service) createShare(ctx context.Context, dc *Context, res *Resolved, link *Link) (string, *pgp.SessionKey, error) {
-	shareKey, sharePass, sharePassSig, sharePriv, shareSessionKey, err := genShareKeys(res.NodeKR, dc.AddrKR)
+	shareKey, sharePass, sharePassSig, sharePriv, shareSessionKey, err := genShareKeys(res.NodeKR, dc.Addr.Write)
 	if err != nil {
 		return "", nil, err
 	}
@@ -463,7 +463,7 @@ func (s *Service) shareSessionKey(ctx context.Context, dc *Context, shareID stri
 	if sk, err := res.NodeKR.DecryptSessionKey(kp); err == nil {
 		return sk, nil
 	}
-	return dc.AddrKR.DecryptSessionKey(kp)
+	return dc.Addr.Read.DecryptSessionKey(kp)
 }
 
 func (s *Service) fetchShareURLs(ctx context.Context, shareID string) ([]shareURLResp, error) {
@@ -482,7 +482,7 @@ func (s *Service) decryptURLPassword(dc *Context, u shareURLResp) (generated, cu
 	if err != nil {
 		return "", ""
 	}
-	dec, err := dc.AddrKR.Decrypt(msg, nil, pgp.GetUnixTime())
+	dec, err := dc.Addr.Read.Decrypt(msg, nil, pgp.GetUnixTime())
 	if err != nil {
 		return "", ""
 	}
@@ -521,7 +521,7 @@ func (s *Service) buildPasswordFields(ctx context.Context, dc *Context, sk *pgp.
 	if err != nil {
 		return nil, err
 	}
-	encPass, err := dc.AddrKR.Encrypt(pgp.NewPlainMessage([]byte(fullPassword)), nil)
+	encPass, err := dc.Addr.Write.Encrypt(pgp.NewPlainMessage([]byte(fullPassword)), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -881,11 +881,11 @@ func decryptSavedPassword(u *keys.Unlocked, armored string) (string, error) {
 		return "", err
 	}
 	for _, addr := range u.Addresses {
-		kr, ok := u.AddrKR(addr.ID)
+		rings, ok := u.AddrRings(addr.ID)
 		if !ok {
 			continue
 		}
-		if dec, err := kr.Decrypt(msg, nil, pgp.GetUnixTime()); err == nil {
+		if dec, err := rings.Read.Decrypt(msg, nil, pgp.GetUnixTime()); err == nil {
 			return dec.GetString(), nil
 		}
 	}
@@ -972,7 +972,7 @@ func (s *Service) savingAddress(ctx context.Context) (addrID, keyID string, kr *
 		}
 		for _, key := range addr.Keys {
 			if key.Primary == 1 {
-				return addr.ID, key.ID, dc.AddrKR, nil
+				return addr.ID, key.ID, dc.Addr.Write, nil
 			}
 		}
 	}

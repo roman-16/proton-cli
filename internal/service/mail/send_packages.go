@@ -17,7 +17,7 @@ func (s *Service) buildBodyPackages(c Content, del Delivery, atts []*draftAttach
 	if err != nil {
 		return nil, err
 	}
-	encBody, err := sessionKey.EncryptAndSign(pgp.NewPlainMessageFromString(c.Body), c.From.KR)
+	encBody, err := sessionKey.EncryptAndSign(pgp.NewPlainMessageFromString(c.Body), c.From.Keys.Write)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +65,7 @@ func (s *Service) buildBodyPackages(c Content, del Delivery, atts []*draftAttach
 
 	var packages []map[string]any
 	if len(internalAddrs) > 0 {
-		bodyKP, err := c.From.KR.EncryptSessionKey(sessionKey)
+		bodyKP, err := c.From.Keys.Write.EncryptSessionKey(sessionKey)
 		if err != nil {
 			return nil, err
 		}
@@ -120,7 +120,7 @@ func (s *Service) buildInlinePackage(c Content, atts []*draftAttachment, plans [
 			if err != nil {
 				return nil, false, err
 			}
-			enc, err := sk.EncryptAndSign(pgp.NewPlainMessageFromString(body), c.From.KR)
+			enc, err := sk.EncryptAndSign(pgp.NewPlainMessageFromString(body), c.From.Keys.Write)
 			if err != nil {
 				return nil, false, err
 			}
@@ -152,7 +152,7 @@ func (s *Service) buildInlinePackage(c Content, atts []*draftAttachment, plans [
 	if len(addrs) == 0 {
 		return nil, false, nil
 	}
-	bodyKP, err := c.From.KR.EncryptSessionKey(sessionKey)
+	bodyKP, err := c.From.Keys.Write.EncryptSessionKey(sessionKey)
 	if err != nil {
 		return nil, false, err
 	}
@@ -191,7 +191,7 @@ func (s *Service) buildPGPMIMEPackage(ctx context.Context, c Content, atts []*dr
 			if err != nil {
 				return nil, false, err
 			}
-			enc, err := sessionKey.EncryptAndSign(pgp.NewPlainMessageFromString(mimeStr), c.From.KR)
+			enc, err := sessionKey.EncryptAndSign(pgp.NewPlainMessageFromString(mimeStr), c.From.Keys.Write)
 			if err != nil {
 				return nil, false, err
 			}

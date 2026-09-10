@@ -43,7 +43,7 @@ type Context struct {
 	URL          string
 	LinkPassword string
 	ShareKR      *pgp.KeyRing
-	AddrKR       *pgp.KeyRing
+	Addr         keys.Rings
 	AddrID       string
 	AddrEmail    string
 	VolumeID     string
@@ -101,7 +101,7 @@ func (dc *Context) handle() string {
 // inside it are sealed to, and reading one with the other yields nothing rather
 // than an error - so this is derived in one place instead of at each of them.
 func (dc *Context) RootKR() (*pgp.KeyRing, error) {
-	kr, err := unlockNode(dc.rootLink, dc.ShareKR, dc.AddrKR)
+	kr, err := unlockNode(dc.rootLink, dc.ShareKR, dc.Addr.Read)
 	if err != nil {
 		return nil, fmt.Errorf("unlock the root of share %s: %w", dc.handle(), err)
 	}
@@ -192,7 +192,7 @@ func (s *Service) unlockShare(ctx context.Context, shareID, rootLinkID, volumeID
 	); err != nil {
 		return nil, err
 	}
-	addrKR, ok := u.AddrKR(sh.AddressID)
+	addrRings, ok := u.AddrRings(sh.AddressID)
 	if !ok {
 		return nil, fmt.Errorf("no key ring for address %s", sh.AddressID)
 	}
@@ -207,12 +207,12 @@ func (s *Service) unlockShare(ctx context.Context, shareID, rootLinkID, volumeID
 	if err != nil {
 		return nil, err
 	}
-	dec, err := addrKR.Decrypt(enc, nil, pgp.GetUnixTime())
+	dec, err := addrRings.Read.Decrypt(enc, nil, pgp.GetUnixTime())
 	if err != nil {
 		return nil, fmt.Errorf("decrypt share passphrase: %w", err)
 	}
 	norm := pgp.NewPlainMessageFromString(string(dec.GetBinary()))
-	if v := pgphelper.VerifyDetachedStatus(addrKR, norm, sh.PassphraseSignature); v != pgphelper.Verified {
+	if v := pgphelper.VerifyDetachedStatus(addrRings.Read, norm, sh.PassphraseSignature); v != pgphelper.Verified {
 		slog.Debug("drive: share passphrase signature not verified", "share", shareID, "result", string(v))
 	}
 	locked, err := pgp.NewKeyFromArmored(sh.Key)
@@ -229,7 +229,7 @@ func (s *Service) unlockShare(ctx context.Context, shareID, rootLinkID, volumeID
 	}
 	dc := &Context{
 		ShareID: shareID, ShareKR: shareKR,
-		AddrKR: addrKR, AddrID: sh.AddressID, AddrEmail: addrEmail,
+		Addr: addrRings, AddrID: sh.AddressID, AddrEmail: addrEmail,
 		VolumeID: volumeID, RootLinkID: rootLinkID, rootLink: rootLink,
 		Type: sh.Type, RootName: rootName(ctx, shareID, sh.Type, rootLink, shareKR),
 	}
@@ -280,7 +280,7 @@ func (a author) attribute(body map[string]any, dc *Context) {
 // clients use there - and a caller with no account writes as nobody.
 func (s *Service) author(ctx context.Context, dc *Context) (author, error) {
 	if !dc.Public() {
-		return author{kr: dc.AddrKR, email: dc.AddrEmail}, nil
+		return author{kr: dc.Addr.Write, email: dc.AddrEmail}, nil
 	}
 	if dc.Anonymous {
 		return author{}, nil
@@ -289,11 +289,11 @@ func (s *Service) author(ctx context.Context, dc *Context) (author, error) {
 	if err != nil {
 		return author{}, err
 	}
-	kr, addr, err := u.PrimaryAddr()
+	rings, addr, err := u.PrimaryAddr()
 	if err != nil {
 		return author{}, err
 	}
-	return author{kr: kr, email: addr.Email}, nil
+	return author{kr: rings.Write, email: addr.Email}, nil
 }
 
 // rootName reads what a tree is called.
@@ -491,7 +491,7 @@ func (s *Service) childNamed(ctx context.Context, dc *Context, parent *Resolved,
 		if decrypted, err := decryptName(child.Name, parent.NodeKR); err != nil || decrypted != name {
 			continue
 		}
-		childKR, err := unlockNode(&child, parent.NodeKR, dc.AddrKR)
+		childKR, err := unlockNode(&child, parent.NodeKR, dc.Addr.Read)
 		if err != nil {
 			return nil, fmt.Errorf("unlock %s: %w", name, err)
 		}

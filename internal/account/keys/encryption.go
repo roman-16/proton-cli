@@ -36,7 +36,7 @@ func (u *Unlocked) SetEncryption(ctx context.Context, c proton.Doer, addr Addres
 	if err := describesAddress(addr.SignedKeyList.Data, held); err != nil {
 		return err
 	}
-	kr, ok := u.AddrKR(addr.ID)
+	rings, ok := u.AddrRings(addr.ID)
 	if !ok {
 		return errs.Problemf(
 			"The keys for %s did not open, so its key list cannot be signed.", addr.Email)
@@ -45,7 +45,7 @@ func (u *Unlocked) SetEncryption(ctx context.Context, c proton.Doer, addr Addres
 	if err != nil {
 		return err
 	}
-	signature, err := signKeyList(data, primarySigners(held, kr))
+	signature, err := signKeyList(data, rings.Write.GetKeys())
 	if err != nil {
 		return err
 	}

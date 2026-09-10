@@ -19,9 +19,26 @@ import (
 	"github.com/roman-16/proton-cli/internal/skip"
 )
 
+// Rings are the two key rings a set of keys opens into.
+//
+// Reading goes under every key that opened, because what arrived years ago was
+// sealed to whichever key was primary then - and a key another account derived
+// for a forwarding is one of them, so it opens what that forwarding re-wrapped.
+// Writing goes under the primary alone, which is what Proton's own clients seal
+// and sign with.
+//
+// The two are separate because an address holds keys it cannot write with. A
+// forwarding key carries no encryption subkey, and a ring encrypts to every key
+// in it, so one of them in the ring an address writes with is an address that
+// can send nothing at all.
+type Rings struct {
+	Read  *pgp.KeyRing
+	Write *pgp.KeyRing
+}
+
 type Unlocked struct {
 	UserKR    *pgp.KeyRing
-	AddrKRs   map[string]*pgp.KeyRing
+	AddrKRs   map[string]Rings
 	Addresses []Address
 	// PaidMail says whether the account's plan includes Mail, which is what
 	// Proton gates setting up a forwarding behind.
@@ -262,25 +279,26 @@ func Unlock(ctx context.Context, c *proton.Client, ask KeyPassword) (*Unlocked, 
 // it fails to open - the item, the share, the card - so counting the address as
 // well would say a listing is short when it is whole.
 func open(ctx context.Context, now func() time.Time, user *User, addrs []Address, skp string) (*Unlocked, error) {
-	userKR, err := unlockKeyRing(ctx, user.Keys, []byte(skp), nil)
+	userRings, err := unlockKeyRing(ctx, user.Keys, []byte(skp), nil)
 	if err != nil {
 		return nil, errWrongKeyPass
 	}
+	userKR := userRings.Read
 
-	addrKRs := map[string]*pgp.KeyRing{}
+	addrKRs := map[string]Rings{}
 	active, addressKeys := 0, 0
 	for _, a := range addrs {
 		if a.Status != 0 {
 			active++
 		}
 		addressKeys += len(a.Keys)
-		kr, err := unlockKeyRing(ctx, a.Keys, []byte(skp), userKR)
+		rings, err := unlockKeyRing(ctx, a.Keys, []byte(skp), userKR)
 		if err != nil {
 			slog.DebugContext(ctx, "keys: an address did not open",
 				"kind", string(skip.KindAddress), "reason", string(reasonFor(err)), "ref", a.ID)
 			continue
 		}
-		addrKRs[a.ID] = kr
+		addrKRs[a.ID] = rings
 	}
 	shape := &unopenable{
 		addresses: len(addrs), active: active,
@@ -530,34 +548,34 @@ func (u *Unlocked) PrimaryUserKey() (*pgp.KeyRing, error) {
 	return u.UserKR.FirstKey()
 }
 
-// PrimaryAddr returns the key ring and address record for the user's primary
+// PrimaryAddr returns the rings and address record for the user's primary
 // proton.me/pm.me address, falling back to the first unlockable address.
-func (u *Unlocked) PrimaryAddr() (*pgp.KeyRing, Address, error) {
+func (u *Unlocked) PrimaryAddr() (Rings, Address, error) {
 	for _, a := range u.Addresses {
-		if kr, ok := u.AddrKRs[a.ID]; ok {
+		if rings, ok := u.AddrKRs[a.ID]; ok {
 			e := a.Email
 			if strings.HasSuffix(e, "@proton.me") || strings.HasSuffix(e, "@pm.me") || strings.HasSuffix(e, "@protonmail.com") {
-				return kr, a, nil
+				return rings, a, nil
 			}
 		}
 	}
 	return u.FirstAddr()
 }
 
-// FirstAddr returns the key ring and address record of the first address whose
+// FirstAddr returns the rings and address record of the first address whose
 // keys could be unlocked.
-func (u *Unlocked) FirstAddr() (*pgp.KeyRing, Address, error) {
+func (u *Unlocked) FirstAddr() (Rings, Address, error) {
 	for _, a := range u.Addresses {
-		if kr, ok := u.AddrKRs[a.ID]; ok {
-			return kr, a, nil
+		if rings, ok := u.AddrKRs[a.ID]; ok {
+			return rings, a, nil
 		}
 	}
-	return nil, Address{}, fmt.Errorf("no address key rings available")
+	return Rings{}, Address{}, fmt.Errorf("no address key rings available")
 }
 
-func (u *Unlocked) AddrKR(addrID string) (*pgp.KeyRing, bool) {
-	kr, ok := u.AddrKRs[addrID]
-	return kr, ok
+func (u *Unlocked) AddrRings(addrID string) (Rings, bool) {
+	rings, ok := u.AddrKRs[addrID]
+	return rings, ok
 }
 
 func getKeySalts(ctx context.Context, c *proton.Client) ([]salt, error) {
@@ -628,10 +646,14 @@ var (
 // opens on the others; whatever was sealed to the shut key alone is counted at
 // the moment it fails to open. The log keeps each key's own reason, which is
 // what tells a retired key from a hierarchy in trouble.
-func unlockKeyRing(ctx context.Context, keys []Key, passphrase []byte, userKR *pgp.KeyRing) (*pgp.KeyRing, error) {
+func unlockKeyRing(ctx context.Context, keys []Key, passphrase []byte, userKR *pgp.KeyRing) (Rings, error) {
 	kr, err := pgp.NewKeyRing(nil)
 	if err != nil {
-		return nil, err
+		return Rings{}, err
+	}
+	writing, err := pgp.NewKeyRing(nil)
+	if err != nil {
+		return Rings{}, err
 	}
 	// The reason the last key failed for, which stands for the owner when the
 	// caller phrases one line about it. Every key's own reason is logged as it
@@ -675,11 +697,14 @@ func unlockKeyRing(ctx context.Context, keys []Key, passphrase []byte, userKR *p
 			continue
 		}
 		_ = kr.AddKey(unlocked)
+		if k.Primary == 1 {
+			_ = writing.AddKey(unlocked)
+		}
 	}
 	if kr.CountEntities() == 0 {
-		return nil, fmt.Errorf("no keys could be unlocked: %w", last)
+		return Rings{}, fmt.Errorf("no keys could be unlocked: %w", last)
 	}
-	return kr, nil
+	return Rings{Read: kr, Write: writing}, nil
 }
 
 func decryptToken(tokenArm, sigArm string, kr *pgp.KeyRing) ([]byte, error) {

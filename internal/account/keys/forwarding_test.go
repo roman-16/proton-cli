@@ -75,7 +75,7 @@ func newHierarchy(t *testing.T, primaries int) *hierarchy {
 	return &hierarchy{
 		u: &Unlocked{
 			UserKR: userKR, Addresses: []Address{addr},
-			AddrKRs: map[string]*pgp.KeyRing{addr.ID: addrKR},
+			AddrKRs: map[string]Rings{addr.ID: {Read: addrKR, Write: addrKR}},
 		},
 		addr:  addr,
 		token: token,
@@ -265,7 +265,7 @@ func assertSignedByAll(t *testing.T, h *hierarchy, data, armored string, want in
 	}
 	message := pgp.NewPlainMessageFromString(data)
 	context := pgp.NewVerificationContext(sklSigningContext, true, 0)
-	for _, key := range h.u.AddrKRs[h.addr.ID].GetKeys() {
+	for _, key := range h.u.AddrKRs[h.addr.ID].Read.GetKeys() {
 		kr, err := pgp.NewKeyRing(key)
 		if err != nil {
 			t.Fatalf("NewKeyRing: %v", err)
@@ -321,7 +321,7 @@ func TestAddForwardingKeyRefusesAKeyListThatDoesNotDescribeTheAddress(t *testing
 // expected there, or accepting a second forwarding would refuse on the first.
 func TestAddForwardingKeyLeavesForwardingKeysOutOfTheKeyListCheck(t *testing.T) {
 	h := newHierarchy(t, 1)
-	forwarding := forwardingKeyOf(t, h.u.AddrKRs[h.addr.ID].GetKeys()[0])
+	forwarding := forwardingKeyOf(t, h.u.AddrKRs[h.addr.ID].Read.GetKeys()[0])
 	// Published earlier by an accept, and absent from the list by design.
 	h.addr.Keys = append(h.addr.Keys, Key{
 		ID: "forwarding", PrivateKey: locked(t, forwarding, h.token),

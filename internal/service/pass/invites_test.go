@@ -124,7 +124,7 @@ func invited(t *testing.T) (*keys.Unlocked, *pgp.KeyRing) {
 			t.Fatalf("AddKey: %v", err)
 		}
 	}
-	return &keys.Unlocked{UserKR: users, AddrKRs: map[string]*pgp.KeyRing{"addr": addr}}, addr
+	return &keys.Unlocked{UserKR: users, AddrKRs: map[string]keys.Rings{"addr": {Read: addr, Write: addr}}}, addr
 }
 
 func TestAcceptRefusesAKeyTheInviterDidNotSign(t *testing.T) {

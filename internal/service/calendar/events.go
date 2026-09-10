@@ -183,13 +183,13 @@ func (s *Service) decrypt(ctx context.Context, ck *calKeys, raw rawEvent) stored
 	// than to the calendar key.
 	packet, decKR := raw.SharedKeyPacket, ck.calKR
 	if packet == "" && raw.AddressKeyPacket != "" {
-		if kr, ok := s.addressKeyRing(ctx, raw.AddressID); ok {
-			packet, decKR = raw.AddressKeyPacket, kr
+		if rings, ok := s.addressKeyRing(ctx, raw.AddressID); ok {
+			packet, decKR = raw.AddressKeyPacket, rings.Read
 		}
 	}
-	model, sig, err := decryptEvent(raw.SharedEvents, packet, decKR, ck.addrKR)
+	model, sig, err := decryptEvent(raw.SharedEvents, packet, decKR, ck.addr.Read)
 	if err == nil && len(raw.AttendeesEvents) > 0 {
-		if attendees, _, aerr := decryptEvent(raw.AttendeesEvents, packet, decKR, ck.addrKR); aerr == nil {
+		if attendees, _, aerr := decryptEvent(raw.AttendeesEvents, packet, decKR, ck.addr.Read); aerr == nil {
 			model.Attendees = attendees.Attendees
 		}
 	}

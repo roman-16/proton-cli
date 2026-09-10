@@ -72,7 +72,7 @@ func newPartyAt(t *testing.T, email string, now func() time.Time) *party {
 	return &party{
 		unlocked: &keys.Unlocked{
 			UserKR: userKR, Addresses: []keys.Address{addr},
-			AddrKRs:  map[string]*pgp.KeyRing{addr.ID: addrKR},
+			AddrKRs:  map[string]keys.Rings{addr.ID: {Read: addrKR, Write: addrKR}},
 			PaidMail: true, Now: now,
 		},
 		addr:  addr,

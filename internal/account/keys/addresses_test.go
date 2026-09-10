@@ -78,7 +78,7 @@ func addressWithoutKeys(t *testing.T) (*Unlocked, Address, *newAddress) {
 	}
 	addr := Address{ID: "address", Email: "work@example.com"}
 	return &Unlocked{
-		UserKR: userKR, Addresses: []Address{addr}, AddrKRs: map[string]*pgp.KeyRing{},
+		UserKR: userKR, Addresses: []Address{addr}, AddrKRs: map[string]Rings{},
 	}, addr, &newAddress{addresses: []Address{addr}}
 }
 

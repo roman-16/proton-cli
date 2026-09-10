@@ -220,7 +220,7 @@ func (s *Service) PhotoDownload(ctx context.Context, dc *Context, linkID string,
 		if err != nil {
 			return "", err
 		}
-		if parentKR, err = unlockNode(parentLink, rootKR, dc.AddrKR); err != nil {
+		if parentKR, err = unlockNode(parentLink, rootKR, dc.Addr.Read); err != nil {
 			return "", err
 		}
 	}
@@ -228,7 +228,7 @@ func (s *Service) PhotoDownload(ctx context.Context, dc *Context, linkID string,
 	if err != nil {
 		name = linkID
 	}
-	nodeKR, err := unlockNode(link, parentKR, dc.AddrKR)
+	nodeKR, err := unlockNode(link, parentKR, dc.Addr.Read)
 	if err != nil {
 		return "", err
 	}
@@ -283,11 +283,11 @@ func (s *Service) AlbumCreate(ctx context.Context, dc *Context, name string) (st
 	if err != nil {
 		return "", err
 	}
-	encName, err := encryptName(name, rootKR, dc.AddrKR)
+	encName, err := encryptName(name, rootKR, dc.Addr.Write)
 	if err != nil {
 		return "", err
 	}
-	nodeKey, nodePass, nodePassSig, nodePriv, err := genNodeKeys(rootKR, dc.AddrKR)
+	nodeKey, nodePass, nodePassSig, nodePriv, err := genNodeKeys(rootKR, dc.Addr.Write)
 	if err != nil {
 		return "", err
 	}
@@ -332,7 +332,7 @@ func (s *Service) AlbumAddPhotos(ctx context.Context, dc *Context, albumLinkID s
 	if err != nil {
 		return err
 	}
-	albumKR, err := unlockNode(albumLink, rootKR, dc.AddrKR)
+	albumKR, err := unlockNode(albumLink, rootKR, dc.Addr.Read)
 	if err != nil {
 		return fmt.Errorf("unlock album: %w", err)
 	}
@@ -360,7 +360,7 @@ func (s *Service) AlbumAddPhotos(ctx context.Context, dc *Context, albumLinkID s
 		if err != nil {
 			return fmt.Errorf("decrypt photo name %s: %w", pid, err)
 		}
-		encName, err := reEncryptName(photoLink.Name, name, rootKR, albumKR, dc.AddrKR)
+		encName, err := reEncryptName(photoLink.Name, name, rootKR, albumKR, dc.Addr.Write)
 		if err != nil {
 			return err
 		}
@@ -368,7 +368,7 @@ func (s *Service) AlbumAddPhotos(ctx context.Context, dc *Context, albumLinkID s
 		if err != nil {
 			return err
 		}
-		newPass, _, err := reEncryptNodePassphrase(photoLink, rootKR, albumKR, dc.AddrKR)
+		newPass, _, err := reEncryptNodePassphrase(photoLink, rootKR, albumKR, dc.Addr.Write)
 		if err != nil {
 			return fmt.Errorf("re-encrypt passphrase %s: %w", pid, err)
 		}
@@ -521,7 +521,7 @@ func (s *Service) favoriteMovedParams(ctx context.Context, dc *Context, link *Li
 	if err != nil {
 		return nil, fmt.Errorf("decrypt photo name %s: %w", link.LinkID, err)
 	}
-	encName, err := reEncryptName(link.Name, name, parentKR, rootKR, dc.AddrKR)
+	encName, err := reEncryptName(link.Name, name, parentKR, rootKR, dc.Addr.Write)
 	if err != nil {
 		return nil, err
 	}
@@ -529,7 +529,7 @@ func (s *Service) favoriteMovedParams(ctx context.Context, dc *Context, link *Li
 	if err != nil {
 		return nil, err
 	}
-	newPass, _, err := reEncryptNodePassphrase(link, parentKR, rootKR, dc.AddrKR)
+	newPass, _, err := reEncryptNodePassphrase(link, parentKR, rootKR, dc.Addr.Write)
 	if err != nil {
 		return nil, fmt.Errorf("re-encrypt passphrase %s: %w", link.LinkID, err)
 	}
@@ -559,7 +559,7 @@ func (s *Service) photoParentKR(ctx context.Context, dc *Context, link *Link, ro
 	if err != nil {
 		return nil, fmt.Errorf("favoriting cross-volume/shared-album photos is not supported (parent %s): %w", parentID, err)
 	}
-	kr, err := unlockNode(parentLink, rootKR, dc.AddrKR)
+	kr, err := unlockNode(parentLink, rootKR, dc.Addr.Read)
 	if err != nil {
 		return nil, fmt.Errorf("favoriting cross-volume/shared-album photos is not supported (unlock parent %s): %w", parentID, err)
 	}

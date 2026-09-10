@@ -95,19 +95,19 @@ func (s *Service) AcceptInvitation(ctx context.Context, invitationID string) err
 	if err != nil {
 		return err
 	}
-	addrKR := inviteeAddrKR(u, details.Invitation.InviteeEmail)
-	if addrKR == nil {
+	addr, ok := inviteeAddr(u, details.Invitation.InviteeEmail)
+	if !ok {
 		return fmt.Errorf("no usable address key for %s", details.Invitation.InviteeEmail)
 	}
 	keyPacket, err := base64.StdEncoding.DecodeString(details.Invitation.KeyPacket)
 	if err != nil {
 		return fmt.Errorf("decode key packet: %w", err)
 	}
-	sessionKey, err := addrKR.DecryptSessionKey(keyPacket)
+	sessionKey, err := addr.Read.DecryptSessionKey(keyPacket)
 	if err != nil {
 		return fmt.Errorf("decrypt session key: %w", err)
 	}
-	sig, err := addrKR.SignDetachedWithContext(pgp.NewPlainMessage(sessionKey.Key), pgp.NewSigningContext(sigContextMember, true))
+	sig, err := addr.Write.SignDetachedWithContext(pgp.NewPlainMessage(sessionKey.Key), pgp.NewSigningContext(sigContextMember, true))
 	if err != nil {
 		return fmt.Errorf("sign session key: %w", err)
 	}
@@ -123,17 +123,17 @@ func (s *Service) RejectInvitation(ctx context.Context, invitationID string) err
 	}, nil)
 }
 
-func inviteeAddrKR(u *keys.Unlocked, email string) *pgp.KeyRing {
+func inviteeAddr(u *keys.Unlocked, email string) (keys.Rings, bool) {
 	for _, a := range u.Addresses {
 		if strings.EqualFold(a.Email, email) {
-			if kr, ok := u.AddrKR(a.ID); ok {
-				return kr
+			if rings, ok := u.AddrRings(a.ID); ok {
+				return rings, true
 			}
 		}
 	}
-	kr, _, err := u.FirstAddr()
+	rings, _, err := u.FirstAddr()
 	if err != nil {
-		return nil
+		return keys.Rings{}, false
 	}
-	return kr
+	return rings, true
 }

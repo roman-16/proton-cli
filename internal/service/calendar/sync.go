@@ -75,7 +75,7 @@ type protonAttendee struct {
 // can wrap it for newly added Proton attendees.
 func (ck *calKeys) object(b eventBody) (map[string]any, *pgp.SessionKey, error) {
 	signedCard, encCard, keyPacket, sk, err := pgphelper.EncryptAndSignCardSplit(
-		b.model.SharedSigned(), b.model.SharedEncrypted(), ck.calKR, ck.addrKR, b.keyPacket)
+		b.model.SharedSigned(), b.model.SharedEncrypted(), ck.calKR, ck.addr.Write, b.keyPacket)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -90,7 +90,7 @@ func (ck *calKeys) object(b eventBody) (map[string]any, *pgp.SessionKey, error) 
 		event["SharedKeyPacket"] = keyPacket
 	}
 	if attendees := b.model.AttendeesEncrypted(); attendees != "" {
-		attCard, err := pgphelper.EncryptPartWithSessionKey(attendees, sk, ck.addrKR)
+		attCard, err := pgphelper.EncryptPartWithSessionKey(attendees, sk, ck.addr.Write)
 		if err != nil {
 			return nil, nil, err
 		}

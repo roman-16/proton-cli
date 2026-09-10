@@ -166,21 +166,21 @@ func (m rawMessage) parsedHeader(name string) string {
 }
 
 func (s *Service) decryptMessage(ctx context.Context, u *keys.Unlocked, m rawMessage) Full {
-	addrKR, ok := u.AddrKR(m.AddressID)
+	rings, ok := u.AddrRings(m.AddressID)
 	if !ok {
-		if kr, _, err := u.FirstAddr(); err == nil {
-			addrKR = kr
+		if first, _, err := u.FirstAddr(); err == nil {
+			rings = first
 		}
 	}
 	var body string
 	sig := pgphelper.Unverified
-	if addrKR == nil {
+	if rings.Read == nil {
 		body = "(decryption failed: no address key available)"
 	} else {
 		// Verify the body signature against the sender's public key (their
 		// own key for sent mail). No key available -> Unverified, never Invalid.
 		verKR := s.senderKeyRing(ctx, senderAddress(m.Sender))
-		b, v, err := decryptBody(m.Body, addrKR, verKR)
+		b, v, err := decryptBody(m.Body, rings.Read, verKR)
 		if err != nil {
 			body = "(decryption failed: " + err.Error() + ")"
 		} else {

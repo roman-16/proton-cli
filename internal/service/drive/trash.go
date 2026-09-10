@@ -154,7 +154,7 @@ func (s *Service) linkMetadata(ctx context.Context, shareID string, linkIDs []st
 // A share whose keys will not open leaves every name blank, which is how a
 // listing says "there, but not readable".
 func (s *Service) namesIn(ctx context.Context, dc *Context, shareID string) *nameReader {
-	r := &nameReader{service: s, shareID: shareID, addrKR: dc.AddrKR, rings: map[string]*pgp.KeyRing{}}
+	r := &nameReader{service: s, shareID: shareID, addrKR: dc.Addr.Read, rings: map[string]*pgp.KeyRing{}}
 	if shareID != dc.ShareID {
 		// Anything not on the file tree's own share is on another of the account's -
 		// the photo volume's, in practice - and its keys are opened the same way.

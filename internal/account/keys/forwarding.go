@@ -100,12 +100,12 @@ func (u *Unlocked) republishKeyList(addr Address) (SignedKeyList, error) {
 	if err := describesAddress(addr.SignedKeyList.Data, held); err != nil {
 		return SignedKeyList{}, err
 	}
-	kr, ok := u.AddrKR(addr.ID)
+	rings, ok := u.AddrRings(addr.ID)
 	if !ok {
 		return SignedKeyList{}, errs.Problemf(
 			"The keys for %s did not open, so its key list cannot be signed.", addr.Email)
 	}
-	signature, err := signKeyList(addr.SignedKeyList.Data, primarySigners(held, kr))
+	signature, err := signKeyList(addr.SignedKeyList.Data, rings.Write.GetKeys())
 	if err != nil {
 		return SignedKeyList{}, err
 	}
@@ -119,37 +119,13 @@ func (u *Unlocked) republishKeyList(addr Address) (SignedKeyList, error) {
 // ordinary one. Which of them a caller may use is the caller's to judge - a
 // forwarding can only be derived from the v4 key - so all of them come back.
 func (u *Unlocked) PrimaryKeys(addr Address) ([]*pgp.Key, error) {
-	held, err := addressKeys(addr)
-	if err != nil {
-		return nil, err
-	}
-	kr, ok := u.AddrKR(addr.ID)
+	rings, ok := u.AddrRings(addr.ID)
 	if !ok {
 		return nil, errs.Problemf("The keys for %s did not open.", addr.Email)
 	}
-	primary := primarySigners(held, kr)
+	primary := rings.Write.GetKeys()
 	if len(primary) == 0 {
 		return nil, errs.Problemf("%s has no active primary key that opened.", addr.Email)
 	}
 	return primary, nil
-}
-
-// primarySigners are the address's primary keys that opened, matched to their
-// records by fingerprint because a ring holds the keys in whatever order they
-// unlocked.
-func primarySigners(held []addressKey, kr *pgp.KeyRing) []*pgp.Key {
-	opened := map[string]*pgp.Key{}
-	for _, key := range kr.GetKeys() {
-		opened[key.GetFingerprint()] = key
-	}
-	var out []*pgp.Key
-	for _, k := range held {
-		if k.record.Primary != 1 {
-			continue
-		}
-		if key, ok := opened[k.key.GetFingerprint()]; ok {
-			out = append(out, key)
-		}
-	}
-	return out
 }

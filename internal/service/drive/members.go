@@ -100,7 +100,7 @@ func (s *Service) InviteMember(ctx context.Context, dc *Context, path, email str
 	if err != nil {
 		return fmt.Errorf("encrypt session key for invitee: %w", err)
 	}
-	sig, err := dc.AddrKR.SignDetachedWithContext(pgp.NewPlainMessage(keyPacket), pgp.NewSigningContext(sigContextInviter, true))
+	sig, err := dc.Addr.Write.SignDetachedWithContext(pgp.NewPlainMessage(keyPacket), pgp.NewSigningContext(sigContextInviter, true))
 	if err != nil {
 		return fmt.Errorf("sign key packet: %w", err)
 	}

@@ -327,7 +327,7 @@ func (s *Service) ForwardingAccept(ctx context.Context, f Forwarding) error {
 	if !ok {
 		return errs.Problemf("%s is not one of your addresses any more.", f.To)
 	}
-	addrKR, ok := u.AddrKR(addr.ID)
+	rings, ok := u.AddrRings(addr.ID)
 	if !ok {
 		return errs.Problemf("The keys for %s did not open, so a forwarding to it cannot be accepted.", addr.Email)
 	}
@@ -343,7 +343,7 @@ func (s *Service) ForwardingAccept(ctx context.Context, f Forwarding) error {
 	}
 
 	for _, sent := range f.keys {
-		key, err := openForwardingKey(sent, addrKR, forwarderKR, f.From, addr.Email)
+		key, err := openForwardingKey(sent, rings.Read, forwarderKR, f.From, addr.Email)
 		if err != nil {
 			return err
 		}
@@ -426,7 +426,7 @@ func (s *Service) forwarderAddress(u *keys.Unlocked, email string) (keys.Address
 		if !strings.EqualFold(a.Email, email) {
 			continue
 		}
-		if _, ok := u.AddrKR(a.ID); !ok {
+		if _, ok := u.AddrRings(a.ID); !ok {
 			return keys.Address{}, errs.Problemf("The keys for %s did not open, so it cannot forward.", a.Email)
 		}
 		return a, nil
@@ -507,7 +507,7 @@ func (s *Service) forwardingMaterial(
 	if err != nil {
 		return nil, err
 	}
-	token, err := sealPassphrase(derived.passphrase, u.AddrKRs[from.ID], forwardeeKR)
+	token, err := sealPassphrase(derived.passphrase, u.AddrKRs[from.ID].Write, forwardeeKR)
 	if err != nil {
 		return nil, err
 	}
