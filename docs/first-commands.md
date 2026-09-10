@@ -6,9 +6,9 @@ Sign in once, then read your mail, move files in and out of Drive, check your ca
 
 ```console
 $ proton account login
-Email:            you@proton.me
+Email: you@proton.me
 Password:
-Two-factor code:  123456
+Two-factor code: 123456
 
 ✓ Signed in as you@proton.me.
 ```

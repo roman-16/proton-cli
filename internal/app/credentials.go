@@ -88,9 +88,8 @@ type Credentials struct {
 	// stdinOwner is set once the App exists, so Supply can claim standard input.
 	stdinOwner func(claim string) (io.Reader, error)
 
-	// prompt is built once and reused, so every question shares one reader and
-	// one label column: a value typed ahead of its question survives, and the
-	// answers line up under each other.
+	// prompt is built once and reused, so every question shares one reader and a
+	// value typed ahead of its question survives.
 	prompt *ui.Prompter
 
 	user, password, totp string
@@ -439,12 +438,10 @@ func (c *Credentials) prefersSecurityKey(alsoTOTP bool) bool {
 	return false
 }
 
-// prompter is the one question block a sign-in asks, built on first use so every
-// label in it lines up whether or not it ends up being asked.
+// prompter is the one question block a sign-in asks, built on first use.
 func (c *Credentials) prompter() *ui.Prompter {
 	if c.prompt == nil {
-		c.prompt = c.ui.Ask(labelEmail, labelPassword, labelSecondPassword,
-			labelExtraPassword, labelConfirm, labelTOTP, labelSecurityKeyPIN, labelPassphrase)
+		c.prompt = c.ui.Ask()
 	}
 	return c.prompt
 }

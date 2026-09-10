@@ -95,7 +95,7 @@ proton prints the verification page and waits:
 
 ```console
 $ proton account login
-Email:             you@proton.me
+Email: you@proton.me
 Password:
 Proton wants to confirm you are human. Solve the CAPTCHA on this page -
 you can open it on any device:

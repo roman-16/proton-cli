@@ -68,21 +68,21 @@ func TestCanPromptRespectsBothTheFlagAndTheEnvironment(t *testing.T) {
 	})
 }
 
-// The questions a sign-in asks form one block, so they are measured like one.
-// Unaligned labels put every answer at a different column and make the block
-// read as three unrelated questions rather than one form.
-func TestAskAlignsTheLabelsItWasGiven(t *testing.T) {
+// A question is written where the cursor already is, whatever else the block
+// goes on to ask. Padding a label towards a question that may never come puts
+// a gap under the cursor of every sign-in that skips it.
+func TestAskWritesTheLabelAndOneSpace(t *testing.T) {
 	u, _, errb := fixture(t, Options{In: strings.NewReader("you@proton.me\n123456\n")})
-	p := u.Ask("Email", "Password", "Two-factor code")
+	p := u.Ask()
 	if _, err := p.Line("Email"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := p.Line("Two-factor code"); err != nil {
 		t.Fatal(err)
 	}
-	want := "Email:            Two-factor code:  "
+	want := "Email: Two-factor code: "
 	if got := errb.String(); got != want {
-		t.Errorf("prompts are not aligned\n got %q\nwant %q", got, want)
+		t.Errorf("prompts are not written as the label alone\n got %q\nwant %q", got, want)
 	}
 }
 
@@ -90,7 +90,7 @@ func TestAskAlignsTheLabelsItWasGiven(t *testing.T) {
 // was asked. A reader per question buffers ahead and then throws the buffer away.
 func TestAskKeepsWhatWasTypedAhead(t *testing.T) {
 	u, _, _ := fixture(t, Options{In: strings.NewReader("you@proton.me\n123456\n")})
-	p := u.Ask("Email", "Two-factor code")
+	p := u.Ask()
 	if got, _ := p.Line("Email"); got != "you@proton.me" {
 		t.Fatalf("first answer = %q", got)
 	}

@@ -116,7 +116,7 @@ Yes. `proton account login` asks you to touch the key you registered with Proton
 
 ```console
 $ proton account login
-Email:             you@proton.me
+Email: you@proton.me
 Password:
 Touch your security key.
 ✓ Signed in as you@proton.me (profile "default").

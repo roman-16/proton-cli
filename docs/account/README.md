@@ -47,7 +47,7 @@ An account that signs in with a security key is asked to touch it:
 
 ```console
 $ proton account login
-Email:             alice@proton.me
+Email: alice@proton.me
 Password:
 Touch your security key.
 ✓ Signed in as alice@proton.me (profile "default").
@@ -57,7 +57,7 @@ With an authenticator app enabled as well, the code prompt is the choice: type a
 
 ```console
 $ proton account login
-Email:             alice@proton.me
+Email: alice@proton.me
 Password:
 This account also has a security key. Press Enter to use it instead of a code.
 Two-factor code:
@@ -77,7 +77,7 @@ If your account is in [two-password mode](https://proton.me/support/switch-two-p
 
 ```console
 $ proton account login
-Email:            alice@proton.me
+Email: alice@proton.me
 Password:
 Second password:
 ✓ Signed in as alice@proton.me (profile "default").

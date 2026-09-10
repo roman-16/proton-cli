@@ -80,27 +80,14 @@ func (u *UI) Await(question string) error {
 
 // Prompter asks a sequence of questions over one reader, so a value typed ahead
 // of the question that wants it is not lost between prompts.
-//
-// The questions form one block, so it is measured like one: the labels are
-// declared up front and padded to a common width, and the answers line up in a
-// column the way a record's values do.
 type Prompter struct {
-	u     *UI
-	in    *bufio.Reader
-	width int
+	u  *UI
+	in *bufio.Reader
 }
 
-// Ask returns a Prompter reading from this UI's input. The labels are every
-// question the caller may go on to ask; naming them here is what lets the block
-// be aligned before the first one is written.
-func (u *UI) Ask(labels ...string) *Prompter {
-	width := 0
-	for _, l := range labels {
-		if n := Cells(l + ":"); n > width {
-			width = n
-		}
-	}
-	return &Prompter{u: u, in: bufio.NewReader(u.In), width: width}
+// Ask returns a Prompter reading from this UI's input.
+func (u *UI) Ask() *Prompter {
+	return &Prompter{u: u, in: bufio.NewReader(u.In)}
 }
 
 // Line asks for a visible value.
@@ -148,8 +135,11 @@ func (p *Prompter) Secret(label string) (string, error) {
 
 // write emits the prompt on stderr, never stdout: a question is not an answer,
 // so redirecting the answer must not capture it.
-// The two spaces after the label are the gap a record block puts between a
-// label and its value, so a sign-in and a record read as the same shape.
+//
+// A question is asked where the cursor already is - the label, a colon and one
+// space - because which question comes next depends on the answer before it,
+// and a column reserved for one that may never be asked is a gap under the
+// cursor of every sign-in that skips it.
 func (p *Prompter) write(label string) {
-	_, _ = fmt.Fprintf(p.u.Err, "%s  ", p.u.errStyle.Paint(Muted, padCells(label+":", p.width, false)))
+	_, _ = fmt.Fprintf(p.u.Err, "%s ", p.u.errStyle.Paint(Muted, label+":"))
 }
