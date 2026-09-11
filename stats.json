@@ -1,10 +1,10 @@
 {
-  "updated_at": "2026-09-10T08:27:21.835088866Z",
+  "updated_at": "2026-09-11T08:21:58.899865553Z",
   "totals": {
-    "downloads": 2742,
-    "stars": 67,
-    "forks": 9,
-    "latest": "3.6.0"
+    "downloads": 2903,
+    "stars": 68,
+    "forks": 10,
+    "latest": "3.7.0"
   },
   "downloads": [
     {
@@ -379,6 +379,54 @@
         "3.5.0": 12,
         "3.6.0": 17
       }
+    },
+    {
+      "date": "2026-09-11",
+      "hours": 23.910295771301943,
+      "update": 29,
+      "script": 0,
+      "other": 132,
+      "platform": {
+        "darwin_amd64": 4,
+        "darwin_arm64": 6,
+        "linux_amd64": 42,
+        "linux_arm64": 18,
+        "windows_amd64": 62,
+        "windows_arm64": 29
+      },
+      "version": {
+        "1.1.1": 4,
+        "1.10.0": 2,
+        "1.11.0": 2,
+        "1.9.10": 2,
+        "1.9.11": 2,
+        "1.9.12": 2,
+        "1.9.13": 2,
+        "2.0.0": 2,
+        "2.1.0": 2,
+        "2.1.1": 2,
+        "2.10.0": 4,
+        "2.2.0": 2,
+        "2.2.1": 2,
+        "2.2.2": 2,
+        "2.3.0": 2,
+        "2.4.0": 2,
+        "2.4.1": 2,
+        "2.5.0": 4,
+        "2.6.0": 2,
+        "2.7.0": 2,
+        "2.8.0": 2,
+        "2.9.0": 2,
+        "3.0.0": 7,
+        "3.1.0": 5,
+        "3.2.0": 5,
+        "3.3.0": 4,
+        "3.3.1": 13,
+        "3.4.0": 7,
+        "3.5.0": 14,
+        "3.6.0": 7,
+        "3.7.0": 49
+      }
     }
   ],
   "traffic": [
@@ -542,13 +590,20 @@
       "cloners": 19,
       "views": 15,
       "visitors": 8
+    },
+    {
+      "date": "2026-09-10",
+      "clones": 101,
+      "cloners": 26,
+      "views": 13,
+      "visitors": 11
     }
   ],
   "traffic_window": {
-    "clones": 1583,
-    "cloners": 259,
-    "views": 410,
-    "visitors": 98
+    "clones": 1554,
+    "cloners": 267,
+    "views": 405,
+    "visitors": 99
   },
   "stars": [
     {
@@ -1142,6 +1197,10 @@
     {
       "date": "2026-09-10",
       "count": 67
+    },
+    {
+      "date": "2026-09-11",
+      "count": 68
     }
   ],
   "forks": [
@@ -1480,6 +1539,10 @@
     {
       "date": "2026-09-10",
       "count": 9
+    },
+    {
+      "date": "2026-09-11",
+      "count": 10
     }
   ],
   "npm": [
@@ -2489,36 +2552,40 @@
     },
     {
       "date": "2026-09-09",
-      "count": 0
+      "count": 17
     },
     {
       "date": "2026-09-10",
       "count": 0
+    },
+    {
+      "date": "2026-09-11",
+      "count": 0
     }
   ],
   "npm_platforms": {
-    "darwin-arm64": 2816,
-    "darwin-x64": 3011,
-    "linux-arm64": 3125,
-    "linux-x64": 3422,
-    "win32-arm64": 1498,
-    "win32-x64": 2816
+    "darwin-arm64": 2488,
+    "darwin-x64": 2711,
+    "linux-arm64": 2809,
+    "linux-x64": 3069,
+    "win32-arm64": 1507,
+    "win32-x64": 2507
   },
   "referrers": [
     {
       "name": "Google",
-      "count": 107,
-      "uniques": 40
+      "count": 110,
+      "uniques": 41
     },
     {
       "name": "github.com",
-      "count": 39,
+      "count": 40,
       "uniques": 10
     },
     {
       "name": "search.brave.com",
-      "count": 31,
-      "uniques": 10
+      "count": 23,
+      "uniques": 9
     },
     {
       "name": "proton-cli.lerchster.dev",
@@ -2531,13 +2598,13 @@
       "uniques": 1
     },
     {
-      "name": "search.nixos.org",
-      "count": 8,
-      "uniques": 6
-    },
-    {
       "name": "DuckDuckGo",
       "count": 8,
+      "uniques": 4
+    },
+    {
+      "name": "search.nixos.org",
+      "count": 5,
       "uniques": 4
     },
     {
@@ -2559,8 +2626,8 @@
   "paths": [
     {
       "name": "/roman-16/proton-cli",
-      "count": 151,
-      "uniques": 78
+      "count": 148,
+      "uniques": 75
     },
     {
       "name": "/roman-16/proton-cli/issues",
@@ -2574,7 +2641,7 @@
     },
     {
       "name": "/roman-16/proton-cli/releases",
-      "count": 9,
+      "count": 8,
       "uniques": 5
     },
     {
@@ -2603,15 +2670,15 @@
       "uniques": 4
     },
     {
-      "name": "/roman-16/proton-cli/commits/main",
+      "name": "/roman-16/proton-cli/blob/main/AGENTS.md",
       "count": 6,
-      "uniques": 2
+      "uniques": 3
     }
   ],
   "packaging": [
     {
       "repository": "aur",
-      "version": "3.6.0",
+      "version": "3.7.0",
       "status": "newest"
     },
     {
@@ -2622,6 +2689,6 @@
   ],
   "aur": {
     "votes": 1,
-    "popularity": 0.652097
+    "popularity": 0.565531
   }
 }
