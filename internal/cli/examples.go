@@ -434,6 +434,7 @@ var examples = map[string][]string{
 	},
 	"proton mail messages attachments download": {
 		"proton mail messages attachments download 'Invoice #2291' --dest-dir .",
+		"proton mail messages attachments download 'Invoice #2291' invoice-2291.pdf --dest-dir .",
 		"proton mail messages attachments download 5bH2mQxK kQ81mDx4 --dest invoice.pdf",
 	},
 
@@ -720,6 +721,7 @@ var examples = map[string][]string{
 	"proton pass export": {
 		"proton pass export --dest pass-backup.zip --passphrase-file ~/.backup-passphrase",
 		"proton pass export --dest pass-backup.zip",
+		"proton pass export --dest pass-backup.zip --no-attachments",
 	},
 	"proton pass import": {
 		"proton pass import pass-backup.zip --passphrase-file ~/.backup-passphrase",
@@ -741,8 +743,23 @@ var examples = map[string][]string{
 		"proton pass items get github.com",
 		"proton pass items get GitHub --output json",
 	},
+	"proton pass items attachments list": {
+		"proton pass items attachments list github.com",
+		"proton pass items attachments list github.com --removed",
+	},
+	"proton pass items attachments download": {
+		"proton pass items attachments download github.com --dest-dir .",
+		"proton pass items attachments download github.com passport.pdf --dest ~/passport.pdf",
+	},
+	"proton pass items attachments update": {
+		"proton pass items attachments update github.com passport.pdf --name passport-2031.pdf",
+	},
+	"proton pass items attachments restore": {
+		"proton pass items attachments restore github.com passport.pdf",
+	},
 	"proton pass items create": {
 		"proton pass items create --name GitHub --username roman --url github.com --generate-password",
+		"proton pass items create --type note --name Passport --attach ~/scans/passport.pdf",
 		"proton pass items create --name Router --generate-password --words 5",
 		"proton pass items create --type note --name 'Door codes' --note 'Front: 1234'",
 		"proton pass items create --type credit-card --name 'Travel card' --holder 'Roman' --expiry 2030-04 --secret-file number=/run/secrets/card",
@@ -753,6 +770,7 @@ var examples = map[string][]string{
 		"proton pass items update GitHub --secret-stdin password",
 		"proton pass items update GitHub --username roman-16 --url github.com",
 		"proton pass items update GitHub --generate-password",
+		"proton pass items update Passport --attach ~/scans/visa.pdf --detach passport.pdf",
 	},
 	"proton pass items move": {
 		"proton pass items move github.com --into Work",
@@ -763,6 +781,9 @@ var examples = map[string][]string{
 	},
 	"proton pass items revisions get": {
 		"proton pass items revisions get github.com 3",
+	},
+	"proton pass items revisions restore": {
+		"proton pass items revisions restore github.com 3",
 	},
 	"proton pass items totp": {
 		"proton pass items totp github.com",

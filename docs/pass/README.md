@@ -75,6 +75,35 @@ A field is identified by its section and name together, so `Network/Password` an
 
 Only the types whose Pass editor offers headings can carry them: `custom`, `ssh-key`, `wifi` and `identity`.
 
+## Attachments
+
+Files live on an item, so putting one there is an edit of the item.
+
+```bash
+proton pass items create --type note --name Passport --attach ~/scans/passport.pdf
+proton pass items update Passport --attach ~/scans/visa.pdf --detach passport.pdf
+
+proton pass items attachments list Passport
+proton pass items attachments download Passport passport.pdf --dest ~/passport.pdf
+proton pass items attachments download Passport --dest-dir ~/scans     # all of them
+proton pass items attachments update Passport passport.pdf --name passport-2031.pdf
+```
+
+**Attachments need a paid Pass plan.** Without one, `--attach` is refused before anything is uploaded. So is a file larger than the plan allows, and a set of files with more in it than your Pass storage has left.
+
+`--attach` and `--detach` repeat. An attachment is named by its own name or by its ID, and a name the item does not have is refused before the edit.
+
+`items get` shows what an item carries. A listing does not.
+
+A detached file is kept, and can be put back:
+
+```bash
+proton pass items attachments list Passport --removed
+proton pass items attachments restore Passport passport.pdf
+```
+
+Attachments are not part of an item's version history. `items revisions restore` puts the fields back and leaves the files as they are.
+
 ## Move it
 
 ```bash
@@ -232,13 +261,17 @@ proton pass import pass-backup.zip --passphrase-file ~/.backup-passphrase
 
 The archive is the one **Proton Pass itself writes**, so the app opens what this writes and this opens what the app wrote.
 
-It holds **the vaults you own**. A vault somebody shared with you is theirs to back up and stays out. When something is left out, the command says how much on stderr.
+It holds **the vaults you own**, and the attachments on their items. A vault somebody shared with you is theirs to back up and stays out. When something is left out, the command says how much on stderr.
 
-**Without a passphrase the archive holds every password in plain text**, and the command says so as it writes. With one, the document is encrypted to it and stored as `data.pgp`, which Proton Pass can import.
+`--no-attachments` writes the items alone, which is much faster.
+
+**Without a passphrase the archive holds every password in plain text**, and the command says so as it writes. With one, the document is encrypted to it and stored as `data.pgp`, which Proton Pass can import. **The attachments are never encrypted**, with a passphrase or without.
 
 The passphrase comes from a file, from stdin with `--passphrase-stdin`, or from a prompt. Never from a flag value.
 
 Importing **adds** items. Nothing in an export says which existing item it was, so importing the same file twice puts the items in twice. Items land in the vault the file names, and a vault that is not there yet is made. Use `--dry-run` to list what would land, and where.
+
+Attachments in the archive are put back on their items, which needs a paid Pass plan. Whatever cannot be put back is named once the items have landed, and the items still land.
 
 Aliases are the exception. An alias address belongs to the account Proton gave it to, so each one is named and skipped while everything else lands.
 
@@ -287,10 +320,14 @@ To change it, turn it off and on again.
 
 ```bash
 proton pass items revisions list github.com    # every edit, newest first
+proton pass items revisions get github.com 3   # one version, decrypted
+proton pass items revisions restore github.com 3
 proton pass breaches list                      # worst first
 proton pass breaches get jane@proton.me
 ```
 
 Pass keeps every edit, so a password changed by mistake can be read back. A revision written under a key this account no longer holds is still listed by its number.
+
+`revisions restore` writes that version as the newest one, so nothing in the history is lost. It changes the item's fields; attachments are left as they are.
 
 `breaches` is Pass Monitor: which of your addresses have turned up in somebody else's data breach, when, and what was exposed. If a password leaked in the clear it shows the last few characters, which is what tells you which one to change. Nothing here writes.

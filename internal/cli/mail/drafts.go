@@ -2,7 +2,6 @@ package mail
 
 import (
 	"context"
-	"strings"
 
 	"github.com/roman-16/proton-cli/internal/cli/kit"
 	mailsvc "github.com/roman-16/proton-cli/internal/service/mail"
@@ -130,20 +129,16 @@ func draftsUpdateCmd() *cobra.Command {
 }
 
 // matchDraftAttachment resolves a --detach value against the draft's own
-// attachments, naming what it does have when nothing matches.
+// attachments, which are named the way every other attachment is.
 func matchDraftAttachment(draft *mailsvc.Draft, spec string) (string, error) {
-	var names []string
-	for _, a := range draft.AttachmentList() {
-		if a.ID == spec || strings.EqualFold(a.Name, spec) {
-			return a.ID, nil
-		}
-		names = append(names, a.Name)
+	at, err := mailsvc.MatchAttachment(spec, draft.AttachmentList(),
+		func(a mailsvc.DraftAttachment) mailsvc.Attachment {
+			return mailsvc.Attachment{ID: a.ID, Name: a.Name, Size: a.Size}
+		})
+	if err != nil {
+		return "", err
 	}
-	if len(names) == 0 {
-		return "", kit.Fail("That draft has no attachments.").Exit(3)
-	}
-	return "", kit.Fail("That draft has no attachment called %q.", spec).
-		Hint("it has: " + strings.Join(names, ", ")).Exit(3)
+	return at.ID, nil
 }
 
 func draftsSendCmd() *cobra.Command {

@@ -10,7 +10,9 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/roman-16/proton-cli/internal/errs"
+	"github.com/roman-16/proton-cli/internal/progress"
 	pb "github.com/roman-16/proton-cli/internal/service/pass/proto"
+	"github.com/roman-16/proton-cli/internal/units"
 )
 
 // Reading a Proton Pass backup back in.
@@ -25,6 +27,22 @@ import (
 type ImportResult struct {
 	Imported []string       `json:"imported"`
 	Skipped  []SkippedEntry `json:"skipped"`
+	// SkippedFiles are the attachments that did not land. They are apart from
+	// the items because an item whose file would not go up is still an item that
+	// landed, and counting it as lost would be a wrong count.
+	SkippedFiles []SkippedFile `json:"skipped_files"`
+}
+
+// SkippedFile is one attachment a read-back could not put back, and why.
+type SkippedFile struct {
+	Name   string `json:"name"`
+	Item   string `json:"item"`
+	Reason string `json:"reason"`
+}
+
+// String names the file and the item it belonged to.
+func (s SkippedFile) String() string {
+	return fmt.Sprintf("Skipped attachment %q of %q: %s.", s.Name, s.Item, s.Reason)
 }
 
 // SkippedEntry is one item a read-back could not take, and why.
@@ -48,6 +66,8 @@ type ImportPlan struct {
 	Vaults []PlannedVault
 	// Skipped are the items that will not be read back, and why.
 	Skipped []SkippedEntry
+	// SkippedFiles are the attachments that will not be read back, and why.
+	SkippedFiles []SkippedFile
 }
 
 // PlannedVault is one vault's worth of the file: where it will land, whether
@@ -57,6 +77,8 @@ type PlannedVault struct {
 	New   bool
 	Items []*pb.Item
 	Names []string
+	// Files are the attachments of each item, in step with Items.
+	Files [][]Upload
 }
 
 // Count is how many items the whole plan would write.
@@ -68,12 +90,24 @@ func (p ImportPlan) Count() int {
 	return n
 }
 
+// Attachments is how many files the whole plan would put back.
+func (p ImportPlan) Attachments() int {
+	var n int
+	for _, v := range p.Vaults {
+		for _, files := range v.Files {
+			n += len(files)
+		}
+	}
+	return n
+}
+
 // PlanImport works out what a document would land, without sending anything.
 //
 // Everything that can go wrong with the file itself goes wrong here - a kind of
-// item this version cannot read, content that will not parse - so a run that
-// reaches the network is one that has already been understood.
-func (s *Service) PlanImport(ctx context.Context, doc *ExportDocument) (*ImportPlan, error) {
+// item this version cannot read, content that will not parse, an attachment the
+// plan will not take - so a run that reaches the network is one that has already
+// been understood, and a dry run says the same things a real one does.
+func (s *Service) PlanImport(ctx context.Context, archive *Archive) (*ImportPlan, error) {
 	existing, err := s.VaultsList(ctx)
 	if err != nil {
 		return nil, err
@@ -82,8 +116,13 @@ func (s *Service) PlanImport(ctx context.Context, doc *ExportDocument) (*ImportP
 	for _, v := range existing {
 		have[v.Name] = true
 	}
+	doc := archive.Document()
 
 	plan := &ImportPlan{}
+	limits, err := s.attachmentLimits(ctx, doc)
+	if err != nil {
+		return nil, err
+	}
 	for _, v := range sortedVaults(doc) {
 		planned := PlannedVault{Name: v.Name, New: !have[v.Name]}
 		if planned.Name == "" {
@@ -97,16 +136,73 @@ func (s *Service) PlanImport(ctx context.Context, doc *ExportDocument) (*ImportP
 				})
 				continue
 			}
+			files, skipped := plannedFiles(archive, item, limits)
+			plan.SkippedFiles = append(plan.SkippedFiles, skipped...)
 			planned.Items = append(planned.Items, built)
 			planned.Names = append(planned.Names, item.Data.Metadata.Name)
+			planned.Files = append(planned.Files, files)
 		}
 		plan.Vaults = append(plan.Vaults, planned)
 	}
 	return plan, nil
 }
 
+// attachmentLimits is what the plan allows, asked for only when the document
+// carries a file at all.
+func (s *Service) attachmentLimits(ctx context.Context, doc *ExportDocument) (*StorageLimits, error) {
+	for _, v := range doc.Vaults {
+		for _, item := range v.Items {
+			if len(item.Files) > 0 {
+				return s.StorageLimits(ctx)
+			}
+		}
+	}
+	return nil, nil
+}
+
+// plannedFiles are one item's attachments, and the ones that will not go back.
+//
+// Each of the three ways a file is refused is known before anything is sent, so
+// a dry run names them too: the archive does not hold it, the plan takes no
+// attachments at all, or the file is larger than one may be.
+func plannedFiles(archive *Archive, item ExportedItem, limits *StorageLimits) ([]Upload, []SkippedFile) {
+	var out []Upload
+	var skipped []SkippedFile
+	for _, entry := range item.Files {
+		name := ImportName(entry)
+		up, ok := archive.Attachment(entry)
+		switch {
+		case !ok:
+			skipped = append(skipped, SkippedFile{
+				Name: name, Item: item.Data.Metadata.Name,
+				Reason: "the archive does not hold it",
+			})
+		case limits == nil || !limits.Allowed:
+			skipped = append(skipped, SkippedFile{
+				Name: name, Item: item.Data.Metadata.Name,
+				Reason: "attachments need a paid Pass plan",
+			})
+		case up.Size == 0:
+			skipped = append(skipped, SkippedFile{
+				Name: name, Item: item.Data.Metadata.Name, Reason: "it is empty",
+			})
+		case limits.MaxFileSize > 0 && up.Size > limits.MaxFileSize:
+			skipped = append(skipped, SkippedFile{
+				Name: name, Item: item.Data.Metadata.Name,
+				Reason: fmt.Sprintf("it is %s, and an attachment may be at most %s",
+					units.Size(up.Size), units.Size(limits.MaxFileSize)),
+			})
+		default:
+			out = append(out, up)
+		}
+	}
+	return out, skipped
+}
+
 // Import carries out a plan.
-func (s *Service) Import(ctx context.Context, plan *ImportPlan) (*ImportResult, error) {
+//
+// report is handed each attachment as it goes up, numbered within the run.
+func (s *Service) Import(ctx context.Context, plan *ImportPlan, report func(index, total int) progress.Sink) (*ImportResult, error) {
 	existing, err := s.VaultsList(ctx)
 	if err != nil {
 		return nil, err
@@ -116,7 +212,8 @@ func (s *Service) Import(ctx context.Context, plan *ImportPlan) (*ImportResult, 
 		shareOf[v.Name] = v.ShareID
 	}
 
-	res := &ImportResult{Skipped: plan.Skipped}
+	res := &ImportResult{Skipped: plan.Skipped, SkippedFiles: plan.SkippedFiles}
+	totalFiles, sentFiles := plan.Attachments(), 0
 	for _, v := range plan.Vaults {
 		if len(v.Items) == 0 {
 			continue
@@ -150,6 +247,31 @@ func (s *Service) Import(ctx context.Context, plan *ImportPlan) (*ImportResult, 
 				continue
 			}
 			res.Imported = append(res.Imported, id)
+			// The item has landed, so a file that will not go up costs the file
+			// and not the item: it is named afterwards rather than counted as a
+			// loss.
+			var pending []pendingFile
+			for _, up := range v.Files[i] {
+				sentFiles++
+				if report != nil {
+					up.Progress = report(sentFiles, totalFiles)
+				}
+				file, err := s.uploadPending(ctx, up)
+				if err != nil {
+					res.SkippedFiles = append(res.SkippedFiles, SkippedFile{
+						Name: up.Name, Item: v.Names[i], Reason: err.Error(),
+					})
+					continue
+				}
+				pending = append(pending, file)
+			}
+			if _, err := s.linkFiles(ctx, shareID, id, 1, pending, nil); err != nil {
+				for _, up := range v.Files[i] {
+					res.SkippedFiles = append(res.SkippedFiles, SkippedFile{
+						Name: up.Name, Item: v.Names[i], Reason: err.Error(),
+					})
+				}
+			}
 		}
 	}
 	return res, nil

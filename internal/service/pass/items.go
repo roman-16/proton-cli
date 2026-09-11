@@ -82,7 +82,15 @@ type FullItem struct {
 	// extra custom fields (any item type)
 	Fields []ItemField `json:"fields"`
 
+	// Attachments are the files the item carries, which a listing leaves out for
+	// the reason it leaves the secrets out: reading them costs requests of their
+	// own.
+	Attachments []Attachment `json:"attachments"`
+
 	raw *pb.Item
+	// hasAttachments is the item saying it carries files, which is what lets a
+	// backup read only the items that have any.
+	hasAttachments bool
 }
 
 // aliasDisabled is the item flag Proton sets on an alias that has been switched
@@ -337,6 +345,15 @@ func (s *Service) ItemGet(ctx context.Context, shareID, itemID string) (*FullIte
 	out.ModifyTime = r.Item.ModifyTime
 	out.Alias = r.Item.AliasEmail
 	out.AliasStatus = aliasStatus(out.Type, r.Item.Flags)
+	if r.Item.Flags&hasFiles != 0 {
+		// The item says whether it carries files, so an item with none costs no
+		// request to find that out.
+		files, err := s.Attachments(ctx, shareID, itemID)
+		if err != nil {
+			return nil, err
+		}
+		out.Attachments = files
+	}
 	if out.Type != "alias" {
 		return out, nil
 	}
@@ -422,6 +439,8 @@ type NewItem struct {
 	ExtraFields ExtraFields
 	// Identity is an identity item's fields, keyed by the flag that sets it.
 	Identity map[string]string
+	// Attach are local files to put on the item once it exists.
+	Attach []Upload
 }
 
 func extraFieldToItem(section string, f *pb.ExtraField) ItemField {
@@ -503,7 +522,25 @@ func (s *Service) ItemCreate(ctx context.Context, shareID string, nc NewItem) (s
 		return "", fmt.Errorf("a %s item has no sections to put a field under", nc.Type)
 	}
 
-	return s.putItem(ctx, shareID, shareKey, rotation, item)
+	// The files go up before the item exists, so a refused upload leaves no item
+	// behind to go and clean up.
+	pending := make([]pendingFile, 0, len(nc.Attach))
+	for _, up := range nc.Attach {
+		file, err := s.uploadPending(ctx, up)
+		if err != nil {
+			return "", err
+		}
+		pending = append(pending, file)
+	}
+
+	itemID, err := s.putItem(ctx, shareID, shareKey, rotation, item)
+	if err != nil {
+		return "", err
+	}
+	if _, err := s.linkFiles(ctx, shareID, itemID, 1, pending, nil); err != nil {
+		return itemID, err
+	}
+	return itemID, nil
 }
 
 // contentFormatVersion is the version of the item protobuf this writes. It
@@ -555,6 +592,10 @@ type Patch struct {
 	// SECTION/NAME=VALUE. One that names an existing field replaces its value;
 	// the rest of them are left alone.
 	ExtraFields ExtraFields
+	// Attach are local files to put on the item, and Detach the files to take
+	// off it, named by ID.
+	Attach []Upload
+	Detach []string
 }
 
 // Scalars are the single-valued fields a patch can carry. They are their own
@@ -570,12 +611,21 @@ type Scalars struct {
 // Empty reports whether the patch changes nothing about the item, which is what
 // an edit that only moved an alias's forwarding leaves behind.
 func (p Patch) Empty() bool {
+	return p.onlyFiles() && len(p.Attach) == 0 && len(p.Detach) == 0
+}
+
+// onlyFiles reports whether the patch leaves the item's own fields alone, which
+// is what an edit that adds or removes a file and nothing else is.
+func (p Patch) onlyFiles() bool {
 	return p.Scalars == Scalars{} && len(p.Identity) == 0 && p.ExtraFields.Empty()
 }
 
 func (s *Service) ItemEdit(ctx context.Context, shareID, itemID string, patch Patch) error {
 	if patch.Empty() {
 		return nil
+	}
+	if patch.onlyFiles() {
+		return s.editFiles(ctx, shareID, itemID, patch)
 	}
 	sk, err := s.decryptShareKeys(ctx, shareID)
 	if err != nil {
@@ -703,15 +753,46 @@ func (s *Service) ItemEdit(ctx context.Context, shareID, itemID string, patch Pa
 	if err != nil {
 		return err
 	}
-	return s.C.Decode(ctx, proton.Request{
+	var written struct{ Item struct{ Revision int } }
+	if err := s.C.Decode(ctx, proton.Request{
 		Method: "PUT", Path: fmt.Sprintf("/pass/v1/share/%s/item/%s", shareID, itemID),
 		Body: map[string]any{
 			"Content":              base64.StdEncoding.EncodeToString(ct),
-			"ContentFormatVersion": 7,
+			"ContentFormatVersion": contentFormatVersion,
 			"KeyRotation":          rotation,
 			"LastRevision":         r.Item.Revision,
 		},
-	}, nil)
+	}, &written); err != nil {
+		return err
+	}
+	return s.applyFiles(ctx, shareID, itemID, written.Item.Revision, patch)
+}
+
+// editFiles is the edit that only adds or removes files, which leaves the item's
+// own fields untouched and so writes no content.
+func (s *Service) editFiles(ctx context.Context, shareID, itemID string, patch Patch) error {
+	revision, err := s.itemRevision(ctx, shareID, itemID)
+	if err != nil {
+		return err
+	}
+	return s.applyFiles(ctx, shareID, itemID, revision, patch)
+}
+
+// applyFiles puts the patch's files on the item and takes its removals off.
+func (s *Service) applyFiles(ctx context.Context, shareID, itemID string, revision int, patch Patch) error {
+	if len(patch.Attach) == 0 && len(patch.Detach) == 0 {
+		return nil
+	}
+	pending := make([]pendingFile, 0, len(patch.Attach))
+	for _, up := range patch.Attach {
+		file, err := s.uploadPending(ctx, up)
+		if err != nil {
+			return err
+		}
+		pending = append(pending, file)
+	}
+	_, err := s.linkFiles(ctx, shareID, itemID, revision, pending, patch.Detach)
+	return err
 }
 
 // latestItemKey opens the item's newest key and returns it with its rotation, so a
@@ -879,6 +960,7 @@ func (s *Service) fetchItems(ctx context.Context, shareID string, sk *shareKeys)
 			item.Alias = enc.AliasEmail
 			item.AliasStatus = aliasStatus(item.Type, enc.Flags)
 			item.Shares = enc.ShareCount
+			item.hasAttachments = enc.Flags&hasFiles != 0
 			out = append(out, *item)
 		}
 		since = r.Items.LastToken
@@ -1026,6 +1108,65 @@ func (s *Service) RevisionGet(ctx context.Context, shareID, itemID string, revis
 	return nil, &errs.NotFound{Kind: "revision", Ref: strconv.Itoa(revision)}
 }
 
+// RevisionRestore makes an earlier version of an item the current one.
+//
+// It is written as a new revision rather than by discarding the ones since, so
+// the history keeps everything, this restore included. The item's files are left
+// as they are: Proton numbers a file being attached as a revision of its own and
+// lists none of them here, so there is no version of an item that a person could
+// have read the files of before asking for it back.
+func (s *Service) RevisionRestore(ctx context.Context, shareID, itemID string, revision int) error {
+	history, err := s.itemHistory(ctx, shareID, itemID)
+	if err != nil {
+		return err
+	}
+	var wanted *fullRevision
+	for i, rev := range history {
+		if rev.Revision == revision {
+			wanted = &history[i]
+			break
+		}
+	}
+	if wanted == nil {
+		return &errs.NotFound{Kind: "revision", Ref: strconv.Itoa(revision)}
+	}
+	if wanted.Item == nil || wanted.Item.raw == nil {
+		return fmt.Errorf("revision %d was written under a key this account no longer holds", revision)
+	}
+
+	sk, err := s.decryptShareKeys(ctx, shareID)
+	if err != nil {
+		return err
+	}
+	key, rotation, err := s.latestItemKey(ctx, sk, shareID, itemID)
+	if err != nil {
+		return err
+	}
+	pbBytes, err := proto.Marshal(wanted.Item.raw)
+	if err != nil {
+		return err
+	}
+	ct, err := aead.Encrypt(key, pbBytes, []byte(aead.TagItemContent))
+	if err != nil {
+		return err
+	}
+	// The revision to write against is the item's own, which runs ahead of the
+	// newest one this history lists whenever a file has been attached since.
+	current, err := s.itemRevision(ctx, shareID, itemID)
+	if err != nil {
+		return err
+	}
+	return s.C.Decode(ctx, proton.Request{
+		Method: "PUT", Path: fmt.Sprintf("/pass/v1/share/%s/item/%s", shareID, itemID),
+		Body: map[string]any{
+			"Content":              base64.StdEncoding.EncodeToString(ct),
+			"ContentFormatVersion": contentFormatVersion,
+			"KeyRotation":          rotation,
+			"LastRevision":         current,
+		},
+	}, nil)
+}
+
 // fullRevision is one earlier state with its content still in it.
 type fullRevision struct {
 	Revision   int
@@ -1086,7 +1227,8 @@ func (s *Service) itemHistory(ctx context.Context, shareID, itemID string) ([]fu
 				// still part of the history, so it is reported by its number rather
 				// than dropped.
 				page = append(page, fullRevision{
-					Revision: rev.Revision, CreateTime: rev.CreateTime, ModifyTime: rev.ModifyTime,
+					Revision: rev.Revision, CreateTime: rev.CreateTime,
+					ModifyTime: rev.ModifyTime,
 				})
 				continue
 			}

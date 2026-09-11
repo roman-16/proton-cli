@@ -2,7 +2,7 @@
 gradient: var(--app-pass)
 href: /pass/
 order: 4
-summary: Notes, cards, SSH keys, identities, two-factor codes, item history, and backups.
+summary: Notes, cards, SSH keys, identities, two-factor codes, attachments, item history, and backups.
 title: Pass
 ---
 

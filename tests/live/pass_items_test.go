@@ -1,8 +1,10 @@
 package live
 
 import (
+	"archive/zip"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -297,6 +299,39 @@ func TestPassItemRevisionsShowWhatItUsedToBe(t *testing.T) {
 	assertField(t, got, "Password:", "first-secret")
 }
 
+// Restoring puts the fields back as they were and is written as the newest
+// version, so the history keeps the restore too.
+func TestPassItemRevisionsRestoreWhatItUsedToBe(t *testing.T) {
+	name := testID() + "-restore"
+	ref := strings.TrimSpace(runOK(t, "pass", "items", "create",
+		"--name", name, "--username", "first",
+		"--secret-file", secretFile(t, "password", "first-secret")))
+	cleanupRun(t, fmt.Sprintf("Delete item: proton pass items delete %s", ref),
+		"pass", "items", "delete", "--", ref)
+
+	runOK(t, "pass", "items", "update", "--username", "second",
+		"--secret-file", secretFile(t, "password", "second-secret"), "--", ref)
+
+	before := runJSONArray(t, "pass", "items", "revisions", "list", "--", ref)
+	if len(before) < 2 {
+		t.Fatalf("an item edited once has %d versions", len(before))
+	}
+	oldest, _ := before[len(before)-1].(map[string]interface{})
+	first, _ := oldest["revision"].(float64)
+
+	runOK(t, "--yes", "pass", "items", "revisions", "restore", ref, strconv.Itoa(int(first)))
+
+	got := runOK(t, "pass", "items", "get", "--", ref)
+	assertField(t, got, "Username:", "first")
+	assertField(t, got, "Password:", "first-secret")
+
+	// Nothing in the history is lost: the restore is another version on top.
+	after := runJSONArray(t, "pass", "items", "revisions", "list", "--", ref)
+	if len(after) <= len(before) {
+		t.Errorf("restoring wrote no new version: %d before, %d after", len(before), len(after))
+	}
+}
+
 // An item is sealed under the key of the vault it is in, so moving it means
 // sealing it again under another's. It keeps what it holds and is given a new
 // ID, because an item in Pass is only unique together with its vault.
@@ -479,14 +514,13 @@ func TestPassExportAndImportRoundTrip(t *testing.T) {
 	archive := filepath.Join(dir, "backup.zip")
 	runOK(t, "pass", "export", "--dest", archive)
 
-	raw, err := os.ReadFile(archive)
-	if err != nil {
-		t.Fatalf("read the archive: %v", err)
-	}
-	// Without a passphrase the archive is readable, which is what the warning
+	// Without a passphrase the document is readable, which is what the warning
 	// says and what makes this assertion possible at all.
-	if !strings.Contains(string(raw), "Proton Pass/data.json") {
-		t.Errorf("the archive does not hold the file Proton Pass looks for")
+	document := archivedEntry(t, archive, "Proton Pass/data.json")
+	// Every item says what it carries, so an item with nothing attached says so
+	// rather than leaving the app to guess.
+	if !strings.Contains(string(document), `"files":[]`) {
+		t.Errorf("the items in the archive do not say what they carry")
 	}
 
 	// A dry run says what it would do and does none of it.
@@ -537,6 +571,34 @@ func TestPassExportAndImportRoundTrip(t *testing.T) {
 	for _, want := range []string{"hunter2", "jane", "https://example.com", "Recovery codes", "abc-def"} {
 		assertContains(t, shown, want)
 	}
+}
+
+// archivedEntry reads one file out of an archive, which is the only way to see
+// what it holds: the names are in the clear and the contents are not.
+func archivedEntry(t *testing.T, archive, name string) []byte {
+	t.Helper()
+	z, err := zip.OpenReader(archive)
+	if err != nil {
+		t.Fatalf("open %s: %v", archive, err)
+	}
+	defer func() { _ = z.Close() }()
+	for _, entry := range z.File {
+		if entry.Name != name {
+			continue
+		}
+		r, err := entry.Open()
+		if err != nil {
+			t.Fatalf("open %s in %s: %v", name, archive, err)
+		}
+		defer func() { _ = r.Close() }()
+		body, err := io.ReadAll(r)
+		if err != nil {
+			t.Fatalf("read %s in %s: %v", name, archive, err)
+		}
+		return body
+	}
+	t.Fatalf("%s holds no %s", archive, name)
+	return nil
 }
 
 // passItemRefs is every item in the account, as the references a command takes.

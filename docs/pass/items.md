@@ -4,7 +4,89 @@ Logins, notes, cards and the rest.
 
 Every command under `proton pass items`, with the arguments and flags it takes. For these commands in use, see [the pass guide](README.md).
 
-Holds `create`, `delete`, `get`, `list`, `move`, `pin`, `revisions`, `share`, `totp`, `trash`, `unpin` and `update`.
+Holds `attachments`, `create`, `delete`, `get`, `list`, `move`, `pin`, `revisions`, `share`, `totp`, `trash`, `unpin` and `update`.
+
+## `attachments`
+
+Files attached to an item.
+
+Holds `download`, `list`, `restore` and `update`.
+
+### `attachments download`
+
+Download and decrypt attachments.
+
+Naming an attachment downloads that one; naming none downloads them all. An attachment is named by its own name or by its ID.
+
+Existing files are never overwritten silently: a collision becomes "file (2).pdf" unless --force says otherwise.
+
+```
+proton pass items attachments download REF [ATTACHMENT_REF]
+```
+
+```bash
+proton pass items attachments download github.com --dest-dir .
+proton pass items attachments download github.com passport.pdf --dest ~/passport.pdf
+```
+
+| Flag | Description |
+| --- | --- |
+| `--dest string` | Write to this path, or - for stdout |
+| `--dest-dir string` | Write into this directory, keeping each item's own name |
+| `--force` | Overwrite a file that already exists |
+
+### `attachments list`
+
+List an item's attachments.
+
+--removed lists the files taken off the item instead, which are the ones `attachments restore` can bring back.
+
+```
+proton pass items attachments list REF
+```
+
+```bash
+proton pass items attachments list github.com
+proton pass items attachments list github.com --removed
+```
+
+| Flag | Description |
+| --- | --- |
+| `--removed` | List what was taken off the item rather than what is on it |
+
+### `attachments restore`
+
+Put a removed attachment back on an item.
+
+ATTACHMENT_REF is the name or ID `attachments list --removed` shows. A name that was removed more than once is refused, with the IDs to choose from.
+
+```
+proton pass items attachments restore REF ATTACHMENT_REF...
+```
+
+```bash
+proton pass items attachments restore github.com passport.pdf
+```
+
+### `attachments update`
+
+Rename an attachment.
+
+Renaming is `update --name`; there is no `rename` verb.
+
+The item is not touched, so this adds nothing to its history.
+
+```
+proton pass items attachments update REF ATTACHMENT_REF
+```
+
+```bash
+proton pass items attachments update github.com passport.pdf --name passport-2031.pdf
+```
+
+| Flag | Description |
+| --- | --- |
+| `--name string` | New name for the file |
 
 ## `create`
 
@@ -14,12 +96,15 @@ A secret is read from a file or from stdin, never from a flag value: --secret-fi
 
 --generate-password makes one instead, so a new login needs no file: it is shaped by the same flags `pass generate` takes.
 
+--attach puts a local file on the item, and needs a paid Pass plan.
+
 ```
 proton pass items create
 ```
 
 ```bash
 proton pass items create --name GitHub --username roman --url github.com --generate-password
+proton pass items create --type note --name Passport --attach ~/scans/passport.pdf
 proton pass items create --name Router --generate-password --words 5
 proton pass items create --type note --name 'Door codes' --note 'Front: 1234'
 proton pass items create --type credit-card --name 'Travel card' --holder 'Roman' --expiry 2030-04 --secret-file number=/run/secrets/card
@@ -29,6 +114,7 @@ proton pass items create --type custom --name Router --field 'Network/SSID=home'
 | Flag | Description |
 | --- | --- |
 | `--address string` | Set the address (identity) |
+| `--attach stringArray` | Attach a local file (repeatable) |
 | `--birthdate string` | Set the birthdate (identity) |
 | `--city string` | Set the city (identity) |
 | `--company string` | Set the company (identity) |
@@ -179,13 +265,15 @@ proton pass items pin github.com
 
 Earlier versions of an item.
 
-Holds `get` and `list`.
+Holds `get`, `list` and `restore`.
 
 ### `revisions get`
 
 Show one earlier version, decrypted.
 
 The password, TOTP secret and private key that revision held are printed in full, as `items get` prints the current ones.
+
+Attachments are not part of a version: `attachments list` shows the ones on the item, and `attachments list --removed` the ones taken off it.
 
 REVISION_REF is the number `revisions list` shows.
 
@@ -212,6 +300,24 @@ proton pass items revisions list REF
 ```bash
 proton pass items revisions list github.com
 proton pass items revisions list github.com --output json
+```
+
+### `revisions restore`
+
+Put an item back to an earlier version.
+
+The version is added to the history as the newest one, so nothing is lost.
+
+The item's attachments are left as they are. To bring one back, use `attachments restore`.
+
+REVISION_REF is the number `revisions list` shows.
+
+```
+proton pass items revisions restore REF REVISION_REF
+```
+
+```bash
+proton pass items revisions restore github.com 3
 ```
 
 ## `share`
@@ -343,6 +449,8 @@ A secret is read from a file or from stdin, never from a flag value: --secret-fi
 
 --generate-password replaces the password with one it makes.
 
+--attach puts a local file on the item, and needs a paid Pass plan. --detach takes one off by name or ID; it stays in the item's history.
+
 ```
 proton pass items update REF
 ```
@@ -352,16 +460,19 @@ proton pass items update GitHub --secret-file password=/run/secrets/github
 proton pass items update GitHub --secret-stdin password
 proton pass items update GitHub --username roman-16 --url github.com
 proton pass items update GitHub --generate-password
+proton pass items update Passport --attach ~/scans/visa.pdf --detach passport.pdf
 ```
 
 | Flag | Description |
 | --- | --- |
 | `--address string` | Replace the address (identity) |
+| `--attach stringArray` | Attach a local file (repeatable) |
 | `--birthdate string` | Replace the birthdate (identity) |
 | `--city string` | Replace the city (identity) |
 | `--company string` | Replace the company (identity) |
 | `--country string` | Replace the country (identity) |
 | `--county string` | Replace the county (identity) |
+| `--detach stringArray` | Remove an attachment, by name or ID (repeatable) |
 | `--display-name string` | Replace the name recipients see on mail from it (alias) |
 | `--email string` | Replace the email address (login) |
 | `--expiry string` | Replace the card expiry, YYYY-MM (credit-card) |

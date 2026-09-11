@@ -23,7 +23,7 @@ var itemTypes = []string{"login", "note", "credit-card", "wifi", "ssh-key", "ide
 
 func itemsCmd() *cobra.Command {
 	c := &cobra.Command{Use: "items", Short: "Logins, notes, cards and the rest"}
-	c.AddCommand(itemsListCmd(), itemsGetCmd(), itemsCreateCmd(), itemsUpdateCmd(),
+	c.AddCommand(attachmentsCmd(), itemsListCmd(), itemsGetCmd(), itemsCreateCmd(), itemsUpdateCmd(),
 		itemsMoveCmd(), itemsRevisionsCmd(), itemsTOTPCmd(), itemsShareCmd(),
 		itemsPinCmd("pin", "Keep items at the top of the list", ui.Pinned, true),
 		itemsPinCmd("unpin", "Stop keeping items at the top", ui.Unpinned, false),
@@ -200,6 +200,7 @@ func itemFields(it *passsvc.FullItem) []ui.Field {
 	for _, f := range it.Fields {
 		fields = append(fields, ui.Field{Label: f.Ref(), Value: f.Value})
 	}
+	fields = append(fields, attachmentFields(it.Attachments)...)
 	return append(fields, ui.Field{Label: "ID", Value: itemRef(it.Item), ID: true})
 }
 
@@ -283,6 +284,27 @@ type fields struct {
 	secrets  kit.Secrets
 	generate bool
 	gen      generator
+	// attach are local files to put on the item, and detach names the ones to
+	// take off it, which only an edit can do.
+	attach []string
+	detach []string
+}
+
+// readAttachments turns what --attach named into files ready to send, and
+// refuses one there is nothing to read, before anything reaches Proton.
+func (d *fields) readAttachments() ([]passsvc.Upload, error) { return uploads(d.attach) }
+
+// allowed refuses the files this plan will not take: an account without file
+// storage, a file over the size one may be, more than the storage left.
+func (d *fields) allowed(c *kit.Invocation, ups []passsvc.Upload) error {
+	if len(ups) == 0 {
+		return nil
+	}
+	limits, err := c.App.Pass.StorageLimits(c.Ctx)
+	if err != nil {
+		return err
+	}
+	return limits.CheckUpload(ups)
 }
 
 // secretFields are the fields --secret-file names by their own flag's name. A
@@ -353,6 +375,7 @@ func (d *fields) readSecrets(c *kit.Invocation) error {
 
 func (d *fields) register(c *cobra.Command, verb string) {
 	f := c.Flags()
+	f.StringArrayVar(&d.attach, "attach", nil, "Attach a local file (repeatable)")
 	f.StringVar(&d.nc.Name, "name", "", verb+" the item's name")
 	f.StringVar(&d.nc.Username, "username", "", verb+" the username (login)")
 	f.StringVar(&d.nc.Email, "email", "", verb+" the email address (login)")
@@ -419,12 +442,17 @@ func itemsCreateCmd() *cobra.Command {
 			"NAME is " + secretFieldNames() + ",\n" +
 			"or any name at all, which makes a hidden custom field of it.\n\n" +
 			"--generate-password makes one instead, so a new login needs no file: it is\n" +
-			"shaped by the same flags `pass generate` takes.",
-		// What a field says, and whether this kind of item has a section to put it
-		// under, are both answerable from the command line alone.
+			"shaped by the same flags `pass generate` takes.\n\n" +
+			"--attach puts a local file on the item, and needs a paid Pass plan.",
+		// What a field says, whether this kind of item has a section to put it
+		// under, and whether a file named by --attach is there to be read are all
+		// answerable from the command line alone.
 		RunE: kit.Run([]kit.Step{d.secrets.Supply, func(*kit.Invocation) error {
 			kind, err := itemType.Value()
 			if err != nil {
+				return err
+			}
+			if _, err := d.readAttachments(); err != nil {
 				return err
 			}
 			return d.checkFields(kind)
@@ -448,13 +476,22 @@ func itemsCreateCmd() *cobra.Command {
 			}
 			d.nc.Type, d.nc.WifiSecurity = kind, wifi
 			d.nc.Identity = d.identityValues()
+			files, err := d.readAttachments()
+			if err != nil {
+				return err
+			}
+			if err := d.allowed(c, files); err != nil {
+				return err
+			}
+			d.nc.Attach = reporting(c, files)
 			shareID, err := resolveVault(c, vault)
 			if err != nil {
 				return err
 			}
 			return kit.Create(c, ui.ResultSpec{
 				Action: ui.Created, Kind: "items", Name: d.nc.Name,
-				Extra: map[string]any{"type": kind},
+				Detail: carrying(len(files), 0),
+				Extra:  map[string]any{"type": kind},
 			}, func() (string, error) {
 				itemID, err := c.App.Pass.ItemCreate(c.Ctx, shareID, d.nc)
 				if err != nil {
@@ -486,11 +523,16 @@ func itemsUpdateCmd() *cobra.Command {
 			"--secret-file NAME=FILE, or --secret-stdin NAME for one of them.\n" +
 			"NAME is " + secretFieldNames() + ",\n" +
 			"or any name at all, which makes a hidden custom field of it.\n\n" +
-			"--generate-password replaces the password with one it makes.",
+			"--generate-password replaces the password with one it makes.\n\n" +
+			"--attach puts a local file on the item, and needs a paid Pass plan.\n" +
+			"--detach takes one off by name or ID; it stays in the item's history.",
 		// Whether the item has a section to put a field under depends on what
-		// kind it is, which is not known until it is read; what a field says is
-		// known now.
+		// kind it is, which is not known until it is read; what a field says, and
+		// whether a file named by --attach is there to be read, are known now.
 		RunE: kit.Run([]kit.Step{kit.StepExpand, d.secrets.Supply, func(*kit.Invocation) error {
+			if _, err := d.readAttachments(); err != nil {
+				return err
+			}
 			return d.checkFields("")
 		}}, func(c *kit.Invocation) error {
 			wifi, err := security.Value()
@@ -503,7 +545,20 @@ func itemsUpdateCmd() *cobra.Command {
 			if err := d.checkFields(""); err != nil {
 				return err
 			}
+			files, err := d.readAttachments()
+			if err != nil {
+				return err
+			}
+			if err := d.allowed(c, files); err != nil {
+				return err
+			}
 			shareID, itemID, err := resolveItem(c, c.Args[0])
+			if err != nil {
+				return err
+			}
+			// A name that is not on the item is caught here, so a dry run refuses
+			// it too and no edit lands with half of what was asked for.
+			detaching, err := detached(c, shareID, itemID, d.detach)
 			if err != nil {
 				return err
 			}
@@ -517,10 +572,13 @@ func itemsUpdateCmd() *cobra.Command {
 				},
 				Identity:    d.identityValues(),
 				ExtraFields: d.nc.ExtraFields,
+				Attach:      reporting(c, files),
+				Detach:      detaching,
 			}
 			return kit.Mutate(c, ui.ResultSpec{
 				Action: ui.Updated, Kind: "items", Count: 1, Name: d.nc.Name,
-				IDs: []string{kit.JoinPair(shareID, itemID)},
+				Detail: carrying(len(files), len(detaching)),
+				IDs:    []string{kit.JoinPair(shareID, itemID)},
 			}, func() error {
 				if err := c.App.Pass.AliasEdit(c.Ctx, shareID, itemID, a.patch); err != nil {
 					return err
@@ -530,9 +588,42 @@ func itemsUpdateCmd() *cobra.Command {
 		}),
 	}
 	d.register(c, "Replace")
+	c.Flags().StringArrayVar(&d.detach, "detach", nil,
+		"Remove an attachment, by name or ID (repeatable)")
 	a.register(c)
 	security.Register(c)
 	return c
+}
+
+// detached turns what --detach named into the IDs of the files to take off.
+func detached(c *kit.Invocation, shareID, itemID string, refs []string) ([]string, error) {
+	out := make([]string, 0, len(refs))
+	for _, reference := range refs {
+		expanded, err := kit.Expand(c.App, reference)
+		if err != nil {
+			return nil, err
+		}
+		file, err := c.App.Pass.ResolveAttachment(c.Ctx, shareID, itemID, expanded)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, file.ID)
+	}
+	return out, nil
+}
+
+// carrying is what a result says about the files an edit moved, and nothing at
+// all when it moved none.
+func carrying(added, removed int) string {
+	switch {
+	case added == 0 && removed == 0:
+		return ""
+	case removed == 0:
+		return "with " + ui.Quantity(added, "attachments")
+	case added == 0:
+		return "with " + ui.Quantity(removed, "attachments") + " removed"
+	}
+	return fmt.Sprintf("with %s added and %d removed", ui.Quantity(added, "attachments"), removed)
 }
 
 // ── removing ──
@@ -750,8 +841,52 @@ func itemsPinCmd(use, short string, action ui.Action, pinned bool) *cobra.Comman
 // whichever app it is in.
 func itemsRevisionsCmd() *cobra.Command {
 	c := &cobra.Command{Use: "revisions", Short: "Earlier versions of an item"}
-	c.AddCommand(itemsRevisionsGetCmd(), itemsRevisionsListCmd())
+	c.AddCommand(itemsRevisionsGetCmd(), itemsRevisionsListCmd(), itemsRevisionsRestoreCmd())
 	return c
+}
+
+// revisionNumber reads the number `revisions list` shows, which is what every
+// command about one earlier version takes.
+func revisionNumber(c *kit.Invocation, arg string) (int, error) {
+	revision, err := strconv.Atoi(arg)
+	if err != nil || revision < 1 {
+		return 0, kit.Fail("%q is not a revision number.", arg).
+			Hint("the number in the first column of `" + kit.Program + " pass items revisions list`")
+	}
+	return revision, nil
+}
+
+func itemsRevisionsRestoreCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "restore REF REVISION_REF",
+		Short: "Put an item back to an earlier version",
+		Long: "Put an item back to an earlier version.\n\n" +
+			"The version is added to the history as the newest one, so nothing is lost.\n\n" +
+			"The item's attachments are left as they are. To bring one back, use\n" +
+			"`attachments restore`.\n\n" +
+			"REVISION_REF is the number `revisions list` shows.",
+		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
+			revision, err := revisionNumber(c, c.Args[1])
+			if err != nil {
+				return err
+			}
+			shareID, itemID, err := resolveItem(c, c.Args[0])
+			if err != nil {
+				return err
+			}
+			was, err := c.App.Pass.RevisionGet(c.Ctx, shareID, itemID, revision)
+			if err != nil {
+				return err
+			}
+			return kit.Mutate(c, ui.ResultSpec{
+				Action: ui.Restored, Kind: "items", Count: 1, Name: was.Name,
+				Detail: "to the version from " + units.Time(was.ModifyTime),
+				IDs:    []string{kit.JoinPair(shareID, itemID)},
+			}, func() error {
+				return c.App.Pass.RevisionRestore(c.Ctx, shareID, itemID, revision)
+			})
+		}),
+	}
 }
 
 func itemsRevisionsGetCmd() *cobra.Command {
@@ -761,12 +896,13 @@ func itemsRevisionsGetCmd() *cobra.Command {
 		Long: "Show one earlier version, decrypted.\n\n" +
 			"The password, TOTP secret and private key that revision held are printed in\n" +
 			"full, as `items get` prints the current ones.\n\n" +
+			"Attachments are not part of a version: `attachments list` shows the ones on\n" +
+			"the item, and `attachments list --removed` the ones taken off it.\n\n" +
 			"REVISION_REF is the number `revisions list` shows.",
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
-			revision, err := strconv.Atoi(c.Args[1])
-			if err != nil || revision < 1 {
-				return kit.Fail("%q is not a revision number.", c.Args[1]).
-					Hint("the number in the first column of `pass items revisions list`")
+			revision, err := revisionNumber(c, c.Args[1])
+			if err != nil {
+				return err
 			}
 			shareID, itemID, err := resolveItem(c, c.Args[0])
 			if err != nil {

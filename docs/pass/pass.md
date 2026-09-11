@@ -12,7 +12,9 @@ Write the vaults you own out as a Proton Pass archive, or to stdout with --dest 
 
 This writes the same archive format Proton Pass writes, so the app can read it back.
 
-Give a passphrase and the contents are encrypted to it. Without one, the archive holds every password in the clear.
+Give a passphrase and the items are encrypted to it. Without one, the archive holds every password in the clear. Attachments are never encrypted, whether a passphrase is given or not.
+
+Attachments are included; --no-attachments leaves them out, which is much faster.
 
 Only vaults you own are included. A vault somebody shared with you is theirs to back up.
 
@@ -23,6 +25,7 @@ proton pass export
 ```bash
 proton pass export --dest pass-backup.zip --passphrase-file ~/.backup-passphrase
 proton pass export --dest pass-backup.zip
+proton pass export --dest pass-backup.zip --no-attachments
 ```
 
 | Flag | Description |
@@ -30,6 +33,7 @@ proton pass export --dest pass-backup.zip
 | `--dest string` | Write to this path, or - for stdout |
 | `--dest-dir string` | Write into this directory, keeping each item's own name |
 | `--force` | Overwrite a file that already exists |
+| `--no-attachments` | Leave attachments out, which is much faster |
 | `--passphrase-file string` | Read the passphrase that locks the file from a file |
 | `--passphrase-stdin` | Read the passphrase that locks the file from stdin |
 
@@ -73,6 +77,8 @@ Read a Proton Pass archive back in, or one on stdin with -.
 A vault in the file lands in the vault of that name, which is created if it does not exist.
 
 Items are always added, never matched against what is already there, so reading the same file twice creates duplicates.
+
+The attachments in the archive are put back on their items, which needs a paid Pass plan. Whatever cannot be put back is named once the items have landed.
 
 ```
 proton pass import PATH

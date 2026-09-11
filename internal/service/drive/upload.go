@@ -12,6 +12,7 @@ import (
 	"time"
 
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	"github.com/roman-16/proton-cli/internal/mimetype"
 	"github.com/roman-16/proton-cli/internal/progress"
 	"github.com/roman-16/proton-cli/internal/proton"
 )
@@ -62,7 +63,9 @@ func (s *Service) Upload(ctx context.Context, dc *Context, plan *UploadPlan, r i
 		return nil
 	}
 	if opts.MIMEType == "" {
-		opts.MIMEType = "application/octet-stream"
+		// A file is typed by its name here, as it is in Drive's own client, so
+		// that what other clients show of it is what it is.
+		opts.MIMEType = mimetype.ByName(plan.Name)
 	}
 
 	by, err := s.author(ctx, dc)

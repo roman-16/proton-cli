@@ -53,6 +53,7 @@ type Kind string
 
 const (
 	KindAddress    Kind = "address"
+	KindAttachment Kind = "attachment"
 	KindCalendar   Kind = "calendar"
 	KindContact    Kind = "contact"
 	KindEvent      Kind = "event"

@@ -252,7 +252,7 @@ const Addresses = "addresses"
 // subject, a name, a path or an email address.
 var Placeholders = map[string]Placeholder{
 	"ALIAS_CONTACT_REF": {Means: "an address the addressed alias may write to", Picks: PicksHolding},
-	"ATTACHMENT_REF":    {Means: "an attachment on the addressed message", Picks: PicksHolding},
+	"ATTACHMENT_REF":    {Means: "an attachment on the addressed message or item", Picks: PicksHolding},
 	"COMMAND":           {Means: "a command, as you would type it"},
 	"CONTACT_REF":       {Means: "a contact, when the command already addresses something else", Picks: "contacts"},
 	"DEST":              {Means: "a Drive folder to write into"},
@@ -264,7 +264,7 @@ var Placeholders = map[string]Placeholder{
 	"PATH":              {Means: "a Drive path that does not exist yet"},
 	"PHOTO_REF":         {Means: "a photo, when the command already addresses an album", Picks: "drive photos"},
 	"REF":               {Means: "a full ID, a short ID, or a human handle", Picks: PicksAddressed},
-	"REVISION_REF":      {Means: "a revision of the addressed file", Picks: PicksHolding},
+	"REVISION_REF":      {Means: "a revision of the addressed file or item", Picks: PicksHolding},
 	"SHELL":             {Means: "a shell to write the script for"},
 	"SRC":               {Means: "a local file or directory to read"},
 	"URL":               {Means: "a public link, as it was sent to you"},

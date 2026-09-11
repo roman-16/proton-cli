@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package proton_pass_file_v1;
+
+option go_package = "github.com/roman-16/proton-cli/internal/proto";
+
+message FileMetadata {
+	string name = 1;
+	string mime_type = 2;
+}

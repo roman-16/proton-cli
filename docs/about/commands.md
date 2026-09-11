@@ -220,6 +220,10 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton pass invitations accept`](../pass/invitations.md#accept) | Take what somebody offered you |
 | [`proton pass invitations decline`](../pass/invitations.md#decline) | Turn down what somebody offered you |
 | [`proton pass invitations list`](../pass/invitations.md#list) | List what other people have offered you |
+| [`proton pass items attachments download`](../pass/items.md#attachments-download) | Download and decrypt attachments |
+| [`proton pass items attachments list`](../pass/items.md#attachments-list) | List an item's attachments |
+| [`proton pass items attachments restore`](../pass/items.md#attachments-restore) | Put a removed attachment back on an item |
+| [`proton pass items attachments update`](../pass/items.md#attachments-update) | Rename an attachment |
 | [`proton pass items create`](../pass/items.md#create) | Create an item |
 | [`proton pass items delete`](../pass/items.md#delete) | Delete items permanently |
 | [`proton pass items get`](../pass/items.md#get) | Show one item, decrypted |
@@ -228,6 +232,7 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton pass items pin`](../pass/items.md#pin) | Keep items at the top of the list |
 | [`proton pass items revisions get`](../pass/items.md#revisions-get) | Show one earlier version, decrypted |
 | [`proton pass items revisions list`](../pass/items.md#revisions-list) | Show what an item used to be |
+| [`proton pass items revisions restore`](../pass/items.md#revisions-restore) | Put an item back to an earlier version |
 | [`proton pass items share add`](../pass/items.md#share-add) | Offer one item to somebody |
 | [`proton pass items share get`](../pass/items.md#share-get) | Show how an item is shared |
 | [`proton pass items share remove`](../pass/items.md#share-remove) | Take somebody's access to an item away |

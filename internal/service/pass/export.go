@@ -6,11 +6,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"os"
 	"strings"
 
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/roman-16/proton-cli/internal/progress"
 	pb "github.com/roman-16/proton-cli/internal/service/pass/proto"
 )
 
@@ -28,9 +31,13 @@ import (
 // is what the app produces: a field it has no value for is written empty rather
 // than left out, and a reader that expects one finds it.
 
-// archiveDir is the folder inside the zip. Proton names it after the app, and
-// its importer looks for exactly this path.
-const archiveDir = "Proton Pass"
+// archiveDir is the folder inside the zip, and archiveFiles the folder inside
+// that one holding the attachments. Proton names them after the app, and its
+// importer looks for exactly these paths.
+const (
+	archiveDir   = "Proton Pass"
+	archiveFiles = archiveDir + "/files"
+)
 
 // exportVersion is what the document claims to be. Proton's importer compares it
 // against the versions whose shape differed, so it has to be at least the one
@@ -70,7 +77,9 @@ type ExportedItem struct {
 	ContentFormatVersion int          `json:"contentFormatVersion"`
 	CreateTime           int64        `json:"createTime"`
 	ModifyTime           int64        `json:"modifyTime"`
-	Files                []string     `json:"files,omitempty"`
+	// Files are the item's attachments, named as they are inside the archive.
+	// An item with none carries an empty list, which is what the app writes.
+	Files []string `json:"files"`
 }
 
 // ExportedData is an item's decrypted content: what kind it is, what it is
@@ -94,51 +103,93 @@ type ExportedMetadata struct {
 // dropped.
 var exportJSON = protojson.MarshalOptions{EmitUnpopulated: true, UseProtoNames: false}
 
-// Export gathers the vaults this account owns, and their items, into the
-// document Proton Pass reads.
+// ExportPlan is everything an archive will hold, worked out before any of it is
+// written: the document, and the attachments that go beside it.
+type ExportPlan struct {
+	Doc *ExportDocument
+	// Files are the attachments to write, in the order they are written.
+	Files []ExportFile
+	// SkippedVaults is how many vaults were left out because somebody else owns
+	// them, since an archive quietly smaller than the account is worth a word.
+	SkippedVaults int
+}
+
+// ExportFile is one attachment on its way into an archive.
+type ExportFile struct {
+	ShareID string
+	ItemID  string
+	// Entry is where it lands inside the archive.
+	Entry string
+	File  Attachment
+}
+
+// Items is how many items the archive will hold.
+func (p *ExportPlan) Items() int {
+	var n int
+	for _, v := range p.Doc.Vaults {
+		n += len(v.Items)
+	}
+	return n
+}
+
+// PlanExport gathers the vaults this account owns, and their items, into the
+// document Proton Pass reads, and names the attachments that travel with them.
 //
 // What somebody else shared is theirs to back up: it stays out, as it does in
 // Proton's own export, so restoring this file cannot turn a vault you were let
-// into to a second copy of it under your name. Skipped says how many were left
-// out, because an archive quietly smaller than the account is worth a word.
-func (s *Service) Export(ctx context.Context, userID string) (doc *ExportDocument, skipped int, err error) {
+// into to a second copy of it under your name.
+func (s *Service) PlanExport(ctx context.Context, userID string, withFiles bool) (*ExportPlan, error) {
 	vaults, err := s.VaultsList(ctx)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 	items, err := s.itemsFull(ctx, "")
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 
-	doc = &ExportDocument{
+	plan := &ExportPlan{Doc: &ExportDocument{
 		UserID:  userID,
 		Vaults:  make(map[string]*ExportedVault, len(vaults)),
 		Version: exportVersion,
-	}
+	}}
 	for _, v := range vaults {
 		if !v.Owner {
-			skipped++
+			plan.SkippedVaults++
 			continue
 		}
-		doc.Vaults[v.ShareID] = &ExportedVault{
+		plan.Doc.Vaults[v.ShareID] = &ExportedVault{
 			Name: v.Name, Description: v.Description,
 			Display: ExportedDisplay{Color: v.Color, Icon: v.Icon},
 			Items:   []ExportedItem{},
 		}
 	}
 	for _, it := range items {
-		vault, ok := doc.Vaults[it.ShareID]
+		vault, ok := plan.Doc.Vaults[it.ShareID]
 		if !ok || it.raw == nil {
 			continue
 		}
 		exported, err := exportItem(it)
 		if err != nil {
-			return nil, 0, err
+			return nil, err
+		}
+		if withFiles && it.hasAttachments {
+			files, err := s.Attachments(ctx, it.ShareID, it.ItemID)
+			if err != nil {
+				return nil, err
+			}
+			for _, file := range files {
+				entry := ExportName(it.ShareID, file)
+				exported.Files = append(exported.Files, entry)
+				plan.Files = append(plan.Files, ExportFile{
+					ShareID: it.ShareID, ItemID: it.ItemID,
+					Entry: entry, File: file,
+				})
+			}
 		}
 		vault.Items = append(vault.Items, *exported)
 	}
-	return doc, skipped, nil
+	return plan, nil
 }
 
 // exportItem renders one item the way the app writes it.
@@ -163,6 +214,7 @@ func exportItem(it FullItem) (*ExportedItem, error) {
 		},
 		State: it.State, ContentFormatVersion: contentFormatVersion,
 		CreateTime: it.CreateTime, ModifyTime: it.ModifyTime,
+		Files: []string{},
 	}
 	// An alias carries the address Proton gave it, and only an alias has one, so
 	// the field is null rather than empty for everything else.
@@ -244,98 +296,169 @@ func importTypeName(kind string) string {
 	return kind
 }
 
-// Archive packs the document into the zip Proton Pass reads.
+// WriteArchive writes the zip Proton Pass reads.
+//
+// The attachments go in first and the document last, each file streamed out of
+// Proton and into the archive rather than held whole, so an account with more
+// attachments than memory still has a backup. An attachment that will not come
+// stops the export: an archive quietly missing a file is worse than no archive.
 //
 // With a passphrase the JSON is encrypted to it and stored as data.pgp, which is
 // what Proton's importer looks for first; without one it is stored as plain
-// data.json. Everything else about the archive is the same either way.
-func Archive(doc *ExportDocument, passphrase string) ([]byte, error) {
-	doc.Encrypted = passphrase != ""
-	body, err := json.Marshal(doc)
+// data.json. The attachments are not encrypted either way, as the app leaves
+// them.
+func (s *Service) WriteArchive(ctx context.Context, w io.Writer, plan *ExportPlan, passphrase string, sink func(index, total int) progress.Sink) error {
+	z := zip.NewWriter(w)
+	for i, f := range plan.Files {
+		// An attachment is stored as it is. What people attach is mostly already
+		// compressed, so squeezing it again would spend the time a large backup
+		// has least of and save nothing.
+		entry, err := z.CreateHeader(&zip.FileHeader{
+			Name: archiveFiles + "/" + f.Entry, Method: zip.Store,
+		})
+		if err != nil {
+			return err
+		}
+		var report progress.Sink
+		if sink != nil {
+			report = sink(i+1, len(plan.Files))
+		}
+		if err := s.AttachmentDownload(ctx, f.ShareID, f.ItemID, f.File, entry, report); err != nil {
+			return fmt.Errorf("%s could not be read, so the archive would be short of it: %w", f.File.Name, err)
+		}
+	}
+
+	plan.Doc.Encrypted = passphrase != ""
+	body, err := json.Marshal(plan.Doc)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	name := "data.json"
 	if passphrase != "" {
 		armored, err := encryptExport(body, passphrase)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		name, body = "data.pgp", []byte(armored)
 	}
-
-	var buf bytes.Buffer
-	z := zip.NewWriter(&buf)
-	w, err := z.Create(archiveDir + "/" + name)
+	entry, err := z.Create(archiveDir + "/" + name)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	if _, err := w.Write(body); err != nil {
-		return nil, err
+	if _, err := entry.Write(body); err != nil {
+		return err
 	}
-	if err := z.Close(); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+	return z.Close()
 }
 
-// Unarchive takes the document back out of an archive, or reads a bare JSON
-// document as it is.
+// Archive is a backup opened for reading: the document, and the attachments
+// beside it, which are read one at a time rather than into memory.
+type Archive struct {
+	doc   *ExportDocument
+	zip   *zip.ReadCloser
+	files map[string]*zip.File
+}
+
+// OpenArchive opens a backup, or a bare JSON document as it is.
 //
-// askPassphrase is called only when the archive turns out to be encrypted, so a
+// askPassphrase is called only when the document turns out to be encrypted, so a
 // plain one is read without asking for anything.
-func Unarchive(raw []byte, askPassphrase func() (string, error)) (*ExportDocument, error) {
-	body, encrypted, err := archiveBody(raw)
+func OpenArchive(path string, askPassphrase func() (string, error)) (*Archive, error) {
+	a := &Archive{files: map[string]*zip.File{}}
+	body, encrypted, err := a.read(path)
 	if err != nil {
+		_ = a.Close()
 		return nil, err
 	}
 	if encrypted {
 		passphrase, err := askPassphrase()
 		if err != nil {
+			_ = a.Close()
 			return nil, err
 		}
 		body, err = decryptExport(string(body), passphrase)
 		if err != nil {
+			_ = a.Close()
 			return nil, fmt.Errorf("could not open the archive with that passphrase")
 		}
 	}
 	var doc ExportDocument
 	if err := json.Unmarshal(body, &doc); err != nil {
+		_ = a.Close()
 		return nil, fmt.Errorf("this is not a Proton Pass export")
 	}
 	if len(doc.Vaults) == 0 {
+		_ = a.Close()
 		return nil, fmt.Errorf("the export holds no vaults")
 	}
-	return &doc, nil
+	a.doc = &doc
+	return a, nil
 }
 
-// archiveBody finds the document inside whatever was handed over: an archive
-// written by Proton Pass, or the JSON on its own.
-func archiveBody(raw []byte) (body []byte, encrypted bool, err error) {
-	z, zipErr := zip.NewReader(bytes.NewReader(raw), int64(len(raw)))
-	if zipErr != nil {
-		// Not an archive. A bare document is either the JSON itself or the
-		// encrypted form of it, and PGP says which in its first line.
-		if bytes.HasPrefix(bytes.TrimSpace(raw), []byte("-----BEGIN PGP MESSAGE-----")) {
-			return raw, true, nil
-		}
-		return raw, false, nil
+// Document is what the archive says the account held.
+func (a *Archive) Document() *ExportDocument { return a.doc }
+
+// Close releases the archive.
+func (a *Archive) Close() error {
+	if a.zip == nil {
+		return nil
 	}
-	for _, f := range z.File {
-		name := f.Name
-		if !strings.HasSuffix(name, "data.json") && !strings.HasSuffix(name, "data.pgp") {
-			continue
-		}
-		r, err := f.Open()
+	return a.zip.Close()
+}
+
+// Attachment describes one file inside the archive, by the name an item's entry
+// gives it.
+func (a *Archive) Attachment(entry string) (Upload, bool) {
+	f, ok := a.files[entry]
+	if !ok {
+		return Upload{}, false
+	}
+	return Upload{
+		Name: ImportName(f.Name),
+		Size: int64(f.UncompressedSize64),
+		Open: func() (io.ReadCloser, error) { return f.Open() },
+	}, true
+}
+
+// read finds the document inside whatever was handed over: an archive written
+// by Proton Pass, or the JSON on its own. The attachments beside it are noted by
+// name, and opened only when one is asked for.
+func (a *Archive) read(path string) (body []byte, encrypted bool, err error) {
+	z, zipErr := zip.OpenReader(path)
+	if zipErr != nil {
+		raw, err := os.ReadFile(path)
 		if err != nil {
 			return nil, false, err
 		}
-		defer func() { _ = r.Close() }()
-		var buf bytes.Buffer
-		if _, err := buf.ReadFrom(r); err != nil {
-			return nil, false, err
-		}
-		return buf.Bytes(), strings.HasSuffix(name, ".pgp"), nil
+		// Not an archive. A bare document is either the JSON itself or the
+		// encrypted form of it, and PGP says which in its first line.
+		return raw, bytes.HasPrefix(bytes.TrimSpace(raw), []byte("-----BEGIN PGP MESSAGE-----")), nil
 	}
-	return nil, false, fmt.Errorf("the archive holds no Proton Pass export")
+	a.zip = z
+	var document *zip.File
+	for _, f := range z.File {
+		switch {
+		case strings.HasSuffix(f.Name, "data.json"), strings.HasSuffix(f.Name, "data.pgp"):
+			if document == nil {
+				document = f
+			}
+		default:
+			if base := f.Name[strings.LastIndexAny(f.Name, `/\`)+1:]; base != "" {
+				a.files[base] = f
+			}
+		}
+	}
+	if document == nil {
+		return nil, false, fmt.Errorf("the archive holds no Proton Pass export")
+	}
+	r, err := document.Open()
+	if err != nil {
+		return nil, false, err
+	}
+	defer func() { _ = r.Close() }()
+	var buf bytes.Buffer
+	if _, err := buf.ReadFrom(r); err != nil {
+		return nil, false, err
+	}
+	return buf.Bytes(), strings.HasSuffix(document.Name, ".pgp"), nil
 }

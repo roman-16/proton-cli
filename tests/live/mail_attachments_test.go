@@ -73,6 +73,23 @@ func TestMailAttachmentsDownloadCollisionExplicitErrors(t *testing.T) {
 	}
 }
 
+// An attachment is named by its own name as readily as by its ID, which is what
+// a listing puts in front of somebody.
+func TestMailAttachmentsDownloadByName(t *testing.T) {
+	msgID, _, _, attName := attachedMail(t)
+
+	dir := t.TempDir()
+	runOK(t, "mail", "messages", "attachments", "download", "--dest-dir", dir, msgID, attName)
+
+	info, err := os.Stat(filepath.Join(dir, attName))
+	if err != nil {
+		t.Fatalf("the attachment named by its own name was not saved: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Errorf("attachment %q is empty", attName)
+	}
+}
+
 func TestMailAttachmentsDownloadForce(t *testing.T) {
 	msgID, _, attID, _ := attachedMail(t)
 

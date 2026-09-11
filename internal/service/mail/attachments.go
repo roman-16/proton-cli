@@ -7,7 +7,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-	"mime"
 	"mime/multipart"
 	"os"
 	"path/filepath"
@@ -16,7 +15,10 @@ import (
 
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
 	"github.com/roman-16/proton-cli/internal/errs"
+	"github.com/roman-16/proton-cli/internal/mimetype"
 	"github.com/roman-16/proton-cli/internal/proton"
+	"github.com/roman-16/proton-cli/internal/ref"
+	"github.com/roman-16/proton-cli/internal/units"
 )
 
 // ConversationAttachment carries its parent MessageID so callers can
@@ -75,13 +77,47 @@ func (s *Service) AttachmentsList(ctx context.Context, msgID string, includeInli
 	return out, nil
 }
 
-func (s *Service) AttachmentDownload(ctx context.Context, msgID, attID string) ([]byte, string, error) {
+// sealedAttachment is one attachment as a message carries it, with the key
+// packets that open its contents.
+type sealedAttachment struct {
+	ID, Name, KeyPackets string
+	Size                 int64
+}
+
+// MatchAttachment finds the attachment a reference names: the ID outright, or
+// the name regardless of case. A name two of them answer to is refused with the
+// IDs to choose from, rather than guessed at.
+//
+// describe is how the caller's own kind of attachment says what it is, so the
+// one on a message, the one in a thread and the one on a draft are all named the
+// same way.
+func MatchAttachment[T any](reference string, atts []T, describe func(T) Attachment) (T, error) {
+	for _, a := range atts {
+		if describe(a).ID == reference {
+			return a, nil
+		}
+	}
+	matches := make([]T, 0, 1)
+	for _, a := range atts {
+		if strings.EqualFold(describe(a).Name, reference) {
+			matches = append(matches, a)
+		}
+	}
+	return ref.Pick("attachment", reference, matches,
+		func(a T) string { return describe(a).ID },
+		func(a T) string {
+			at := describe(a)
+			return fmt.Sprintf("%s (%s)", at.Name, units.Size(at.Size))
+		})
+}
+
+// AttachmentDownload decrypts one attachment of a message, named by its ID or
+// by its own name.
+func (s *Service) AttachmentDownload(ctx context.Context, msgID, reference string) ([]byte, string, error) {
 	var r struct {
 		Message struct {
 			AddressID   string
-			Attachments []struct {
-				ID, Name, KeyPackets string
-			}
+			Attachments []sealedAttachment
 		}
 	}
 	u, err := s.keys.Alongside(ctx, func(ctx context.Context) error {
@@ -90,15 +126,16 @@ func (s *Service) AttachmentDownload(ctx context.Context, msgID, attID string) (
 	if err != nil {
 		return nil, "", err
 	}
-	var keyPackets, name string
-	for _, a := range r.Message.Attachments {
-		if a.ID == attID {
-			keyPackets, name = a.KeyPackets, a.Name
-			break
-		}
+	wanted, err := MatchAttachment(reference, r.Message.Attachments,
+		func(a sealedAttachment) Attachment {
+			return Attachment{ID: a.ID, Name: a.Name, Size: a.Size}
+		})
+	if err != nil {
+		return nil, "", err
 	}
+	attID, keyPackets, name := wanted.ID, wanted.KeyPackets, wanted.Name
 	if keyPackets == "" {
-		return nil, "", &errs.NotFound{Kind: "attachment", Ref: attID}
+		return nil, "", &errs.NotFound{Kind: "attachment", Ref: reference}
 	}
 	rings, ok := u.AddrRings(r.Message.AddressID)
 	if !ok {
@@ -124,8 +161,8 @@ func (s *Service) AttachmentDownload(ctx context.Context, msgID, attID string) (
 	return dec.GetBinary(), name, nil
 }
 
-// ReadLocalAttachment reads a file into a LocalAttachment, resolving its MIME
-// type from the extension. inline marks an image to embed in an HTML body.
+// ReadLocalAttachment reads a file into a LocalAttachment, typed by its name.
+// inline marks an image to embed in an HTML body.
 func ReadLocalAttachment(path string, inline bool) (LocalAttachment, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -133,17 +170,10 @@ func ReadLocalAttachment(path string, inline bool) (LocalAttachment, error) {
 	}
 	return LocalAttachment{
 		Filename: filepath.Base(path),
-		MIMEType: mimeTypeForPath(path),
+		MIMEType: mimetype.ByName(path),
 		Data:     data,
 		Inline:   inline,
 	}, nil
-}
-
-func mimeTypeForPath(path string) string {
-	if t := mime.TypeByExtension(filepath.Ext(path)); t != "" {
-		return t
-	}
-	return "application/octet-stream"
 }
 
 // assignInlineContentIDs gives every inline attachment a Content-ID and appends

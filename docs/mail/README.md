@@ -155,8 +155,11 @@ Snooze works on **threads**, not messages: a conversation leaves the inbox as a 
 ```bash
 proton mail messages attachments list REF
 proton mail messages attachments download REF --dest-dir ./attachments/
+proton mail messages attachments download REF invoice-2291.pdf --dest-dir .
 proton mail conversations attachments download REF --dest-dir ./thread/
 ```
+
+Naming an attachment downloads that one, by its own name or by its ID; naming none downloads them all.
 
 Existing files are never overwritten silently: names collide into `file (2).pdf`, or pass `--force`. `--include-inline` covers embedded images too.
 

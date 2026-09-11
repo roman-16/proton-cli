@@ -24,6 +24,7 @@ proton mail messages attachments download REF [ATTACHMENT_REF]
 
 ```bash
 proton mail messages attachments download 'Invoice #2291' --dest-dir .
+proton mail messages attachments download 'Invoice #2291' invoice-2291.pdf --dest-dir .
 proton mail messages attachments download 5bH2mQxK kQ81mDx4 --dest invoice.pdf
 ```
 

@@ -1,8 +1,10 @@
 package pass
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -13,14 +15,7 @@ import (
 // the identifiers and secrets replaced. The point of the format is that Proton
 // can read what this writes and this can read what Proton wrote, so the file
 // Proton wrote is what the reader is held to.
-func protonExport(t *testing.T) []byte {
-	t.Helper()
-	raw, err := os.ReadFile("testdata/protonpass-export.zip")
-	if err != nil {
-		t.Fatalf("read the fixture: %v", err)
-	}
-	return raw
-}
+const protonExport = "testdata/protonpass-export.zip"
 
 func neverAsked(t *testing.T) func() (string, error) {
 	t.Helper()
@@ -30,11 +25,41 @@ func neverAsked(t *testing.T) func() (string, error) {
 	}
 }
 
-func TestAnArchiveProtonWroteIsRead(t *testing.T) {
-	doc, err := Unarchive(protonExport(t), neverAsked(t))
+// opened reads an archive, or a bare document, from a file the test names.
+func opened(t *testing.T, path string, ask func() (string, error)) *Archive {
+	t.Helper()
+	a, err := OpenArchive(path, ask)
 	if err != nil {
-		t.Fatalf("Unarchive: %v", err)
+		t.Fatalf("OpenArchive(%s): %v", path, err)
 	}
+	t.Cleanup(func() { _ = a.Close() })
+	return a
+}
+
+// written puts bytes where an archive can be opened from, which is how a test
+// hands over a document it built itself.
+func written(t *testing.T, name string, body []byte) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), name)
+	if err := os.WriteFile(path, body, 0o600); err != nil {
+		t.Fatalf("write %s: %v", name, err)
+	}
+	return path
+}
+
+// archived is the zip an export of this document would write, with no account
+// to read attachments from and none in the document.
+func archived(t *testing.T, doc *ExportDocument, passphrase string) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	if err := (&Service{}).WriteArchive(t.Context(), &buf, &ExportPlan{Doc: doc}, passphrase, nil); err != nil {
+		t.Fatalf("WriteArchive: %v", err)
+	}
+	return buf.Bytes()
+}
+
+func TestAnArchiveProtonWroteIsRead(t *testing.T) {
+	doc := opened(t, protonExport, neverAsked(t)).Document()
 	if len(doc.Vaults) != 3 {
 		t.Errorf("read %d vaults, want 3", len(doc.Vaults))
 	}
@@ -67,10 +92,7 @@ func TestAnArchiveProtonWroteIsRead(t *testing.T) {
 
 // What a login holds has to arrive, not just the item around it.
 func TestALoginsContentSurvivesTheTrip(t *testing.T) {
-	doc, err := Unarchive(protonExport(t), neverAsked(t))
-	if err != nil {
-		t.Fatalf("Unarchive: %v", err)
-	}
+	doc := opened(t, protonExport, neverAsked(t)).Document()
 	var found bool
 	for _, v := range doc.Vaults {
 		for _, item := range v.Items {
@@ -167,9 +189,15 @@ func TestAnExportWritesEveryFieldEvenTheEmptyOnes(t *testing.T) {
 			t.Errorf("the content leaves out %s: %s", want, exported.Data.Content)
 		}
 	}
-	// An item with no custom fields carries an empty list, not a null.
+	// An item with no custom fields carries an empty list, not a null. So does
+	// one with no attachments.
 	if string(exported.Data.ExtraFields) != "[]" {
 		t.Errorf("extraFields = %s, want []", exported.Data.ExtraFields)
+	}
+	if body, err := json.Marshal(exported); err != nil {
+		t.Fatalf("marshal: %v", err)
+	} else if !strings.Contains(string(body), `"files":[]`) {
+		t.Errorf("the item leaves out its files: %s", body)
 	}
 	// Only an alias has an address, so everything else says so with a null.
 	if exported.AliasEmail != nil {
@@ -184,24 +212,19 @@ func TestAnEncryptedArchiveNeedsItsPassphrase(t *testing.T) {
 		Vaults:  map[string]*ExportedVault{"s-1": {Name: "Personal", Items: []ExportedItem{}}},
 		Version: exportVersion,
 	}
-	raw, err := Archive(doc, "correct horse")
-	if err != nil {
-		t.Fatalf("Archive: %v", err)
-	}
+	raw := archived(t, doc, "correct horse")
 	if !doc.Encrypted {
 		t.Error("the document does not say it is encrypted")
 	}
 	if strings.Contains(string(raw), "Personal") {
 		t.Error("the vault name is readable in an encrypted archive")
 	}
+	path := written(t, "locked.zip", raw)
 
-	if _, err := Unarchive(raw, func() (string, error) { return "wrong", nil }); err == nil {
+	if _, err := OpenArchive(path, func() (string, error) { return "wrong", nil }); err == nil {
 		t.Error("the wrong passphrase opened the archive")
 	}
-	back, err := Unarchive(raw, func() (string, error) { return "correct horse", nil })
-	if err != nil {
-		t.Fatalf("Unarchive: %v", err)
-	}
+	back := opened(t, path, func() (string, error) { return "correct horse", nil }).Document()
 	if back.Vaults["s-1"].Name != "Personal" {
 		t.Errorf("the vault came back as %v", back.Vaults["s-1"])
 	}
@@ -218,10 +241,7 @@ func TestABareDocumentIsReadWithoutAnArchive(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	back, err := Unarchive(body, neverAsked(t))
-	if err != nil {
-		t.Fatalf("Unarchive: %v", err)
-	}
+	back := opened(t, written(t, "data.json", body), neverAsked(t)).Document()
 	if back.Vaults["s-1"].Name != "Personal" {
 		t.Errorf("the vault came back as %v", back.Vaults["s-1"])
 	}
@@ -229,8 +249,12 @@ func TestABareDocumentIsReadWithoutAnArchive(t *testing.T) {
 
 func TestSomethingThatIsNotAnExportIsRefused(t *testing.T) {
 	for _, raw := range []string{"", "{}", "not json at all", `{"vaults":{}}`} {
-		if _, err := Unarchive([]byte(raw), neverAsked(t)); err == nil {
+		path := written(t, "whatever.json", []byte(raw))
+		if _, err := OpenArchive(path, neverAsked(t)); err == nil {
 			t.Errorf("%q was read as an export", raw)
 		}
+	}
+	if _, err := OpenArchive(filepath.Join(t.TempDir(), "missing.zip"), neverAsked(t)); err == nil {
+		t.Error("a file that is not there was read as an export")
 	}
 }

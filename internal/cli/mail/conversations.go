@@ -442,12 +442,14 @@ func convAttachmentsDownloadCmd() *cobra.Command {
 				return wrongTable(err, "attachments download")
 			}
 			if one {
-				for _, at := range list {
-					if at.ID == c.Args[1] {
-						return downloadOne(c, at.MessageID, at.ID, &dest)
-					}
+				at, err := mailsvc.MatchAttachment(c.Args[1], list,
+					func(a mailsvc.ConversationAttachment) mailsvc.Attachment {
+						return mailsvc.Attachment{ID: a.ID, Name: a.Name, Size: a.Size}
+					})
+				if err != nil {
+					return err
 				}
-				return kit.Fail("No attachment %s in that thread.", c.Args[1]).Exit(3)
+				return downloadOne(c, at.MessageID, at.ID, &dest)
 			}
 			if !includeInline {
 				kept := list[:0]

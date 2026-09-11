@@ -99,12 +99,16 @@ GET /pass/v1/share/{id}/alias/{id}/contact
 GET /pass/v1/share/{id}/invite
 GET /pass/v1/share/{id}/item
 GET /pass/v1/share/{id}/item/{id}
+GET /pass/v1/share/{id}/item/{id}/file/{id}/chunk/{id}
+GET /pass/v1/share/{id}/item/{id}/files
 GET /pass/v1/share/{id}/item/{id}/key
 GET /pass/v1/share/{id}/item/{id}/key/latest
 GET /pass/v1/share/{id}/item/{id}/revision
+GET /pass/v1/share/{id}/item/{id}/revisions/files
 GET /pass/v1/share/{id}/key
 GET /pass/v1/share/{id}/user
 GET /pass/v1/share/{id}/user/item/{id}
+GET /pass/v1/user/access
 GET /pass/v1/user/alias/domain
 GET /pass/v1/user/alias/mailbox
 GET /pass/v1/user/srp
@@ -155,6 +159,8 @@ POST /mail/v4/messages
 POST /mail/v4/messages/apply-filters
 POST /mail/v4/messages/{id}
 POST /mail/v4/messages/{id}/cancel_send
+POST /pass/v1/file
+POST /pass/v1/file/{id}/chunk
 POST /pass/v1/invite/{id}
 POST /pass/v1/share/{id}/alias/custom
 POST /pass/v1/share/{id}/alias/{id}/contact
@@ -163,6 +169,8 @@ POST /pass/v1/share/{id}/invite
 POST /pass/v1/share/{id}/item
 POST /pass/v1/share/{id}/item/trash
 POST /pass/v1/share/{id}/item/untrash
+POST /pass/v1/share/{id}/item/{id}/file/{id}/restore
+POST /pass/v1/share/{id}/item/{id}/link_files
 POST /pass/v1/share/{id}/item/{id}/pin
 POST /pass/v1/share/{id}/item/{id}/public_link
 POST /pass/v1/user/alias/mailbox
@@ -227,6 +235,7 @@ PUT /pass/v1/share/{id}/alias/{id}/name
 PUT /pass/v1/share/{id}/alias/{id}/status
 PUT /pass/v1/share/{id}/item/share
 PUT /pass/v1/share/{id}/item/{id}
+PUT /pass/v1/share/{id}/item/{id}/file/{id}/metadata
 PUT /pass/v1/share/{id}/user/{id}
 PUT /pass/v1/user/alias/settings/default_mailbox_id
 PUT /pass/v1/vault/{id}

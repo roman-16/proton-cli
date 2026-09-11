@@ -404,6 +404,7 @@ var flagMeanings = map[string]string{
 	"reddit":                 "a Reddit handle",
 	"reinstall":              "install again even if already current",
 	"remind":                 "a reminder before the start",
+	"removed":                "list what was taken away rather than what is there",
 	"render":                 "which representation of a message body to print",
 	"repeat":                 "how a schedule repeats",
 	"revoke":                 "also invalidate the session at Proton",
