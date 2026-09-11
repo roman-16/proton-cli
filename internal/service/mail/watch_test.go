@@ -7,7 +7,7 @@ import (
 func makeBatch(messages ...struct {
 	ID      string
 	Action  int
-	Message *rawEventMessage
+	Message *rawListMessage
 }) eventBatch {
 	return eventBatch{Messages: messages}
 }
@@ -15,21 +15,19 @@ func makeBatch(messages ...struct {
 func event(id string, action, unread int, flags int64, labels []string, conv string) struct {
 	ID      string
 	Action  int
-	Message *rawEventMessage
+	Message *rawListMessage
 } {
 	return struct {
 		ID      string
 		Action  int
-		Message *rawEventMessage
+		Message *rawListMessage
 	}{
 		ID: id, Action: action,
-		Message: &rawEventMessage{
-			rawListMessage: rawListMessage{
-				ID: id, ConversationID: conv, Subject: "Subject " + id, Unread: unread,
-				Sender:   struct{ Name, Address string }{Name: "Fastmail", Address: "billing@fastmail.com"},
-				LabelIDs: labels,
-			},
-			Flags: flags,
+		Message: &rawListMessage{
+			ID: id, ConversationID: conv, Subject: "Subject " + id, Unread: unread,
+			Sender:   struct{ Name, Address string }{Name: "Fastmail", Address: "billing@fastmail.com"},
+			LabelIDs: labels,
+			Flags:    flags,
 		},
 	}
 }
@@ -71,12 +69,10 @@ func TestArrivalsSkipReadAndOtherFolders(t *testing.T) {
 // The narrowed filters reach the same substrings a listing's --from and
 // --subject do.
 func TestMatchesHonoursFromAndSubject(t *testing.T) {
-	m := &rawEventMessage{
-		rawListMessage: rawListMessage{
-			Subject:  "Invoice #2291 ready",
-			Sender:   struct{ Name, Address string }{Name: "Fastmail Billing", Address: "billing@fastmail.com"},
-			LabelIDs: []string{labelInbox},
-		},
+	m := &rawListMessage{
+		Subject:  "Invoice #2291 ready",
+		Sender:   struct{ Name, Address string }{Name: "Fastmail Billing", Address: "billing@fastmail.com"},
+		LabelIDs: []string{labelInbox},
 	}
 
 	if !m.matches(inbox()) {

@@ -79,26 +79,29 @@ var (
 	Unstarred    = Action{"Unstarred", "unstar", "unstarred", Ordinary}
 	MarkedRead   = Action{"Marked", "mark", "marked_read", Ordinary}
 	MarkedUnread = Action{"Marked", "mark", "marked_unread", Ordinary}
-	Enabled      = Action{"Enabled", "enable", "enabled", Ordinary}
-	Disabled     = Action{"Disabled", "disable", "disabled", Ordinary}
-	Linked       = Action{"Created", "create", "linked", Ordinary}
-	Unlinked     = Action{"Removed", "remove", "unlinked", Ordinary}
-	Added        = Action{"Added", "add", "added", Ordinary}
-	Removed      = Action{"Removed", "remove", "removed", Ordinary}
-	Left         = Action{"Left", "leave", "left", Forever}
-	Accepted     = Action{"Accepted", "accept", "accepted", Ordinary}
-	Declined     = Action{"Declined", "decline", "declined", Ordinary}
-	Favorited    = Action{"Favorited", "favorite", "favorited", Ordinary}
-	Unfavorited  = Action{"Unfavorited", "unfavorite", "unfavorited", Ordinary}
-	Pinned       = Action{"Pinned", "pin", "pinned", Ordinary}
-	Unpinned     = Action{"Unpinned", "unpin", "unpinned", Ordinary}
-	Responded    = Action{"Responded", "respond", "responded", Ordinary}
-	Set          = Action{"Set", "set", "set", Ordinary}
-	Invited      = Action{"Invited", "invite", "invited", Ordinary}
-	Revoked      = Action{"Revoked", "revoke", "revoked", Ordinary}
-	Transferred  = Action{"Transferred", "transfer", "transferred", Ordinary}
-	SignedIn     = Action{"Signed in as", "sign in as", "signed_in", Ordinary}
-	SignedOut    = Action{"Signed out", "sign out", "signed_out", Ordinary}
+
+	MarkedLegitimate = Action{"Marked", "mark", "marked_legitimate", Ordinary}
+	Reported         = Action{"Reported", "report", "reported", Ordinary}
+	Enabled          = Action{"Enabled", "enable", "enabled", Ordinary}
+	Disabled         = Action{"Disabled", "disable", "disabled", Ordinary}
+	Linked           = Action{"Created", "create", "linked", Ordinary}
+	Unlinked         = Action{"Removed", "remove", "unlinked", Ordinary}
+	Added            = Action{"Added", "add", "added", Ordinary}
+	Removed          = Action{"Removed", "remove", "removed", Ordinary}
+	Left             = Action{"Left", "leave", "left", Forever}
+	Accepted         = Action{"Accepted", "accept", "accepted", Ordinary}
+	Declined         = Action{"Declined", "decline", "declined", Ordinary}
+	Favorited        = Action{"Favorited", "favorite", "favorited", Ordinary}
+	Unfavorited      = Action{"Unfavorited", "unfavorite", "unfavorited", Ordinary}
+	Pinned           = Action{"Pinned", "pin", "pinned", Ordinary}
+	Unpinned         = Action{"Unpinned", "unpin", "unpinned", Ordinary}
+	Responded        = Action{"Responded", "respond", "responded", Ordinary}
+	Set              = Action{"Set", "set", "set", Ordinary}
+	Invited          = Action{"Invited", "invite", "invited", Ordinary}
+	Revoked          = Action{"Revoked", "revoke", "revoked", Ordinary}
+	Transferred      = Action{"Transferred", "transfer", "transferred", Ordinary}
+	SignedIn         = Action{"Signed in as", "sign in as", "signed_in", Ordinary}
+	SignedOut        = Action{"Signed out", "sign out", "signed_out", Ordinary}
 )
 
 // Asks reports whether a change with this action stops for a yes.
@@ -115,6 +118,7 @@ var Actions = []Action{
 	Created, Updated, Deleted, Trashed, Restored, Emptied, Uninstalled, Moved,
 	Copied, Uploaded, Downloaded, Exported, Imported, Merged, Resent, Verified, Blocked, Allowed, Filed, Forgot, Unsubscribed, Snoozed, Unsnoozed, Applied, Reordered, Sent, Scheduled, Unscheduled, Saved,
 	Labelled, Unlabelled, Starred, Unstarred, MarkedRead, MarkedUnread,
+	MarkedLegitimate, Reported,
 	Enabled, Disabled, Linked, Unlinked, Added, Removed, Left, Accepted, Declined,
 	Favorited, Unfavorited, Pinned, Unpinned, Responded, Set, Invited, Revoked,
 	Transferred, SignedIn, SignedOut,
@@ -165,7 +169,8 @@ func Result(u *UI, spec ResultSpec) error {
 		if spec.AnswerFollows && !spec.DryRun {
 			return nil
 		}
-		return u.encode(spec.object())
+		// The result object carries the count itself, beside what was changed.
+		return u.encode(spec.object(), 0)
 	}
 
 	if spec.DryRun {

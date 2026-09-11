@@ -42,15 +42,21 @@ type RecordSpec struct {
 	// service's own struct, so JSON keeps its snake_case tags rather than
 	// echoing display labels.
 	Object any
+	// Skipped is what the reading behind this record could not include; see
+	// IncompleteSpec. It is filled in by kit.Show from the invocation's tally, as
+	// a listing's is, because a thing assembled out of parts can be short of one
+	// just as a collection can.
+	Skipped IncompleteSpec
 }
 
 // Record renders one object as an aligned label/value block on Out, or as the
 // object itself in a machine format.
 func Record(u *UI, spec RecordSpec) error {
 	if u.Format.Machine() {
-		return u.encode(spec.Object)
+		return u.encode(spec.Object, spec.Skipped.Count)
 	}
 	writeFields(u, spec.Fields, "")
+	u.Incomplete(spec.Skipped)
 	return nil
 }
 

@@ -2,6 +2,7 @@ package mail
 
 import (
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/roman-16/proton-cli/internal/cli/kit"
@@ -73,6 +74,11 @@ func getCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "get REF",
 		Short: "Show one message, decrypted",
+		Long: "Show one message, decrypted.\n\n" +
+			"A message Proton flagged carries a Flagged line reading phishing or\n" +
+			"suspicious; `mark legitimate` overrules it. DMARC: failed means the\n" +
+			"sender's domain did not vouch for the message, so the address it claims\n" +
+			"to come from may not be the address it came from.",
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			shape, err := render.Value()
 			if err != nil {
@@ -86,13 +92,17 @@ func getCmd() *cobra.Command {
 			if err != nil {
 				return wrongTable(err, "get")
 			}
-			return kit.Read(c, ui.DocumentSpec{
+			if err := kit.Read(c, ui.DocumentSpec{
 				Object: msg,
 				// Asking for html or raw means asking for the body as it is, so the
 				// header block and attachment list would only get in the way.
 				BodyOnly: bodyOnly || shape != "text",
 				Parts:    []ui.Part{messagePart(msg, shape, stripQuotes, includeInline)},
-			})
+			}); err != nil {
+				return err
+			}
+			overruleHint(c, msg)
+			return nil
 		}),
 	}
 	render.Register(c)
@@ -132,8 +142,8 @@ func messagePart(msg *mailsvc.Full, shape string, stripQuotes, includeInline boo
 	return part
 }
 
-// messageHeader is the block above a message body: the date and the full
-// recipient lists.
+// messageHeader is the block above a message body: the date, the full recipient
+// lists, and what Proton made of the message.
 func messageHeader(msg *mailsvc.Full) []ui.Field {
 	fields := []ui.Field{
 		{Label: "Subject", Value: msg.Subject, Handle: true},
@@ -147,11 +157,56 @@ func messageHeader(msg *mailsvc.Full) []ui.Field {
 			fields = append(fields, ui.Field{Label: group.label, Value: addressLine(a)})
 		}
 	}
-	return append(fields,
+	fields = append(fields,
 		ui.Field{Label: "Date", Value: units.Time(msg.Time)},
 		kit.SignatureField(string(msg.Signature)),
-		ui.Field{Label: "ID", Value: msg.ID, ID: true},
 	)
+	if msg.DMARCFailed {
+		fields = append(fields, ui.Field{Label: "DMARC", Value: "failed", Role: ui.Danger})
+	}
+	if msg.SpamFlagged() {
+		fields = append(fields, ui.Field{Label: "Flagged", Value: verdictLine(msg), Role: verdictRole(msg)})
+	}
+	return append(fields, ui.Field{Label: "ID", Value: msg.ID, ID: true})
+}
+
+// verdictLine names what Proton's filters concluded, and says when the reader
+// has already overruled it - which is what stops a message somebody has cleared
+// from looking exactly like one nobody has looked at.
+func verdictLine(msg *mailsvc.Full) string {
+	var found []string
+	if msg.Phishing {
+		found = append(found, "phishing")
+	}
+	if msg.Suspicious {
+		found = append(found, "suspicious")
+	}
+	line := strings.Join(found, ", ")
+	if msg.MarkedLegitimate {
+		line += " (marked legitimate)"
+	}
+	return line
+}
+
+func verdictRole(msg *mailsvc.Full) ui.Role {
+	if msg.MarkedLegitimate {
+		return ui.Plain
+	}
+	return ui.Danger
+}
+
+// overruleHint offers the way out of a wrong verdict, beside the message it is
+// about.
+//
+// A reader who has just read the thing and can see it is their accountant is the
+// one person able to settle it, and the line is on the commentary stream, so a
+// body being piped somewhere is still only the body.
+func overruleHint(c *kit.Invocation, msg *mailsvc.Full) {
+	if !msg.SpamFlagged() || msg.MarkedLegitimate {
+		return
+	}
+	c.UI().Hint("Proton flagged this message. If it is legitimate: " +
+		kit.Program + " mail messages mark legitimate " + ui.Short(msg.ID, c.UI().ShortIDs()))
 }
 
 // addressLine renders one recipient the way mail does: a display name with the
@@ -285,18 +340,74 @@ func starVerb(use, short string, action ui.Action, apply func(*kit.Invocation, [
 	return c
 }
 
-// markCmd is a group with two real subcommands rather than a verb taking a verb
-// as an argument. `mark read` therefore has its own help and completion, and no
-// hand-written check that the word was one of two.
+// markCmd is a group with real subcommands rather than a verb taking a verb as
+// an argument. `mark read` therefore has its own help and completion, and no
+// hand-written check that the word was one of a few.
 func markCmd() *cobra.Command {
-	c := &cobra.Command{Use: "mark", Short: "Set whether messages count as read"}
+	c := &cobra.Command{Use: "mark", Short: "Set what messages count as"}
 	c.AddCommand(
+		legitimateCmd(), phishingCmd(),
 		markVerb("read", "Mark messages as read", ui.MarkedRead,
 			func(c *kit.Invocation, ids []string) error { return c.App.Mail.MarkRead(c.Ctx, ids) }),
 		markVerb("unread", "Mark messages as unread", ui.MarkedUnread,
 			func(c *kit.Invocation, ids []string) error { return c.App.Mail.MarkUnread(c.Ctx, ids) }),
 	)
 	return c
+}
+
+func legitimateCmd() *cobra.Command {
+	return verdictVerb("legitimate", "Mark a message Proton flagged as legitimate",
+		"Mark a message Proton flagged as legitimate.\n\n"+
+			"This overrules the phishing or suspicious verdict on that message alone.\n"+
+			"To let a sender through from now on, use `settings senders allow`.",
+		ui.MarkedLegitimate, "as legitimate",
+		func(c *kit.Invocation, ids []string) error {
+			return c.App.Mail.MarkLegitimate(c.Ctx, ids)
+		})
+}
+
+func phishingCmd() *cobra.Command {
+	return verdictVerb("phishing", "Report a message to Proton as phishing",
+		"Report a message to Proton as phishing.\n\n"+
+			"Proton receives the message decrypted, body included, and the message\n"+
+			"moves to spam. To keep a sender out without reporting anything, use\n"+
+			"`settings senders block`.",
+		ui.Reported, "to Proton as phishing",
+		func(c *kit.Invocation, ids []string) error {
+			for _, id := range ids {
+				if err := c.App.Mail.ReportPhishing(c.Ctx, id); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+}
+
+// verdictVerb builds the two verdicts a reader can give a message, against
+// Proton's own.
+//
+// Both name their messages and take no filters: each is a judgement on something
+// that was read, rather than on everything matching a pattern. The standing
+// decision about a sender is `settings senders`, which is where a rule belongs.
+func verdictVerb(use, short, long string, action ui.Action, detail string,
+	apply func(*kit.Invocation, []string) error) *cobra.Command {
+	return &cobra.Command{
+		Use:   use + " REF...",
+		Short: short,
+		Long:  long,
+		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
+			sel, err := selectMessages(c, &filters{})
+			if err != nil {
+				return wrongTable(err, "mark "+use)
+			}
+			return kit.Mutate(c, ui.ResultSpec{
+				Action: action, Kind: "messages", Count: sel.Len(), IDs: sel.IDs,
+				Name:    kit.Sole(sel.Rows, func(m mailsvc.Message) string { return m.Subject }),
+				Detail:  detail,
+				Preview: sel.Preview(),
+			}, func() error { return apply(c, sel.IDs) })
+		}),
+	}
 }
 
 func markVerb(use, short string, action ui.Action, apply func(*kit.Invocation, []string) error) *cobra.Command {

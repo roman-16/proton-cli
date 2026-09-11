@@ -87,11 +87,29 @@ type Message struct {
 	Unread         int      `json:"unread"`
 	NumAttachments int      `json:"num_attachments"`
 	Labels         []string `json:"labels"`
+
+	// What Proton concluded about the message. Each is written only when it is
+	// true: a message nobody doubts carries no verdict at all, and "phishing":
+	// false on every ordinary message would read as a finding rather than as the
+	// absence of one.
+	DMARCFailed      bool `json:"dmarc_failed,omitempty"`
+	MarkedLegitimate bool `json:"marked_legitimate,omitempty"`
+	Phishing         bool `json:"phishing,omitempty"`
+	Suspicious       bool `json:"suspicious,omitempty"`
 }
 
 // Starred reports whether the message carries the Starred label. A star is a
 // label like any other, so this is a lookup rather than a field of its own.
 func (m Message) Starred() bool { return hasLabel(m.Labels, labelStarred) }
+
+// Flagged reports whether Proton thinks this message is not what it says it is.
+//
+// Marking a message legitimate overrules the spam filters and not the domain's
+// own refusal to vouch for it: the reader can say a message is what it claims,
+// but not that its sender's domain said so.
+func (m Message) Flagged() bool {
+	return m.DMARCFailed || ((m.Phishing || m.Suspicious) && !m.MarkedLegitimate)
+}
 
 // Full carries a decrypted body, unlike the raw API envelope.
 type Full struct {
@@ -108,7 +126,21 @@ type Full struct {
 	AddressID      string                 `json:"address_id"`
 	Attachments    []Attachment           `json:"attachments"`
 	Signature      pgphelper.VerifyResult `json:"signature,omitempty"`
+
+	DMARCFailed      bool `json:"dmarc_failed,omitempty"`
+	MarkedLegitimate bool `json:"marked_legitimate,omitempty"`
+	Phishing         bool `json:"phishing,omitempty"`
+	Suspicious       bool `json:"suspicious,omitempty"`
 }
+
+// Flagged reports whether Proton thinks this message is not what it says it is.
+func (f Full) Flagged() bool {
+	return f.DMARCFailed || ((f.Phishing || f.Suspicious) && !f.MarkedLegitimate)
+}
+
+// SpamFlagged reports whether Proton's filters flagged the message, which is the
+// half of a verdict that marking it legitimate overrules.
+func (f Full) SpamFlagged() bool { return f.Phishing || f.Suspicious }
 
 type Conversation struct {
 	ID             string           `json:"id"`

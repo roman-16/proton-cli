@@ -286,6 +286,24 @@ func TestMailMessagesMarkReadUnread(t *testing.T) {
 	}
 }
 
+// Marking a message legitimate is the reader overruling Proton's own verdict, so
+// what proves it is the verdict reading back off the message afterwards.
+//
+// The fixture is not a message Proton flagged - no account holds one to order -
+// so what this establishes is that the endpoint takes a message the CLI names and
+// that the flag it sets is the one `get` reports. The screen a real verdict
+// produces is the half no test account can show.
+func TestMailMessagesMarkLegitimate(t *testing.T) {
+	msgID := mutableMail(t)
+
+	runOK(t, "mail", "messages", "mark", "legitimate", "--", msgID)
+
+	msg := runJSON(t, "mail", "messages", "get", "--output", "json", "--", msgID)
+	if legitimate, _ := msg["marked_legitimate"].(bool); !legitimate {
+		t.Errorf("marked_legitimate = %v, want true after mark legitimate", msg["marked_legitimate"])
+	}
+}
+
 func TestMailMessagesStarUnstar(t *testing.T) {
 	msgID := mutableMail(t)
 

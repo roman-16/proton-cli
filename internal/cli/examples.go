@@ -402,6 +402,13 @@ var examples = map[string][]string{
 	"proton mail messages unlabel": {"proton mail messages unlabel 'Invoice #2291' --label Accounting"},
 	"proton mail messages star":    {"proton mail messages star 'Invoice #2291'"},
 	"proton mail messages unstar":  {"proton mail messages unstar 'Invoice #2291'"},
+	"proton mail messages mark legitimate": {
+		"proton mail messages mark legitimate 5bH2mQxK",
+	},
+	"proton mail messages mark phishing": {
+		"proton mail messages mark phishing 5bH2mQxK",
+		"proton mail messages mark phishing 'Your account will be suspended' --dry-run",
+	},
 	"proton mail messages mark read": {
 		"proton mail messages mark read 'Invoice #2291'",
 		"proton mail messages mark read --folder inbox --all",

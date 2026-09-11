@@ -99,6 +99,46 @@ func TestDocumentThread(t *testing.T) {
 	check(t, "document_thread", out, errb)
 }
 
+// A thread one message short says so, for the reason a listing does: what could
+// not be opened is exactly what the reader was looking for as often as not, and
+// a document that drops it quietly is a wrong answer with nothing to question.
+func TestDocumentSaysWhenAPartIsMissing(t *testing.T) {
+	u, out, errb := fixture(t, Options{})
+	spec := DocumentSpec{
+		Header: []Field{{Label: "Subject", Value: "Quarterly numbers"}},
+		Parts:  []Part{{Divider: "1/1", Body: "Numbers attached."}},
+		Skipped: IncompleteSpec{
+			Count: 1, Kind: "message",
+			Remedy: "This is a bug or damaged data - `proton report` has the details.",
+		},
+	}
+	if err := Document(u, spec); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out.String(), "could not be decrypted") {
+		t.Errorf("the caveat landed on the answer stream: %q", out.String())
+	}
+	if !strings.Contains(errb.String(), "1 message could not be decrypted and is not listed.") {
+		t.Errorf("stderr = %q, want the missing message named", errb.String())
+	}
+}
+
+// A consumer is told the same thing, since nothing about a warning on the
+// commentary stream reaches a program reading the answer.
+func TestDocumentMachineFormCarriesWhatIsMissing(t *testing.T) {
+	u, out, _ := fixture(t, Options{Format: FormatJSON})
+	spec := DocumentSpec{
+		Object:  map[string]any{"id": "8Tr4nVx2"},
+		Skipped: IncompleteSpec{Count: 2, Kind: "message"},
+	}
+	if err := Document(u, spec); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), `"skipped": 2`) {
+		t.Errorf("json = %s, want skipped", out.String())
+	}
+}
+
 // A document's machine form carries the body as a field, so a consumer never has
 // to parse the header block back out of loose text.
 func TestDocumentMachineUsesObject(t *testing.T) {

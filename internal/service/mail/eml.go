@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"mime"
 	"mime/multipart"
 	"net/mail"
@@ -16,6 +17,7 @@ import (
 
 	gomime "github.com/ProtonMail/go-mime"
 	"github.com/roman-16/proton-cli/internal/mailtext"
+	"github.com/roman-16/proton-cli/internal/skip"
 )
 
 // Exporting a message rebuilds it as RFC 822: Proton keeps the original header
@@ -43,10 +45,14 @@ func (s *Service) Export(ctx context.Context, id string, withAttachments bool) (
 		}
 		rings = first
 	}
-	body, _, err := decryptBody(raw.Body, rings.Read, nil)
+	body, _, err := s.openBody(ctx, u, *raw, false)
 	if err != nil {
-		// Keep the ciphertext rather than losing the message; the header block
-		// still identifies it.
+		// Recorded and not counted: nothing is missing from the file. The armour
+		// goes in as it stands, so the message is exported whole and somebody
+		// holding the key can still read it - which is what a backup is for.
+		slog.DebugContext(ctx, "mail: a body was exported as ciphertext",
+			"kind", string(skip.KindMessage), "reason", string(skip.Undecryptable),
+			"ref", raw.ID, "error", err)
 		body = raw.Body
 	}
 

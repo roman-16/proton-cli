@@ -17,7 +17,7 @@ ID        FROM              SUBJECT                DATE              FLAGS
 3 of 47 messages. Next page: --page 1
 ```
 
-`ID` is always the first column. `FLAGS` reads `●` for unread, `★` for starred, and a number for attachments.
+`ID` is always the first column. `FLAGS` reads `●` for unread, `★` for starred, `✗` for a message Proton flagged as phishing or suspicious, and a number for attachments.
 
 An empty collection prints nothing on stdout, so a redirect yields an empty file rather than a stray header. On stderr it says `No messages.`, or `No messages match.` when a filter was applied.
 
@@ -168,7 +168,7 @@ The one exception is [`proton api`](../api/README.md), which passes Proton's res
 
 ## Colour
 
-Colour marks the parts that carry a verdict: `✓` green, `!` yellow, `Error:` red, IDs magenta, `●` unread, `★` starred, and the signature line green, yellow or red. A `■` beside a label, folder, calendar or group is the exact colour Proton stores for it. Everything else stays plain.
+Colour marks the parts that carry a verdict: `✓` green, `!` yellow, `Error:` red, `✗` red, IDs magenta, `●` unread, `★` starred, and the signature, `DMARC` and `Flagged` lines green, yellow or red. A `■` beside a label, folder, calendar or group is the exact colour Proton stores for it. Everything else stays plain.
 
 Shades come from your terminal's theme, not from proton.
 

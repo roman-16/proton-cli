@@ -37,6 +37,10 @@ type DocumentSpec struct {
 	BodyOnly bool
 	// Object replaces the rendering in machine formats.
 	Object any
+	// Skipped is what this document could not include; see IncompleteSpec. A
+	// thread is a collection of bodies, and one of them that will not open is a
+	// message missing from what is on the screen.
+	Skipped IncompleteSpec
 }
 
 // dividerWidth is the length of the rule that separates messages in a thread.
@@ -48,7 +52,7 @@ const dividerWidth = 56
 // the body arrives as a field rather than as loose text.
 func Document(u *UI, spec DocumentSpec) error {
 	if u.Format.Machine() {
-		return u.encode(spec.Object)
+		return u.encode(spec.Object, spec.Skipped.Count)
 	}
 
 	if !spec.BodyOnly && len(spec.Header) > 0 {
@@ -84,5 +88,6 @@ func Document(u *UI, spec DocumentSpec) error {
 			_, _ = fmt.Fprintln(u.Out)
 		}
 	}
+	u.Incomplete(spec.Skipped)
 	return nil
 }

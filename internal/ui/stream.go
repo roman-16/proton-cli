@@ -82,24 +82,25 @@ func (s *Stream[T]) Emit(item T) error {
 // line writes one thing as a machine-readable record: compact JSON on one line,
 // or a YAML document of its own.
 //
-// It marshals rather than going through UI.encode because that one indents, and
-// an indented object is not a line. Both encoders read the same `json` tags, so
-// the two formats still cannot disagree about a field name.
+// It does not go through UI.encode because that one indents, and an indented
+// object is not a line. It is the same marshalling all the same - the bytes are
+// JSON, and YAML is rendered from them - so a thing streamed has exactly the
+// shape it would have had in a listing.
 func (s *Stream[T]) line(item T) error {
 	var v any = item
 	if s.spec.Object != nil {
 		v = s.spec.Object(item)
 	}
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
 	if s.u.Format == FormatYAML {
-		b, err := yaml.Marshal(v)
+		y, err := yaml.JSONToYAML(b)
 		if err != nil {
 			return err
 		}
-		_, err = fmt.Fprintf(s.u.Out, "---\n%s", b)
-		return err
-	}
-	b, err := json.Marshal(v)
-	if err != nil {
+		_, err = fmt.Fprintf(s.u.Out, "---\n%s", y)
 		return err
 	}
 	_, err = fmt.Fprintf(s.u.Out, "%s\n", b)

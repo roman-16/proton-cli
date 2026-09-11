@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	"github.com/roman-16/proton-cli/internal/proton"
+	"github.com/roman-16/proton-cli/internal/skip"
 )
 
 type rawConversation struct {
@@ -76,11 +77,22 @@ func (s *Service) ConversationRead(ctx context.Context, id string) (*Conversatio
 		// ones come back as metadata. Lazy-load each older body so the whole
 		// thread decrypts.
 		if m.Body == "" {
-			if full, err := s.fetchMessageRaw(ctx, m.ID); err == nil {
-				m = *full
+			full, err := s.fetchMessageRaw(ctx, m.ID)
+			if err != nil {
+				skip.Record(ctx, skip.KindMessage, m.ID, skip.Unreadable, err)
+				continue
 			}
+			m = *full
 		}
-		msgs = append(msgs, s.decryptMessage(ctx, u, m))
+		// One message of a thread that will not open is no reason to refuse the
+		// other four, and every reason to say so: the count above the thread is
+		// what was shown, and the warning beside it is what was not.
+		body, sig, err := s.openBody(ctx, u, m, true)
+		if err != nil {
+			skip.Record(ctx, skip.KindMessage, m.ID, skip.Undecryptable, err)
+			continue
+		}
+		msgs = append(msgs, asFull(m, body, sig))
 	}
 	return &ConversationFull{Conversation: toConversation(r.Conversation), Messages: msgs}, nil
 }

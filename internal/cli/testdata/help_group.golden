@@ -13,7 +13,7 @@ Commands:
   get          Show one message, decrypted
   label        Attach a label to messages
   list         List messages in a folder
-  mark         Set whether messages count as read
+  mark         Set what messages count as
   move         Move messages to a folder
   reply        Reply to a message
   send         Compose and send a message

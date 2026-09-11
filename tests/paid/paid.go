@@ -60,6 +60,10 @@ func Restrictions() []Restriction {
 		Command: []string{"mail", "messages", "empty"},
 		Why:     "it deletes a whole folder with no listing of what was in it",
 	}, {
+		Command: []string{"mail", "messages", "mark", "phishing"},
+		Why: "it hands somebody's real mail, decrypted, to the people at Proton who read reports," +
+			" and nothing withdraws one",
+	}, {
 		Command: []string{"mail", "settings", "addresses", "delete"},
 		Why: "Proton allows one address deletion a year, and the address is gone for good" +
 			" - nobody, including its owner, can have it again",

@@ -81,6 +81,12 @@ var untested = map[string]string{
 	// and not the state, which is not the same thing.
 	"PUT /mail/v4/settings/autoresponder": "writing an auto-reply cannot be undone, and only a real account has the plan for one",
 
+	// Reporting phishing hands the message, decrypted, to the people at Proton
+	// who read reports. A suite that ran it every run would file its own test mail
+	// as an attack on somebody's desk, over and over, and no run could take one
+	// back. The flow was walked by hand against the live API instead.
+	"POST /core/v4/reports/phishing": "a report is read by a person at Proton and cannot be withdrawn",
+
 	// A refresh happens when a session expires mid-run, which is Proton's to
 	// decide and no test can arrange - so whether a run reaches it is luck. It
 	// stays listed rather than being relied on: a golden line that appears and

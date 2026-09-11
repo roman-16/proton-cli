@@ -3,7 +3,6 @@ package mail
 import (
 	"context"
 
-	"github.com/roman-16/proton-cli/internal/account/keys"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/mailtext"
 )
@@ -58,9 +57,11 @@ func (s *Service) Answer(ctx context.Context, parentID string, spec AnswerSpec) 
 		return Content{}, err
 	}
 
-	body, err := s.decryptForQuote(ctx, u, raw)
+	body, _, err := s.openBody(ctx, u, *raw, false)
 	if err != nil {
-		return Content{}, err
+		return Content{}, errs.Problemf("The message being answered could not be decrypted, so it cannot be quoted.").
+			Hint("--no-quote answers without it.").
+			Exit(errs.ExitBug)
 	}
 	parent := replyContext{
 		Sender:   Recipient{Address: senderAddress(raw.Sender), Name: senderName(raw.Sender)},
@@ -125,25 +126,6 @@ func (s *Service) Answer(ctx context.Context, parentID string, spec AnswerSpec) 
 	}
 	c.AppendSignature(signature, quote)
 	return c, nil
-}
-
-// decryptForQuote decrypts the parent's body for quoting. A body that will not
-// decrypt is quoted as its ciphertext rather than failing the reply, matching the
-// web client, which quotes the raw body on a decryption error.
-func (s *Service) decryptForQuote(ctx context.Context, u *keys.Unlocked, raw *rawMessage) (string, error) {
-	rings, ok := u.AddrRings(raw.AddressID)
-	if !ok {
-		first, _, err := u.FirstAddr()
-		if err != nil {
-			return "", err
-		}
-		rings = first
-	}
-	body, _, err := decryptBody(raw.Body, rings.Read, nil)
-	if err != nil {
-		return raw.Body, nil
-	}
-	return body, nil
 }
 
 // carriedFrom lists the parent's attachments to keep on a forward.

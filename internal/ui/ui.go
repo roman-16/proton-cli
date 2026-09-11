@@ -344,22 +344,55 @@ func writeCaution(w io.Writer, style Style, role Role, msg string) {
 // Warnf is Warn with formatting.
 func (u *UI) Warnf(format string, a ...any) { u.Warn(fmt.Sprintf(format, a...)) }
 
-// encode writes v to Out in the machine format. It is the single marshalling
-// path, so JSON and YAML can never disagree about field names: goccy/go-yaml
-// falls back to `json:"..."` tags when no `yaml:"..."` tag is present.
-func (u *UI) encode(v any) error {
-	v = spelledOut(v)
+// encode writes v to Out in the machine format, with what the answer could not
+// include attached.
+//
+// There is one marshalling, and YAML is a rendering of its bytes rather than a
+// second pass over the value. That is what makes "the two formats cannot
+// disagree" true by construction instead of true as long as every struct is
+// shaped in the way both encoders happen to read alike - a promise an embedded
+// struct quietly breaks, since one of them flattens it and the other files it
+// under its type name.
+func (u *UI) encode(v any, skipped int) error {
+	b, err := json.Marshal(spelledOut(v))
+	if err != nil {
+		return err
+	}
+	b = withSkipped(b, skipped)
 	if u.Format == FormatYAML {
-		b, err := yaml.Marshal(v)
+		y, err := yaml.JSONToYAML(b)
 		if err != nil {
 			return err
 		}
-		_, err = u.Out.Write(b)
+		_, err = u.Out.Write(y)
 		return err
 	}
-	enc := json.NewEncoder(u.Out)
-	enc.SetIndent("", "  ")
-	return enc.Encode(v)
+	var out bytes.Buffer
+	if err := json.Indent(&out, b, "", "  "); err != nil {
+		return err
+	}
+	out.WriteByte('\n')
+	_, err = u.Out.Write(out.Bytes())
+	return err
+}
+
+// withSkipped adds the count of what could not be read to an object that is
+// about to be written.
+//
+// A record and a document carry it for the reason a listing's envelope does: a
+// consumer that never sees the key read a whole answer, and one that does has
+// been told the answer is short - which the warning on the commentary stream
+// could never tell it. An answer that is not an object has nowhere to put it,
+// and the only such answers are `api`'s, which are Proton's own shape.
+func withSkipped(b []byte, skipped int) []byte {
+	if skipped == 0 || len(b) < 2 || b[0] != '{' || b[len(b)-1] != '}' {
+		return b
+	}
+	key := fmt.Sprintf(`"skipped":%d}`, skipped)
+	if bytes.Equal(bytes.TrimSpace(b), []byte("{}")) {
+		return []byte("{" + key)
+	}
+	return append(b[:len(b)-1:len(b)-1], []byte(","+key)...)
 }
 
 // spelledOut is v with every empty list and map written out as one.
@@ -439,11 +472,13 @@ func spellOut(v reflect.Value) reflect.Value {
 	return v
 }
 
-// Raw writes pre-formatted JSON bytes through, re-encoding for YAML. It exists
-// for `proton api`, the one command whose contract is Proton's own shape.
+// Raw writes pre-formatted JSON bytes through, re-rendering them for YAML. It
+// exists for `proton api`, the one command whose contract is Proton's own shape.
 //
-// Numbers are decoded via json.Number so YAML keeps integer fields integral
-// rather than rendering 1000 as 1000.0.
+// The bytes are reformatted rather than decoded and marshalled again, so the
+// answer keeps the order Proton wrote its keys in and every number the width it
+// was sent with. Decoding into a map would sort the keys and round the integers,
+// neither of which is the shape the command promises.
 //
 // A body that is not JSON is not that shape, so it never reaches Out: a proxy's
 // error page landing where jq is waiting is a broken pipeline reported as a
@@ -454,41 +489,26 @@ func Raw(u *UI, raw []byte) error {
 	if len(bytes.TrimSpace(raw)) == 0 {
 		return nil
 	}
-	dec := json.NewDecoder(bytes.NewReader(raw))
-	dec.UseNumber()
-	var v any
-	if err := dec.Decode(&v); err != nil {
+	if !json.Valid(raw) {
 		_, _ = u.Err.Write(raw)
 		if raw[len(raw)-1] != '\n' {
 			_, _ = fmt.Fprintln(u.Err)
 		}
 		return errs.Problemf("The API returned a body that is not JSON.").Exit(5)
 	}
-	return u.encode(plainNumbers(v))
-}
-
-// plainNumbers converts json.Number to int64 where it fits, else float64, so
-// both encoders emit numbers rather than quoted strings.
-func plainNumbers(v any) any {
-	switch x := v.(type) {
-	case json.Number:
-		if i, err := x.Int64(); err == nil {
-			return i
+	if u.Format == FormatYAML {
+		y, err := yaml.JSONToYAML(raw)
+		if err != nil {
+			return err
 		}
-		if f, err := x.Float64(); err == nil {
-			return f
-		}
-		return x.String()
-	case map[string]any:
-		for k, vv := range x {
-			x[k] = plainNumbers(vv)
-		}
-		return x
-	case []any:
-		for i, vv := range x {
-			x[i] = plainNumbers(vv)
-		}
-		return x
+		_, err = u.Out.Write(y)
+		return err
 	}
-	return v
+	var out bytes.Buffer
+	if err := json.Indent(&out, bytes.TrimSpace(raw), "", "  "); err != nil {
+		return err
+	}
+	out.WriteByte('\n')
+	_, err := u.Out.Write(out.Bytes())
+	return err
 }

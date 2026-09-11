@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/goccy/go-yaml"
 	"github.com/roman-16/proton-cli/internal/errs"
 )
 
@@ -137,6 +138,72 @@ func TestQuietSilencesOnlyStderr(t *testing.T) {
 	}
 }
 
+// The two machine formats are one marshalling, so nothing about a struct can
+// make them disagree - an embedded struct least of all, which one of them
+// flattens and the other would file under its type name.
+func TestTheTwoMachineFormatsCannotDisagree(t *testing.T) {
+	type item struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	}
+	type fullItem struct {
+		item
+		Note string `json:"note"`
+	}
+	v := fullItem{item: item{ID: "7Kd91mQx", Name: "github.com"}, Note: "recovery codes"}
+
+	jsonUI, jsonOut, _ := fixture(t, Options{Format: FormatJSON})
+	if err := jsonUI.encode(v, 0); err != nil {
+		t.Fatal(err)
+	}
+	yamlUI, yamlOut, _ := fixture(t, Options{Format: FormatYAML})
+	if err := yamlUI.encode(v, 0); err != nil {
+		t.Fatal(err)
+	}
+
+	var fromJSON, fromYAML map[string]any
+	if err := json.Unmarshal(jsonOut.Bytes(), &fromJSON); err != nil {
+		t.Fatalf("json: %v", err)
+	}
+	if err := yaml.Unmarshal(yamlOut.Bytes(), &fromYAML); err != nil {
+		t.Fatalf("yaml: %v", err)
+	}
+	if !reflect.DeepEqual(fromJSON, fromYAML) {
+		t.Errorf("the formats disagree:\njson: %#v\nyaml: %#v", fromJSON, fromYAML)
+	}
+	for _, key := range []string{"id", "name", "note"} {
+		if _, ok := fromYAML[key]; !ok {
+			t.Errorf("yaml = %s, want %q at the top level", yamlOut.String(), key)
+		}
+	}
+}
+
+// An answer that is short says so in the data as well as on the screen, because
+// a warning on the commentary stream reaches nobody who is parsing the answer.
+func TestMachineOutputCarriesWhatWasSkipped(t *testing.T) {
+	for _, tc := range []struct {
+		format Format
+		want   string
+	}{{FormatJSON, `"skipped": 3`}, {FormatYAML, "skipped: 3"}} {
+		u, out, _ := fixture(t, Options{Format: tc.format})
+		if err := u.encode(map[string]any{"id": "5bH2mQxK"}, 3); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(out.String(), tc.want) {
+			t.Errorf("%s = %s, want %s", tc.format, out.String(), tc.want)
+		}
+	}
+
+	// A whole answer has exactly the shape it always had.
+	u, out, _ := fixture(t, Options{Format: FormatJSON})
+	if err := u.encode(map[string]any{"id": "5bH2mQxK"}, 0); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out.String(), "skipped") {
+		t.Errorf("json = %s, want no skipped key when nothing was skipped", out.String())
+	}
+}
+
 // Raw is the pass-through for `proton api`. Integers have to survive it,
 // because YAML would otherwise turn 1000 into 1000.0 and break every consumer.
 func TestRawKeepsIntegers(t *testing.T) {
@@ -151,6 +218,24 @@ func TestRawKeepsIntegers(t *testing.T) {
 		}
 		if !strings.Contains(got, "1.5") {
 			t.Errorf("%s: float not preserved: %s", format, got)
+		}
+	}
+}
+
+// `proton api` answers in Proton's shape, and the order the keys came in is part
+// of it: a reader comparing an answer against Proton's own documentation is
+// looking at the same object in the same order.
+func TestRawKeepsProtonsOwnKeyOrder(t *testing.T) {
+	const body = `{"Code":1000,"Addresses":[{"ID":"a","Email":"you@proton.me"}],"Total":1}`
+	for _, format := range []Format{FormatJSON, FormatYAML} {
+		u, out, _ := fixture(t, Options{Format: format})
+		if err := Raw(u, []byte(body)); err != nil {
+			t.Fatal(err)
+		}
+		got := out.String()
+		code, addresses := strings.Index(got, "Code"), strings.Index(got, "Addresses")
+		if code < 0 || addresses < 0 || code > addresses {
+			t.Errorf("%s reordered the answer:\n%s", format, got)
 		}
 	}
 }
@@ -327,7 +412,7 @@ func TestMachineOutputSpellsEmptyCollectionsOut(t *testing.T) {
 	out, errb := &bytes.Buffer{}, &bytes.Buffer{}
 	u := New(Options{Format: FormatJSON})
 	u.Out, u.Err = out, errb
-	if err := u.encode(row{Nested: []inner{{}}}); err != nil {
+	if err := u.encode(row{Nested: []inner{{}}}, 0); err != nil {
 		t.Fatal(err)
 	}
 

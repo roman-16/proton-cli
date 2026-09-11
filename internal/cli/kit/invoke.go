@@ -230,6 +230,7 @@ func Watch[T any](c *Invocation, spec ui.StreamSpec[T], run func(emit func(T) er
 // writes to by default. Both are references that were on the screen, so both are
 // references the next command line can start typing.
 func Show(c *Invocation, spec ui.RecordSpec) error {
+	spec.Skipped = c.Incomplete()
 	c.remember(shown(c, spec.Fields))
 	return ui.Record(c.UI(), spec)
 }
@@ -237,6 +238,7 @@ func Show(c *Invocation, spec ui.RecordSpec) error {
 // Read renders decrypted content meant to be read, remembering the references in
 // its header for the same reason Show does.
 func Read(c *Invocation, spec ui.DocumentSpec) error {
+	spec.Skipped = c.Incomplete()
 	fields := spec.Header
 	for _, p := range spec.Parts {
 		fields = append(fields, p.Header...)

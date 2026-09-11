@@ -20,6 +20,35 @@ Folders are `inbox`, `sent`, `drafts`, `trash`, `spam`, `archive`, `starred`, `s
 
 A `Signature:` line reports the verdict of the signature check against the sender's key.
 
+## Spot a message Proton distrusts
+
+A message Proton flagged carries two more lines:
+
+```console
+$ proton mail messages get 5bH2mQxK
+Subject:    Your account will be suspended
+From:       PayPal <security@paypa1-secure.com>
+To:         me@proton.me
+Date:       2026-04-15 14:32
+Signature:  unsigned
+DMARC:      failed
+Flagged:    phishing
+ID:         5bH2mQxK
+```
+
+`Flagged:` reads `phishing`, `suspicious`, or both. `DMARC: failed` means the sender's domain did not vouch for the message, so the address it claims to come from may not be the address it came from.
+
+`list` marks the same messages with `✗` in the FLAGS column. In `--output json` each verdict is a field of its own: `phishing`, `suspicious` and `dmarc_failed`, present only when true.
+
+```bash
+proton mail messages mark legitimate REF      # Proton was wrong about this one
+proton mail messages mark phishing REF        # report it, and file it as spam
+```
+
+`mark legitimate` settles the `Flagged:` verdict on that message alone, and the `DMARC:` line stays. To let a sender through from now on, see [Who reaches the inbox](#who-reaches-the-inbox).
+
+`mark phishing` sends the message to Proton decrypted, body included, for their anti-abuse team to read. Nothing withdraws a report. To keep a sender out without reporting anything, use `proton mail settings senders block`.
+
 ## Search
 
 Searching is `list` with a filter. `list` looks in the inbox; **`--folder all` searches everything.**

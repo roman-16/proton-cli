@@ -229,6 +229,7 @@ PUT /mail/v4/messages/read
 PUT /mail/v4/messages/unlabel
 PUT /mail/v4/messages/unread
 PUT /mail/v4/messages/{id}
+PUT /mail/v4/messages/{id}/mark/ham
 PUT /mail/v4/settings/viewmode
 PUT /pass/v1/share/{id}/alias/{id}/contact/{n}/blocked
 PUT /pass/v1/share/{id}/alias/{id}/name

@@ -88,7 +88,13 @@ func convGetCmd() *cobra.Command {
 			if summary {
 				return threadSummary(c, conv)
 			}
-			return kit.Read(c, threadDocument(conv, shape, bodyOnly, stripQuotes, includeInline))
+			if err := kit.Read(c, threadDocument(conv, shape, bodyOnly, stripQuotes, includeInline)); err != nil {
+				return err
+			}
+			for i := range conv.Messages {
+				overruleHint(c, &conv.Messages[i])
+			}
+			return nil
 		}),
 	}
 	render.Register(c)
@@ -126,6 +132,7 @@ type threadPreview struct {
 	From        string `json:"from"`
 	Preview     string `json:"preview"`
 	Attachments int    `json:"attachments"`
+	Flagged     bool   `json:"flagged,omitempty"`
 }
 
 // threadSummary renders a thread as a table, which is what a one-line-per-message
@@ -141,6 +148,7 @@ func threadSummary(c *kit.Invocation, conv *mailsvc.ConversationFull) error {
 			From:        addressLine(m.Sender),
 			Preview:     mailtext.MessagePreview(m.Body, m.MIMEType),
 			Attachments: len(mailsvc.FilterInline(m.Attachments)),
+			Flagged:     m.Flagged(),
 		})
 	}
 	return kit.List(c, ui.TableSpec[threadPreview]{
@@ -152,7 +160,7 @@ func threadSummary(c *kit.Invocation, conv *mailsvc.ConversationFull) error {
 			{Header: "FROM", Flex: true, Cell: func(p threadPreview) string { return p.From }},
 			{Header: "PREVIEW", Flex: true, Cell: func(p threadPreview) string { return p.Preview }},
 			{Header: "FLAGS", Marks: func(p threadPreview) ui.Marks {
-				return flags(false, false, p.Attachments)
+				return flags(false, false, p.Flagged, p.Attachments)
 			}},
 		},
 	}, rows)

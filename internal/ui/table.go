@@ -91,7 +91,9 @@ const flexFloor = 12
 // - so a redirect yields an empty file rather than a stray header.
 func Table[T any](u *UI, spec TableSpec[T], items []T) error {
 	if u.Format.Machine() {
-		return u.encode(envelope(spec, items))
+		// The envelope carries the count itself, beside the facts about the page it
+		// belongs with.
+		return u.encode(envelope(spec, items), 0)
 	}
 
 	if len(items) > 0 {

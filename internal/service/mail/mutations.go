@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/url"
 
+	"github.com/roman-16/proton-cli/internal/mailtext"
 	"github.com/roman-16/proton-cli/internal/proton"
 )
 
@@ -59,6 +60,51 @@ func (s *Service) MarkUnread(ctx context.Context, ids []string) error {
 		Method: "PUT", Path: "/mail/v4/messages/unread",
 		Body: map[string]any{"IDs": ids},
 	}, nil)
+}
+
+// MarkLegitimate tells Proton a message it flagged is what it claims to be.
+//
+// It is one message at a time because that is what Proton takes: the verdict is
+// about this message, not about its sender - `settings senders allow` is the
+// standing decision.
+func (s *Service) MarkLegitimate(ctx context.Context, ids []string) error {
+	for _, id := range ids {
+		if err := s.C.Decode(ctx, proton.Request{
+			Method: "PUT", Path: "/mail/v4/messages/" + id + "/mark/ham",
+		}, nil); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ReportPhishing hands a message to Proton's anti-abuse team and files it as
+// spam, which is what the web client's "Report phishing" does.
+//
+// The report carries the body decrypted, because a report nobody can read is not
+// a report: Proton holds no key to the message, so the only way for anyone there
+// to see what was sent is for this machine to open it first. A body that will not
+// open is refused rather than reported as the armour it still is.
+func (s *Service) ReportPhishing(ctx context.Context, id string) error {
+	raw, u, err := s.messageAndKeys(ctx, id)
+	if err != nil {
+		return err
+	}
+	body, _, err := s.openBody(ctx, u, *raw, false)
+	if err != nil {
+		return err
+	}
+	mimeType := mimeTypeHTML
+	if !mailtext.IsHTML(raw.MIMEType) {
+		mimeType = mimeTypePlain
+	}
+	if err := s.C.Decode(ctx, proton.Request{
+		Method: "POST", Path: "/core/v4/reports/phishing",
+		Body: map[string]any{"MessageID": id, "MIMEType": mimeType, "Body": body},
+	}, nil); err != nil {
+		return err
+	}
+	return s.Label(ctx, []string{id}, labelSpam)
 }
 
 // Unschedule cancels a scheduled send, pulling the message out of the Scheduled

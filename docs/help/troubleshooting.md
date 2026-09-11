@@ -42,11 +42,21 @@ NAME                  TYPE    VAULT    MODIFIED
 aws-root              login   Work     2026-08-30 11:02
 github.com            login   Work     2026-08-14 09:41
 41 items.
-⚠ 1 item could not be decrypted and is not listed.
+! 1 item could not be decrypted and is not listed.
   This is a bug or damaged data - `proton report` has the details.
 ```
 
 An item that will not open is left out, and the listing says so. The exit code stays `0`: the command answered, just not completely.
+
+A thread says the same when one of its messages will not open, and the message count above it is what was shown:
+
+```console
+$ proton mail conversations get 8Tr4nVx2
+! 1 message could not be decrypted and is not listed.
+  This is a bug or damaged data - `proton report` has the details.
+```
+
+Asking for that one message instead fails with exit `7`, because there would be nothing else in the answer.
 
 In a machine format the same fact is a field:
 
@@ -58,8 +68,8 @@ $ proton pass items list --vault Work --output json | jq .skipped
 `skipped` is absent when nothing was skipped. A container that cannot be opened says that nothing inside it is listed:
 
 ```console
-⚠ 1 vault could not be opened, so nothing inside it is listed.
-⚠ 1 folder could not be opened, so nothing inside it is listed.
+! 1 vault could not be opened, so nothing inside it is listed.
+! 1 folder could not be opened, so nothing inside it is listed.
 ```
 
 The same tally answers a puzzling `get`, where an item that cannot be read is otherwise indistinguishable from one that was never there:

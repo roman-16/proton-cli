@@ -147,6 +147,8 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton mail messages get`](../mail/messages.md#get) | Show one message, decrypted |
 | [`proton mail messages label`](../mail/messages.md#label) | Attach a label to messages |
 | [`proton mail messages list`](../mail/messages.md#list) | List messages in a folder |
+| [`proton mail messages mark legitimate`](../mail/messages.md#mark-legitimate) | Mark a message Proton flagged as legitimate |
+| [`proton mail messages mark phishing`](../mail/messages.md#mark-phishing) | Report a message to Proton as phishing |
 | [`proton mail messages mark read`](../mail/messages.md#mark-read) | Mark messages as read |
 | [`proton mail messages mark unread`](../mail/messages.md#mark-unread) | Mark messages as unread |
 | [`proton mail messages move`](../mail/messages.md#move) | Move messages to a folder |

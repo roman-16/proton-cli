@@ -13,6 +13,7 @@ import "strings"
 const (
 	GlyphSuccess    = "✓" // a mutation succeeded
 	GlyphCaution    = "!" // it worked, and something about it is worth knowing
+	GlyphFlagged    = "✗" // a thing the service itself distrusts
 	GlyphUnread     = "●" // an unread message
 	GlyphStarred    = "★" // a starred message
 	GlyphSwatch     = "■" // the colour a label, folder or calendar is shown in

@@ -215,6 +215,8 @@ proton mail messages forward 'Invoice #2291' --to jane@example.com --no-attachme
 
 Show one message, decrypted.
 
+A message Proton flagged carries a Flagged line reading phishing or suspicious; `mark legitimate` overrules it. DMARC: failed means the sender's domain did not vouch for the message, so the address it claims to come from may not be the address it came from.
+
 ```
 proton mail messages get REF
 ```
@@ -301,9 +303,38 @@ proton mail messages list --keyword invoice --after 2026-01-01 --folder all
 
 ## `mark`
 
-Set whether messages count as read.
+Set what messages count as.
 
-Holds `read` and `unread`.
+Holds `legitimate`, `phishing`, `read` and `unread`.
+
+### `mark legitimate`
+
+Mark a message Proton flagged as legitimate.
+
+This overrules the phishing or suspicious verdict on that message alone. To let a sender through from now on, use `settings senders allow`.
+
+```
+proton mail messages mark legitimate REF...
+```
+
+```bash
+proton mail messages mark legitimate 5bH2mQxK
+```
+
+### `mark phishing`
+
+Report a message to Proton as phishing.
+
+Proton receives the message decrypted, body included, and the message moves to spam. To keep a sender out without reporting anything, use `settings senders block`.
+
+```
+proton mail messages mark phishing REF...
+```
+
+```bash
+proton mail messages mark phishing 5bH2mQxK
+proton mail messages mark phishing 'Your account will be suspended' --dry-run
+```
 
 ### `mark read`
 

@@ -3,6 +3,7 @@ package mail
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"time"
 
@@ -23,14 +24,18 @@ type rawListMessage struct {
 	Sender         struct{ Name, Address string }
 	NumAttachments int
 	LabelIDs       []string
+	Flags          int64
 }
 
 func toMessage(m rawListMessage) Message {
+	v := verdicts(m.Flags)
 	return Message{
 		ID: m.ID, ConversationID: m.ConversationID,
 		Subject: m.Subject, Unread: m.Unread, Time: m.Time,
 		FromName: m.Sender.Name, FromAddress: m.Sender.Address,
 		NumAttachments: m.NumAttachments, Labels: m.LabelIDs,
+		DMARCFailed: v.dmarcFailed, MarkedLegitimate: v.markedLegitimate,
+		Phishing: v.phishing, Suspicious: v.suspicious,
 	}
 }
 
@@ -138,10 +143,34 @@ type rawAttachment struct {
 }
 
 // Message flags the CLI acts on, from Proton's MESSAGE_FLAGS.
+//
+// The last four are what Proton concluded about a message's honesty: whether the
+// sender's domain vouched for it, what the spam filters made of it, and whether
+// the reader has since overruled them.
 const (
-	flagReceived = 1 << 0
-	flagSent     = 1 << 1
+	flagSent         = 1 << 1
+	flagImported     = 1 << 9
+	flagDMARCFail    = 1 << 26
+	flagHamManual    = 1 << 27
+	flagPhishingAuto = 1 << 30
+	flagSuspicious   = 1 << 33
 )
+
+// verdict is what Proton concluded about one message, read off the flags every
+// envelope carries - a listing row as much as a single message, which is why a
+// listing can mark a flagged message without asking for anything more.
+type verdict struct {
+	dmarcFailed, markedLegitimate, phishing, suspicious bool
+}
+
+func verdicts(flags int64) verdict {
+	return verdict{
+		dmarcFailed:      flags&flagDMARCFail != 0,
+		markedLegitimate: flags&flagHamManual != 0,
+		phishing:         flags&flagPhishingAuto != 0,
+		suspicious:       flags&flagSuspicious != 0,
+	}
+}
 
 // isSent reports whether we sent this message, which flips how a reply derives
 // its recipients: answering our own sent mail addresses its original recipients.
@@ -165,28 +194,41 @@ func (m rawMessage) parsedHeader(name string) string {
 	return ""
 }
 
-func (s *Service) decryptMessage(ctx context.Context, u *keys.Unlocked, m rawMessage) Full {
+// openBody decrypts a message body, and is the only thing in this package that
+// does.
+//
+// What a body that will not open means is the caller's to decide, and the
+// callers disagree: reading one message fails, reading a thread drops the
+// message and says so, and an export keeps the armour rather than losing the
+// message. None of them can decide anything about an error they were never
+// handed, which is what a placeholder body amounts to.
+//
+// verify says whether to check the body's signature. A caller that is going to
+// quote or re-encode the text has no verdict to show and no reason to fetch the
+// sender's key for one.
+func (s *Service) openBody(ctx context.Context, u *keys.Unlocked, m rawMessage, verify bool) (string, pgphelper.VerifyResult, error) {
 	rings, ok := u.AddrRings(m.AddressID)
 	if !ok {
-		if first, _, err := u.FirstAddr(); err == nil {
-			rings = first
-		}
-	}
-	var body string
-	sig := pgphelper.Unverified
-	if rings.Read == nil {
-		body = "(decryption failed: no address key available)"
-	} else {
-		// Verify the body signature against the sender's public key (their
-		// own key for sent mail). No key available -> Unverified, never Invalid.
-		verKR := s.senderKeyRing(ctx, senderAddress(m.Sender))
-		b, v, err := decryptBody(m.Body, rings.Read, verKR)
+		first, _, err := u.FirstAddr()
 		if err != nil {
-			body = "(decryption failed: " + err.Error() + ")"
-		} else {
-			body, sig = b, v
+			return "", pgphelper.Unverified, err
 		}
+		rings = first
 	}
+	if rings.Read == nil {
+		return "", pgphelper.Unverified, fmt.Errorf("no address key available")
+	}
+	// The signature is verified against the sender's public key - their own key
+	// for mail we sent. No key available -> Unverified, never Invalid.
+	var verKR *pgp.KeyRing
+	if verify {
+		verKR = s.senderKeyRing(ctx, senderAddress(m.Sender))
+	}
+	return decryptBody(m.Body, rings.Read, verKR)
+}
+
+// asFull is a raw message with its decrypted body, as a reader sees it.
+func asFull(m rawMessage, body string, sig pgphelper.VerifyResult) Full {
 	atts := make([]Attachment, 0, len(m.Attachments))
 	for _, a := range m.Attachments {
 		atts = append(atts, Attachment{
@@ -194,11 +236,14 @@ func (s *Service) decryptMessage(ctx context.Context, u *keys.Unlocked, m rawMes
 			Disposition: a.Disposition, KeyPackets: a.KeyPackets,
 		})
 	}
+	v := verdicts(m.Flags)
 	return Full{
 		ID: m.ID, ConversationID: m.ConversationID, Subject: m.Subject, Sender: m.Sender,
 		ToList: m.ToList, CCList: m.CCList, BCCList: m.BCCList,
 		Time: m.Time, Body: body, MIMEType: m.MIMEType, AddressID: m.AddressID,
 		Attachments: atts, Signature: sig,
+		DMARCFailed: v.dmarcFailed, MarkedLegitimate: v.markedLegitimate,
+		Phishing: v.phishing, Suspicious: v.suspicious,
 	}
 }
 
@@ -219,7 +264,7 @@ func senderAddress(sender map[string]any) string {
 // question of what a secret may be sealed to.
 //
 // A key that cannot be reached or read is not a failure to show the message, so
-// it is recorded rather than raised. What it costs the reader is the difference
+// it is logged rather than raised. What it costs the reader is the difference
 // between "this was not signed" and "nobody could check", which looks the same on
 // screen - so the log is the only thing that can tell them apart, and it says
 // which of the two happened.
@@ -242,18 +287,32 @@ func (s *Service) senderKeyRing(ctx context.Context, email string) *pgp.KeyRing 
 func (s *Service) fetchSenderKeyRing(ctx context.Context, email string) *pgp.KeyRing {
 	ring, err := keys.Signing(ctx, s.C, email)
 	if err != nil {
-		skip.Record(ctx, skip.KindKey, email, skip.Unreadable, err)
+		// Recorded and not counted: nothing is missing from the answer that the
+		// answer does not already state. The message is shown whole, and its
+		// Signature line says the sender could not be verified.
+		slog.DebugContext(ctx, "mail: the sender's key could not be fetched",
+			"kind", string(skip.KindKey), "reason", string(skip.Unreadable),
+			"signer", email, "error", err)
 		return nil
 	}
 	return ring
 }
 
+// Read is one message, decrypted.
+//
+// A body that will not open fails the read rather than standing in for itself:
+// this is the one message somebody asked for, and text saying why it is absent
+// would go on to be quoted, exported and piped as though it were the message.
 func (s *Service) Read(ctx context.Context, id string) (*Full, error) {
 	raw, u, err := s.messageAndKeys(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	full := s.decryptMessage(ctx, u, *raw)
+	body, sig, err := s.openBody(ctx, u, *raw, true)
+	if err != nil {
+		return nil, err
+	}
+	full := asFull(*raw, body, sig)
 	return &full, nil
 }
 

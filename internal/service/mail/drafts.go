@@ -234,7 +234,7 @@ func (s *Service) DraftLoad(ctx context.Context, id string) (*Draft, error) {
 	if !ok {
 		rings = sender.Keys
 	}
-	body, _, err := decryptBody(raw.Body, rings.Read, nil)
+	body, _, err := s.openBody(ctx, u, *raw, false)
 	if err != nil {
 		return nil, fmt.Errorf("decrypt draft: %w", err)
 	}

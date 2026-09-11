@@ -158,6 +158,25 @@ func TestRecordSignatureVerdicts(t *testing.T) {
 	check(t, "record_signature", out, errb)
 }
 
+// A record assembled out of parts can be short of one, exactly as a listing can,
+// and the sentence belongs beside it rather than in a log nobody is reading.
+func TestRecordSaysWhenSomethingCouldNotBeRead(t *testing.T) {
+	u, out, errb := fixture(t, Options{})
+	spec := RecordSpec{
+		Fields:  []Field{{Label: "Name", Value: "github.com"}},
+		Skipped: IncompleteSpec{Count: 1, Kind: "item"},
+	}
+	if err := Record(u, spec); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "github.com") {
+		t.Errorf("stdout = %q, want the record itself", out.String())
+	}
+	if !strings.Contains(errb.String(), "1 item could not be decrypted") {
+		t.Errorf("stderr = %q, want the caveat", errb.String())
+	}
+}
+
 // A colour on a record must not change what a pipe receives.
 func TestRecordColourLeavesTheTextAlone(t *testing.T) {
 	spec := RecordSpec{Fields: []Field{

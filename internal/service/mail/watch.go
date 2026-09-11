@@ -46,11 +46,6 @@ const (
 	eventFlags  = 3
 )
 
-// flagImported marks a message that arrived by import rather than by post. The
-// web clients leave those out of notifications, because importing a mailbox is
-// not fifty thousand new messages.
-const flagImported = 1 << 9
-
 // WatchOptions says which arrivals are worth reporting.
 type WatchOptions struct {
 	// In is where to watch. WatchedIn works out the default.
@@ -173,7 +168,7 @@ type eventBatch struct {
 	Messages []struct {
 		ID      string
 		Action  int
-		Message *rawEventMessage
+		Message *rawListMessage
 	}
 	Conversations []struct {
 		ID           string
@@ -184,13 +179,6 @@ type eventBatch struct {
 			LabelIDsRemoved        []string
 		}
 	}
-}
-
-// rawEventMessage is a message as the feed carries it: the same envelope a
-// listing returns, plus the one field only an arrival asks about.
-type rawEventMessage struct {
-	rawListMessage
-	Flags int64
 }
 
 // arrivals are the messages in this page worth telling somebody about.
@@ -204,7 +192,7 @@ func (b eventBatch) arrivals(opts WatchOptions) []Message {
 	var out []Message
 	for _, e := range b.Messages {
 		if e.Action == eventCreate && e.Message.arrived(opts) {
-			out = append(out, toMessage(e.Message.rawListMessage))
+			out = append(out, toMessage(*e.Message))
 		}
 	}
 	for _, e := range b.Conversations {
@@ -225,7 +213,7 @@ func (b eventBatch) arrivals(opts WatchOptions) []Message {
 // newestIn finds the latest message of a conversation in this page, which is the
 // one a thread is worth naming by.
 func (b eventBatch) newestIn(conversation string, opts WatchOptions) *Message {
-	var newest *rawEventMessage
+	var newest *rawListMessage
 	for _, e := range b.Messages {
 		m := e.Message
 		if m == nil || m.ConversationID != conversation || !m.matches(opts) {
@@ -238,21 +226,23 @@ func (b eventBatch) newestIn(conversation string, opts WatchOptions) *Message {
 	if newest == nil {
 		return nil
 	}
-	msg := toMessage(newest.rawListMessage)
+	msg := toMessage(*newest)
 	return &msg
 }
 
 // arrived reports whether a created message is one that just came in, rather
 // than one the account produced or absorbed: a draft saved, a copy filed in
-// Sent, or a mailbox imported.
-func (m *rawEventMessage) arrived(opts WatchOptions) bool {
+// Sent, or a mailbox imported. The web clients leave an import out of their
+// notifications too, because importing a mailbox is not fifty thousand new
+// messages.
+func (m *rawListMessage) arrived(opts WatchOptions) bool {
 	if m == nil || m.Unread != 1 || m.Flags&flagImported != 0 {
 		return false
 	}
 	return m.matches(opts)
 }
 
-func (m *rawEventMessage) matches(opts WatchOptions) bool {
+func (m *rawListMessage) matches(opts WatchOptions) bool {
 	if m == nil {
 		return false
 	}
