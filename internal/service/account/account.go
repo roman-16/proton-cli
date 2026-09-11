@@ -9,6 +9,7 @@ package account
 import (
 	"context"
 
+	"github.com/roman-16/proton-cli/internal/fetch"
 	"github.com/roman-16/proton-cli/internal/proton"
 )
 
@@ -28,9 +29,33 @@ type Account struct {
 	MaxSpace    int64  `json:"max_space"`
 	MaxUpload   int64  `json:"max_upload"`
 	CreateTime  int64  `json:"create_time"`
+	// LockedKeys is how many of the account's keys a password reset left shut,
+	// counting the user's own and every address's. Everything sealed to them
+	// stays sealed until they are reactivated.
+	LockedKeys int `json:"locked_keys,omitempty"`
+}
+
+// keyed is anything Proton hands back with its keys: the user, an address.
+type keyed struct {
+	Keys []struct{ Active int }
+}
+
+// locked counts the keys that are shut.
+func (k keyed) locked() int {
+	n := 0
+	for _, key := range k.Keys {
+		if key.Active == 0 {
+			n++
+		}
+	}
+	return n
 }
 
 // Get fetches the account record.
+//
+// The account and its addresses are asked for together: the keys of both are
+// what says whether a password reset left anything locked, and neither answer
+// is needed to ask for the other.
 func (s *Service) Get(ctx context.Context) (*Account, error) {
 	var r struct {
 		User struct {
@@ -42,9 +67,18 @@ func (s *Service) Get(ctx context.Context) (*Account, error) {
 			MaxSpace    int64
 			MaxUpload   int64
 			CreateTime  int64
+			keyed
 		}
 	}
-	if err := s.C.Decode(ctx, proton.Request{Method: "GET", Path: "/core/v4/users"}, &r); err != nil {
+	var a struct{ Addresses []keyed }
+	if err := fetch.Together(ctx,
+		func(ctx context.Context) error {
+			return s.C.Decode(ctx, proton.Request{Method: "GET", Path: "/core/v4/users"}, &r)
+		},
+		func(ctx context.Context) error {
+			return s.C.Decode(ctx, proton.Request{Method: "GET", Path: "/core/v4/addresses"}, &a)
+		},
+	); err != nil {
 		return nil, err
 	}
 	u := r.User
@@ -59,9 +93,14 @@ func (s *Service) Get(ctx context.Context) (*Account, error) {
 	if name == "" {
 		name = u.Name
 	}
+	locked := u.locked()
+	for _, addr := range a.Addresses {
+		locked += addr.locked()
+	}
 	return &Account{
 		ID: u.ID, Email: email, DisplayName: name,
 		UsedSpace: u.UsedSpace, MaxSpace: u.MaxSpace,
 		MaxUpload: u.MaxUpload, CreateTime: u.CreateTime,
+		LockedKeys: locked,
 	}, nil
 }

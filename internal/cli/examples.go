@@ -29,6 +29,12 @@ var examples = map[string][]string{
 		"proton account get",
 		"proton account get --output json",
 	},
+	"proton account keys reactivate": {
+		"proton account keys reactivate",
+		"proton account keys reactivate --recovery-phrase",
+		"proton account keys reactivate --recovery-file ~/Downloads/proton_recovery.asc",
+		"proton account keys reactivate --previous-password-file /run/secrets/proton-old --password-file /run/secrets/proton",
+	},
 	"proton account login": {
 		"proton account login",
 		"proton account login --profile work",
@@ -345,6 +351,15 @@ var examples = map[string][]string{
 	"proton drive settings get":  {"proton drive settings get"},
 	"proton drive settings list": {"proton drive settings list"},
 	"proton drive settings set":  {"proton drive settings set version-history 30d"},
+	"proton drive volumes list":  {"proton drive volumes list"},
+	"proton drive volumes restore": {
+		"proton drive volumes restore 7Kd91mQx",
+		"proton drive volumes restore --all",
+	},
+	"proton drive volumes delete": {
+		"proton drive volumes delete 7Kd91mQx",
+		"proton drive volumes delete 7Kd91mQx --yes",
+	},
 
 	// ── mail: messages ──
 	"proton mail messages list": {

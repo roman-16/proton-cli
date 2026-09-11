@@ -23,7 +23,7 @@ func TestPassSecureLinkShowsOneItemToAnybody(t *testing.T) {
 	ref := strings.TrimSpace(out)
 	cleanupRunPaid(t, "Delete item: proton pass items delete "+ref, "pass", "items", "delete", ref)
 
-	shown, stderr := runOKStderrPaid(t, "pass", "links", "create", ref, "--expires", "1h", "--views", "2")
+	shown, stderr := runOKStderrPaid(t, "pass", "links", "create", "--expires", "1h", "--views", "2", ref)
 
 	// The URL carries the key after a '#', which is what a browser never sends
 	// to Proton - so a link without one would be a link nothing can open.

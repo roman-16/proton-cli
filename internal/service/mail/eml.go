@@ -51,7 +51,7 @@ func (s *Service) Export(ctx context.Context, id string, withAttachments bool) (
 		// goes in as it stands, so the message is exported whole and somebody
 		// holding the key can still read it - which is what a backup is for.
 		slog.DebugContext(ctx, "mail: a body was exported as ciphertext",
-			"kind", string(skip.KindMessage), "reason", string(skip.Undecryptable),
+			"kind", string(skip.KindMessage), "reason", string(u.Shut(sealed(raw.Body))),
 			"ref", raw.ID, "error", err)
 		body = raw.Body
 	}

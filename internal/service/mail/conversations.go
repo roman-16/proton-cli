@@ -89,7 +89,7 @@ func (s *Service) ConversationRead(ctx context.Context, id string) (*Conversatio
 		// what was shown, and the warning beside it is what was not.
 		body, sig, err := s.openBody(ctx, u, m, true)
 		if err != nil {
-			skip.Record(ctx, skip.KindMessage, m.ID, skip.Undecryptable, err)
+			skip.Record(ctx, skip.KindMessage, m.ID, u.Shut(sealed(m.Body)), err)
 			continue
 		}
 		msgs = append(msgs, asFull(m, body, sig))

@@ -227,6 +227,17 @@ func (s *Service) openBody(ctx context.Context, u *keys.Unlocked, m rawMessage, 
 	return decryptBody(m.Body, rings.Read, verKR)
 }
 
+// sealed is a body as the message it is, for asking which keys it was sealed to.
+// A body that is not a message at all answers nothing, which is the right answer
+// to that question.
+func sealed(body string) *pgp.PGPMessage {
+	msg, err := pgp.NewPGPMessageFromArmored(body)
+	if err != nil {
+		return nil
+	}
+	return msg
+}
+
 // asFull is a raw message with its decrypted body, as a reader sees it.
 func asFull(m rawMessage, body string, sig pgphelper.VerifyResult) Full {
 	atts := make([]Attachment, 0, len(m.Attachments))
@@ -310,7 +321,7 @@ func (s *Service) Read(ctx context.Context, id string) (*Full, error) {
 	}
 	body, sig, err := s.openBody(ctx, u, *raw, true)
 	if err != nil {
-		return nil, err
+		return nil, u.Explain(err, "message", sealed(raw.Body))
 	}
 	full := asFull(*raw, body, sig)
 	return &full, nil

@@ -526,6 +526,12 @@ import Footer from "../components/Footer.astro";
     margin-block: 1.5rem 0;
   }
 
+  .stats :global(.figure),
+  .stats :global(.legend li),
+  .stats :global(.ranked li) {
+    margin-block-start: 0;
+  }
+
   .stats :global(.figure) {
     display: flex;
     flex-direction: column;

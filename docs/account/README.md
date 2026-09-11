@@ -2,9 +2,9 @@
 
 Sign in once and your password is never asked for again on that machine.
 
-This page covers signing in and out, unattended and two-password sign-in, running several Proton accounts side by side, the sessions Proton holds across your devices, and your account settings.
+This page covers signing in and out, unattended and two-password sign-in, running several Proton accounts side by side, the sessions Proton holds across your devices, unlocking data after a password reset, and your account settings.
 
-For every command and flag, see the reference: [account](account.md), [sessions](sessions.md), [profiles](profiles.md), [settings](settings.md).
+For every command and flag, see the reference: [account](account.md), [keys](keys.md), [sessions](sessions.md), [profiles](profiles.md), [settings](settings.md).
 
 ## Check who you are signed in as
 
@@ -12,12 +12,12 @@ For every command and flag, see the reference: [account](account.md), [sessions]
 $ proton account get
 Email:       you@proton.me
 Name:        Roman
-Storage:     128.4 GB of 500 GB (26%)
-Max Upload:  5.0 GB
+Storage:     ━━━━━───────────────   26%  119.6 GB of 465.7 GB
+Max Upload:  4.7 GB
 Profile:     default
 Session:     valid
 Unlocked:    yes
-ID:          Kd91mQxT…
+ID:          Kd91mQxT7v
 ```
 
 `Session: valid` and `Unlocked: yes` together mean this machine can act as the account right now.
@@ -125,6 +125,7 @@ proton account login --user alice@proton.me \
 
 These commands ask for your password again even when you are signed in:
 
+- `account keys reactivate`
 - `calendar settings calendars delete`
 - `mail messages expire`
 - `mail settings addresses create`
@@ -148,6 +149,65 @@ printf '%s' "$PW" | proton calendar settings calendars delete Work --password-st
 $ printf '%s' "$PW" | proton --password-stdin mail messages send --body - ...
 Error: --password-stdin and --body - both read standard input, which can only be read once.
 Try:   pass it with --password-file instead
+```
+
+## After a password reset
+
+A password reset locks everything encrypted before it. Mail, contacts, calendars, vaults and Drive stay sealed until you bring the old keys back:
+
+```bash
+proton account keys reactivate
+```
+
+It asks for the password from before the reset, then for your current password. In two-password mode, the one from before the reset is the second password.
+
+```console
+$ proton account keys reactivate
+Previous password:
+Current password:
+✓ Reactivated 3 keys.
+```
+
+A recovery phrase or a recovery file works instead:
+
+```bash
+proton account keys reactivate --recovery-phrase
+proton account keys reactivate --recovery-file ~/Downloads/proton_recovery.asc
+```
+
+Keys the secret does not open stay locked and are named. A key from an earlier reset opens with the secret from that time, so run the command again with it.
+
+What was locked opens from the next command onwards. Drive files need one more step, under [Drive](../drive/README.md#after-a-password-reset).
+
+`proton account get` counts what is still locked:
+
+```console
+$ proton account get
+Email:        you@proton.me
+Name:         Roman
+Storage:      ━━━━━───────────────   26%  119.6 GB of 465.7 GB
+Max Upload:   4.7 GB
+Profile:      default
+Session:      valid
+Unlocked:     yes
+Locked keys:  3
+ID:           Kd91mQxT7v
+```
+
+Until then, a command that meets locked data names why:
+
+```console
+$ proton mail messages get "Invoice #2291"
+Error: This message is sealed to a key that a password reset locked.
+Try:   proton account keys reactivate
+```
+
+An unattended run hands both secrets over:
+
+```bash
+proton account keys reactivate \
+    --previous-password-file /run/secrets/proton-old \
+    --password-file /run/secrets/proton
 ```
 
 ## Sign out

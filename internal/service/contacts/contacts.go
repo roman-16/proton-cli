@@ -246,7 +246,7 @@ func (s *Service) List(ctx context.Context) ([]Contact, error) {
 		for _, c := range r.Contacts {
 			ct, err := openContact(c.ID, c.Cards, u)
 			if err != nil {
-				skip.Record(ctx, skip.KindContact, c.ID, skip.Undecryptable, err)
+				skip.Record(ctx, skip.KindContact, c.ID, u.Shut(sealedCard(c.Cards)), err)
 				continue
 			}
 			out = append(out, ct)
@@ -270,9 +270,26 @@ func (s *Service) Get(ctx context.Context, id string) (*Contact, error) {
 	}
 	c, err := openContact(r.Contact.ID, r.Contact.Cards, u)
 	if err != nil {
-		return nil, err
+		return nil, u.Explain(err, "contact", sealedCard(r.Contact.Cards))
 	}
 	return &c, nil
+}
+
+// sealedCard is a contact's encrypted card as the message it is, for asking
+// which keys it was sealed to. A contact with no encrypted card answers nothing,
+// which is the right answer to that question.
+func sealedCard(raw []map[string]any) *gopenpgp.PGPMessage {
+	for _, m := range raw {
+		t, _ := m["Type"].(float64)
+		if int(t) != pgp.CardEncrypted && int(t) != pgp.CardEncryptedSigned {
+			continue
+		}
+		data, _ := m["Data"].(string)
+		if msg, err := gopenpgp.NewPGPMessageFromArmored(data); err == nil {
+			return msg
+		}
+	}
+	return nil
 }
 
 // openContact decrypts a contact's cards and reads the contact out of them.

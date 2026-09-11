@@ -95,6 +95,7 @@ var (
 	Unfavorited      = Action{"Unfavorited", "unfavorite", "unfavorited", Ordinary}
 	Pinned           = Action{"Pinned", "pin", "pinned", Ordinary}
 	Unpinned         = Action{"Unpinned", "unpin", "unpinned", Ordinary}
+	Reactivated      = Action{"Reactivated", "reactivate", "reactivated", Ordinary}
 	Responded        = Action{"Responded", "respond", "responded", Ordinary}
 	Set              = Action{"Set", "set", "set", Ordinary}
 	Invited          = Action{"Invited", "invite", "invited", Ordinary}
@@ -120,7 +121,7 @@ var Actions = []Action{
 	Labelled, Unlabelled, Starred, Unstarred, MarkedRead, MarkedUnread,
 	MarkedLegitimate, Reported,
 	Enabled, Disabled, Linked, Unlinked, Added, Removed, Left, Accepted, Declined,
-	Favorited, Unfavorited, Pinned, Unpinned, Responded, Set, Invited, Revoked,
+	Favorited, Unfavorited, Pinned, Unpinned, Reactivated, Responded, Set, Invited, Revoked,
 	Transferred, SignedIn, SignedOut,
 }
 

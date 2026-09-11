@@ -160,7 +160,7 @@ func (s *Service) decryptShareKeys(ctx context.Context, shareID string) (*shareK
 			msg := pgp.NewPGPMessage(kb)
 			dec, err := u.UserKR.Decrypt(msg, u.UserKR, pgp.GetUnixTime())
 			if err != nil {
-				skip.Record(ctx, skip.KindKey, shareID, skip.Undecryptable, err)
+				skip.Record(ctx, skip.KindKey, shareID, u.Shut(msg), err)
 				continue
 			}
 			out.keys[k.KeyRotation] = dec.GetBinary()

@@ -15,9 +15,10 @@ import (
 // package says about somebody's keys that other clients will believe. Two rules
 // follow, and everything here is one of them: a list is only composed where
 // there is nothing to contradict, and a list that already exists is signed
-// again with its bytes untouched - except that turning end-to-end encryption on
-// or off flips the one flag bit on every entry that Proton's clients flip, and
-// nothing else about it.
+// again with its bytes untouched - except for the two changes Proton's clients
+// make to one: turning end-to-end encryption on or off flips the one flag bit on
+// every entry, and bringing a key back after a password reset names it again at
+// the end, as a key that encrypts nothing new.
 
 // sklSigningContext is the notation Proton's clients sign a key list under,
 // which is what stops a signature over one being read as a signature over
@@ -34,6 +35,12 @@ const mailKeyFlags = 3
 // address cannot be encrypted to that key. Mirrors KEY_FLAG.FLAG_EMAIL_NO_ENCRYPT
 // in WebClients (packages/shared/lib/constants.ts).
 const keyEncryptionOff = 4
+
+// keyNotObsolete is the bit an entry carries while the key may still be
+// encrypted to. A key brought back after a password reset comes back without
+// it: it opens and verifies what was sealed to it and is sealed to nothing new,
+// which is what Proton's clients write for one. Mirrors KEY_FLAG.FLAG_NOT_OBSOLETE.
+const keyNotObsolete = 2
 
 // keyListEntry is one key as a key list names it. The field order is the order
 // Proton's clients write, since the list is stored as the text that was signed.
@@ -114,6 +121,40 @@ func withEncryption(data string, on bool) (string, error) {
 			continue
 		}
 		items[i].Flags |= keyEncryptionOff
+	}
+	out, err := json.Marshal(items)
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
+}
+
+// withReactivated is the published list with keys a password reset had locked
+// named again at its end.
+//
+// Every entry the list had stays as it was: the address's live keys are not what
+// changed. Each key coming back is added primary to nothing and no longer
+// encryptable to, under the flags its record carried otherwise, which is the
+// entry Proton's own clients write for a reactivated key.
+func withReactivated(data string, keys []reactivated) (string, error) {
+	var items []keyListEntry
+	if err := json.Unmarshal([]byte(data), &items); err != nil {
+		return "", fmt.Errorf("read the published key list: %w", err)
+	}
+	if len(items) == 0 {
+		return "", fmt.Errorf("the published key list names no key")
+	}
+	for _, k := range keys {
+		flags := k.record.Flags
+		if flags == 0 {
+			flags = mailKeyFlags
+		}
+		items = append(items, keyListEntry{
+			Primary:            0,
+			Flags:              flags &^ keyNotObsolete,
+			Fingerprint:        k.key.GetFingerprint(),
+			SHA256Fingerprints: k.key.GetSHA256Fingerprints(),
+		})
 	}
 	out, err := json.Marshal(items)
 	if err != nil {

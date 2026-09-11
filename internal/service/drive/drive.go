@@ -46,8 +46,11 @@ type Context struct {
 	Addr         keys.Rings
 	AddrID       string
 	AddrEmail    string
-	VolumeID     string
-	RootLinkID   string
+	// addrKeys is every key record of the address the tree was opened through,
+	// for the requests that name the signing key by ID.
+	addrKeys   []keys.Key
+	VolumeID   string
+	RootLinkID string
 	// Permissions is what the tree permits whoever opened it, as Proton numbers
 	// them: what a link grants its readers, or what your membership in somebody
 	// else's share grants you. A tree of your own is nobody's to grant and
@@ -108,13 +111,14 @@ func (dc *Context) RootKR() (*pgp.KeyRing, error) {
 	return kr, nil
 }
 
+// Resolve opens the tree your own files are in: the account's active files
+// volume, which is the one Proton's own clients work in.
+//
+// A volume a password reset locked is passed over, whatever position it holds
+// in the list; its files are reached by restoring it. An account with no active
+// files volume has nothing to open, and says so as NoVolume.
 func (s *Service) Resolve(ctx context.Context) (*Context, error) {
-	var r struct {
-		Volumes []struct {
-			VolumeID string
-			Share    struct{ ShareID, LinkID string }
-		}
-	}
+	var r struct{ Volumes []volumeRecord }
 	// The keys leave with the first request rather than after it: the volume has
 	// to answer before the share can be named, and the share cannot be opened
 	// without them.
@@ -123,34 +127,24 @@ func (s *Service) Resolve(ctx context.Context) (*Context, error) {
 	}); err != nil {
 		return nil, err
 	}
-	if len(r.Volumes) == 0 {
-		return nil, fmt.Errorf("no volumes found")
-	}
-	return s.unlockShare(ctx, r.Volumes[0].Share.ShareID, r.Volumes[0].Share.LinkID, r.Volumes[0].VolumeID)
-}
-
-// ResolvePhotos resolves the dedicated photos share (ShareType 4) and unwraps
-// its keys, parallel to Resolve for the main volume.
-func (s *Service) ResolvePhotos(ctx context.Context) (*Context, error) {
-	var r struct {
-		Shares []struct {
-			ShareID  string
-			LinkID   string
-			VolumeID string
-			Type     int
-			State    int
-			Locked   bool
+	for _, v := range r.Volumes {
+		if v.Type == volumeFiles && v.State == volumeActive {
+			return s.unlockShare(ctx, v.shareID(), v.Share.LinkID, v.id())
 		}
 	}
-	q := url.Values{}
-	q.Set("ShowAll", "1")
-	if _, err := s.keys.Alongside(ctx, func(ctx context.Context) error {
-		return s.C.Decode(ctx, proton.Request{Method: "GET", Path: "/drive/shares", Query: q}, &r)
-	}); err != nil {
+	slog.DebugContext(ctx, "drive: no active files volume", "volumes", len(r.Volumes))
+	return nil, &NoVolume{}
+}
+
+// ResolvePhotos opens the photo library, which Proton keeps on a share of its
+// own, parallel to Resolve for the file tree.
+func (s *Service) ResolvePhotos(ctx context.Context) (*Context, error) {
+	shares, _, err := s.listShares(ctx)
+	if err != nil {
 		return nil, err
 	}
-	for _, sh := range r.Shares {
-		if sh.Type == 4 && !sh.Locked {
+	for _, sh := range shares {
+		if sh.Type == shareTypePhotos && !sh.Locked {
 			return s.unlockShare(ctx, sh.ShareID, sh.LinkID, sh.VolumeID)
 		}
 	}
@@ -197,9 +191,10 @@ func (s *Service) unlockShare(ctx context.Context, shareID, rootLinkID, volumeID
 		return nil, fmt.Errorf("no key ring for address %s", sh.AddressID)
 	}
 	var addrEmail string
+	var addrKeys []keys.Key
 	for _, a := range u.Addresses {
 		if a.ID == sh.AddressID {
-			addrEmail = a.Email
+			addrEmail, addrKeys = a.Email, a.Keys
 			break
 		}
 	}
@@ -209,7 +204,7 @@ func (s *Service) unlockShare(ctx context.Context, shareID, rootLinkID, volumeID
 	}
 	dec, err := addrRings.Read.Decrypt(enc, nil, pgp.GetUnixTime())
 	if err != nil {
-		return nil, fmt.Errorf("decrypt share passphrase: %w", err)
+		return nil, u.Explain(fmt.Errorf("decrypt share passphrase: %w", err), "share", enc)
 	}
 	norm := pgp.NewPlainMessageFromString(string(dec.GetBinary()))
 	if v := pgphelper.VerifyDetachedStatus(addrRings.Read, norm, sh.PassphraseSignature); v != pgphelper.Verified {
@@ -229,7 +224,7 @@ func (s *Service) unlockShare(ctx context.Context, shareID, rootLinkID, volumeID
 	}
 	dc := &Context{
 		ShareID: shareID, ShareKR: shareKR,
-		Addr: addrRings, AddrID: sh.AddressID, AddrEmail: addrEmail,
+		Addr: addrRings, AddrID: sh.AddressID, AddrEmail: addrEmail, addrKeys: addrKeys,
 		VolumeID: volumeID, RootLinkID: rootLinkID, rootLink: rootLink,
 		Type: sh.Type, RootName: rootName(ctx, shareID, sh.Type, rootLink, shareKR),
 	}

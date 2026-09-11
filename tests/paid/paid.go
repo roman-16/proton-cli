@@ -57,6 +57,10 @@ func Restrictions() []Restriction {
 		Command: []string{"drive", "trash", "empty"},
 		Why:     "it deletes everything in the trash, including whatever was there before the run",
 	}, {
+		Command: []string{"drive", "volumes", "delete"},
+		Why: "it deletes a volume with every file on it, and Proton removes them within" +
+			" 72 hours with nothing to bring them back",
+	}, {
 		Command: []string{"mail", "messages", "empty"},
 		Why:     "it deletes a whole folder with no listing of what was in it",
 	}, {

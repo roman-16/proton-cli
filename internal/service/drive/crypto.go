@@ -188,24 +188,36 @@ func genNodeKeys(parentKR, addrKR *pgp.KeyRing) (nodeKey, passphrase, passSig st
 	if err != nil {
 		return "", "", "", nil, err
 	}
-	msg := pgp.NewPlainMessageFromString(phrase)
-	enc, err := parentKR.Encrypt(msg, nil)
-	if err != nil {
-		return "", "", "", nil, err
-	}
-	armPass, err := enc.GetArmored()
-	if err != nil {
-		return "", "", "", nil, err
-	}
-	sig, err := addrKR.SignDetached(msg)
-	if err != nil {
-		return "", "", "", nil, err
-	}
-	armSig, err := sig.GetArmored()
+	armPass, armSig, err := sealPassphrase(phrase, parentKR, addrKR)
 	if err != nil {
 		return "", "", "", nil, err
 	}
 	return armKey, armPass, armSig, key, nil
+}
+
+// sealPassphrase encrypts a node's passphrase to the key above it and signs it
+// as the address, which is how every passphrase in the tree is written: the
+// signature is detached, so what Proton stores is the passphrase and a
+// signature beside it rather than one message holding both.
+func sealPassphrase(phrase string, parentKR, addrKR *pgp.KeyRing) (passphrase, signature string, err error) {
+	msg := pgp.NewPlainMessageFromString(phrase)
+	enc, err := parentKR.Encrypt(msg, nil)
+	if err != nil {
+		return "", "", err
+	}
+	armored, err := enc.GetArmored()
+	if err != nil {
+		return "", "", err
+	}
+	sig, err := addrKR.SignDetached(msg)
+	if err != nil {
+		return "", "", err
+	}
+	armoredSig, err := sig.GetArmored()
+	if err != nil {
+		return "", "", err
+	}
+	return armored, armoredSig, nil
 }
 
 // genShareKeys differs from genNodeKeys: it encrypts the passphrase to a

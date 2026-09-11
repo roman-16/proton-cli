@@ -40,6 +40,9 @@ type Unlocked struct {
 	UserKR    *pgp.KeyRing
 	AddrKRs   map[string]Rings
 	Addresses []Address
+	// UserKeys is every user key record Proton holds, open or not: the ones a
+	// reactivation looks for are the ones that did not open.
+	UserKeys []Key
 	// PaidMail says whether the account's plan includes Mail, which is what
 	// Proton gates setting up a forwarding behind.
 	PaidMail bool
@@ -49,6 +52,107 @@ type Unlocked struct {
 	// Now is the time as Proton keeps it, which is what every key and signature
 	// this build writes is dated by. Nil falls back to this machine's clock.
 	Now func() time.Time
+
+	// keyPass is the passphrase the hierarchy opened with, kept because a key
+	// brought back after a password reset is locked under it before Proton is
+	// handed the key.
+	keyPass []byte
+	// recoveryPhrase says whether the account has a recovery phrase to recover
+	// with, which is asked before a phrase is taken from anybody.
+	recoveryPhrase bool
+	// lockedID is the PGP key IDs the locked keys hold, so that a message which
+	// will not open can be asked whether one of them is the reason. It is the one
+	// thing about them that cannot be read off a record.
+	lockedID map[uint64]bool
+}
+
+// LockedKey is a key of the account's that a password reset left shut: Proton
+// still holds it, nothing opens it, and everything sealed to it stays sealed
+// until it is reactivated.
+type LockedKey struct {
+	Key Key
+	// AddressID and Email name the address the key belongs to, and are empty for
+	// a user key.
+	AddressID string
+	Email     string
+}
+
+// Locked is every key a password reset left shut, account keys first.
+//
+// A key Proton marks inactive is one nothing opens: the unlock passes over it,
+// so whatever was sealed to it stays sealed. That is what the record says, so
+// this reads it rather than remembering it.
+func (u *Unlocked) Locked() []LockedKey {
+	out := u.LockedAccountKeys()
+	for _, a := range u.Addresses {
+		for _, k := range a.Keys {
+			if k.Active == 0 {
+				out = append(out, LockedKey{Key: k, AddressID: a.ID, Email: a.Email})
+			}
+		}
+	}
+	return out
+}
+
+// LockedAccountKeys is the locked keys of the account itself, which are the ones
+// a secret from before the reset opens. Every locked address key comes back with
+// the account key whose token opens it.
+func (u *Unlocked) LockedAccountKeys() []LockedKey {
+	var out []LockedKey
+	for _, k := range u.UserKeys {
+		if k.Active == 0 {
+			out = append(out, LockedKey{Key: k})
+		}
+	}
+	return out
+}
+
+// HasRecoveryPhrase reports whether the account has a recovery phrase for a
+// phrase to be checked against.
+func (u *Unlocked) HasRecoveryPhrase() bool { return u.recoveryPhrase }
+
+// SealedToLocked reports whether a message was encrypted to one of the account's
+// locked keys, which is what tells "a password reset locked this" from "this
+// build could not open it". A message names the keys it is sealed to, so the
+// answer is read off the message rather than guessed from the account.
+func (u *Unlocked) SealedToLocked(msg *pgp.PGPMessage) bool {
+	if msg == nil || len(u.lockedID) == 0 {
+		return false
+	}
+	ids, _ := msg.GetEncryptionKeyIDs()
+	for _, id := range ids {
+		if u.lockedID[id] {
+			return true
+		}
+	}
+	return false
+}
+
+// Shut names why a message did not open, for the tally: sealed to a key a
+// password reset locked, or something this build could not open.
+func (u *Unlocked) Shut(msg *pgp.PGPMessage) skip.Reason {
+	if u.SealedToLocked(msg) {
+		return skip.Locked
+	}
+	return skip.Undecryptable
+}
+
+// Explain phrases a failure to open one thing for the person who asked for it:
+// a thing sealed to a locked key gets the sentence that says so, and anything
+// else is left as it was, which is what marks it as this build's to answer for.
+func (u *Unlocked) Explain(err error, kind string, msg *pgp.PGPMessage) error {
+	if err == nil || !u.SealedToLocked(msg) {
+		return err
+	}
+	return LockedData(kind)
+}
+
+// LockedData is the sentence for a thing sealed to a key a password reset
+// locked: the one decryption failure that is nobody's bug and that this CLI can
+// put right.
+func LockedData(kind string) error {
+	return errs.Problemf("This %s is sealed to a key that a password reset locked.", kind).
+		Hint("proton account keys reactivate")
 }
 
 // Get hands back the unlocked hierarchy, fetching it the first time it is asked
@@ -85,6 +189,23 @@ type User struct {
 	Keys []Key
 	// Subscribed is which products the account's plan covers, one bit each.
 	Subscribed int
+	// MnemonicStatus is where the account stands with its recovery phrase, as
+	// Proton numbers it. Mirrors MNEMONIC_STATUS in WebClients
+	// (packages/shared/lib/interfaces/User.ts).
+	MnemonicStatus int
+}
+
+// The two states in which a recovery phrase exists to recover with: set and
+// current, or set before the keys it opens were replaced - which still opens
+// the keys it was set for, and those are exactly the ones a reset left locked.
+const (
+	mnemonicOutdated = 2
+	mnemonicSet      = 3
+)
+
+// hasRecoveryPhrase reports whether the account has a recovery phrase at all.
+func (u User) hasRecoveryPhrase() bool {
+	return u.MnemonicStatus == mnemonicOutdated || u.MnemonicStatus == mnemonicSet
 }
 
 // productMail is the bit of Subscribed that says the plan covers Mail. Mirrors
@@ -163,6 +284,11 @@ type Key struct {
 	Signature  string
 	Primary    int
 	Active     int
+	// Flags is what the key may be used for, as Proton's key lists carry it.
+	Flags int
+	// RecoverySecret is what a recovery file downloaded for this account is
+	// encrypted with. Only a user key carries one.
+	RecoverySecret string
 }
 
 type salt struct {
@@ -311,10 +437,42 @@ func open(ctx context.Context, now func() time.Time, user *User, addrs []Address
 	if len(addrKRs) == 0 {
 		return nil, shape
 	}
-	return &Unlocked{
-		UserKR: userKR, AddrKRs: addrKRs, Addresses: addrs,
+	u := &Unlocked{
+		UserKR: userKR, AddrKRs: addrKRs, Addresses: addrs, UserKeys: user.Keys,
 		PaidMail: user.paidMail(), Username: user.Name, Now: now,
-	}, nil
+		recoveryPhrase: user.hasRecoveryPhrase(),
+		keyPass:        []byte(skp), lockedID: map[uint64]bool{},
+	}
+	locked := u.Locked()
+	for _, k := range locked {
+		u.noteLocked(ctx, k)
+	}
+	if len(locked) > 0 {
+		slog.DebugContext(ctx, "keys: a password reset left keys locked", "keys_locked", len(locked))
+	}
+	return u, nil
+}
+
+// noteLocked remembers the PGP key IDs a locked key holds. The public half of a
+// locked key reads without its passphrase, which is all that naming its IDs
+// takes.
+//
+// Recorded and not counted: a locked key that will not even parse cannot be
+// matched against a message, so a failure sealed to it reads as this build's
+// rather than the reset's - which is the worse of the two mistakes, and the
+// only one this line leaves anything to diagnose from.
+func (u *Unlocked) noteLocked(ctx context.Context, k LockedKey) {
+	key, err := pgp.NewKeyFromArmored(k.Key.PrivateKey)
+	if err != nil {
+		slog.DebugContext(ctx, "keys: a locked key could not be read",
+			"kind", string(skip.KindKey), "reason", string(skip.Malformed), "ref", k.Key.ID, "error", err.Error())
+		return
+	}
+	entity := key.GetEntity()
+	u.lockedID[entity.PrimaryKey.KeyId] = true
+	for _, sub := range entity.Subkeys {
+		u.lockedID[sub.PublicKey.KeyId] = true
+	}
 }
 
 // unopenable is the account's shape when the user keys opened and not one
@@ -578,7 +736,7 @@ func (u *Unlocked) AddrRings(addrID string) (Rings, bool) {
 	return rings, ok
 }
 
-func getKeySalts(ctx context.Context, c *proton.Client) ([]salt, error) {
+func getKeySalts(ctx context.Context, c proton.Doer) ([]salt, error) {
 	var r struct{ KeySalts []salt }
 	if err := c.Decode(ctx, proton.Request{Method: "GET", Path: "/core/v4/keys/salts"}, &r); err != nil {
 		return nil, err

@@ -37,6 +37,12 @@ func TestAccountGetJSON(t *testing.T) {
 	} else if !unlocked {
 		t.Error("the suite runs with an unlocked session, so this should be true")
 	}
+	// Keys a password reset locked are counted, and an account with none is not
+	// told about a state it is not in.
+	if locked, ok := data["locked_keys"]; ok {
+		t.Errorf("locked_keys = %v, want the field absent while no key is locked", locked)
+	}
+	assertNotContains(t, runOK(t, "account", "get"), "Locked keys:")
 }
 
 // Storage is reported as a share of a total, which is how a person reads it.

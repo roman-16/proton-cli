@@ -49,6 +49,8 @@ func (s passwordSource) hint(flag string) []string {
 //	password  --password-file, else --password-stdin, else a prompt
 //	second    --second-password-file, else --second-password-stdin, else a prompt
 //	extra     --extra-password-file, else --extra-password-stdin, else a prompt
+//	previous  --previous-password-file, else --previous-password-stdin, else a prompt
+//	phrase    --recovery-phrase-file, else --recovery-phrase-stdin, else a prompt
 //	code      --totp, else a prompt
 //
 // Only `account login` names an account, and it does so with its own --user.
@@ -85,6 +87,21 @@ type Credentials struct {
 		value  string
 		have   bool
 	}
+	// previous is the password from before a password reset, which is what the
+	// keys the reset locked are still locked with. It opens nothing the account
+	// has now, so nothing else may be handed it by mistake.
+	previous struct {
+		source passwordSource
+		value  string
+		have   bool
+	}
+	// phrase is the account's recovery phrase, the other secret that opens keys a
+	// reset locked.
+	phrase struct {
+		source passwordSource
+		value  string
+		have   bool
+	}
 	// stdinOwner is set once the App exists, so Supply can claim standard input.
 	stdinOwner func(claim string) (io.Reader, error)
 
@@ -113,7 +130,15 @@ const (
 	// chooses rather than reads back: a hidden prompt shows nothing, and a typo
 	// in an extra password is not something anybody can put right afterwards.
 	labelConfirm = "Confirm"
-	labelTOTP    = "Two-factor code"
+	// labelPreviousPassword is the password from before a reset, under the name
+	// Proton's own recovery dialog gives it. labelCurrentPassword is what the
+	// account password is called in the one run that asks for both, so that
+	// neither prompt can be taken for the other.
+	labelPreviousPassword = "Previous password"
+	labelCurrentPassword  = "Current password"
+	// labelRecoveryPhrase is the twelve words, under Proton's name for them.
+	labelRecoveryPhrase = "Recovery phrase"
+	labelTOTP           = "Two-factor code"
 	// labelSecurityKeyPIN is the PIN of the key itself, which is set on the key
 	// and known only to it. It is never the account password, and a key counts
 	// wrong answers, so it is worth being unmistakable about which is wanted.
@@ -323,9 +348,78 @@ func (c *Credentials) Password(reason string) (string, error) {
 }
 
 func (c *Credentials) readPassword(reason string) (string, error) {
-	return c.read(c.source, labelPassword,
+	label := labelPassword
+	if c.previous.have {
+		label = labelCurrentPassword
+	}
+	return c.read(c.source, label,
 		errs.Problemf("Your password is required to %s.", reason).
 			Hint(c.source.hint("--password-file")...))
+}
+
+// SupplyPreviousPassword records where the password from before a reset may be
+// read from. Only reactivating keys declares it: nothing else the account does
+// wants a password that opens nothing it has now.
+func (c *Credentials) SupplyPreviousPassword(file string, stdin bool) error {
+	c.previous.source.file = file
+	c.previous.source.declared = true
+	if !stdin {
+		return nil
+	}
+	r, err := c.stdinOwner("--previous-password-stdin")
+	if err != nil {
+		return err
+	}
+	c.previous.source.stdin = r
+	return nil
+}
+
+// PreviousPassword returns the password from before the reset, asking for it if
+// there is somebody to ask.
+func (c *Credentials) PreviousPassword() (string, error) {
+	if c.previous.have {
+		return c.previous.value, nil
+	}
+	v, err := c.read(c.previous.source, labelPreviousPassword,
+		errs.Problemf("The password from before the reset is required to reactivate your keys.").
+			Hint(c.previous.source.hint("--previous-password-file")...))
+	if err != nil {
+		return "", err
+	}
+	c.previous.value, c.previous.have = v, true
+	return v, nil
+}
+
+// SupplyRecoveryPhrase records where the recovery phrase may be read from.
+func (c *Credentials) SupplyRecoveryPhrase(file string, stdin bool) error {
+	c.phrase.source.file = file
+	c.phrase.source.declared = true
+	if !stdin {
+		return nil
+	}
+	r, err := c.stdinOwner("--recovery-phrase-stdin")
+	if err != nil {
+		return err
+	}
+	c.phrase.source.stdin = r
+	return nil
+}
+
+// RecoveryPhrase returns the account's recovery phrase, asking for it if there
+// is somebody to ask. It is read the way every other secret is, without echo:
+// twelve words open the account as surely as a password does.
+func (c *Credentials) RecoveryPhrase() (string, error) {
+	if c.phrase.have {
+		return c.phrase.value, nil
+	}
+	v, err := c.read(c.phrase.source, labelRecoveryPhrase,
+		errs.Problemf("The recovery phrase is required to reactivate your keys with it.").
+			Hint(c.phrase.source.hint("--recovery-phrase-file")...))
+	if err != nil {
+		return "", err
+	}
+	c.phrase.value, c.phrase.have = v, true
+	return v, nil
 }
 
 // KeyPassword returns the secret the account's keys are locked with.

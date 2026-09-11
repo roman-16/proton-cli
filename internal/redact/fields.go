@@ -65,6 +65,10 @@ var Fields = map[string]Policy{
 	"addresses_active": Keep,
 	"user_keys":        Keep,
 	"address_keys":     Keep,
+	"keys_locked":      Keep, // how many keys a password reset left shut
+	"keys_reactivated": Keep,
+	"keys_unsupported": Keep, // how many are held in a form only a Proton client brings back
+	"volumes":          Keep, // how many volumes the account has
 
 	// ── the things an account holds ──
 	"calendar": Handle,
@@ -73,6 +77,13 @@ var Fields = map[string]Policy{
 	"parent":   Handle,
 	"share":    Handle,
 	"vault":    Handle,
+	"volume":   Handle,
+
+	// ── restoring a volume a password reset locked ──
+	"share_type":       Keep, // which sort of share it is, as Proton numbers them
+	"shares_computers": Keep,
+	"shares_files":     Keep,
+	"shares_photos":    Keep,
 
 	// ── who signed something ──
 	"signer": Address,

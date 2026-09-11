@@ -143,6 +143,7 @@ One line per group, with the verbs under it. Arguments, flags and examples are i
 - `proton drive shared` - Files and folders other people have shared with you: add, leave, list, remove
 - `proton drive sharing` - What you have shared with other people: list
 - `proton drive trash` - Items you have removed but not yet deleted: empty, list, restore
+- `proton drive volumes` - The volumes your files and photos are kept on: delete, list, restore
 
 ### mail - Read, write and organize mail
 
@@ -186,6 +187,7 @@ One line per group, with the verbs under it. Arguments, flags and examples are i
 ### account - Your Proton account, its settings and your session
 
 - `proton account` - get, login, logout
+- `proton account keys` - The keys your data is encrypted with: reactivate
 - `proton account profiles` - Accounts signed in on this machine: delete, list
 - `proton account sessions` - Sessions Proton holds for this account: list, revoke
 - `proton account settings` - Account-wide preferences: get, list, set

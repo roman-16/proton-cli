@@ -13,6 +13,7 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton account get`](../account/account.md#get) | Show the account, its storage and this machine's session |
 | [`proton account login`](../account/account.md#login) | Sign in and save the session for this profile |
 | [`proton account logout`](../account/account.md#logout) | Discard the saved session for this profile |
+| [`proton account keys reactivate`](../account/keys.md#reactivate) | Bring back the keys a password reset locked |
 | [`proton account profiles delete`](../account/profiles.md#delete) | Remove saved sessions by profile name |
 | [`proton account profiles list`](../account/profiles.md#list) | List the profiles with a saved session |
 | [`proton account sessions list`](../account/sessions.md#list) | List every signed-in session |
@@ -114,6 +115,9 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton drive trash empty`](../drive/trash.md#empty) | Delete everything in the trash, permanently |
 | [`proton drive trash list`](../drive/trash.md#list) | List what is in the trash |
 | [`proton drive trash restore`](../drive/trash.md#restore) | Put items back where they came from |
+| [`proton drive volumes delete`](../drive/volumes.md#delete) | Delete a locked volume and everything on it |
+| [`proton drive volumes list`](../drive/volumes.md#list) | List the volumes your files and photos are kept on |
+| [`proton drive volumes restore`](../drive/volumes.md#restore) | Put the files of a locked volume back |
 | [`proton mail conversations attachments download`](../mail/conversations.md#attachments-download) | Download and decrypt attachments from a thread |
 | [`proton mail conversations attachments list`](../mail/conversations.md#attachments-list) | List every attachment in a thread |
 | [`proton mail conversations delete`](../mail/conversations.md#delete) | Delete threads permanently |

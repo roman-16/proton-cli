@@ -41,11 +41,11 @@ func TestContactsGroups(t *testing.T) {
 
 	// --email narrows it to the ones named, which is the whole reason Proton
 	// groups addresses rather than people.
-	runOKPaid(t, "contacts", "groups", "add", group, contact, "--email", work)
+	runOKPaid(t, "contacts", "groups", "add", "--email", work, group, contact)
 	if n := groupSize(t, group); n != 1 {
 		t.Errorf("after adding one address the group holds %d, want 1", n)
 	}
-	runOKPaid(t, "contacts", "groups", "remove", group, contact, "--email", work)
+	runOKPaid(t, "contacts", "groups", "remove", "--email", work, group, contact)
 	if n := groupSize(t, group); n != 0 {
 		t.Errorf("after removing that address the group holds %d, want 0", n)
 	}

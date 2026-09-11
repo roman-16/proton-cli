@@ -28,6 +28,9 @@ type Reason string
 const (
 	// Inactive is a key Proton has marked as no longer in use.
 	Inactive Reason = "inactive"
+	// Locked is a blob sealed to a key a password reset left shut, which is the
+	// one reason a person can do something about: reactivating the key opens it.
+	Locked Reason = "sealed to a locked key"
 	// Malformed is a blob that did not parse: not base64, not armoured, not the
 	// protocol buffer it was supposed to be.
 	Malformed Reason = "malformed"
@@ -67,6 +70,7 @@ const (
 	KindReminder   Kind = "reminder"
 	KindShare      Kind = "share"
 	KindVault      Kind = "vault"
+	KindVolume     Kind = "volume"
 )
 
 // Hides marks the kinds whose loss takes more with it than itself.
@@ -83,9 +87,10 @@ var Hides = map[Kind]bool{
 
 // Tally counts what one invocation could not show.
 type Tally struct {
-	count atomic.Int64
-	kind  atomic.Value
-	hides atomic.Bool
+	count  atomic.Int64
+	locked atomic.Int64
+	kind   atomic.Value
+	hides  atomic.Bool
 }
 
 // Count is how many things went missing.
@@ -94,6 +99,15 @@ func (t *Tally) Count() int {
 		return 0
 	}
 	return int(t.count.Load())
+}
+
+// Locked is how many of them were sealed to a key a password reset left shut,
+// which is the part of the answer whose remedy is not a bug report.
+func (t *Tally) Locked() int {
+	if t == nil {
+		return 0
+	}
+	return int(t.locked.Load())
 }
 
 // Kind is what went missing. When an invocation skipped more than one sort of
@@ -150,6 +164,9 @@ func Record(ctx context.Context, kind Kind, ref string, reason Reason, cause err
 		return
 	}
 	t.count.Add(1)
+	if reason == Locked {
+		t.locked.Add(1)
+	}
 	t.kind.CompareAndSwap(nil, kind)
 	if Hides[kind] {
 		t.hides.Store(true)

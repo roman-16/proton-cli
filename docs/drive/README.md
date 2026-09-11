@@ -2,7 +2,7 @@
 
 Upload, download, share and organize Proton Drive as ordinary paths. Files are encrypted before they leave your machine and decrypted after they arrive, block by block, with your keys.
 
-This page is what people actually do. For every command and flag, see the reference: [items](items.md), [trash](trash.md), [photos](photos.md), [computers](computers.md), [shared](shared.md), [sharing](sharing.md), [invitations](invitations.md), [settings](settings.md).
+This page is what people actually do. For every command and flag, see the reference: [items](items.md), [trash](trash.md), [photos](photos.md), [computers](computers.md), [shared](shared.md), [sharing](sharing.md), [invitations](invitations.md), [settings](settings.md), [volumes](volumes.md).
 
 ## Look around
 
@@ -236,6 +236,36 @@ proton drive photos albums add ALBUM_ID PHOTO_ID...
 proton drive photos list --album ALBUM_ID
 proton drive photos albums delete Holiday --delete-photos
 ```
+
+## After a password reset
+
+A password reset locks the volume your files are on, and Drive starts again empty. The old files are still there, on a volume marked `locked`:
+
+```console
+$ proton drive volumes list
+ID        TYPE   STATE      USED  RESTORE  CREATED
+────────  ─────  ──────  ───────  ───────  ────────────────
+7Kd91mQx  files  active   1.2 GB           2026-05-04 09:14
+3Ns8pT2v  files  locked  38.6 GB           2023-02-11 18:02
+2 volumes.
+```
+
+Bring the keys back first, as under [Account](../account/README.md#after-a-password-reset), then put the files back:
+
+```bash
+proton account keys reactivate
+proton drive volumes restore 3Ns8pT2v
+```
+
+They come back as a folder named `Restored files` and the date. Proton moves them in its own time, so they appear as it finishes. Computers and the photo library stay where they are.
+
+To give the old files up instead:
+
+```bash
+proton drive volumes delete 3Ns8pT2v
+```
+
+Proton removes them within 72 hours, and nothing brings them back afterwards.
 
 ## Settings
 

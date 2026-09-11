@@ -154,9 +154,10 @@ func (s *Service) AttachmentDownload(ctx context.Context, msgID, reference strin
 		return nil, "", fmt.Errorf("decode key packets: %w", err)
 	}
 	split := pgp.NewPGPSplitMessage(kp, resp.Body)
-	dec, err := rings.Read.Decrypt(split.GetPGPMessage(), nil, 0)
+	msg := split.GetPGPMessage()
+	dec, err := rings.Read.Decrypt(msg, nil, 0)
 	if err != nil {
-		return nil, "", fmt.Errorf("decrypt attachment: %w", err)
+		return nil, "", u.Explain(fmt.Errorf("decrypt attachment: %w", err), "attachment", msg)
 	}
 	return dec.GetBinary(), name, nil
 }

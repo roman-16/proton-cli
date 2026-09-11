@@ -879,3 +879,97 @@ func ringOf(t *testing.T, armored, passphrase string) *pgp.KeyRing {
 	}
 	return kr
 }
+
+// Whether a password reset is the reason something will not open is read off the
+// thing itself: a message names the keys it is sealed to, and only a message
+// sealed to one Proton has marked inactive is the reset's doing.
+func TestLockedDataIsToldFromABugByWhatItIsSealedTo(t *testing.T) {
+	lockedKey, liveKey := generated(t, "locked"), generated(t, "live")
+	u := &Unlocked{lockedID: map[uint64]bool{}}
+	u.noteLocked(context.Background(), LockedKey{Key: Key{ID: "old", PrivateKey: armoredOf(t, lockedKey)}})
+
+	for _, tc := range []struct {
+		name   string
+		to     *pgp.Key
+		reason skip.Reason
+		locked bool
+	}{
+		{name: "sealed to the locked key", to: lockedKey, reason: skip.Locked, locked: true},
+		{name: "sealed to a key that is fine", to: liveKey, reason: skip.Undecryptable},
+	} {
+		msg := sealedTo(t, tc.to)
+		if got := u.SealedToLocked(msg); got != tc.locked {
+			t.Errorf("%s: SealedToLocked = %v, want %v", tc.name, got, tc.locked)
+		}
+		if got := u.Shut(msg); got != tc.reason {
+			t.Errorf("%s: Shut = %q, want %q", tc.name, got, tc.reason)
+		}
+
+		bug := errors.New("openpgp: incorrect key")
+		err := u.Explain(bug, "message", msg)
+		switch {
+		case tc.locked && !strings.Contains(err.Error(), "a password reset locked"):
+			t.Errorf("%s: Explain = %v, want the sentence about the reset", tc.name, err)
+		case tc.locked && !hasHint(err, "keys reactivate"):
+			t.Errorf("%s: Explain = %v, want it to point at the remedy", tc.name, err)
+		case !tc.locked && !errors.Is(err, bug):
+			t.Errorf("%s: Explain = %v, want the failure left as it was", tc.name, err)
+		}
+	}
+
+	// Nothing to read the answer off, and nothing to say about it.
+	if u.SealedToLocked(nil) {
+		t.Error("a message that is not there was called sealed to a locked key")
+	}
+	if err := u.Explain(nil, "message", sealedTo(t, lockedKey)); err != nil {
+		t.Errorf("Explain with no failure = %v, want nothing", err)
+	}
+}
+
+// An account with nothing locked answers no differently for a message it cannot
+// open: the remedy would be a lie.
+func TestNothingIsSealedToALockedKeyWhenNoneAre(t *testing.T) {
+	u := &Unlocked{lockedID: map[uint64]bool{}}
+	msg := sealedTo(t, generated(t, "live"))
+	if u.SealedToLocked(msg) || u.Shut(msg) != skip.Undecryptable {
+		t.Error("a message was blamed on a password reset that never happened")
+	}
+	if len(u.Locked()) != 0 || len(u.LockedAccountKeys()) != 0 {
+		t.Error("keys are reported locked on an account with none")
+	}
+}
+
+// Account keys and address keys are told apart, since only an account key is
+// what a secret from before the reset opens.
+func TestLockedAccountKeysAreTheAccountsOwn(t *testing.T) {
+	u := &Unlocked{
+		UserKeys: []Key{{ID: "current", Active: 1}, {ID: "user"}},
+		Addresses: []Address{{ID: "address", Email: "me@proton.me", Keys: []Key{
+			{ID: "current-addr", Active: 1}, {ID: "addr"},
+		}}},
+	}
+	account := u.LockedAccountKeys()
+	if len(account) != 1 || account[0].Key.ID != "user" {
+		t.Errorf("LockedAccountKeys = %v, want the account's own key alone", account)
+	}
+	locked := u.Locked()
+	if len(locked) != 2 || locked[0].Key.ID != "user" || locked[1].Key.ID != "addr" {
+		t.Errorf("Locked = %v, want the account key and the address key, account key first", locked)
+	}
+	if locked[1].Email != "me@proton.me" {
+		t.Errorf("the locked address key names %q, want the address it belongs to", locked[1].Email)
+	}
+}
+
+func sealedTo(t *testing.T, key *pgp.Key) *pgp.PGPMessage {
+	t.Helper()
+	kr, err := pgp.NewKeyRing(key)
+	if err != nil {
+		t.Fatalf("NewKeyRing: %v", err)
+	}
+	msg, err := kr.Encrypt(pgp.NewPlainMessageFromString("something of yours"), nil)
+	if err != nil {
+		t.Fatalf("encrypt: %v", err)
+	}
+	return msg
+}

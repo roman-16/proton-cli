@@ -144,3 +144,32 @@ func TestHintList(t *testing.T) {
 		}
 	}
 }
+
+// What to do about a short answer depends on why it is short: a thing sealed to
+// a key a password reset locked is opened by reactivating the key, and anything
+// else is a bug to report. Both are said when both happened.
+func TestTheRemedyFollowsTheReason(t *testing.T) {
+	for _, tc := range []struct {
+		count, locked int
+		want          []string
+		never         []string
+	}{
+		{count: 3, locked: 0, want: []string{"proton report"}, never: []string{"reactivate"}},
+		{count: 1, locked: 1, want: []string{"It is sealed", "proton account keys reactivate", "opens it"}, never: []string{"proton report"}},
+		{count: 3, locked: 3, want: []string{"They are sealed", "opens them"}, never: []string{"proton report"}},
+		{count: 3, locked: 1, want: []string{"1 of them is", "opens those", "proton report"}},
+		{count: 5, locked: 2, want: []string{"2 of them are", "opens those", "proton report"}},
+	} {
+		got := remedy(tc.count, tc.locked)
+		for _, w := range tc.want {
+			if !strings.Contains(got, w) {
+				t.Errorf("remedy(%d, %d) = %q, want it to say %q", tc.count, tc.locked, got, w)
+			}
+		}
+		for _, n := range tc.never {
+			if strings.Contains(got, n) {
+				t.Errorf("remedy(%d, %d) = %q, which must not say %q", tc.count, tc.locked, got, n)
+			}
+		}
+	}
+}

@@ -184,7 +184,7 @@ func (s *Service) unlockCalendar(ctx context.Context, calendarID string) (*calKe
 			}
 			dec, err := addr.Read.Decrypt(msg, nil, pgp.GetUnixTime())
 			if err != nil {
-				return nil, fmt.Errorf("decrypt calendar passphrase: %w", err)
+				return nil, u.Explain(fmt.Errorf("decrypt calendar passphrase: %w", err), "calendar", msg)
 			}
 			if err := addr.Read.VerifyDetached(dec, sig, pgp.GetUnixTime()); err != nil {
 				return nil, err

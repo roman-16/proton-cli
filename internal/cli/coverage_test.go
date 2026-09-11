@@ -58,6 +58,20 @@ var unreachable = map[string]string{
 
 	"POST /auth/v4/sessions": "only a first sign-in creates one, and no test signs out to force another",
 	"POST /core/v4/auth/2fa": "no test account has two-factor enabled, so nothing is ever asked for a code",
+
+	// Everything a password reset leaves behind. Only a reset locks a key or a
+	// volume, and a run that reset a test account's password would lock that
+	// account's Drive for good and spend keys nothing can put back - so no test
+	// may make the state these requests answer, and every test account is in the
+	// state where they are refused before the network. What the CLI builds is
+	// covered offline instead, against the shape Proton documents.
+	"GET /core/v4/settings/mnemonic":        "only a key a password reset locked is opened with a recovery phrase, and no test may reset a password",
+	"PUT /core/v4/keys/user/{id}":           "the same: nothing but a reset leaves a key to reactivate",
+	"PUT /drive/volumes/{id}/restore":       "the same: nothing but a reset leaves a volume locked",
+	"PUT /drive/volumes/{id}/delete_locked": "the same, and deleting a locked volume cannot be undone by a run",
+	"GET /drive/volumes/{id}":               "only a locked volume the volume listing left out is read alone, and no test account has one",
+
+	"POST /drive/volumes": "a volume is made once in an account's life, and every test account is long past that moment",
 }
 
 // untested are the requests a run could make and does not. Each is a gap somebody

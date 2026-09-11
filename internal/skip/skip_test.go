@@ -51,6 +51,23 @@ func TestAContainerSaysItTookThingsWithIt(t *testing.T) {
 	}
 }
 
+func TestALockedKeyIsCountedApart(t *testing.T) {
+	ctx, tally := With(context.Background())
+	Record(ctx, KindMessage, "abc", Locked, nil)
+	Record(ctx, KindMessage, "def", Undecryptable, nil)
+
+	if tally.Count() != 2 {
+		t.Errorf("counted %d, want 2", tally.Count())
+	}
+	if tally.Locked() != 1 {
+		t.Errorf("counted %d sealed to a locked key, want 1", tally.Locked())
+	}
+	var none *Tally
+	if none.Locked() != 0 {
+		t.Error("a nil tally claims something was sealed to a locked key")
+	}
+}
+
 func TestRecordingWithNobodyCountingIsHarmless(t *testing.T) {
 	Record(context.Background(), KindItem, "abc", Undecryptable, nil)
 }
@@ -67,6 +84,7 @@ func TestEveryHidingKindIsAKind(t *testing.T) {
 	for _, k := range []Kind{
 		KindAddress, KindCalendar, KindContact, KindEvent, KindFolder, KindInvitation,
 		KindItem, KindKey, KindMember, KindProfile, KindReminder, KindShare, KindVault,
+		KindVolume,
 	} {
 		known[k] = true
 	}

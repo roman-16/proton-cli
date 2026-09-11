@@ -145,6 +145,7 @@ export default defineConfig({
           items: [
             { label: "Guide", slug: "account" },
             "account/account",
+            "account/keys",
             "account/sessions",
             "account/profiles",
             "account/settings",
@@ -172,6 +173,7 @@ export default defineConfig({
             "drive/shared",
             "drive/invitations",
             "drive/settings",
+            "drive/volumes",
           ],
           label: "Drive",
         },

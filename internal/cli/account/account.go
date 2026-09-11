@@ -26,7 +26,7 @@ func New() *cobra.Command {
 		Use:   "account",
 		Short: "Your Proton account, its settings and your session",
 	}
-	c.AddCommand(getCmd(), loginCmd(), logoutCmd(), profilesCmd(), sessionsCmd(), settingsCmd())
+	c.AddCommand(getCmd(), keysCmd(), loginCmd(), logoutCmd(), profilesCmd(), sessionsCmd(), settingsCmd())
 	return c
 }
 
@@ -84,6 +84,7 @@ func getCmd() *cobra.Command {
 					{Label: "Profile", Value: st.Profile},
 					{Label: "Session", Value: st.Session, Always: true},
 					{Label: "Unlocked", Value: yesNo(st.Unlocked), Always: true},
+					{Label: "Locked keys", Value: count(acct.LockedKeys), Role: ui.Caution},
 					{Label: "ID", Value: acct.ID, ID: true},
 				},
 			})
@@ -118,6 +119,14 @@ func yesNo(b bool) string {
 		return "yes"
 	}
 	return "no"
+}
+
+// count renders a number that is only worth a line when it is not zero.
+func count(n int) string {
+	if n == 0 {
+		return ""
+	}
+	return fmt.Sprintf("%d", n)
 }
 
 // ── account login / logout ──

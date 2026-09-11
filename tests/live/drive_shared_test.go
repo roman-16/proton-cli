@@ -553,6 +553,6 @@ func TestDriveSharedLeaveGivesUpAnItemSomebodyShared(t *testing.T) {
 	assertContains(t, stderr, "--yes")
 	assertContains(t, runOKSecondary(t, "drive", "shared", "list"), id)
 
-	runOKSecondary(t, "drive", "shared", "leave", id, "--yes")
+	runOKSecondary(t, "drive", "shared", "leave", id)
 	assertNotContains(t, runOKSecondary(t, "drive", "shared", "list"), id)
 }

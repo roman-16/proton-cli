@@ -156,3 +156,75 @@ func TestAnExtraPasswordFromAFlagIsTakenAsItIs(t *testing.T) {
 		t.Errorf("hints = %v, want the flag this command takes", hinter.Hints())
 	}
 }
+
+// The one run that asks for two passwords labels them apart: the one from
+// before the reset by Proton's name for it, and the account's own as the current
+// one, so that neither prompt can be taken for the other.
+func TestAPreviousPasswordRenamesTheCurrentOne(t *testing.T) {
+	var out bytes.Buffer
+	creds := newCredentials(ui.New(ui.Options{
+		Format: ui.FormatText, Err: &out, Out: &out,
+		In: strings.NewReader("old horse\nnew horse\n"),
+	}), "alice@proton.me")
+
+	previous, err := creds.PreviousPassword()
+	if err != nil || previous != "old horse" {
+		t.Fatalf("PreviousPassword = %q, %v; want the first line typed", previous, err)
+	}
+	current, err := creds.Password("reactivate your keys")
+	if err != nil || current != "new horse" {
+		t.Fatalf("Password = %q, %v; want the second line typed", current, err)
+	}
+	prompts := out.String()
+	if !strings.Contains(prompts, "Previous password") || !strings.Contains(prompts, "Current password") {
+		t.Errorf("prompts were:\n%s\nwant one for the previous and one for the current password", prompts)
+	}
+	if again, err := creds.PreviousPassword(); err != nil || again != previous {
+		t.Errorf("asked a second time = %q, %v; want the first answer", again, err)
+	}
+}
+
+// Alone, the account password keeps its ordinary name.
+func TestThePasswordIsCurrentOnlyBesideAPreviousOne(t *testing.T) {
+	var out bytes.Buffer
+	creds := newCredentials(ui.New(ui.Options{
+		Format: ui.FormatText, Err: &out, Out: &out, In: strings.NewReader("new horse\n"),
+	}), "alice@proton.me")
+	if _, err := creds.Password("delete a calendar"); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out.String(), "Current password") {
+		t.Errorf("prompt was %q; the account password is only current beside a previous one", out.String())
+	}
+}
+
+// A run with nobody to ask is told the flags the command takes.
+func TestARecoverySecretWithNobodyToAskNamesItsFlag(t *testing.T) {
+	var out bytes.Buffer
+	creds := newCredentials(ui.New(ui.Options{
+		Format: ui.FormatText, Err: &out, Out: &out, NoInput: true,
+	}), "alice@proton.me")
+	if err := creds.SupplyPreviousPassword("", false); err != nil {
+		t.Fatal(err)
+	}
+	if err := creds.SupplyRecoveryPhrase("", false); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name string
+		ask  func() (string, error)
+		flag string
+	}{
+		{name: "previous password", ask: creds.PreviousPassword, flag: "--previous-password-file"},
+		{name: "recovery phrase", ask: creds.RecoveryPhrase, flag: "--recovery-phrase-file"},
+	} {
+		_, err := tc.ask()
+		var hinter errs.Hinter
+		if !errors.As(err, &hinter) {
+			t.Fatalf("%s: err = %v, want one that says what to do next", tc.name, err)
+		}
+		if !strings.Contains(strings.Join(hinter.Hints(), " "), tc.flag) {
+			t.Errorf("%s: hints = %v, want %s", tc.name, hinter.Hints(), tc.flag)
+		}
+	}
+}

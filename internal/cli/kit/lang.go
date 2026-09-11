@@ -107,8 +107,9 @@ var Verbs = map[string]string{
 	"generate": "make a new secret",
 
 	// Keys
-	"pin":   "trust a public key for a contact",
-	"unpin": "stop trusting a pinned key",
+	"pin":        "trust a public key for a contact",
+	"unpin":      "stop trusting a pinned key",
+	"reactivate": "bring keys a password reset locked back into use",
 
 	// Calendar
 	"respond": "reply to an invitation",
@@ -180,7 +181,7 @@ var Mutating = map[string]bool{
 	"decline": true, "resend": true, "block": true, "allow": true,
 	"spam": true, "forget": true, "expire": true, "unsubscribe": true,
 	"snooze": true, "unsnooze": true, "apply": true, "reorder": true, "favorite": true, "unfavorite": true, "pin": true,
-	"unpin": true, "respond": true, "login": true, "logout": true,
+	"unpin": true, "reactivate": true, "respond": true, "login": true, "logout": true,
 	"revoke": true, "uninstall": true, "transfer": true,
 }
 

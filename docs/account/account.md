@@ -4,7 +4,7 @@ Your Proton account, its settings and your session.
 
 Every command under `proton account`, with the arguments and flags it takes. For these commands in use, see [the account guide](README.md).
 
-Holds `get`, `login`, `logout`, `profiles`, `sessions` and `settings`.
+Holds `get`, `keys`, `login`, `logout`, `profiles`, `sessions` and `settings`.
 
 ## `get`
 

@@ -720,16 +720,28 @@ type rawShare struct {
 	CreateTime int64
 }
 
-// listShares reads every share the account can see, and the addresses that
-// decide which of them are its own.
-func (s *Service) listShares(ctx context.Context) ([]rawShare, map[string]bool, error) {
+// fetchShares reads every share the account can see, the locked ones included.
+func (s *Service) fetchShares(ctx context.Context) ([]rawShare, error) {
 	var r struct{ Shares []rawShare }
 	q := url.Values{}
 	q.Set("ShowAll", "1")
+	if err := s.C.Decode(ctx, proton.Request{Method: "GET", Path: "/drive/shares", Query: q}, &r); err != nil {
+		return nil, err
+	}
+	return r.Shares, nil
+}
+
+// listShares reads every share the account can see, and the addresses that
+// decide which of them are its own. The two are asked for together: neither
+// answer is needed to ask for the other.
+func (s *Service) listShares(ctx context.Context) ([]rawShare, map[string]bool, error) {
+	var shares []rawShare
 	var u *keys.Unlocked
 	if err := fetch.Together(ctx,
 		func(ctx context.Context) error {
-			return s.C.Decode(ctx, proton.Request{Method: "GET", Path: "/drive/shares", Query: q}, &r)
+			var err error
+			shares, err = s.fetchShares(ctx)
+			return err
 		},
 		func(ctx context.Context) error {
 			var err error
@@ -743,7 +755,7 @@ func (s *Service) listShares(ctx context.Context) ([]rawShare, map[string]bool, 
 	for _, a := range u.Addresses {
 		mine[strings.ToLower(a.Email)] = true
 	}
-	return r.Shares, mine, nil
+	return shares, mine, nil
 }
 
 // describeShare opens a share and reads what it grants.
@@ -955,28 +967,27 @@ func (s *Service) LeaveShare(ctx context.Context, item SharedItem) error {
 	}, nil)
 }
 
-// savingAddress is the address a saved link is written to: the one your own
-// files hang from, and its primary key.
+// savingAddress is the address a saved link is written to: your own, and its
+// primary key.
+//
+// Which address it is decides nothing afterwards - a saved link is read back by
+// trying every address the account holds - so it is the account's main address
+// rather than the one a share happens to hang from, and saving a link therefore
+// needs no volume.
 func (s *Service) savingAddress(ctx context.Context) (addrID, keyID string, kr *pgp.KeyRing, err error) {
-	dc, err := s.Resolve(ctx)
-	if err != nil {
-		return "", "", nil, err
-	}
 	u, err := s.keys(ctx)
 	if err != nil {
 		return "", "", nil, err
 	}
-	for _, addr := range u.Addresses {
-		if addr.ID != dc.AddrID {
-			continue
-		}
-		for _, key := range addr.Keys {
-			if key.Primary == 1 {
-				return addr.ID, key.ID, dc.Addr.Write, nil
-			}
-		}
+	rings, addr, err := u.PrimaryAddr()
+	if err != nil {
+		return "", "", nil, err
 	}
-	return "", "", nil, fmt.Errorf("no primary key for address %s", dc.AddrID)
+	keyID, err = primaryKeyID(addr.Keys, addr.ID)
+	if err != nil {
+		return "", "", nil, err
+	}
+	return addr.ID, keyID, rings.Write, nil
 }
 
 // sealLinkPassword encrypts a link's password to your own address key and signs

@@ -81,7 +81,17 @@ Try:   1 item could not be decrypted and is not listed.
        proton report
 ```
 
-Run `proton report` and open an issue. This is not something you can fix from the command line, and it is not your data being gone - it is proton failing to open something Proton still holds.
+Run `proton report` and open an issue. Your data is not gone; proton could not open something Proton still holds.
+
+After a password reset the remedy is on the same line, and it is one you can run:
+
+```console
+$ proton contacts list
+! 3 contacts could not be decrypted and are not listed.
+  They are sealed to keys a password reset locked - `proton account keys reactivate` opens them.
+```
+
+See [Account](../account/README.md#after-a-password-reset).
 
 ## The config file is refused
 

@@ -33,7 +33,8 @@ type Selector[T any] struct {
 	// user set no filters; that is how Select knows.
 	ByFilter func(context.Context) ([]T, error)
 	// FilterHint completes "pass a REF, or a filter such as ...", so the error a
-	// user sees names the filters this particular command actually has.
+	// user sees names the filters this particular command actually has. Leave it
+	// empty for a collection whose only selector is --all.
 	FilterHint string
 	// Scope names what --all would cover when nothing narrows it, for the warning
 	// that precedes an unbounded change.
@@ -159,6 +160,9 @@ func Select[T any](c *Invocation, s Selector[T]) (Selection[T], error) {
 // earlier, because it is the same judgement: whether anything was named is decided
 // by the command line, and nothing a request could answer changes it.
 func NothingSelected(filterHint, scope string) error {
+	if filterHint == "" {
+		return Fail("Nothing selected.").Hint("pass a REF, or --all to target " + scope + ".")
+	}
 	return Fail("Nothing selected.").
 		Hint("pass a REF, or a filter such as "+filterHint+".",
 			"Use --all to target "+scope+".")

@@ -3,6 +3,7 @@ package kit
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/roman-16/proton-cli/internal/app"
@@ -62,8 +63,33 @@ func (c *Invocation) Incomplete() ui.IncompleteSpec {
 		Count:  c.tally.Count(),
 		Kind:   string(c.tally.Kind()),
 		Hides:  c.tally.Hides(),
-		Remedy: "This is a bug or damaged data - `" + Program + " report` has the details.",
+		Remedy: remedy(c.tally.Count(), c.tally.Locked()),
 	}
+}
+
+// remedy says what to do about what could not be shown, which depends on why.
+//
+// A thing sealed to a key a password reset locked is nobody's bug and is opened
+// by reactivating the key, so pointing its reader at a bug report would send
+// them the wrong way; anything else is this build's to answer for. When both
+// happened in one answer, both are said.
+func remedy(count, locked int) string {
+	bug := "This is a bug or damaged data - `" + Program + " report` has the details."
+	reactivate := "`" + Program + " account keys reactivate`"
+	switch {
+	case locked == 0:
+		return bug
+	case locked == count && count == 1:
+		return "It is sealed to a key a password reset locked - " + reactivate + " opens it."
+	case locked == count:
+		return "They are sealed to keys a password reset locked - " + reactivate + " opens them."
+	}
+	subject := fmt.Sprintf("%d of them are", locked)
+	if locked == 1 {
+		subject = "1 of them is"
+	}
+	return subject + " sealed to keys a password reset locked - " + reactivate +
+		" opens those. The rest is a bug or damaged data - `" + Program + " report` has the details."
 }
 
 // incomplete attaches the tally to a reference that matched nothing.

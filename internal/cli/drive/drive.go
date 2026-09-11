@@ -13,6 +13,8 @@
 package drive
 
 import (
+	"errors"
+
 	"github.com/roman-16/proton-cli/internal/cli/kit"
 	drivesvc "github.com/roman-16/proton-cli/internal/service/drive"
 	"github.com/spf13/cobra"
@@ -24,14 +26,23 @@ func New() *cobra.Command {
 		Short: "Files and folders in Drive",
 	}
 	c.AddCommand(computersCmd(), itemsCmd(), trashCmd(), invitationsCmd(), sharedCmd(),
-		sharingCmd(), photosCmd(), settingsCmd())
+		sharingCmd(), photosCmd(), settingsCmd(), volumesCmd())
 	return c
 }
 
 // context opens your own files, which is the tree a command works in when it is
 // not pointed at another.
+//
+// An account with no volume for them is given one, the way Proton's own client
+// makes one the moment it opens - except under --dry-run, which promises to
+// change nothing and keeps the promise by saying so instead.
 func context(c *kit.Invocation) (*drivesvc.Context, error) {
-	return c.App.Drive.Resolve(c.Ctx)
+	dc, err := c.App.Drive.Resolve(c.Ctx)
+	var none *drivesvc.NoVolume
+	if !errors.As(err, &none) || c.App.DryRun {
+		return dc, err
+	}
+	return c.App.Drive.CreateVolume(c.Ctx)
 }
 
 // photosContext opens the photo volume, which Proton keeps separate from the
