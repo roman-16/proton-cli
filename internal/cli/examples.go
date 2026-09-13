@@ -744,10 +744,14 @@ var examples = map[string][]string{
 		"proton pass export --dest pass-backup.zip --passphrase-file ~/.backup-passphrase",
 		"proton pass export --dest pass-backup.zip",
 		"proton pass export --dest pass-backup.zip --no-attachments",
+		"proton pass export --format csv --dest pass.csv",
+		"proton pass export --format json --dest -",
 	},
 	"proton pass import": {
 		"proton pass import pass-backup.zip --passphrase-file ~/.backup-passphrase",
 		"proton pass import --dry-run pass-backup.zip",
+		"proton pass import bitwarden-export.json --manager bitwarden",
+		"proton pass import chrome-passwords.csv --manager chrome --vault Personal",
 	},
 	"proton pass generate": {
 		"proton pass generate",

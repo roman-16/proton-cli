@@ -661,3 +661,260 @@ func TestPassExportWithAPassphrase(t *testing.T) {
 	}
 	assertContains(t, stderr, "passphrase")
 }
+
+// ── moving items in from a file ──
+
+// A backup keeps what the account knows about an item beyond its content: when
+// it was made, when it last changed, and whether it was in the trash.
+//
+// Everything lands in a vault of this test's own, so deleting that vault is the
+// whole cleanup however much the account holds.
+func TestPassImportKeepsDatesAndTrash(t *testing.T) {
+	name := testID() + "-dated"
+	ref := strings.TrimSpace(runOK(t, "pass", "items", "create", "--name", name,
+		"--username", "jane", "--url", "https://example.com",
+		"--secret-file", secretFile(t, "password", "hunter2")))
+	cleanupRun(t, fmt.Sprintf("Delete item: proton pass items delete %s", ref),
+		"pass", "items", "delete", "--", ref)
+	runOK(t, "--yes", "pass", "items", "trash", "--", ref)
+
+	document := filepath.Join(t.TempDir(), "export.json")
+	runOK(t, "pass", "export", "--format", "json", "--dest", document)
+	body, err := os.ReadFile(document)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	// The document is the one the archive holds, so it says what each item
+	// carries and how a login fills.
+	for _, want := range []string{`"vaults"`, `"files":[]`, `"autofillUrls"`} {
+		if !strings.Contains(string(body), want) {
+			t.Errorf("the document leaves out %s", want)
+		}
+	}
+	was := exportedItem(t, body, "", name)
+	if was["state"] != float64(2) {
+		t.Fatalf("the export says the item is in state %v, want it trashed", was["state"])
+	}
+
+	into := importVault(t)
+	runOK(t, "pass", "import", document, "--vault", into)
+
+	// An item that was in the trash goes back to the trash, so a listing cannot
+	// see it. What the account now holds is read the same way it was written:
+	// exporting again says where the item landed and what state it is in.
+	second := filepath.Join(t.TempDir(), "after.json")
+	runOK(t, "pass", "export", "--format", "json", "--dest", second)
+	after, err := os.ReadFile(second)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	restored := exportedItem(t, after, into, name)
+	if restored["state"] != float64(2) {
+		t.Errorf("the item came back in state %v, want it trashed", restored["state"])
+	}
+	for _, field := range []string{"createTime", "modifyTime"} {
+		if restored[field] != was[field] {
+			t.Errorf("%s came back as %v, want %v", field, restored[field], was[field])
+		}
+	}
+}
+
+// exportedItem is what a document says about one item: the one of that name in
+// the vault named, or in any vault when that is empty.
+func exportedItem(t *testing.T, body []byte, vault, name string) map[string]interface{} {
+	t.Helper()
+	var document struct {
+		Vaults map[string]struct {
+			Name  string
+			Items []map[string]interface{}
+		}
+	}
+	if err := json.Unmarshal(body, &document); err != nil {
+		t.Fatalf("the document will not parse: %v", err)
+	}
+	for _, holder := range document.Vaults {
+		if vault != "" && holder.Name != vault {
+			continue
+		}
+		for _, item := range holder.Items {
+			data, _ := item["data"].(map[string]interface{})
+			metadata, _ := data["metadata"].(map[string]interface{})
+			if n, _ := metadata["name"].(string); n == name {
+				return item
+			}
+		}
+	}
+	t.Fatalf("the document holds no item called %s in %s", name, vault)
+	return nil
+}
+
+// The spreadsheet is Proton Pass's own columns, so what this writes it reads.
+func TestPassExportCSVRoundTrip(t *testing.T) {
+	name := testID() + "-csv"
+	ref := strings.TrimSpace(runOK(t, "pass", "items", "create", "--name", name,
+		"--username", "jane", "--url", "https://example.com",
+		"--secret-file", secretFile(t, "password", "hunter2")))
+	cleanupRun(t, fmt.Sprintf("Delete item: proton pass items delete %s", ref),
+		"pass", "items", "delete", "--", ref)
+
+	sheet := filepath.Join(t.TempDir(), "pass.csv")
+	_, stderr := runOKStderr(t, "pass", "export", "--format", "csv", "--dest", sheet)
+	// A file nobody locked holds every password, and a CSV cannot hold
+	// everything an item does. Both are said as it is written.
+	assertContains(t, stderr, "not encrypted")
+	assertContains(t, stderr, "custom fields")
+
+	body, err := os.ReadFile(sheet)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	header := strings.SplitN(string(body), "\n", 2)[0]
+	assertContains(t, header, "type,name,url,autofillUrls,email,username,password,note,totp,createTime,modifyTime,vault")
+	assertContains(t, string(body), name)
+
+	// A passphrase cannot lock a CSV, and that is refused before anything is
+	// written.
+	secret := filepath.Join(t.TempDir(), "passphrase")
+	if err := os.WriteFile(secret, []byte("correct horse"), 0o600); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	_, stderr, code := run(t, "pass", "export", "--format", "csv",
+		"--dest", filepath.Join(t.TempDir(), "locked.csv"), "--passphrase-file", secret)
+	if code == 0 {
+		t.Error("a CSV was written with a passphrase")
+	}
+	assertContains(t, stderr, "cannot be encrypted")
+
+	into := importVault(t)
+	runOK(t, "pass", "import", sheet, "--vault", into)
+	restored := itemInVault(t, into, name)
+	if restored["username"] != "jane" {
+		t.Errorf("the login came back as %v", restored)
+	}
+	shown := runOK(t, "pass", "items", "get", "--",
+		fmt.Sprint(restored["share_id"], "/", restored["item_id"]))
+	for _, want := range []string{"hunter2", "https://example.com"} {
+		assertContains(t, shown, want)
+	}
+}
+
+// A file another password manager wrote comes in whole: its folders become
+// vaults, and the kinds Pass has an item for become that item.
+func TestPassImportFromBitwarden(t *testing.T) {
+	name := testID() + "-bitwarden"
+	export := filepath.Join(t.TempDir(), "bitwarden.json")
+	body := strings.ReplaceAll(`{
+  "encrypted": false,
+  "folders": [{"id": "f-1", "name": "NAME"}],
+  "items": [
+    {"id": "i-1", "type": 1, "name": "NAME-login", "notes": "a note", "folderId": "f-1",
+     "fields": [{"name": "Ticket", "type": 0, "value": "T-1"}],
+     "login": {"username": "jane@example.com", "password": "hunter2",
+               "totp": "JBSWY3DPEHPK3PXP",
+               "uris": [{"uri": "https://example.com", "match": null}]}},
+    {"id": "i-2", "type": 2, "name": "NAME-note", "notes": "the note", "folderId": "f-1"},
+    {"id": "i-3", "type": 3, "name": "NAME-card", "folderId": "f-1",
+     "card": {"cardholderName": "Jane Doe", "number": "4242424242424242",
+              "code": "123", "expMonth": "3", "expYear": "2027"}}
+  ]
+}`, "NAME", name)
+	if err := os.WriteFile(export, []byte(body), 0o600); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// A dry run says what would land, and does none of it.
+	stdout, stderr := runOKStderr(t, "--dry-run", "pass", "import", export, "--manager", "bitwarden")
+	assertContains(t, stderr, "Dry run")
+	for _, want := range []string{name + "-login", "credit-card", name} {
+		assertContains(t, stdout+stderr, want)
+	}
+
+	// The folder in the file becomes a vault of that name, which is what the
+	// cleanup takes away again.
+	cleanup(t, fmt.Sprintf("Delete the vault an import made: proton pass vaults delete -- %s", name),
+		func() error {
+			_, stderr, code, err := runArgs(nil, "--yes", "pass", "vaults", "delete", "--", name)
+			if err != nil {
+				return err
+			}
+			if code != 0 && !strings.Contains(stderr, "not found") {
+				return fmt.Errorf("exit %d: %s", code, stderr)
+			}
+			return nil
+		})
+	runOK(t, "pass", "import", export, "--manager", "bitwarden")
+
+	rows := runJSONArray(t, "pass", "items", "list", "--vault", name)
+	if len(rows) != 3 {
+		t.Fatalf("the import put %d items in %s, want 3", len(rows), name)
+	}
+	kinds := map[string]bool{}
+	for _, row := range rows {
+		m, _ := row.(map[string]interface{})
+		kind, _ := m["type"].(string)
+		kinds[kind] = true
+	}
+	for _, want := range []string{"login", "note", "credit-card"} {
+		if !kinds[want] {
+			t.Errorf("no %s came in: %v", want, kinds)
+		}
+	}
+
+	login := itemInVault(t, name, name+"-login")
+	shown := runOK(t, "pass", "items", "get", "--",
+		fmt.Sprint(login["share_id"], "/", login["item_id"]))
+	for _, want := range []string{"hunter2", "jane@example.com", "https://example.com", "Ticket"} {
+		assertContains(t, shown, want)
+	}
+}
+
+// A browser's export has no folders in it, and --vault says where it goes.
+func TestPassImportChromeIntoVault(t *testing.T) {
+	name := testID() + "-chrome"
+	export := filepath.Join(t.TempDir(), "chrome.csv")
+	body := "name,url,username,password,note\n" +
+		name + ",https://example.com,jane@example.com,hunter2,a note\n"
+	if err := os.WriteFile(export, []byte(body), 0o600); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	into := importVault(t)
+	runOK(t, "pass", "import", export, "--manager", "chrome", "--vault", into)
+
+	row := itemInVault(t, into, name)
+	if row["type"] != "login" || row["email"] != "jane@example.com" {
+		t.Errorf("the login came back as %v", row)
+	}
+
+	// Without --manager the file is not one Proton Pass wrote, and the refusal
+	// names the flag that would read it.
+	_, stderr, code := run(t, "pass", "import", export)
+	if code == 0 {
+		t.Error("a Chrome export was read as a Proton Pass one")
+	}
+	assertContains(t, stderr, "--manager")
+}
+
+// importVault is a vault made for one import to land in, and taken away
+// afterwards with everything the import put in it.
+func importVault(t *testing.T) string {
+	t.Helper()
+	name := testID() + "-import"
+	shareID := strings.TrimSpace(createVault(t, name))
+	cleanupRun(t, fmt.Sprintf("Delete vault: proton pass vaults delete -- %s", shareID),
+		"pass", "vaults", "delete", "--", shareID)
+	return name
+}
+
+// itemInVault is one item of a vault, by name.
+func itemInVault(t *testing.T, vault, name string) map[string]interface{} {
+	t.Helper()
+	for _, row := range runJSONArray(t, "pass", "items", "list", "--vault", vault) {
+		m, _ := row.(map[string]interface{})
+		if n, _ := m["name"].(string); n == name {
+			return m
+		}
+	}
+	t.Fatalf("%s holds no item called %s", vault, name)
+	return nil
+}

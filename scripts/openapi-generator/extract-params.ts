@@ -139,6 +139,20 @@ export function typeToProperties(type: Type): Property[] {
             description = trailing[0].getText().replace(/^\/\/\s*/, "").trim();
           }
         }
+        if (!description) {
+          // Pass annotates its types with a block comment above the property
+          // rather than with JSDoc.
+          const leading = valDecl.getLeadingCommentRanges();
+          if (leading.length > 0) {
+            description = leading[leading.length - 1]
+              .getText()
+              .replace(/^\/\*+/, "")
+              .replace(/\*+\/$/, "")
+              .replace(/^\s*\*/gm, "")
+              .replace(/\s+/g, " ")
+              .trim();
+          }
+        }
       }
 
       props.push({

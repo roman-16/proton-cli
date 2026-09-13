@@ -4,6 +4,7 @@ import { readdirSync, statSync } from "fs";
 import type { Endpoint, EnumInfo } from "./types.js";
 import { collectConstants, collectEnums, ENUM_MAP } from "./registry.js";
 import { extractFromArrow, extractFromFunction } from "./extract-endpoint.js";
+import { parsePass } from "./parse-pass.js";
 
 const SKIP_FILES = new Set([
   "createApi.ts",
@@ -52,6 +53,10 @@ export function parseAll(repoDir: string): { endpoints: Endpoint[]; enums: Map<s
       }
     }
   }
+
+  // Pass declares its API as types rather than as functions, in a package of
+  // its own.
+  endpoints.push(...parsePass(repoDir));
 
   return { endpoints, enums: ENUM_MAP };
 }

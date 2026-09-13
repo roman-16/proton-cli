@@ -2,83 +2,69 @@ package pass
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/base64"
 	"fmt"
-	"slices"
+	"log/slog"
 
-	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/roman-16/proton-cli/internal/crypto/aead"
 	"github.com/roman-16/proton-cli/internal/errs"
+	"github.com/roman-16/proton-cli/internal/passfile"
 	"github.com/roman-16/proton-cli/internal/progress"
+	"github.com/roman-16/proton-cli/internal/proton"
 	pb "github.com/roman-16/proton-cli/internal/service/pass/proto"
 	"github.com/roman-16/proton-cli/internal/units"
 )
 
-// Reading a Proton Pass backup back in.
+// Landing a file's worth of items in the account.
 //
-// A vault in the file lands in the vault of that name, and one that does not
-// exist yet is made. Items are added rather than matched: an item carries no
-// identity a second account would recognise, so nothing here can tell a re-import
-// from a file somebody edited, and inventing a match would be the one mistake
-// that loses data instead of duplicating it.
+// Everything about where an item goes is settled here, before anything is sent:
+// which vault it lands in, whether that vault has to be made and whether the
+// plan has room for it, and which of its attachments will travel. Reading the
+// file is passfile's, and this does not care which program wrote it.
+//
+// Items are added rather than matched: an item carries no identity a second
+// account would recognise, so nothing here can tell a re-import from a file
+// somebody edited, and inventing a match would be the one mistake that loses
+// data instead of duplicating it.
+
+// importBatch is how many items go up in one request. Proton takes a hundred;
+// the app sends fifty, and a batch that is refused is refused whole, so the
+// smaller number is the one worth losing.
+const importBatch = 50
 
 // ImportResult is what a read-back did and what it could not.
 type ImportResult struct {
-	Imported []string       `json:"imported"`
-	Skipped  []SkippedEntry `json:"skipped"`
-	// SkippedFiles are the attachments that did not land. They are apart from
-	// the items because an item whose file would not go up is still an item that
-	// landed, and counting it as lost would be a wrong count.
-	SkippedFiles []SkippedFile `json:"skipped_files"`
+	Imported []string               `json:"imported"`
+	Skipped  []passfile.Skip        `json:"skipped"`
+	Files    []passfile.SkippedFile `json:"skipped_files"`
 }
 
-// SkippedFile is one attachment a read-back could not put back, and why.
-type SkippedFile struct {
-	Name   string `json:"name"`
-	Item   string `json:"item"`
-	Reason string `json:"reason"`
-}
-
-// String names the file and the item it belonged to.
-func (s SkippedFile) String() string {
-	return fmt.Sprintf("Skipped attachment %q of %q: %s.", s.Name, s.Item, s.Reason)
-}
-
-// SkippedEntry is one item a read-back could not take, and why.
-type SkippedEntry struct {
-	Name   string `json:"name,omitempty"`
-	Vault  string `json:"vault,omitempty"`
-	Reason string `json:"reason"`
-}
-
-// String names the item and the vault it was headed for.
-func (s SkippedEntry) String() string {
-	if s.Name == "" {
-		return fmt.Sprintf("Skipped an item: %s.", s.Reason)
-	}
-	return fmt.Sprintf("Skipped %q: %s.", s.Name, s.Reason)
-}
-
-// ImportPlan is what a read-back would do, worked out before any of it is done.
+// ImportPlan is what an import would do, worked out before any of it is done.
 type ImportPlan struct {
 	// Vaults are the vaults the file names, in the order they appear.
 	Vaults []PlannedVault
-	// Skipped are the items that will not be read back, and why.
-	Skipped []SkippedEntry
-	// SkippedFiles are the attachments that will not be read back, and why.
-	SkippedFiles []SkippedFile
+	// Skipped are the items that will not land, and why.
+	Skipped []passfile.Skip
+	// SkippedFiles are the attachments that will not land, and why.
+	SkippedFiles []passfile.SkippedFile
 }
 
 // PlannedVault is one vault's worth of the file: where it will land, whether
 // that vault has to be made, and what will go into it.
 type PlannedVault struct {
-	Name  string
-	New   bool
-	Items []*pb.Item
-	Names []string
-	// Files are the attachments of each item, in step with Items.
-	Files [][]Upload
+	Name    string
+	ShareID string
+	New     bool
+	Items   []PlannedItem
+}
+
+// PlannedItem is one item on its way in, with the attachments that travel with
+// it.
+type PlannedItem struct {
+	passfile.Entry
+	Files []Upload
 }
 
 // Count is how many items the whole plan would write.
@@ -94,8 +80,20 @@ func (p ImportPlan) Count() int {
 func (p ImportPlan) Attachments() int {
 	var n int
 	for _, v := range p.Vaults {
-		for _, files := range v.Files {
-			n += len(files)
+		for _, item := range v.Items {
+			n += len(item.Files)
+		}
+	}
+	return n
+}
+
+// NewVaults is how many vaults the import would create, since making one is the
+// part a person cannot undo by deleting a few items.
+func (p ImportPlan) NewVaults() int {
+	var n int
+	for _, v := range p.Vaults {
+		if v.New && len(v.Items) > 0 {
+			n++
 		}
 	}
 	return n
@@ -103,98 +101,217 @@ func (p ImportPlan) Attachments() int {
 
 // PlanImport works out what a document would land, without sending anything.
 //
-// Everything that can go wrong with the file itself goes wrong here - a kind of
-// item this version cannot read, content that will not parse, an attachment the
-// plan will not take - so a run that reaches the network is one that has already
-// been understood, and a dry run says the same things a real one does.
-func (s *Service) PlanImport(ctx context.Context, archive *Archive) (*ImportPlan, error) {
+// target names one vault to put everything in; without it the file's own vaults
+// are followed, and one the account does not have yet is made. Everything that
+// can go wrong before the network does go wrong here - a kind of item this
+// version cannot read, an alias that cannot be recreated, a vault the plan has
+// no room for, an attachment that will not be taken - so a dry run says the same
+// things a real one does.
+func (s *Service) PlanImport(ctx context.Context, doc *passfile.Document, userID, target string) (*ImportPlan, error) {
 	existing, err := s.VaultsList(ctx)
 	if err != nil {
 		return nil, err
 	}
-	have := make(map[string]bool, len(existing))
-	for _, v := range existing {
-		have[v.Name] = true
+	if len(existing) == 0 {
+		return nil, errs.Problemf("This account has no vault to import into.")
 	}
-	doc := archive.Document()
-
-	plan := &ImportPlan{}
-	limits, err := s.attachmentLimits(ctx, doc)
+	limits, err := s.Limits(ctx)
 	if err != nil {
 		return nil, err
 	}
-	for _, v := range sortedVaults(doc) {
-		planned := PlannedVault{Name: v.Name, New: !have[v.Name]}
-		if planned.Name == "" {
-			planned.Name = "Personal"
+
+	plan := &ImportPlan{Skipped: doc.Skipped, SkippedFiles: doc.SkippedFiles}
+	placed, err := s.placeVaults(ctx, doc, existing, target)
+	if err != nil {
+		return nil, err
+	}
+	held, err := s.heldAliases(ctx, doc, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	room := vaultRoom(existing, limits)
+	for _, vault := range placed {
+		if vault.New {
+			if room <= 0 {
+				plan.Skipped = append(plan.Skipped, vaultOverLimit(vault, existing, limits)...)
+				continue
+			}
+			room--
 		}
-		for _, item := range v.Items {
-			built, err := importItem(item)
-			if err != nil {
-				plan.Skipped = append(plan.Skipped, SkippedEntry{
-					Name: item.Data.Metadata.Name, Vault: v.Name, Reason: err.Error(),
+		planned := PlannedVault{Name: vault.Name, ShareID: vault.ShareID, New: vault.New}
+		for _, entry := range vault.Items {
+			if reason := refusedEntry(entry, doc.UserID, userID, held); reason != "" {
+				plan.Skipped = append(plan.Skipped, passfile.Skip{
+					Name: entry.Name, Vault: vault.Name, Reason: reason,
 				})
 				continue
 			}
-			files, skipped := plannedFiles(archive, item, limits)
+			files, skipped := plannedFiles(entry, limits.Storage)
 			plan.SkippedFiles = append(plan.SkippedFiles, skipped...)
-			planned.Items = append(planned.Items, built)
-			planned.Names = append(planned.Names, item.Data.Metadata.Name)
-			planned.Files = append(planned.Files, files)
+			planned.Items = append(planned.Items, PlannedItem{Entry: entry, Files: files})
 		}
 		plan.Vaults = append(plan.Vaults, planned)
 	}
 	return plan, nil
 }
 
-// attachmentLimits is what the plan allows, asked for only when the document
-// carries a file at all.
-func (s *Service) attachmentLimits(ctx context.Context, doc *ExportDocument) (*StorageLimits, error) {
-	for _, v := range doc.Vaults {
-		for _, item := range v.Items {
-			if len(item.Files) > 0 {
-				return s.StorageLimits(ctx)
-			}
-		}
-	}
-	return nil, nil
+// placedVault is one of the file's vaults with the account's answer to it:
+// which share it lands in, or that it has to be made.
+type placedVault struct {
+	Name    string
+	ShareID string
+	New     bool
+	Items   []passfile.Entry
 }
 
-// plannedFiles are one item's attachments, and the ones that will not go back.
+// placeVaults decides where each of the file's vaults lands.
 //
-// Each of the three ways a file is refused is known before anything is sent, so
-// a dry run names them too: the archive does not hold it, the plan takes no
-// attachments at all, or the file is larger than one may be.
-func plannedFiles(archive *Archive, item ExportedItem, limits *StorageLimits) ([]Upload, []SkippedFile) {
-	var out []Upload
-	var skipped []SkippedFile
-	for _, entry := range item.Files {
-		name := ImportName(entry)
-		up, ok := archive.Attachment(entry)
-		switch {
-		case !ok:
-			skipped = append(skipped, SkippedFile{
-				Name: name, Item: item.Data.Metadata.Name,
-				Reason: "the archive does not hold it",
-			})
-		case limits == nil || !limits.Allowed:
-			skipped = append(skipped, SkippedFile{
-				Name: name, Item: item.Data.Metadata.Name,
-				Reason: "attachments need a paid Pass plan",
-			})
-		case up.Size == 0:
-			skipped = append(skipped, SkippedFile{
-				Name: name, Item: item.Data.Metadata.Name, Reason: "it is empty",
-			})
-		case limits.MaxFileSize > 0 && up.Size > limits.MaxFileSize:
-			skipped = append(skipped, SkippedFile{
-				Name: name, Item: item.Data.Metadata.Name,
-				Reason: fmt.Sprintf("it is %s, and an attachment may be at most %s",
-					units.Size(up.Size), units.Size(limits.MaxFileSize)),
-			})
-		default:
-			out = append(out, up)
+// A file that names no vault - which is most of them, since only Proton Pass and
+// the managers with folders do - lands in the account's first vault, the one the
+// app opens on. --vault overrides all of it.
+func (s *Service) placeVaults(ctx context.Context, doc *passfile.Document, existing []Vault, target string) ([]placedVault, error) {
+	byName := make(map[string]Vault, len(existing))
+	for _, v := range existing {
+		byName[v.Name] = v
+	}
+
+	if target != "" {
+		shareID, err := s.ResolveVault(ctx, target)
+		if err != nil {
+			return nil, err
 		}
+		into := placedVault{ShareID: shareID}
+		for _, v := range existing {
+			if v.ShareID == shareID {
+				into.Name = v.Name
+			}
+		}
+		for _, vault := range doc.Vaults {
+			into.Items = append(into.Items, vault.Items...)
+		}
+		return []placedVault{into}, nil
+	}
+
+	var out []placedVault
+	seen := map[string]int{}
+	for _, vault := range doc.Vaults {
+		name := vault.Name
+		if name == "" {
+			name = existing[0].Name
+		}
+		if at, ok := seen[name]; ok {
+			out[at].Items = append(out[at].Items, vault.Items...)
+			continue
+		}
+		seen[name] = len(out)
+		placed := placedVault{Name: name, Items: vault.Items}
+		if v, ok := byName[name]; ok {
+			placed.ShareID = v.ShareID
+		} else {
+			placed.New = true
+		}
+		out = append(out, placed)
+	}
+	return out, nil
+}
+
+// vaultRoom is how many more vaults the plan allows.
+func vaultRoom(existing []Vault, limits *Limits) int {
+	if limits.Vaults == nil {
+		return len(existing) + 1000
+	}
+	return *limits.Vaults - len(existing)
+}
+
+// vaultOverLimit is what the items of a vault the plan has no room for are told.
+func vaultOverLimit(vault placedVault, existing []Vault, limits *Limits) []passfile.Skip {
+	allowed := fmt.Sprintf("%d vaults", *limits.Vaults)
+	if *limits.Vaults == 1 {
+		allowed = "1 vault"
+	}
+	reason := fmt.Sprintf("your plan allows %s and you have %d", allowed, len(existing))
+	out := make([]passfile.Skip, 0, len(vault.Items))
+	for _, entry := range vault.Items {
+		out = append(out, passfile.Skip{Name: entry.Name, Vault: vault.Name, Reason: reason})
+	}
+	return out
+}
+
+// refusedEntry is why an item cannot land, and empty when it can.
+//
+// An alias is an address Proton owns and hands out. The account that made it
+// still has it, and a second account cannot be given the same one, so the only
+// alias that can come back is one this account made and has since deleted.
+func refusedEntry(entry passfile.Entry, fileUser, accountUser string, held map[string]bool) string {
+	if entry.Kind != "alias" {
+		return ""
+	}
+	switch {
+	case entry.AliasEmail == "":
+		return "the file does not say which address this alias stands for"
+	case fileUser == "" || fileUser != accountUser:
+		return "an alias belongs to the account that made it, so it cannot be read into another one"
+	case held[entry.AliasEmail]:
+		return "this account already holds that alias"
+	}
+	return ""
+}
+
+// heldAliases are the addresses the account has now, which is asked for only
+// when the file carries an alias this account could recreate.
+func (s *Service) heldAliases(ctx context.Context, doc *passfile.Document, userID string) (map[string]bool, error) {
+	if doc.UserID == "" || doc.UserID != userID {
+		return nil, nil
+	}
+	var any bool
+	for _, vault := range doc.Vaults {
+		for _, entry := range vault.Items {
+			any = any || entry.Kind == "alias"
+		}
+	}
+	if !any {
+		return nil, nil
+	}
+	items, err := s.itemsFull(ctx, "", true)
+	if err != nil {
+		return nil, err
+	}
+	held := map[string]bool{}
+	for _, it := range items {
+		if it.Alias != "" {
+			held[it.Alias] = true
+		}
+	}
+	return held, nil
+}
+
+// plannedFiles are one item's attachments, and the ones that will not go.
+//
+// Each way a file is refused is known before anything is sent, so a dry run
+// names them too: the plan takes no attachments at all, the file is empty, or it
+// is larger than one may be.
+func plannedFiles(entry passfile.Entry, limits StorageLimits) ([]Upload, []passfile.SkippedFile) {
+	var out []Upload
+	var skipped []passfile.SkippedFile
+	for _, file := range entry.Files {
+		refused := ""
+		switch {
+		case !limits.Allowed:
+			refused = "attachments need a paid Pass plan"
+		case file.Size == 0:
+			refused = "it is empty"
+		case limits.MaxFileSize > 0 && file.Size > limits.MaxFileSize:
+			refused = fmt.Sprintf("it is %s, and an attachment may be at most %s",
+				units.Size(file.Size), units.Size(limits.MaxFileSize))
+		}
+		if refused != "" {
+			skipped = append(skipped, passfile.SkippedFile{
+				Name: file.Name, Item: entry.Name, Reason: refused,
+			})
+			continue
+		}
+		out = append(out, Upload{Name: file.Name, Size: file.Size, Open: file.Open})
 	}
 	return out, skipped
 }
@@ -203,167 +320,165 @@ func plannedFiles(archive *Archive, item ExportedItem, limits *StorageLimits) ([
 //
 // report is handed each attachment as it goes up, numbered within the run.
 func (s *Service) Import(ctx context.Context, plan *ImportPlan, report func(index, total int) progress.Sink) (*ImportResult, error) {
-	existing, err := s.VaultsList(ctx)
-	if err != nil {
-		return nil, err
-	}
-	shareOf := make(map[string]string, len(existing))
-	for _, v := range existing {
-		shareOf[v.Name] = v.ShareID
-	}
-
-	res := &ImportResult{Skipped: plan.Skipped, SkippedFiles: plan.SkippedFiles}
+	res := &ImportResult{Skipped: plan.Skipped, Files: plan.SkippedFiles}
 	totalFiles, sentFiles := plan.Attachments(), 0
-	for _, v := range plan.Vaults {
-		if len(v.Items) == 0 {
+
+	for _, vault := range plan.Vaults {
+		if len(vault.Items) == 0 {
 			continue
 		}
-		shareID, ok := shareOf[v.Name]
-		if !ok {
-			shareID, err = s.VaultCreate(ctx, v.Name)
+		shareID := vault.ShareID
+		if shareID == "" {
+			created, err := s.VaultCreate(ctx, vault.Name)
 			if err != nil {
-				// A vault that cannot be made takes its items with it, and the
-				// free plan's vault limit is the usual reason.
-				for _, name := range v.Names {
-					res.Skipped = append(res.Skipped, SkippedEntry{
-						Name: name, Vault: v.Name, Reason: err.Error(),
+				// A vault that cannot be made takes its items with it.
+				slog.WarnContext(ctx, "import vault refused",
+					"count", len(vault.Items), "error", err)
+				for _, item := range vault.Items {
+					res.Skipped = append(res.Skipped, passfile.Skip{
+						Name: item.Name, Vault: vault.Name, Reason: err.Error(),
 					})
 				}
 				continue
 			}
-			shareOf[v.Name] = shareID
+			shareID = created
 		}
 		sk, err := s.decryptShareKeys(ctx, shareID)
 		if err != nil {
 			return nil, err
 		}
 		shareKey, rotation := sk.latest()
-		for i, item := range v.Items {
-			id, err := s.putItem(ctx, shareID, shareKey, rotation, item)
+
+		for start := 0; start < len(vault.Items); start += importBatch {
+			batch := vault.Items[start:min(start+importBatch, len(vault.Items))]
+			ids, err := s.importItems(ctx, shareID, shareKey, rotation, batch)
 			if err != nil {
-				res.Skipped = append(res.Skipped, SkippedEntry{
-					Name: v.Names[i], Vault: v.Name, Reason: err.Error(),
-				})
+				// Proton refuses a batch whole, so every item in it is lost and
+				// the run carries on with the next one.
+				slog.WarnContext(ctx, "import batch refused",
+					"count", len(batch), "error", err)
+				for _, item := range batch {
+					res.Skipped = append(res.Skipped, passfile.Skip{
+						Name: item.Name, Vault: vault.Name, Reason: err.Error(),
+					})
+				}
 				continue
 			}
-			res.Imported = append(res.Imported, id)
-			// The item has landed, so a file that will not go up costs the file
-			// and not the item: it is named afterwards rather than counted as a
-			// loss.
-			var pending []pendingFile
-			for _, up := range v.Files[i] {
-				sentFiles++
-				if report != nil {
-					up.Progress = report(sentFiles, totalFiles)
-				}
-				file, err := s.uploadPending(ctx, up)
-				if err != nil {
-					res.SkippedFiles = append(res.SkippedFiles, SkippedFile{
-						Name: up.Name, Item: v.Names[i], Reason: err.Error(),
-					})
-					continue
-				}
-				pending = append(pending, file)
-			}
-			if _, err := s.linkFiles(ctx, shareID, id, 1, pending, nil); err != nil {
-				for _, up := range v.Files[i] {
-					res.SkippedFiles = append(res.SkippedFiles, SkippedFile{
-						Name: up.Name, Item: v.Names[i], Reason: err.Error(),
-					})
-				}
+			res.Imported = append(res.Imported, ids...)
+			for i, item := range batch {
+				// The item has landed, so a file that will not go up costs the
+				// file and not the item: it is named afterwards rather than
+				// counted as a loss.
+				sentFiles = s.attach(ctx, shareID, ids[i], item, res, report, sentFiles, totalFiles)
 			}
 		}
 	}
 	return res, nil
 }
 
-// importItem rebuilds the stored protobuf from one entry of the document.
-func importItem(in ExportedItem) (*pb.Item, error) {
-	// An alias is an address Proton owns and hands out; a second account cannot
-	// be given the same one, and the account that exported it still has it. So
-	// there is nothing to recreate.
-	kind := importTypeName(in.Data.Type)
-	if kind == "alias" {
-		return nil, errs.Problemf("An alias belongs to the account that made it, so it cannot be read back.")
+// importItems seals one batch and sends it.
+//
+// The import endpoint is what the app uses, and it is the only one that carries
+// what a backup knows beyond the item's content: when it was made, when it last
+// changed, whether it was in the trash, and the address an alias stands for.
+func (s *Service) importItems(ctx context.Context, shareID string, shareKey []byte, rotation int, items []PlannedItem) ([]string, error) {
+	body := make([]map[string]any, 0, len(items))
+	for _, item := range items {
+		sealed, err := sealItem(shareKey, rotation, item.Item)
+		if err != nil {
+			return nil, err
+		}
+		one := map[string]any{"Item": sealed}
+		if item.Trashed {
+			one["Trashed"] = true
+		}
+		if item.CreateTime > 0 {
+			one["CreateTime"] = item.CreateTime
+		}
+		if item.ModifyTime > 0 {
+			one["ModifyTime"] = item.ModifyTime
+		}
+		if item.AliasEmail != "" {
+			one["AliasEmail"] = item.AliasEmail
+		}
+		body = append(body, one)
 	}
 
-	content, err := importContent(kind, in.Data.Content)
-	if err != nil {
+	var r struct {
+		Revisions struct {
+			RevisionsData []struct{ ItemID string }
+		}
+	}
+	if err := s.C.Decode(ctx, proton.Request{
+		Method: "POST", Path: "/pass/v1/share/" + shareID + "/item/import/batch",
+		Body: map[string]any{"Items": body},
+	}, &r); err != nil {
 		return nil, err
 	}
-	item := &pb.Item{
-		Metadata: &pb.Metadata{
-			Name: in.Data.Metadata.Name, Note: in.Data.Metadata.Note,
-			ItemUuid: in.Data.Metadata.ItemUUID,
-		},
-		Content: content,
+	if len(r.Revisions.RevisionsData) != len(items) {
+		return nil, fmt.Errorf("only %d of the %d items sent came back", len(r.Revisions.RevisionsData), len(items))
 	}
-	if len(in.Data.ExtraFields) > 0 {
-		var raws []json.RawMessage
-		if err := json.Unmarshal(in.Data.ExtraFields, &raws); err != nil {
-			return nil, fmt.Errorf("its custom fields could not be read")
-		}
-		for _, raw := range raws {
-			var f pb.ExtraField
-			if err := protojson.Unmarshal(raw, &f); err != nil {
-				return nil, fmt.Errorf("one of its custom fields could not be read")
-			}
-			item.ExtraFields = append(item.ExtraFields, &f)
-		}
-	}
-	return item, nil
-}
-
-// importContent parses the content of whichever kind of item this is.
-func importContent(kind string, raw json.RawMessage) (*pb.Content, error) {
-	out := &pb.Content{}
-	var msg proto.Message
-	switch kind {
-	case "login":
-		m := &pb.ItemLogin{}
-		out.Content, msg = &pb.Content_Login{Login: m}, m
-	case "note":
-		m := &pb.ItemNote{}
-		out.Content, msg = &pb.Content_Note{Note: m}, m
-	case "credit-card":
-		m := &pb.ItemCreditCard{}
-		out.Content, msg = &pb.Content_CreditCard{CreditCard: m}, m
-	case "identity":
-		m := &pb.ItemIdentity{}
-		out.Content, msg = &pb.Content_Identity{Identity: m}, m
-	case "ssh-key":
-		m := &pb.ItemSSHKey{}
-		out.Content, msg = &pb.Content_SshKey{SshKey: m}, m
-	case "wifi":
-		m := &pb.ItemWifi{}
-		out.Content, msg = &pb.Content_Wifi{Wifi: m}, m
-	case "custom":
-		m := &pb.ItemCustom{}
-		out.Content, msg = &pb.Content_Custom{Custom: m}, m
-	default:
-		return nil, fmt.Errorf("%q is a kind of item this version does not know how to read", kind)
-	}
-	// Proton writes a field it has no value for as an empty one rather than
-	// leaving it out, and a newer app may write fields this one has never heard
-	// of. Neither is a reason to refuse the item.
-	opts := protojson.UnmarshalOptions{DiscardUnknown: true}
-	if err := opts.Unmarshal(raw, msg); err != nil {
-		return nil, fmt.Errorf("its contents could not be read")
+	out := make([]string, 0, len(items))
+	for _, rev := range r.Revisions.RevisionsData {
+		out = append(out, rev.ItemID)
 	}
 	return out, nil
 }
 
-// sortedVaults returns the document's vaults in a settled order, so a dry run and
-// the run itself say the same thing.
-func sortedVaults(doc *ExportDocument) []*ExportedVault {
-	keys := make([]string, 0, len(doc.Vaults))
-	for k := range doc.Vaults {
-		keys = append(keys, k)
+// sealItem locks one item under a fresh key of its own, which is sealed in turn
+// under the vault's.
+func sealItem(shareKey []byte, rotation int, item *pb.Item) (map[string]any, error) {
+	itemKey, err := aead.NewKey()
+	if err != nil {
+		return nil, err
 	}
-	slices.Sort(keys)
-	out := make([]*ExportedVault, 0, len(keys))
-	for _, k := range keys {
-		out = append(out, doc.Vaults[k])
+	pbBytes, err := proto.Marshal(item)
+	if err != nil {
+		return nil, err
 	}
-	return out
+	ct, err := aead.Encrypt(itemKey, pbBytes, []byte(aead.TagItemContent))
+	if err != nil {
+		return nil, err
+	}
+	ek, err := aead.Encrypt(shareKey, itemKey, []byte(aead.TagItemKey))
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{
+		"Content":              base64.StdEncoding.EncodeToString(ct),
+		"ContentFormatVersion": contentFormatVersion,
+		"ItemKey":              base64.StdEncoding.EncodeToString(ek),
+		"KeyRotation":          rotation,
+	}, nil
+}
+
+// attach puts one item's files back on it, and returns how many files the run
+// has sent.
+func (s *Service) attach(ctx context.Context, shareID, itemID string, item PlannedItem, res *ImportResult, report func(int, int) progress.Sink, sent, total int) int {
+	if len(item.Files) == 0 {
+		return sent
+	}
+	var pending []pendingFile
+	for _, up := range item.Files {
+		sent++
+		if report != nil {
+			up.Progress = report(sent, total)
+		}
+		file, err := s.uploadPending(ctx, up)
+		if err != nil {
+			res.Files = append(res.Files, passfile.SkippedFile{
+				Name: up.Name, Item: item.Name, Reason: err.Error(),
+			})
+			continue
+		}
+		pending = append(pending, file)
+	}
+	if _, err := s.linkFiles(ctx, shareID, itemID, 1, pending, nil); err != nil {
+		for _, up := range item.Files {
+			res.Files = append(res.Files, passfile.SkippedFile{
+				Name: up.Name, Item: item.Name, Reason: err.Error(),
+			})
+		}
+	}
+	return sent
 }

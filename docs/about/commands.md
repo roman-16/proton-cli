@@ -251,9 +251,9 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton pass links get`](../pass/links.md#get) | Show one link, URL and all |
 | [`proton pass links list`](../pass/links.md#list) | List the links you have made |
 | [`proton pass links revoke`](../pass/links.md#revoke) | Stop a link working |
-| [`proton pass export`](../pass/pass.md#export) | Write the vaults you own out as a Proton Pass archive |
+| [`proton pass export`](../pass/pass.md#export) | Write the vaults you own out to a file |
 | [`proton pass generate`](../pass/pass.md#generate) | Make a password |
-| [`proton pass import`](../pass/pass.md#import) | Read a Proton Pass archive back in |
+| [`proton pass import`](../pass/pass.md#import) | Read items in from a password manager's export |
 | [`proton pass settings domains list`](../pass/settings.md#domains-list) | List the domains an alias can be made on |
 | [`proton pass settings extra-password disable`](../pass/settings.md#extra-password-disable) | Remove the extra password from Pass |
 | [`proton pass settings extra-password enable`](../pass/settings.md#extra-password-enable) | Protect Pass with an extra password |

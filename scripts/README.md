@@ -93,6 +93,16 @@ Per endpoint:
 | `silence` array | `x-expected-errors` |
 | All exported enums | Comment block in components section |
 
+Pass declares its API as two conditional types in `packages/pass/types/api/pass.ts` rather than as one function per endpoint, so it is parsed on its own:
+
+| Source | OpenAPI |
+|---|---|
+| `` Path extends `pass/v1/…` `` | `paths`, with each `${string}` named after the segment before it |
+| `` Method extends `post` `` | HTTP method |
+| `ApiRequestBody<Path, Method>` | `requestBody` schema |
+| `ApiResponse<Path, Method>` | Response schema beside the envelope |
+| Block comments above a property | `description` |
+
 Global:
 
 | Source | OpenAPI |
@@ -106,7 +116,7 @@ Global:
 1. **Checkout** - `just webclients` puts the current `ProtonMail/WebClients` main in `/tmp/proton-cli-WebClients`, and the directory is passed to the generator
 2. **Project setup** - creates a ts-morph `Project` with `tsconfig.base.json` for path resolution
 3. **Registry** - scans all source files for string/number constants and enum declarations
-4. **Parse** - walks all exported declarations in `api/**/*.ts`, extracts endpoint metadata from the AST
+4. **Parse** - walks all exported declarations in `api/**/*.ts`, extracts endpoint metadata from the AST, then walks the Pass `ApiRequestBody` and `ApiResponse` type chains
 5. **Type resolution** - follows TypeScript imports to resolve `data: SomeType` to actual property lists (including `extends`, `Partial<>`, `Omit<>`, etc.)
 6. **Emit** - generates OpenAPI 3.1 YAML to stdout
 
@@ -119,6 +129,7 @@ openapi-generator/
 ├── registry.ts           - constant and enum collection
 ├── extract-endpoint.ts   - endpoint extraction from AST nodes
 ├── extract-params.ts     - body/query param type resolution
+├── parse-pass.ts         - the Pass API, declared as conditional types
 ├── emit-yaml.ts          - OpenAPI YAML output
 └── types.ts              - shared TypeScript interfaces
 ```

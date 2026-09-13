@@ -269,11 +269,56 @@ It holds **the vaults you own**, and the attachments on their items. A vault som
 
 The passphrase comes from a file, from stdin with `--passphrase-stdin`, or from a prompt. Never from a flag value.
 
-Importing **adds** items. Nothing in an export says which existing item it was, so importing the same file twice puts the items in twice. Items land in the vault the file names, and a vault that is not there yet is made. Use `--dry-run` to list what would land, and where.
+Reading a backup back keeps what it says about each item: the dates it was made and last changed on, and the trash, so an item that was in the trash goes back to the trash.
 
-Attachments in the archive are put back on their items, which needs a paid Pass plan. Whatever cannot be put back is named once the items have landed, and the items still land.
+An alias address belongs to the account Proton gave it to. One from your own backup comes back if you have since deleted it; one from another account, or one you still hold, is named and skipped while everything else lands.
 
-Aliases are the exception. An alias address belongs to the account Proton gave it to, so each one is named and skipped while everything else lands.
+## Other layouts to export to
+
+```bash
+proton pass export --format csv --dest pass.csv
+proton pass export --format json --dest - | jq '.vaults[].name'
+```
+
+| `--format` | Holds | Encrypted with a passphrase |
+| --- | --- | --- |
+| `zip` | Every item and its attachments | Yes |
+| `json` | Every item, no attachments | Yes |
+| `csv` | One row per item | No |
+
+A CSV leaves out custom fields, attachments, passkeys and the keys of SSH items. It is in Proton Pass's own columns, so the app and `pass import` both read it back. `--passphrase-file` with `--format csv` is refused.
+
+## Moving from another password manager
+
+```bash
+proton pass import bitwarden-export.json --manager bitwarden
+proton pass import chrome-passwords.csv --manager chrome --vault Personal
+```
+
+`--manager` names the program that wrote the file:
+
+| `--manager` | Export it reads |
+| --- | --- |
+| `1password` | `.1pux`, `.1pif`, or a `.zip` of either |
+| `apple-passwords`, `safari` | CSV |
+| `bitwarden` | JSON, or a `.zip` with the attachments |
+| `brave`, `chrome`, `edge` | CSV |
+| `dashlane` | CSV, or a `.zip` of one CSV per kind of item |
+| `enpass` | JSON, attachments included |
+| `firefox` | CSV |
+| `kaspersky` | TXT |
+| `keepass` | XML |
+| `keeper`, `nordpass`, `roboform` | JSON or CSV |
+| `lastpass` | CSV |
+| `proton-pass` | The archive, the document inside it, or the CSV (the default) |
+
+Logins, notes, cards, identities, SSH keys, networks and custom items come across with their custom fields and one-time codes. Attachments come from 1Password, Bitwarden and Enpass, and need a paid Pass plan.
+
+A vault, folder or group in the file becomes a vault of that name, made if it is not there. Items in none land in your first vault. `--vault` puts everything into the one you name.
+
+Importing **adds** items. Nothing in a file says which existing item it was, so importing the same file twice puts the items in twice. Use `--dry-run` to list what would land, and where.
+
+On a plan with a vault limit, the items of a vault that will not fit are named before anything is sent, and `--vault` is the way to bring them in anyway.
 
 ## An extra password
 

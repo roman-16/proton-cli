@@ -133,6 +133,67 @@ func (CardType) EnumDescriptor() ([]byte, []int) {
 	return file_item_v1_proto_rawDescGZIP(), []int{1}
 }
 
+type AutofillUrl_Mode int32
+
+const (
+	AutofillUrl_Default           AutofillUrl_Mode = 0
+	AutofillUrl_Exact             AutofillUrl_Mode = 1
+	AutofillUrl_Never             AutofillUrl_Mode = 2
+	AutofillUrl_StartWith         AutofillUrl_Mode = 3
+	AutofillUrl_Pattern           AutofillUrl_Mode = 4
+	AutofillUrl_RegularExpression AutofillUrl_Mode = 5
+	AutofillUrl_ExactPath         AutofillUrl_Mode = 6
+)
+
+// Enum value maps for AutofillUrl_Mode.
+var (
+	AutofillUrl_Mode_name = map[int32]string{
+		0: "Default",
+		1: "Exact",
+		2: "Never",
+		3: "StartWith",
+		4: "Pattern",
+		5: "RegularExpression",
+		6: "ExactPath",
+	}
+	AutofillUrl_Mode_value = map[string]int32{
+		"Default":           0,
+		"Exact":             1,
+		"Never":             2,
+		"StartWith":         3,
+		"Pattern":           4,
+		"RegularExpression": 5,
+		"ExactPath":         6,
+	}
+)
+
+func (x AutofillUrl_Mode) Enum() *AutofillUrl_Mode {
+	p := new(AutofillUrl_Mode)
+	*p = x
+	return p
+}
+
+func (x AutofillUrl_Mode) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (AutofillUrl_Mode) Descriptor() protoreflect.EnumDescriptor {
+	return file_item_v1_proto_enumTypes[2].Descriptor()
+}
+
+func (AutofillUrl_Mode) Type() protoreflect.EnumType {
+	return &file_item_v1_proto_enumTypes[2]
+}
+
+func (x AutofillUrl_Mode) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use AutofillUrl_Mode.Descriptor instead.
+func (AutofillUrl_Mode) EnumDescriptor() ([]byte, []int) {
+	return file_item_v1_proto_rawDescGZIP(), []int{3, 0}
+}
+
 type ItemNote struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -377,6 +438,58 @@ func (x *Passkey) GetCreationData() *PasskeyCreationData {
 	return nil
 }
 
+type AutofillUrl struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Url           string                 `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
+	Mode          AutofillUrl_Mode       `protobuf:"varint,2,opt,name=mode,proto3,enum=proton_pass_item_v1.AutofillUrl_Mode" json:"mode,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AutofillUrl) Reset() {
+	*x = AutofillUrl{}
+	mi := &file_item_v1_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AutofillUrl) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AutofillUrl) ProtoMessage() {}
+
+func (x *AutofillUrl) ProtoReflect() protoreflect.Message {
+	mi := &file_item_v1_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AutofillUrl.ProtoReflect.Descriptor instead.
+func (*AutofillUrl) Descriptor() ([]byte, []int) {
+	return file_item_v1_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *AutofillUrl) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+func (x *AutofillUrl) GetMode() AutofillUrl_Mode {
+	if x != nil {
+		return x.Mode
+	}
+	return AutofillUrl_Default
+}
+
 type ItemLogin struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ItemEmail     string                 `protobuf:"bytes,1,opt,name=item_email,json=itemEmail,proto3" json:"item_email,omitempty"`
@@ -385,13 +498,14 @@ type ItemLogin struct {
 	TotpUri       string                 `protobuf:"bytes,4,opt,name=totp_uri,json=totpUri,proto3" json:"totp_uri,omitempty"`
 	Passkeys      []*Passkey             `protobuf:"bytes,5,rep,name=passkeys,proto3" json:"passkeys,omitempty"`
 	ItemUsername  string                 `protobuf:"bytes,6,opt,name=item_username,json=itemUsername,proto3" json:"item_username,omitempty"`
+	AutofillUrls  []*AutofillUrl         `protobuf:"bytes,7,rep,name=autofill_urls,json=autofillUrls,proto3" json:"autofill_urls,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ItemLogin) Reset() {
 	*x = ItemLogin{}
-	mi := &file_item_v1_proto_msgTypes[3]
+	mi := &file_item_v1_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -403,7 +517,7 @@ func (x *ItemLogin) String() string {
 func (*ItemLogin) ProtoMessage() {}
 
 func (x *ItemLogin) ProtoReflect() protoreflect.Message {
-	mi := &file_item_v1_proto_msgTypes[3]
+	mi := &file_item_v1_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -416,7 +530,7 @@ func (x *ItemLogin) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ItemLogin.ProtoReflect.Descriptor instead.
 func (*ItemLogin) Descriptor() ([]byte, []int) {
-	return file_item_v1_proto_rawDescGZIP(), []int{3}
+	return file_item_v1_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *ItemLogin) GetItemEmail() string {
@@ -461,6 +575,13 @@ func (x *ItemLogin) GetItemUsername() string {
 	return ""
 }
 
+func (x *ItemLogin) GetAutofillUrls() []*AutofillUrl {
+	if x != nil {
+		return x.AutofillUrls
+	}
+	return nil
+}
+
 type ItemAlias struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -469,7 +590,7 @@ type ItemAlias struct {
 
 func (x *ItemAlias) Reset() {
 	*x = ItemAlias{}
-	mi := &file_item_v1_proto_msgTypes[4]
+	mi := &file_item_v1_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -481,7 +602,7 @@ func (x *ItemAlias) String() string {
 func (*ItemAlias) ProtoMessage() {}
 
 func (x *ItemAlias) ProtoReflect() protoreflect.Message {
-	mi := &file_item_v1_proto_msgTypes[4]
+	mi := &file_item_v1_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -494,7 +615,7 @@ func (x *ItemAlias) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ItemAlias.ProtoReflect.Descriptor instead.
 func (*ItemAlias) Descriptor() ([]byte, []int) {
-	return file_item_v1_proto_rawDescGZIP(), []int{4}
+	return file_item_v1_proto_rawDescGZIP(), []int{5}
 }
 
 type CustomSection struct {
@@ -507,7 +628,7 @@ type CustomSection struct {
 
 func (x *CustomSection) Reset() {
 	*x = CustomSection{}
-	mi := &file_item_v1_proto_msgTypes[5]
+	mi := &file_item_v1_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -519,7 +640,7 @@ func (x *CustomSection) String() string {
 func (*CustomSection) ProtoMessage() {}
 
 func (x *CustomSection) ProtoReflect() protoreflect.Message {
-	mi := &file_item_v1_proto_msgTypes[5]
+	mi := &file_item_v1_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -532,7 +653,7 @@ func (x *CustomSection) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CustomSection.ProtoReflect.Descriptor instead.
 func (*CustomSection) Descriptor() ([]byte, []int) {
-	return file_item_v1_proto_rawDescGZIP(), []int{5}
+	return file_item_v1_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *CustomSection) GetSectionName() string {
@@ -558,7 +679,7 @@ type ItemCustom struct {
 
 func (x *ItemCustom) Reset() {
 	*x = ItemCustom{}
-	mi := &file_item_v1_proto_msgTypes[6]
+	mi := &file_item_v1_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -570,7 +691,7 @@ func (x *ItemCustom) String() string {
 func (*ItemCustom) ProtoMessage() {}
 
 func (x *ItemCustom) ProtoReflect() protoreflect.Message {
-	mi := &file_item_v1_proto_msgTypes[6]
+	mi := &file_item_v1_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -583,7 +704,7 @@ func (x *ItemCustom) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ItemCustom.ProtoReflect.Descriptor instead.
 func (*ItemCustom) Descriptor() ([]byte, []int) {
-	return file_item_v1_proto_rawDescGZIP(), []int{6}
+	return file_item_v1_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ItemCustom) GetSections() []*CustomSection {
@@ -604,7 +725,7 @@ type ItemSSHKey struct {
 
 func (x *ItemSSHKey) Reset() {
 	*x = ItemSSHKey{}
-	mi := &file_item_v1_proto_msgTypes[7]
+	mi := &file_item_v1_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -616,7 +737,7 @@ func (x *ItemSSHKey) String() string {
 func (*ItemSSHKey) ProtoMessage() {}
 
 func (x *ItemSSHKey) ProtoReflect() protoreflect.Message {
-	mi := &file_item_v1_proto_msgTypes[7]
+	mi := &file_item_v1_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -629,7 +750,7 @@ func (x *ItemSSHKey) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ItemSSHKey.ProtoReflect.Descriptor instead.
 func (*ItemSSHKey) Descriptor() ([]byte, []int) {
-	return file_item_v1_proto_rawDescGZIP(), []int{7}
+	return file_item_v1_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ItemSSHKey) GetPrivateKey() string {
@@ -665,7 +786,7 @@ type ItemWifi struct {
 
 func (x *ItemWifi) Reset() {
 	*x = ItemWifi{}
-	mi := &file_item_v1_proto_msgTypes[8]
+	mi := &file_item_v1_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -677,7 +798,7 @@ func (x *ItemWifi) String() string {
 func (*ItemWifi) ProtoMessage() {}
 
 func (x *ItemWifi) ProtoReflect() protoreflect.Message {
-	mi := &file_item_v1_proto_msgTypes[8]
+	mi := &file_item_v1_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -690,7 +811,7 @@ func (x *ItemWifi) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ItemWifi.ProtoReflect.Descriptor instead.
 func (*ItemWifi) Descriptor() ([]byte, []int) {
-	return file_item_v1_proto_rawDescGZIP(), []int{8}
+	return file_item_v1_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ItemWifi) GetSsid() string {
@@ -736,7 +857,7 @@ type ItemCreditCard struct {
 
 func (x *ItemCreditCard) Reset() {
 	*x = ItemCreditCard{}
-	mi := &file_item_v1_proto_msgTypes[9]
+	mi := &file_item_v1_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -748,7 +869,7 @@ func (x *ItemCreditCard) String() string {
 func (*ItemCreditCard) ProtoMessage() {}
 
 func (x *ItemCreditCard) ProtoReflect() protoreflect.Message {
-	mi := &file_item_v1_proto_msgTypes[9]
+	mi := &file_item_v1_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -761,7 +882,7 @@ func (x *ItemCreditCard) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ItemCreditCard.ProtoReflect.Descriptor instead.
 func (*ItemCreditCard) Descriptor() ([]byte, []int) {
-	return file_item_v1_proto_rawDescGZIP(), []int{9}
+	return file_item_v1_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ItemCreditCard) GetCardholderName() string {
@@ -864,7 +985,7 @@ type ItemIdentity struct {
 
 func (x *ItemIdentity) Reset() {
 	*x = ItemIdentity{}
-	mi := &file_item_v1_proto_msgTypes[10]
+	mi := &file_item_v1_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -876,7 +997,7 @@ func (x *ItemIdentity) String() string {
 func (*ItemIdentity) ProtoMessage() {}
 
 func (x *ItemIdentity) ProtoReflect() protoreflect.Message {
-	mi := &file_item_v1_proto_msgTypes[10]
+	mi := &file_item_v1_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -889,7 +1010,7 @@ func (x *ItemIdentity) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ItemIdentity.ProtoReflect.Descriptor instead.
 func (*ItemIdentity) Descriptor() ([]byte, []int) {
-	return file_item_v1_proto_rawDescGZIP(), []int{10}
+	return file_item_v1_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ItemIdentity) GetFullName() string {
@@ -1163,7 +1284,7 @@ type AllowedAndroidApp struct {
 
 func (x *AllowedAndroidApp) Reset() {
 	*x = AllowedAndroidApp{}
-	mi := &file_item_v1_proto_msgTypes[11]
+	mi := &file_item_v1_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1175,7 +1296,7 @@ func (x *AllowedAndroidApp) String() string {
 func (*AllowedAndroidApp) ProtoMessage() {}
 
 func (x *AllowedAndroidApp) ProtoReflect() protoreflect.Message {
-	mi := &file_item_v1_proto_msgTypes[11]
+	mi := &file_item_v1_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1188,7 +1309,7 @@ func (x *AllowedAndroidApp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AllowedAndroidApp.ProtoReflect.Descriptor instead.
 func (*AllowedAndroidApp) Descriptor() ([]byte, []int) {
-	return file_item_v1_proto_rawDescGZIP(), []int{11}
+	return file_item_v1_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *AllowedAndroidApp) GetPackageName() string {
@@ -1221,7 +1342,7 @@ type AndroidSpecific struct {
 
 func (x *AndroidSpecific) Reset() {
 	*x = AndroidSpecific{}
-	mi := &file_item_v1_proto_msgTypes[12]
+	mi := &file_item_v1_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1233,7 +1354,7 @@ func (x *AndroidSpecific) String() string {
 func (*AndroidSpecific) ProtoMessage() {}
 
 func (x *AndroidSpecific) ProtoReflect() protoreflect.Message {
-	mi := &file_item_v1_proto_msgTypes[12]
+	mi := &file_item_v1_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1246,7 +1367,7 @@ func (x *AndroidSpecific) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AndroidSpecific.ProtoReflect.Descriptor instead.
 func (*AndroidSpecific) Descriptor() ([]byte, []int) {
-	return file_item_v1_proto_rawDescGZIP(), []int{12}
+	return file_item_v1_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *AndroidSpecific) GetAllowedApps() []*AllowedAndroidApp {
@@ -1265,7 +1386,7 @@ type PlatformSpecific struct {
 
 func (x *PlatformSpecific) Reset() {
 	*x = PlatformSpecific{}
-	mi := &file_item_v1_proto_msgTypes[13]
+	mi := &file_item_v1_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1277,7 +1398,7 @@ func (x *PlatformSpecific) String() string {
 func (*PlatformSpecific) ProtoMessage() {}
 
 func (x *PlatformSpecific) ProtoReflect() protoreflect.Message {
-	mi := &file_item_v1_proto_msgTypes[13]
+	mi := &file_item_v1_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1290,7 +1411,7 @@ func (x *PlatformSpecific) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlatformSpecific.ProtoReflect.Descriptor instead.
 func (*PlatformSpecific) Descriptor() ([]byte, []int) {
-	return file_item_v1_proto_rawDescGZIP(), []int{13}
+	return file_item_v1_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *PlatformSpecific) GetAndroid() *AndroidSpecific {
@@ -1309,7 +1430,7 @@ type ExtraTotp struct {
 
 func (x *ExtraTotp) Reset() {
 	*x = ExtraTotp{}
-	mi := &file_item_v1_proto_msgTypes[14]
+	mi := &file_item_v1_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1321,7 +1442,7 @@ func (x *ExtraTotp) String() string {
 func (*ExtraTotp) ProtoMessage() {}
 
 func (x *ExtraTotp) ProtoReflect() protoreflect.Message {
-	mi := &file_item_v1_proto_msgTypes[14]
+	mi := &file_item_v1_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1334,7 +1455,7 @@ func (x *ExtraTotp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExtraTotp.ProtoReflect.Descriptor instead.
 func (*ExtraTotp) Descriptor() ([]byte, []int) {
-	return file_item_v1_proto_rawDescGZIP(), []int{14}
+	return file_item_v1_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *ExtraTotp) GetTotpUri() string {
@@ -1353,7 +1474,7 @@ type ExtraTextField struct {
 
 func (x *ExtraTextField) Reset() {
 	*x = ExtraTextField{}
-	mi := &file_item_v1_proto_msgTypes[15]
+	mi := &file_item_v1_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1365,7 +1486,7 @@ func (x *ExtraTextField) String() string {
 func (*ExtraTextField) ProtoMessage() {}
 
 func (x *ExtraTextField) ProtoReflect() protoreflect.Message {
-	mi := &file_item_v1_proto_msgTypes[15]
+	mi := &file_item_v1_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1378,7 +1499,7 @@ func (x *ExtraTextField) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExtraTextField.ProtoReflect.Descriptor instead.
 func (*ExtraTextField) Descriptor() ([]byte, []int) {
-	return file_item_v1_proto_rawDescGZIP(), []int{15}
+	return file_item_v1_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ExtraTextField) GetContent() string {
@@ -1397,7 +1518,7 @@ type ExtraHiddenField struct {
 
 func (x *ExtraHiddenField) Reset() {
 	*x = ExtraHiddenField{}
-	mi := &file_item_v1_proto_msgTypes[16]
+	mi := &file_item_v1_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1409,7 +1530,7 @@ func (x *ExtraHiddenField) String() string {
 func (*ExtraHiddenField) ProtoMessage() {}
 
 func (x *ExtraHiddenField) ProtoReflect() protoreflect.Message {
-	mi := &file_item_v1_proto_msgTypes[16]
+	mi := &file_item_v1_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1422,7 +1543,7 @@ func (x *ExtraHiddenField) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExtraHiddenField.ProtoReflect.Descriptor instead.
 func (*ExtraHiddenField) Descriptor() ([]byte, []int) {
-	return file_item_v1_proto_rawDescGZIP(), []int{16}
+	return file_item_v1_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *ExtraHiddenField) GetContent() string {
@@ -1441,7 +1562,7 @@ type ExtraTimestampField struct {
 
 func (x *ExtraTimestampField) Reset() {
 	*x = ExtraTimestampField{}
-	mi := &file_item_v1_proto_msgTypes[17]
+	mi := &file_item_v1_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1453,7 +1574,7 @@ func (x *ExtraTimestampField) String() string {
 func (*ExtraTimestampField) ProtoMessage() {}
 
 func (x *ExtraTimestampField) ProtoReflect() protoreflect.Message {
-	mi := &file_item_v1_proto_msgTypes[17]
+	mi := &file_item_v1_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1466,7 +1587,7 @@ func (x *ExtraTimestampField) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExtraTimestampField.ProtoReflect.Descriptor instead.
 func (*ExtraTimestampField) Descriptor() ([]byte, []int) {
-	return file_item_v1_proto_rawDescGZIP(), []int{17}
+	return file_item_v1_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ExtraTimestampField) GetTimestamp() *timestamppb.Timestamp {
@@ -1492,7 +1613,7 @@ type ExtraField struct {
 
 func (x *ExtraField) Reset() {
 	*x = ExtraField{}
-	mi := &file_item_v1_proto_msgTypes[18]
+	mi := &file_item_v1_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1504,7 +1625,7 @@ func (x *ExtraField) String() string {
 func (*ExtraField) ProtoMessage() {}
 
 func (x *ExtraField) ProtoReflect() protoreflect.Message {
-	mi := &file_item_v1_proto_msgTypes[18]
+	mi := &file_item_v1_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1517,7 +1638,7 @@ func (x *ExtraField) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExtraField.ProtoReflect.Descriptor instead.
 func (*ExtraField) Descriptor() ([]byte, []int) {
-	return file_item_v1_proto_rawDescGZIP(), []int{18}
+	return file_item_v1_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *ExtraField) GetFieldName() string {
@@ -1609,7 +1730,7 @@ type Metadata struct {
 
 func (x *Metadata) Reset() {
 	*x = Metadata{}
-	mi := &file_item_v1_proto_msgTypes[19]
+	mi := &file_item_v1_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1621,7 +1742,7 @@ func (x *Metadata) String() string {
 func (*Metadata) ProtoMessage() {}
 
 func (x *Metadata) ProtoReflect() protoreflect.Message {
-	mi := &file_item_v1_proto_msgTypes[19]
+	mi := &file_item_v1_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1634,7 +1755,7 @@ func (x *Metadata) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Metadata.ProtoReflect.Descriptor instead.
 func (*Metadata) Descriptor() ([]byte, []int) {
-	return file_item_v1_proto_rawDescGZIP(), []int{19}
+	return file_item_v1_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *Metadata) GetName() string {
@@ -1679,7 +1800,7 @@ type Content struct {
 
 func (x *Content) Reset() {
 	*x = Content{}
-	mi := &file_item_v1_proto_msgTypes[20]
+	mi := &file_item_v1_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1691,7 +1812,7 @@ func (x *Content) String() string {
 func (*Content) ProtoMessage() {}
 
 func (x *Content) ProtoReflect() protoreflect.Message {
-	mi := &file_item_v1_proto_msgTypes[20]
+	mi := &file_item_v1_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1704,7 +1825,7 @@ func (x *Content) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Content.ProtoReflect.Descriptor instead.
 func (*Content) Descriptor() ([]byte, []int) {
-	return file_item_v1_proto_rawDescGZIP(), []int{20}
+	return file_item_v1_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *Content) GetContent() isContent_Content {
@@ -1850,7 +1971,7 @@ type Item struct {
 
 func (x *Item) Reset() {
 	*x = Item{}
-	mi := &file_item_v1_proto_msgTypes[21]
+	mi := &file_item_v1_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1862,7 +1983,7 @@ func (x *Item) String() string {
 func (*Item) ProtoMessage() {}
 
 func (x *Item) ProtoReflect() protoreflect.Message {
-	mi := &file_item_v1_proto_msgTypes[21]
+	mi := &file_item_v1_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1875,7 +1996,7 @@ func (x *Item) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Item.ProtoReflect.Descriptor instead.
 func (*Item) Descriptor() ([]byte, []int) {
-	return file_item_v1_proto_rawDescGZIP(), []int{21}
+	return file_item_v1_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *Item) GetMetadata() *Metadata {
@@ -1937,7 +2058,18 @@ const file_item_v1_proto_rawDesc = "" +
 	"\rcredential_id\x18\v \x01(\fR\fcredentialId\x12\x1f\n" +
 	"\vuser_handle\x18\f \x01(\fR\n" +
 	"userHandle\x12M\n" +
-	"\rcreation_data\x18\r \x01(\v2(.proton_pass_item_v1.PasskeyCreationDataR\fcreationData\"\xd4\x01\n" +
+	"\rcreation_data\x18\r \x01(\v2(.proton_pass_item_v1.PasskeyCreationDataR\fcreationData\"\xc7\x01\n" +
+	"\vAutofillUrl\x12\x10\n" +
+	"\x03url\x18\x01 \x01(\tR\x03url\x129\n" +
+	"\x04mode\x18\x02 \x01(\x0e2%.proton_pass_item_v1.AutofillUrl.ModeR\x04mode\"k\n" +
+	"\x04Mode\x12\v\n" +
+	"\aDefault\x10\x00\x12\t\n" +
+	"\x05Exact\x10\x01\x12\t\n" +
+	"\x05Never\x10\x02\x12\r\n" +
+	"\tStartWith\x10\x03\x12\v\n" +
+	"\aPattern\x10\x04\x12\x15\n" +
+	"\x11RegularExpression\x10\x05\x12\r\n" +
+	"\tExactPath\x10\x06\"\x9b\x02\n" +
 	"\tItemLogin\x12\x1d\n" +
 	"\n" +
 	"item_email\x18\x01 \x01(\tR\titemEmail\x12\x1a\n" +
@@ -1945,7 +2077,8 @@ const file_item_v1_proto_rawDesc = "" +
 	"\x04urls\x18\x03 \x03(\tR\x04urls\x12\x19\n" +
 	"\btotp_uri\x18\x04 \x01(\tR\atotpUri\x128\n" +
 	"\bpasskeys\x18\x05 \x03(\v2\x1c.proton_pass_item_v1.PasskeyR\bpasskeys\x12#\n" +
-	"\ritem_username\x18\x06 \x01(\tR\fitemUsername\"\v\n" +
+	"\ritem_username\x18\x06 \x01(\tR\fitemUsername\x12E\n" +
+	"\rautofill_urls\x18\a \x03(\v2 .proton_pass_item_v1.AutofillUrlR\fautofillUrls\"\v\n" +
 	"\tItemAlias\"z\n" +
 	"\rCustomSection\x12!\n" +
 	"\fsection_name\x18\x01 \x01(\tR\vsectionName\x12F\n" +
@@ -2085,73 +2218,77 @@ func file_item_v1_proto_rawDescGZIP() []byte {
 	return file_item_v1_proto_rawDescData
 }
 
-var file_item_v1_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_item_v1_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
+var file_item_v1_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
+var file_item_v1_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
 var file_item_v1_proto_goTypes = []any{
 	(WifiSecurity)(0),             // 0: proton_pass_item_v1.WifiSecurity
 	(CardType)(0),                 // 1: proton_pass_item_v1.CardType
-	(*ItemNote)(nil),              // 2: proton_pass_item_v1.ItemNote
-	(*PasskeyCreationData)(nil),   // 3: proton_pass_item_v1.PasskeyCreationData
-	(*Passkey)(nil),               // 4: proton_pass_item_v1.Passkey
-	(*ItemLogin)(nil),             // 5: proton_pass_item_v1.ItemLogin
-	(*ItemAlias)(nil),             // 6: proton_pass_item_v1.ItemAlias
-	(*CustomSection)(nil),         // 7: proton_pass_item_v1.CustomSection
-	(*ItemCustom)(nil),            // 8: proton_pass_item_v1.ItemCustom
-	(*ItemSSHKey)(nil),            // 9: proton_pass_item_v1.ItemSSHKey
-	(*ItemWifi)(nil),              // 10: proton_pass_item_v1.ItemWifi
-	(*ItemCreditCard)(nil),        // 11: proton_pass_item_v1.ItemCreditCard
-	(*ItemIdentity)(nil),          // 12: proton_pass_item_v1.ItemIdentity
-	(*AllowedAndroidApp)(nil),     // 13: proton_pass_item_v1.AllowedAndroidApp
-	(*AndroidSpecific)(nil),       // 14: proton_pass_item_v1.AndroidSpecific
-	(*PlatformSpecific)(nil),      // 15: proton_pass_item_v1.PlatformSpecific
-	(*ExtraTotp)(nil),             // 16: proton_pass_item_v1.ExtraTotp
-	(*ExtraTextField)(nil),        // 17: proton_pass_item_v1.ExtraTextField
-	(*ExtraHiddenField)(nil),      // 18: proton_pass_item_v1.ExtraHiddenField
-	(*ExtraTimestampField)(nil),   // 19: proton_pass_item_v1.ExtraTimestampField
-	(*ExtraField)(nil),            // 20: proton_pass_item_v1.ExtraField
-	(*Metadata)(nil),              // 21: proton_pass_item_v1.Metadata
-	(*Content)(nil),               // 22: proton_pass_item_v1.Content
-	(*Item)(nil),                  // 23: proton_pass_item_v1.Item
-	(*timestamppb.Timestamp)(nil), // 24: google.protobuf.Timestamp
+	(AutofillUrl_Mode)(0),         // 2: proton_pass_item_v1.AutofillUrl.Mode
+	(*ItemNote)(nil),              // 3: proton_pass_item_v1.ItemNote
+	(*PasskeyCreationData)(nil),   // 4: proton_pass_item_v1.PasskeyCreationData
+	(*Passkey)(nil),               // 5: proton_pass_item_v1.Passkey
+	(*AutofillUrl)(nil),           // 6: proton_pass_item_v1.AutofillUrl
+	(*ItemLogin)(nil),             // 7: proton_pass_item_v1.ItemLogin
+	(*ItemAlias)(nil),             // 8: proton_pass_item_v1.ItemAlias
+	(*CustomSection)(nil),         // 9: proton_pass_item_v1.CustomSection
+	(*ItemCustom)(nil),            // 10: proton_pass_item_v1.ItemCustom
+	(*ItemSSHKey)(nil),            // 11: proton_pass_item_v1.ItemSSHKey
+	(*ItemWifi)(nil),              // 12: proton_pass_item_v1.ItemWifi
+	(*ItemCreditCard)(nil),        // 13: proton_pass_item_v1.ItemCreditCard
+	(*ItemIdentity)(nil),          // 14: proton_pass_item_v1.ItemIdentity
+	(*AllowedAndroidApp)(nil),     // 15: proton_pass_item_v1.AllowedAndroidApp
+	(*AndroidSpecific)(nil),       // 16: proton_pass_item_v1.AndroidSpecific
+	(*PlatformSpecific)(nil),      // 17: proton_pass_item_v1.PlatformSpecific
+	(*ExtraTotp)(nil),             // 18: proton_pass_item_v1.ExtraTotp
+	(*ExtraTextField)(nil),        // 19: proton_pass_item_v1.ExtraTextField
+	(*ExtraHiddenField)(nil),      // 20: proton_pass_item_v1.ExtraHiddenField
+	(*ExtraTimestampField)(nil),   // 21: proton_pass_item_v1.ExtraTimestampField
+	(*ExtraField)(nil),            // 22: proton_pass_item_v1.ExtraField
+	(*Metadata)(nil),              // 23: proton_pass_item_v1.Metadata
+	(*Content)(nil),               // 24: proton_pass_item_v1.Content
+	(*Item)(nil),                  // 25: proton_pass_item_v1.Item
+	(*timestamppb.Timestamp)(nil), // 26: google.protobuf.Timestamp
 }
 var file_item_v1_proto_depIdxs = []int32{
-	3,  // 0: proton_pass_item_v1.Passkey.creation_data:type_name -> proton_pass_item_v1.PasskeyCreationData
-	4,  // 1: proton_pass_item_v1.ItemLogin.passkeys:type_name -> proton_pass_item_v1.Passkey
-	20, // 2: proton_pass_item_v1.CustomSection.section_fields:type_name -> proton_pass_item_v1.ExtraField
-	7,  // 3: proton_pass_item_v1.ItemCustom.sections:type_name -> proton_pass_item_v1.CustomSection
-	7,  // 4: proton_pass_item_v1.ItemSSHKey.sections:type_name -> proton_pass_item_v1.CustomSection
-	0,  // 5: proton_pass_item_v1.ItemWifi.security:type_name -> proton_pass_item_v1.WifiSecurity
-	7,  // 6: proton_pass_item_v1.ItemWifi.sections:type_name -> proton_pass_item_v1.CustomSection
-	1,  // 7: proton_pass_item_v1.ItemCreditCard.card_type:type_name -> proton_pass_item_v1.CardType
-	20, // 8: proton_pass_item_v1.ItemIdentity.extra_personal_details:type_name -> proton_pass_item_v1.ExtraField
-	20, // 9: proton_pass_item_v1.ItemIdentity.extra_address_details:type_name -> proton_pass_item_v1.ExtraField
-	20, // 10: proton_pass_item_v1.ItemIdentity.extra_contact_details:type_name -> proton_pass_item_v1.ExtraField
-	20, // 11: proton_pass_item_v1.ItemIdentity.extra_work_details:type_name -> proton_pass_item_v1.ExtraField
-	7,  // 12: proton_pass_item_v1.ItemIdentity.extra_sections:type_name -> proton_pass_item_v1.CustomSection
-	13, // 13: proton_pass_item_v1.AndroidSpecific.allowed_apps:type_name -> proton_pass_item_v1.AllowedAndroidApp
-	14, // 14: proton_pass_item_v1.PlatformSpecific.android:type_name -> proton_pass_item_v1.AndroidSpecific
-	24, // 15: proton_pass_item_v1.ExtraTimestampField.timestamp:type_name -> google.protobuf.Timestamp
-	16, // 16: proton_pass_item_v1.ExtraField.totp:type_name -> proton_pass_item_v1.ExtraTotp
-	17, // 17: proton_pass_item_v1.ExtraField.text:type_name -> proton_pass_item_v1.ExtraTextField
-	18, // 18: proton_pass_item_v1.ExtraField.hidden:type_name -> proton_pass_item_v1.ExtraHiddenField
-	19, // 19: proton_pass_item_v1.ExtraField.timestamp:type_name -> proton_pass_item_v1.ExtraTimestampField
-	2,  // 20: proton_pass_item_v1.Content.note:type_name -> proton_pass_item_v1.ItemNote
-	5,  // 21: proton_pass_item_v1.Content.login:type_name -> proton_pass_item_v1.ItemLogin
-	6,  // 22: proton_pass_item_v1.Content.alias:type_name -> proton_pass_item_v1.ItemAlias
-	11, // 23: proton_pass_item_v1.Content.credit_card:type_name -> proton_pass_item_v1.ItemCreditCard
-	12, // 24: proton_pass_item_v1.Content.identity:type_name -> proton_pass_item_v1.ItemIdentity
-	9,  // 25: proton_pass_item_v1.Content.ssh_key:type_name -> proton_pass_item_v1.ItemSSHKey
-	10, // 26: proton_pass_item_v1.Content.wifi:type_name -> proton_pass_item_v1.ItemWifi
-	8,  // 27: proton_pass_item_v1.Content.custom:type_name -> proton_pass_item_v1.ItemCustom
-	21, // 28: proton_pass_item_v1.Item.metadata:type_name -> proton_pass_item_v1.Metadata
-	22, // 29: proton_pass_item_v1.Item.content:type_name -> proton_pass_item_v1.Content
-	15, // 30: proton_pass_item_v1.Item.platform_specific:type_name -> proton_pass_item_v1.PlatformSpecific
-	20, // 31: proton_pass_item_v1.Item.extra_fields:type_name -> proton_pass_item_v1.ExtraField
-	32, // [32:32] is the sub-list for method output_type
-	32, // [32:32] is the sub-list for method input_type
-	32, // [32:32] is the sub-list for extension type_name
-	32, // [32:32] is the sub-list for extension extendee
-	0,  // [0:32] is the sub-list for field type_name
+	4,  // 0: proton_pass_item_v1.Passkey.creation_data:type_name -> proton_pass_item_v1.PasskeyCreationData
+	2,  // 1: proton_pass_item_v1.AutofillUrl.mode:type_name -> proton_pass_item_v1.AutofillUrl.Mode
+	5,  // 2: proton_pass_item_v1.ItemLogin.passkeys:type_name -> proton_pass_item_v1.Passkey
+	6,  // 3: proton_pass_item_v1.ItemLogin.autofill_urls:type_name -> proton_pass_item_v1.AutofillUrl
+	22, // 4: proton_pass_item_v1.CustomSection.section_fields:type_name -> proton_pass_item_v1.ExtraField
+	9,  // 5: proton_pass_item_v1.ItemCustom.sections:type_name -> proton_pass_item_v1.CustomSection
+	9,  // 6: proton_pass_item_v1.ItemSSHKey.sections:type_name -> proton_pass_item_v1.CustomSection
+	0,  // 7: proton_pass_item_v1.ItemWifi.security:type_name -> proton_pass_item_v1.WifiSecurity
+	9,  // 8: proton_pass_item_v1.ItemWifi.sections:type_name -> proton_pass_item_v1.CustomSection
+	1,  // 9: proton_pass_item_v1.ItemCreditCard.card_type:type_name -> proton_pass_item_v1.CardType
+	22, // 10: proton_pass_item_v1.ItemIdentity.extra_personal_details:type_name -> proton_pass_item_v1.ExtraField
+	22, // 11: proton_pass_item_v1.ItemIdentity.extra_address_details:type_name -> proton_pass_item_v1.ExtraField
+	22, // 12: proton_pass_item_v1.ItemIdentity.extra_contact_details:type_name -> proton_pass_item_v1.ExtraField
+	22, // 13: proton_pass_item_v1.ItemIdentity.extra_work_details:type_name -> proton_pass_item_v1.ExtraField
+	9,  // 14: proton_pass_item_v1.ItemIdentity.extra_sections:type_name -> proton_pass_item_v1.CustomSection
+	15, // 15: proton_pass_item_v1.AndroidSpecific.allowed_apps:type_name -> proton_pass_item_v1.AllowedAndroidApp
+	16, // 16: proton_pass_item_v1.PlatformSpecific.android:type_name -> proton_pass_item_v1.AndroidSpecific
+	26, // 17: proton_pass_item_v1.ExtraTimestampField.timestamp:type_name -> google.protobuf.Timestamp
+	18, // 18: proton_pass_item_v1.ExtraField.totp:type_name -> proton_pass_item_v1.ExtraTotp
+	19, // 19: proton_pass_item_v1.ExtraField.text:type_name -> proton_pass_item_v1.ExtraTextField
+	20, // 20: proton_pass_item_v1.ExtraField.hidden:type_name -> proton_pass_item_v1.ExtraHiddenField
+	21, // 21: proton_pass_item_v1.ExtraField.timestamp:type_name -> proton_pass_item_v1.ExtraTimestampField
+	3,  // 22: proton_pass_item_v1.Content.note:type_name -> proton_pass_item_v1.ItemNote
+	7,  // 23: proton_pass_item_v1.Content.login:type_name -> proton_pass_item_v1.ItemLogin
+	8,  // 24: proton_pass_item_v1.Content.alias:type_name -> proton_pass_item_v1.ItemAlias
+	13, // 25: proton_pass_item_v1.Content.credit_card:type_name -> proton_pass_item_v1.ItemCreditCard
+	14, // 26: proton_pass_item_v1.Content.identity:type_name -> proton_pass_item_v1.ItemIdentity
+	11, // 27: proton_pass_item_v1.Content.ssh_key:type_name -> proton_pass_item_v1.ItemSSHKey
+	12, // 28: proton_pass_item_v1.Content.wifi:type_name -> proton_pass_item_v1.ItemWifi
+	10, // 29: proton_pass_item_v1.Content.custom:type_name -> proton_pass_item_v1.ItemCustom
+	23, // 30: proton_pass_item_v1.Item.metadata:type_name -> proton_pass_item_v1.Metadata
+	24, // 31: proton_pass_item_v1.Item.content:type_name -> proton_pass_item_v1.Content
+	17, // 32: proton_pass_item_v1.Item.platform_specific:type_name -> proton_pass_item_v1.PlatformSpecific
+	22, // 33: proton_pass_item_v1.Item.extra_fields:type_name -> proton_pass_item_v1.ExtraField
+	34, // [34:34] is the sub-list for method output_type
+	34, // [34:34] is the sub-list for method input_type
+	34, // [34:34] is the sub-list for extension type_name
+	34, // [34:34] is the sub-list for extension extendee
+	0,  // [0:34] is the sub-list for field type_name
 }
 
 func init() { file_item_v1_proto_init() }
@@ -2159,13 +2296,13 @@ func file_item_v1_proto_init() {
 	if File_item_v1_proto != nil {
 		return
 	}
-	file_item_v1_proto_msgTypes[18].OneofWrappers = []any{
+	file_item_v1_proto_msgTypes[19].OneofWrappers = []any{
 		(*ExtraField_Totp)(nil),
 		(*ExtraField_Text)(nil),
 		(*ExtraField_Hidden)(nil),
 		(*ExtraField_Timestamp)(nil),
 	}
-	file_item_v1_proto_msgTypes[20].OneofWrappers = []any{
+	file_item_v1_proto_msgTypes[21].OneofWrappers = []any{
 		(*Content_Note)(nil),
 		(*Content_Login)(nil),
 		(*Content_Alias)(nil),
@@ -2180,8 +2317,8 @@ func file_item_v1_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_item_v1_proto_rawDesc), len(file_item_v1_proto_rawDesc)),
-			NumEnums:      2,
-			NumMessages:   22,
+			NumEnums:      3,
+			NumMessages:   23,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

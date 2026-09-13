@@ -13,7 +13,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"unicode/utf16"
 
 	"google.golang.org/protobuf/proto"
 
@@ -606,12 +605,30 @@ type StorageLimits struct {
 // Free is how much more may be stored.
 func (l StorageLimits) Free() int64 { return max(l.Quota-l.Used, 0) }
 
-// StorageLimits reads what the account's plan allows.
+// Limits is what the account's plan allows, as one answer: the plan is one
+// request, and an import wants the vaults and the storage from it at once.
+type Limits struct {
+	Storage StorageLimits
+	// Vaults is how many vaults the plan allows. A plan with no limit reports
+	// none, which is what a paid one has.
+	Vaults *int
+}
+
+// StorageLimits reads what the account's plan allows of attachments.
 //
 // It is asked before anything is sent, because every one of the three ways an
 // upload is refused is knowable in advance, and finding out at the end means
 // having spent the transfer to learn it.
 func (s *Service) StorageLimits(ctx context.Context) (*StorageLimits, error) {
+	limits, err := s.Limits(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &limits.Storage, nil
+}
+
+// Limits reads the account's plan.
+func (s *Service) Limits(ctx context.Context) (*Limits, error) {
 	var r struct {
 		Access struct {
 			Plan struct {
@@ -619,6 +636,7 @@ func (s *Service) StorageLimits(ctx context.Context) (*StorageLimits, error) {
 				StorageMaxFileSize int64
 				StorageUsed        int64
 				StorageQuota       int64
+				VaultLimit         *int
 			}
 		}
 	}
@@ -628,69 +646,15 @@ func (s *Service) StorageLimits(ctx context.Context) (*StorageLimits, error) {
 		return nil, err
 	}
 	plan := r.Access.Plan
-	return &StorageLimits{
-		Allowed:     plan.StorageAllowed,
-		MaxFileSize: plan.StorageMaxFileSize,
-		Used:        plan.StorageUsed,
-		Quota:       plan.StorageQuota,
+	return &Limits{
+		Storage: StorageLimits{
+			Allowed:     plan.StorageAllowed,
+			MaxFileSize: plan.StorageMaxFileSize,
+			Used:        plan.StorageUsed,
+			Quota:       plan.StorageQuota,
+		},
+		Vaults: plan.VaultLimit,
 	}, nil
-}
-
-// ── a file inside a backup ──
-
-// ExportName is what a file is called inside an archive.
-//
-// Two items may hold files of the same name, and an archive is flat, so the name
-// carries where the file came from. It is the app's own naming, because the
-// archive is the app's: what this writes, Proton Pass reads back.
-func ExportName(shareID string, a Attachment) string {
-	base, ext := fileParts(a.Name)
-	return fmt.Sprintf("%s.%s%s%s", base, hashCode(shareID), hashCode(a.ID), ext)
-}
-
-// ImportName recovers the name a file had before an archive renamed it.
-func ImportName(path string) string {
-	name := path
-	if i := strings.LastIndexAny(name, `/\`); i >= 0 {
-		name = name[i+1:]
-	}
-	base, ext := fileParts(name)
-	// A file that had no extension of its own was exported with the whole stamp
-	// as one, which is what a run of that length is.
-	if len(ext) >= 16 {
-		return base
-	}
-	parts := strings.Split(base, ".")
-	if len(parts) == 1 {
-		return name
-	}
-	return strings.Join(parts[:len(parts)-1], ".") + ext
-}
-
-// fileParts splits a name on its last dot, the way the app does: a name with no
-// dot is all base, and the extension keeps its dot.
-func fileParts(name string) (base, ext string) {
-	i := strings.LastIndexByte(name, '.')
-	if i < 0 {
-		return name, ""
-	}
-	return name[:i], name[i:]
-}
-
-// hashCode is the stamp an export puts in a file's name: Java's string hash, as
-// the app computes it, in hexadecimal.
-func hashCode(s string) string {
-	var h int32
-	for _, c := range utf16.Encode([]rune(s)) {
-		h = h*31 + int32(c)
-	}
-	// The smallest int32 has no positive counterpart, so the absolute value is
-	// taken with room to hold it - which is what the app's own arithmetic does.
-	n := int64(h)
-	if n < 0 {
-		n = -n
-	}
-	return strconv.FormatInt(n, 16)
 }
 
 // ── judging a file before it is sent ──

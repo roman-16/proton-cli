@@ -38,21 +38,32 @@ type checked interface {
 	validate() error
 }
 
-// The registry records declared domains twice over: by command path and flag name,
-// so the conformance test can check that each constrained flag has one, and by
-// command, so Run can validate them all before doing anything else.
+// The registry records declared domains twice over: by command and flag name, so
+// the conformance test can check that each constrained flag has one, and by
+// command alone, so Run can validate them all before doing anything else.
+//
+// The command is kept rather than its path, because a flag is declared while the
+// command is still on its own: two commands both called `export` have the same
+// path until each is attached to its app, and recording that path would have one
+// of them standing in for the other.
 var (
 	enumMu       sync.Mutex
-	enumRegistry = map[string][]string{}
+	enumRegistry []declaredEnum
 	checksByCmd  = map[*cobra.Command][]checked{}
 )
+
+type declaredEnum struct {
+	cmd    *cobra.Command
+	flag   string
+	values []string
+}
 
 // registerCheck records a flag whose value can be validated locally.
 func registerCheck(cmd *cobra.Command, flag string, values []string, c checked) {
 	enumMu.Lock()
 	defer enumMu.Unlock()
 	if values != nil {
-		enumRegistry[cmd.CommandPath()+" --"+flag] = values
+		enumRegistry = append(enumRegistry, declaredEnum{cmd: cmd, flag: flag, values: values})
 	}
 	checksByCmd[cmd] = append(checksByCmd[cmd], c)
 }
@@ -118,13 +129,15 @@ func (e *Enum) Set() bool { return e.target != "" }
 // Value has succeeded.
 func (e *Enum) Is(want string) bool { return strings.EqualFold(e.target, want) }
 
-// DeclaredEnums returns a copy of the registry, for the conformance test.
+// DeclaredEnums returns the registry keyed by command path and flag, for the
+// conformance test. It is read once the tree is built, which is when a command
+// knows where it sits.
 func DeclaredEnums() map[string][]string {
 	enumMu.Lock()
 	defer enumMu.Unlock()
 	out := make(map[string][]string, len(enumRegistry))
-	for k, v := range enumRegistry {
-		out[k] = v
+	for _, e := range enumRegistry {
+		out[e.cmd.CommandPath()+" --"+e.flag] = e.values
 	}
 	return out
 }

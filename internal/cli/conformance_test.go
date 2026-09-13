@@ -332,7 +332,7 @@ var flagMeanings = map[string]string{
 	"floor":                  "a floor within a building",
 	"folder":                 "the mail location to look in",
 	"force":                  "overwrite a local file that already exists",
-	"format":                 "the file layout to write: eml or mbox",
+	"format":                 "the file layout to write",
 	"from":                   "the sender: compose sets it, a filter matches it",
 	"full-name":              "a full name",
 	"generate-password":      "make the password rather than being given one",
@@ -362,6 +362,7 @@ var flagMeanings = map[string]string{
 	"linkedin":               "a LinkedIn handle",
 	"location":               "where something is",
 	"mailbox":                "where mail to an alias should arrive",
+	"manager":                "the password manager that wrote a file being read in",
 	"message":                "an accompanying note",
 	"middle-name":            "a middle name",
 	"move-to":                "the folder to move matching mail into",
@@ -558,6 +559,14 @@ var kitFlagUsage = map[string]string{
 // The domains are compared rather than the help text, because a domain is what
 // the flag actually means: two commands offering different values are asking
 // different questions whatever their usage strings say.
+//
+// domainsByCollection are the two that ask one question whose answers belong to
+// whatever is being acted on: which column to order by, and which layout to
+// write. A message can be laid down as eml or mbox and a vault cannot; a card
+// sorts by name and a file by size. The question is the same word in every one
+// of them, and anything not named here that offers a second set is not.
+var domainsByCollection = map[string]bool{"format": true, "sort": true}
+
 func TestAFlagNameNamesOneSetOfValues(t *testing.T) {
 	// Building the tree is what populates the registry.
 	newRoot()
@@ -582,7 +591,7 @@ func TestAFlagNameNamesOneSetOfValues(t *testing.T) {
 	sort.Strings(flags)
 
 	for _, flag := range flags {
-		if len(domains[flag]) < 2 {
+		if len(domains[flag]) < 2 || domainsByCollection[flag] {
 			continue
 		}
 		var b strings.Builder

@@ -8,12 +8,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"google.golang.org/protobuf/proto"
 
 	"github.com/roman-16/proton-cli/internal/crypto/aead"
+	"github.com/roman-16/proton-cli/internal/passfile"
 	"github.com/roman-16/proton-cli/internal/proton"
 	pb "github.com/roman-16/proton-cli/internal/service/pass/proto"
 )
@@ -203,59 +206,6 @@ func TestTheChunksAreReadInOrder(t *testing.T) {
 	}
 }
 
-// The identifiers a Proton account gives out, for the naming an archive does:
-// the stamp a file's name carries is made of these, so a short stand-in would
-// make a name the app never writes.
-const (
-	exampleShare = "zZ4c1dEXAMPLEshare=="
-	exampleFile  = "kQ81mDx4EXAMPLEfile=="
-)
-
-// The name a file takes inside an archive is the app's own, because the archive
-// is: what this writes, Proton Pass reads back.
-func TestWhatAFileIsCalledInsideAnArchive(t *testing.T) {
-	// The values are the app's own function's, run over the same arguments.
-	cases := []struct{ name, want string }{
-		{"passport.pdf", "passport.78e91fe938d5208c.pdf"},
-		{"archive.tar.gz", "archive.tar.78e91fe938d5208c.gz"},
-		{"receipts", "receipts.78e91fe938d5208c"},
-	}
-	for _, c := range cases {
-		got := ExportName(exampleShare, Attachment{ID: exampleFile, Name: c.name})
-		if got != c.want {
-			t.Errorf("ExportName(%q) = %q, want %q", c.name, got, c.want)
-		}
-	}
-}
-
-// What an archive renamed, an import names back.
-func TestWhatAFileIsCalledAfterAnArchive(t *testing.T) {
-	cases := []struct{ entry, want string }{
-		{"Proton Pass/files/passport.78e91fe938d5208c.pdf", "passport.pdf"},
-		{"passport.78e91fe938d5208c.pdf", "passport.pdf"},
-		{"archive.tar.78e91fe938d5208c.gz", "archive.tar.gz"},
-		// A file that had no extension of its own was given the stamp as one.
-		{"receipts.78e91fe938d5208c", "receipts"},
-		// Anything else keeps the name it has.
-		{"plain.pdf", "plain.pdf"},
-	}
-	for _, c := range cases {
-		if got := ImportName(c.entry); got != c.want {
-			t.Errorf("ImportName(%q) = %q, want %q", c.entry, got, c.want)
-		}
-	}
-}
-
-// A name survives the round trip through an archive, whatever it holds.
-func TestANameSurvivesTheArchive(t *testing.T) {
-	for _, name := range []string{"passport.pdf", "archive.tar.gz", "a.b.c.txt", "receipts"} {
-		entry := ExportName(exampleShare, Attachment{ID: exampleFile, Name: name})
-		if got := ImportName(entry); got != name {
-			t.Errorf("%q came back as %q (via %q)", name, got, entry)
-		}
-	}
-}
-
 // The three refusals are made before anything is sent, so a file that would be
 // turned away costs nothing to find out about.
 func TestWhatAPlanWillNotTake(t *testing.T) {
@@ -333,19 +283,35 @@ func sealedAttachment(t *testing.T, shareID, itemID, name string, contents []byt
 	return file, server
 }
 
+// The identifiers a Proton account gives out, for the naming an archive does:
+// the stamp a file's name carries is made of these, so a short stand-in would
+// make a name the app never writes.
+const exampleShare = "zZ4c1dEXAMPLEshare=="
+
 // An archive holds the attachments as well as the items, where the app looks for
 // them and under the name the app gives them.
 func TestAnArchiveCarriesTheAttachments(t *testing.T) {
 	contents := bytes.Repeat([]byte("attached"), 1024)
 	file, server := sealedAttachment(t, exampleShare, "i-1", "passport.pdf", contents)
 
-	item := ExportedItem{ItemID: "i-1", ShareID: exampleShare, Files: []string{ExportName(exampleShare, file)}}
-	plan := &ExportPlan{
-		Doc: &ExportDocument{
-			Vaults:  map[string]*ExportedVault{exampleShare: {Name: "Personal", Items: []ExportedItem{item}}},
-			Version: exportVersion,
+	entry := passfile.ArchiveEntry(exampleShare, file.ID, file.Name)
+	item, err := passfile.ExportItem(passfile.StoredItem{
+		ShareID: exampleShare, ItemID: "i-1", Files: []string{entry},
+		Item: &pb.Item{
+			Metadata: &pb.Metadata{Name: "Passport"},
+			Content:  &pb.Content{Content: &pb.Content_Note{Note: &pb.ItemNote{}}},
 		},
-		Files: []ExportFile{{ShareID: exampleShare, ItemID: "i-1", Entry: item.Files[0], File: file}},
+	})
+	if err != nil {
+		t.Fatalf("ExportItem: %v", err)
+	}
+	doc := passfile.NewDocument("u-1")
+	doc.Vaults[exampleShare] = &passfile.ExportedVault{
+		Name: "Personal", Items: []passfile.ExportedItem{*item},
+	}
+	plan := &ExportPlan{
+		Doc:   doc,
+		Files: []ExportFile{{ShareID: exampleShare, ItemID: "i-1", Entry: entry, File: file}},
 	}
 
 	var buf bytes.Buffer
@@ -356,24 +322,24 @@ func TestAnArchiveCarriesTheAttachments(t *testing.T) {
 	if err != nil {
 		t.Fatalf("the archive will not open: %v", err)
 	}
-	want := "Proton Pass/files/" + item.Files[0]
+	want := "Proton Pass/files/" + entry
 	var found bool
-	for _, entry := range z.File {
-		if entry.Name != want {
+	for _, f := range z.File {
+		if f.Name != want {
 			continue
 		}
 		found = true
-		r, err := entry.Open()
+		r, err := f.Open()
 		if err != nil {
-			t.Fatalf("open %s: %v", entry.Name, err)
+			t.Fatalf("open %s: %v", f.Name, err)
 		}
 		got, err := io.ReadAll(r)
 		_ = r.Close()
 		if err != nil {
-			t.Fatalf("read %s: %v", entry.Name, err)
+			t.Fatalf("read %s: %v", f.Name, err)
 		}
 		if !bytes.Equal(got, contents) {
-			t.Errorf("%s holds %d bytes, want %d", entry.Name, len(got), len(contents))
+			t.Errorf("%s holds %d bytes, want %d", f.Name, len(got), len(contents))
 		}
 	}
 	if !found {
@@ -381,18 +347,22 @@ func TestAnArchiveCarriesTheAttachments(t *testing.T) {
 	}
 
 	// The document is the last thing written, and each item names its own files,
-	// which is how the app finds them again.
-	archive := opened(t, written(t, "backup.zip", buf.Bytes()), neverAsked(t))
-	back := archive.Document().Vaults[exampleShare].Items[0]
-	if len(back.Files) != 1 || back.Files[0] != item.Files[0] {
-		t.Errorf("the item's files came back as %v", back.Files)
+	// which is how a read-back finds them again.
+	path := filepath.Join(t.TempDir(), "backup.zip")
+	if err := os.WriteFile(path, buf.Bytes(), 0o600); err != nil {
+		t.Fatal(err)
 	}
-	up, ok := archive.Attachment(back.Files[0])
-	if !ok {
-		t.Fatalf("the archive does not offer %s back", back.Files[0])
+	back, err := passfile.Open(path, passfile.Proton, nil)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
 	}
-	if up.Name != "passport.pdf" || up.Size != int64(len(contents)) {
-		t.Errorf("the file came back as %q (%d bytes)", up.Name, up.Size)
+	defer func() { _ = back.Close() }()
+	files := back.Vaults[0].Items[0].Files
+	if len(files) != 1 {
+		t.Fatalf("the item came back with %d files", len(files))
+	}
+	if files[0].Name != "passport.pdf" || files[0].Size != int64(len(contents)) {
+		t.Errorf("the file came back as %q (%d bytes)", files[0].Name, files[0].Size)
 	}
 }
 

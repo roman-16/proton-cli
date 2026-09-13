@@ -9,6 +9,9 @@ export interface Endpoint {
   pathParams: string[];
   queryParams: Property[];
   bodyParams: Property[];
+  // responseParams are the fields the answer carries, for the part of the API
+  // whose source types them.
+  responseParams?: Property[];
   hasBody: boolean;
   inputType: string;
   outputType: string;

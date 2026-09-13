@@ -167,6 +167,7 @@ POST /pass/v1/share/{id}/alias/{id}/contact
 POST /pass/v1/share/{id}/alias/{id}/mailbox
 POST /pass/v1/share/{id}/invite
 POST /pass/v1/share/{id}/item
+POST /pass/v1/share/{id}/item/import/batch
 POST /pass/v1/share/{id}/item/trash
 POST /pass/v1/share/{id}/item/untrash
 POST /pass/v1/share/{id}/item/{id}/file/{id}/restore

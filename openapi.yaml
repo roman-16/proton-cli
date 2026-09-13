@@ -4,7 +4,8 @@ info:
   version: "1.0"
   description: |
     Auto-generated from ProtonMail/WebClients TypeScript source files.
-    Source: https://github.com/ProtonMail/WebClients/tree/main/packages/shared/lib/api
+    Sources: https://github.com/ProtonMail/WebClients/tree/main/packages/shared/lib/api
+             https://github.com/ProtonMail/WebClients/blob/main/packages/pass/types/api/pass.ts
 
 servers:
   - url: https://mail.proton.me/api
@@ -36,6 +37,8 @@ components:
   # ACTION_VIEWS: VIEW=VIEW
   # ActionEventV6: 0=Delete, 1=Create, 2=Update
   # ADD_EVENT_ERROR_TYPE: 0=TOO_MANY_PARTICIPANTS
+  # ADDON_NAMES: 1member-drivepro2022=MEMBER_DRIVE_PRO, 1lumo-drivepro2022=LUMO_DRIVE_PRO, 1meet-drivepro2022=MEET_DRIVE_PRO, 1member-drivebiz2024=MEMBER_DRIVE_BUSINESS, 1lumo-drivebiz2024=LUMO_DRIVE_BUSINESS, 1meet-drivebiz2024=MEET_DRIVE_BUSINESS, 1member-mailpro2022=MEMBER_MAIL_PRO, 1scribe-mailpro2022=MEMBER_SCRIBE_MAIL_PRO, 1lumo-mailpro2022=LUMO_MAIL_PRO, 1meet-mailpro2022=MEET_MAIL_PRO, 1member-mailbiz2024=MEMBER_MAIL_BUSINESS, 1scribe-mailbiz2024=MEMBER_SCRIBE_MAIL_BUSINESS, 1lumo-mailbiz2024=LUMO_MAIL_BUSINESS, 1meet-mailbiz2024=MEET_MAIL_BUSINESS, 1member-bundlepro2022=MEMBER_BUNDLE_PRO, 1domain-bundlepro2022=DOMAIN_BUNDLE_PRO, 1ip-bundlepro2022=IP_BUNDLE_PRO, 1scribe-bundlepro2022=MEMBER_SCRIBE_BUNDLE_PRO, 1lumo-bundlepro2022=LUMO_BUNDLE_PRO, 1meet-bundlepro2022=MEET_BUNDLE_PRO, 1member-bundlepro2024=MEMBER_BUNDLE_PRO_2024, 1domain-bundlepro2024=DOMAIN_BUNDLE_PRO_2024, 1ip-bundlepro2024=IP_BUNDLE_PRO_2024, 1scribe-bundlepro2024=MEMBER_SCRIBE_BUNDLE_PRO_2024, 1lumo-bundlepro2024=LUMO_BUNDLE_PRO_2024, 1member-bundlebiz2025=MEMBER_BUNDLE_BIZ_2025, 1domain-bundlebiz2025=DOMAIN_BUNDLE_BIZ_2025, 1ip-bundlebiz2025=IP_BUNDLE_BIZ_2025, 1member-vpnpro2023=MEMBER_VPN_PRO, 1lumo-vpnpro2023=LUMO_VPN_PRO, 1meet-vpnpro2023=MEET_VPN_PRO, 1member-vpnbiz2023=MEMBER_VPN_BUSINESS, 1ip-vpnbiz2023=IP_VPN_BUSINESS, 1lumo-vpnbiz2023=LUMO_VPN_BUSINESS, 1meet-vpnbiz2023=MEET_VPN_BUSINESS, 1domain-vpnbiz2023=DOMAIN_VPN_BUSINESS, 1member-passpro2024=MEMBER_PASS_PRO, 1lumo-passpro2024=LUMO_PASS_PRO, 1meet-passpro2024=MEET_PASS_PRO, 1member-passbiz2024=MEMBER_PASS_BUSINESS, 1lumo-passbiz2024=LUMO_PASS_BUSINESS, 1meet-passbiz2024=MEET_PASS_BUSINESS, 1member-lumobiz2025=MEMBER_LUMO_BUSINESS, 1meet-lumobiz2025=MEET_LUMO_BUSINESS, 1member-meetbiz2025=MEMBER_MEET_BUSINESS, 1lumo-meetbiz2025=LUMO_MEET_BUSINESS, 1member-meet2026=MEMBER_MEET, 1lumo-meet2026=LUMO_MEET, 1member-vpnpassbiz2025=MEMBER_VPN_PASS_BUNDLE_BUSINESS, 1lumo-vpnpassbiz2025=LUMO_VPN_PASS_BUNDLE_BUSINESS, 1ip-vpnpassbiz2025=IP_VPN_PASS_BUNDLE_BUSINESS, 1meet-vpnpassbiz2025=MEET_VPN_PASS_BUNDLE_BUSINESS, 1lumo-mail2022=LUMO_MAIL, 1lumo-drive2022=LUMO_DRIVE, 1lumo-drive1tb2025=LUMO_DRIVE_1TB, 1lumo-pass2023=LUMO_PASS, 1lumo-passfamily2024=LUMO_PASS_FAMILY, 1lumo-vpn2024=LUMO_VPN2024, 1lumo-bundle2022=LUMO_BUNDLE, 1lumo-family2022=LUMO_FAMILY, 1lumo-duo2024=LUMO_DUO, 1meet-lumo2024=MEET_LUMO, 1meet-mail2022=MEET_MAIL, 1meet-drive2022=MEET_DRIVE, 1meet-drive1tb2025=MEET_DRIVE_1TB, 1meet-pass2023=MEET_PASS, 1meet-passfamily2024=MEET_PASS_FAMILY, 1meet-vpn2024=MEET_VPN2024, 1meet-bundle2022=MEET_BUNDLE, 1meet-family2022=MEET_FAMILY, 1meet-duo2024=MEET_DUO, 1meet-vpnpass2023=MEET_VPN_PASS_BUNDLE
+  # ADDON_PREFIXES: 1member=MEMBER, 1domain=DOMAIN, 1ip=IP, 1scribe=SCRIBE, 1lumo=LUMO, 1meet=MEET
   # ADDRESS_COMPONENTS: 0=POST_BOX, 1=EXTENDED, 2=STREET, 3=LOCALITY, 4=REGION, 5=POSTAL_CODE, 6=COUNTRY
   # ADDRESS_FLAGS: 16=FLAG_DISABLE_E2EE, 32=FLAG_DISABLE_EXPECTED_SIGNED, 64=BYOE
   # ADDRESS_PERMISSION_TYPE: receive=RECEIVE, send=SEND
@@ -69,6 +72,7 @@ components:
   # AUTO_DELETE_SPAM_AND_TRASH_DAYS: 30=ACTIVE, 0=DISABLED
   # AUTO_SAVE_CONTACTS: 0=DISABLED, 1=ENABLED
   # AutoAddVideoConferenceLinkProvider: 0=None, 1=Zoom, 2=Meet
+  # Autopay: 0=DISABLE, 1=ENABLE
   # AutoReplyDuration: 0=FIXED, 1=DAILY, 2=WEEKLY, 3=MONTHLY, 4=PERMANENT
   # BLOCK_SENDER_CONFIRMATION: 1=DO_NOT_ASK
   # BUSY_TIME_SLOT_TYPE: 0=PARTIAL_DAY_IN, 1=PARTIAL_DAY_BEFORE, 2=FULL_DAY_IN, 3=FULL_DAY_BEFORE
@@ -94,19 +98,21 @@ components:
   # ChecklistType: 1=MailFreeUser, 2=MailPaidUser, 3=DriveUser, 4=MailBYOEUser
   # ClaimableAddressType: 0=Fixed, 1=Any
   # CLIENT_TYPES: 1=MAIL, 2=VPN, 4=DRIVE, 5=PASS, 6=WALLET, 7=SPACES, 9=LUMO, 10=AUTHENTICATOR, 11=MEET
-  # Clients: 0=Windows, 1=macOS, 2=Linux, 3=Android, 4=iOS, 5=Chrome, 6=Brave, 7=Firefox, 8=Edge, 9=Safari, 10=CLI
   # COLLAPSE_EVENTS: COLLAPSE=COLLAPSE, EXPAND=EXPAND
   # ColorScheme: 0=Dark, 1=Light
   # COMPOSER_MODE: 0=POPUP, 1=MAXIMIZED
   # CONFIRM_LINK: 0=DISABLED, 1=CONFIRM
   # CONTACT_CARD_TYPE: 3=ENCRYPTED_AND_SIGNED, 2=SIGNED, 1=ENCRYPTED, 0=CLEAR_TEXT
   # CookieSameSiteAttribute: lax=Lax, strict=Strict, none=None
+  # COUPON_CODES: PORKBUN=PORKBUN, BF25PROMO=BLACK_FRIDAY_2025, BF25PROMO1M=BLACK_FRIDAY_2025_MONTH, BF25BUNDLEPROMO=BLACK_FRIDAY_2025_BUNDLE, BF25LIGHTNING=BLACK_FRIDAY_2025_LIGHTNING, BF25LUMOADDON=BLACK_FRIDAY_2025_LUMOADDON, BF25LUMOADDONPROMO=BLACK_FRIDAY_2025_LUMOADDON_OMNI, BF25DEALPD=BLACK_FRIDAY_2025_DEALPD, BF25DEALVM=BLACK_FRIDAY_2025_DEALVM, BF25PROMO24=BLACK_FRIDAY_2025_TWOYEAR, BF25PROMOCS=BLACK_FRIDAY_2025_CS, BF25PROMO24CS=BLACK_FRIDAY_2025_TWOYEAR_CS, BF25PROMO1MCS=BLACK_FRIDAY_2025_MONTH_CS, BF25BUNDLEPROMOCS=BLACK_FRIDAY_2025_BUNDLE_CS, BF25LUMOADDONCS=BLACK_FRIDAY_2025_LUMOADDON_CS, BF25LIGHTNINGCS=BLACK_FRIDAY_2025_LIGHTNING_CS, BF25LUMOADDONPROMOCS=BLACK_FRIDAY_2025_LUMOADDON_PROMO_CS, ANNUALOFFER25=ANNUALOFFER25, RENEWANDSAVE1M26=RENEWANDSAVE1M26, RENEWANDSAVE12M26=RENEWANDSAVE12M26, LIFETIME=LIFETIME, VIVALDIVPN=VPN_VIVALDI, MAILPLUSINTRO=MAILPLUSINTRO, DRIVEPLUSINTRO2024=TRYDRIVEPLUS2024, PASSPLUSINTRO2024=PASSPLUSINTRO2024, VPNINTROPRICE2025=VPN_INTRO_2025, VPNPLUSFREE2024=VPN_PLUS_FREE_2024, TRYVPNPLUS2024=TRYVPNPLUS2024, VPNMATCHDAYDEALS=VPNMATCHDAYDEALS, TECHRADARVPNPASS=TECHRADARVPNPASS, CNETVPNPASS=CNETVPNPASS, COMPARITECHVPNPASS=COMPARITECHVPNPASS, PCMAGVPNPASS=PCMAGVPNPASS, VPNPASSINTRO2026=VPNPASSINTRO2026, TRYMAILPLUS0724=TRYMAILPLUS0724, TRYMAILPLUSMOBILE2026=TRYMAILPLUSMOBILE2026, PASSEARLYSUPPORTER=PASSEARLYSUPPORTER, PASSFAMILYLAUNCH=PASSFAMILYLAUNCH, MAR26SALECS=MAR26SALECS, MAR26BUNDLESALECS=MAR26BUNDLESALECS, MAR26OFFERCS=MAR26OFFERCS, JUNE26SALE=JUNE26SALE, JUNE26BUNDLESALE=JUNE26BUNDLESALE, SEP26BUNDLESALE=SEP26BUNDLESALE, SEP26BUNDLEDEAL=SEP26BUNDLEDEAL, SEP26BUNDLESALECS=SEP26BUNDLESALECS, SEP26BUNDLEDEALCS=SEP26BUNDLEDEALCS, VPNSAVEOFFER=VPNSAVEOFFER
   # CREATE_DRAFT_MESSAGE_ACTION: 0=REPLY, 1=REPLY_ALL, 2=FORWARD
   # CreateMemberMode: 0=Password, 1=Invitation, 2=LoginLink
   # CRYPTO_PROCESSING_TYPES: 0=SUCCESS, 1=SIGNATURE_NOT_VERIFIED, 2=FAIL_TO_READ, 3=FAIL_TO_LOAD, 4=FAIL_TO_DECRYPT
+  # CurrencySymbols: US$=USD, AU$=AUD, CA$=CAD, €=EUR, £=GBP, CHF=CHF, BRL=BRL, ¥=JPY, ₩=KRW, zł=PLN, SGD=SGD, HK$=HKD
   # CUSTOM_FETCH_ERROR_STATUS_CODE: 0=NO_NETWORK_CONNECTION, -1=TIMEOUT
   # CUSTOM_VIEWS_LABELS: views/newsletters=NEWSLETTER_SUBSCRIPTIONS
   # CustomPasswordState: 0=NO_PASSWORD, 1=PASSWORD_SET
+  # CYCLE: 1=MONTHLY, 3=THREE, 6=SIX, 12=YEARLY, 15=FIFTEEN, 18=EIGHTEEN, 24=TWO_YEARS, 30=THIRTY
   # DAILY_TYPE: 0=ALL_DAYS
   # DARK_WEB_MONITORING_ELIGIBILITY_STATE: 0=NONPAID, 1=PAID
   # DARK_WEB_MONITORING_EMAILS_STATE: 0=DISABLED, 1=ENABLED
@@ -194,6 +200,9 @@ components:
   # INHERIT_PARENT_FOLDER_COLOR: 0=DISABLED, 1=ENABLED
   # INVITATION_ERROR_TYPE: INVITATION_INVALID=INVITATION_INVALID, INVITATION_UNSUPPORTED=INVITATION_UNSUPPORTED, INVALID_METHOD=INVALID_METHOD, NO_COMPONENT=NO_COMPONENT, NO_VEVENT=NO_VEVENT, PARSING_ERROR=PARSING_ERROR, DECRYPTION_ERROR=DECRYPTION_ERROR, FETCHING_ERROR=FETCHING_ERROR, UPDATING_ERROR=UPDATING_ERROR, EVENT_CREATION_ERROR=EVENT_CREATION_ERROR, EVENT_UPDATE_ERROR=EVENT_UPDATE_ERROR, CANCELLATION_ERROR=CANCELLATION_ERROR, UNEXPECTED_ERROR=UNEXPECTED_ERROR, EXTERNAL_ERROR=EXTERNAL_ERROR
   # INVOICE_EMAIL_STATE: 0=DISABLED, 1=ENABLED, 2=BOUNCED
+  # InvoiceOwner: 0=User, 1=Organization
+  # InvoiceState: 0=Unpaid, 1=Paid, 2=Void, 3=Billed, 4=Writeoff
+  # InvoiceType: 0=Other, 1=Subscription, 2=Cancellation, 3=Credit, 4=Donation, 5=Chargeback, 6=Renewal, 7=Refund, 8=Modification, 9=Addition, 10=CurrencyConversion, 12=Product, 13=Manual
   # KEY_FLAG: 8=FLAG_EMAIL_NO_SIGN, 4=FLAG_EMAIL_NO_ENCRYPT, 2=FLAG_NOT_OBSOLETE, 1=FLAG_NOT_COMPROMISED
   # KEY_TRANSPARENCY_SETTING: 0=DISABLED, 1=ENABLED
   # KeyboardKey: Backspace=Backspace, Tab=Tab, Enter=Enter, Shift=Shift, Control=Control, Alt=Alt, CapsLock=CapsLock, Escape=Escape,  =Space,  =Spacebar, PageUp=PageUp, PageDown=PageDown, End=End, Home=Home, ArrowLeft=ArrowLeft, ArrowUp=ArrowUp, ArrowRight=ArrowRight, ArrowDown=ArrowDown, Left=Left, Up=Up, Right=Right, Down=Down, Insert=Insert, Delete=Delete, 0=Zero, )=ClosedParen, 1=One, !=ExclamationMark, 2=Two, @=AtSign, 3=Three, £=PoundSign, #=Hash, 4=Four, $=DollarSign, 5=Five, %=PercentSign, 6=Six, ^=Caret, ^=Hat, 7=Seven, &=Ampersand, 8=Eight, *=Star, *=Asterisk, 9=Nine, (=OpenParen, a=a, b=b, c=c, d=d, e=e, f=f, g=g, h=h, i=i, j=j, k=k, l=l, m=m, n=n, o=o, p=p, q=q, r=r, s=s, t=t, u=u, v=v, w=w, x=x, y=y, z=z, A=A, B=B, C=C, D=D, E=E, F=F, G=G, H=H, I=I, J=J, K=K, L=L, M=M, N=N, O=O, P=P, Q=Q, R=R, S=S, T=T, U=U, V=V, W=W, X=X, Y=Y, Z=Z, Meta=Meta, Meta=LeftWindowKey, Meta=RightWindowKey, 0=Numpad0, 1=Numpad1, 2=Numpad2, 3=Numpad3, 4=Numpad4, 5=Numpad5, 6=Numpad6, 7=Numpad7, 8=Numpad8, 9=Numpad9, *=Multiply, +=Add, -=Subtract, .=DecimalPoint, Decimal=MSDecimalPoint, /=Divide, F1=F1, F2=F2, F3=F3, F4=F4, F5=F5, F6=F6, F7=F7, F8=F8, F9=F9, F10=F10, F11=F11, F12=F12, NumLock=NumLock, ScrollLock=ScrollLock, ;=SemiColon, ==Equals, ,=Comma, -=Dash, .=Period, _=UnderScore, +=PlusSign, /=Slash, /=ForwardSlash, ~=Tilde, `=GraveAccent, [=OpenBracket, ]=ClosedBracket, '=Quote, ?=QuestionMark
@@ -256,11 +265,17 @@ components:
   # PASSWORD_MODE: 1=SINGLE, 2=TWO_PASSWORD
   # PASSWORD_REMINDERS_VALUE: 0=ENABLED, 1=DISABLED
   # PasswordPolicyState: 1=ENABLED, 2=OPTIONAL
+  # PAYMENT_METHOD_TYPES: chargebee-bitcoin=CHARGEBEE_BITCOIN, cash=CASH, token=TOKEN, chargebee-card=CHARGEBEE_CARD, chargebee-paypal=CHARGEBEE_PAYPAL, chargebee-ideal=CHARGEBEE_IDEAL, sepa-direct-debit=CHARGEBEE_SEPA_DIRECT_DEBIT, apple-pay=APPLE_PAY, google-pay=GOOGLE_PAY
+  # PAYMENT_TOKEN_STATUS: 0=PENDING, 1=CHARGEABLE, 2=FAILED, 3=CONSUMED, 4=NOT_SUPPORTED
   # PersonalMeetingState: 0=NOT_YOUR_PERSONAL, 1=YOUR_PERSONAL
   # PGP_SCHEME_TEXT: PGP/Inline=INLINE, PGP/MIME=MIME
   # PGP_SCHEMES: pgp-inline=PGP_INLINE, pgp-mime=PGP_MIME
   # PGP_SCHEMES_MORE: =GLOBAL_DEFAULT
   # PhotoTag: -1=All, 0=Favorites, 1=Screenshots, 2=Videos, 3=LivePhotos, 4=MotionPhotos, 5=Selfies, 6=Portraits, 7=Bursts, 8=Panoramas, 9=Raw
+  # PLAN_SERVICES: 1=MAIL, 2=DRIVE, 4=VPN, 8=PASS
+  # PLAN_TYPES: 0=ADDON, 1=PLAN, 2=PRODUCT
+  # PLANS: free=FREE, drive2022=DRIVE, drive1tb2025=DRIVE_1TB, drivepro2022=DRIVE_PRO, drivebiz2024=DRIVE_BUSINESS, drivelite2024=DRIVE_LITE, pass2023=PASS, mail2022=MAIL, mailpro2022=MAIL_PRO, mailbiz2024=MAIL_BUSINESS, vpn2022=VPN, vpn2024=VPN2024, bundle2022=BUNDLE, bundlepro2022=BUNDLE_PRO, bundlepro2024=BUNDLE_PRO_2024, bundlebiz2025=BUNDLE_BIZ_2025, family2022=FAMILY, duo2024=DUO, visionary2022=VISIONARY, vpnpro2023=VPN_PRO, vpnbiz2023=VPN_BUSINESS, vpnpass2023=VPN_PASS_BUNDLE, passpro2024=PASS_PRO, passbiz2024=PASS_BUSINESS, passfamily2024=PASS_FAMILY, passlifetime2024=PASS_LIFETIME, lumo2024=LUMO, lumobiz2025=LUMO_BUSINESS, meet2026=MEET, meetbiz2025=MEET_BUSINESS, vpnpassbiz2025=VPN_PASS_BUNDLE_BUSINESS
+  # PlanState: 0=Unavailable, 1=Available
   # PM_SIGNATURE: 0=DISABLED, 1=ENABLED, 2=LOCKED
   # PM_SIGNATURE_REFERRAL: 0=DISABLED, 1=ENABLED
   # PREDEFINED_ROLE_NAME: Owner=OWNER, User Admin=USER_ADMIN, Security Admin=SECURITY_ADMIN
@@ -278,6 +293,7 @@ components:
   # RECURRING_TYPES: 1=ALL, 2=FUTURE, 3=SINGLE
   # ReferralState: 0=INVITED, 1=SIGNED_UP, 2=TRIAL, 3=COMPLETED, 4=REWARDED
   # RELEASE_CATEGORIES: Stable=STABLE, Alpha=ALPHA, EarlyAccess=EARLY_ACCESS
+  # Renew: 0=Disabled, 1=Enabled
   # RESPONSE_CODE: 1000=SUCCESS, 2011=NOT_ALLOWED, 2000=INVALID_REQUIREMENT, 2001=INVALID_LINK_TYPE, 2500=ALREADY_EXISTS, 2501=NOT_FOUND, 2061=INVALID_ID
   # RetentionRuleAction: 0=RetainPurgeDeleted, 1=RetainPurgeAll, 2=RetainAll
   # RetentionRuleProduct: 1=Mail
@@ -323,10 +339,13 @@ components:
   # SPF_STATE: 0=SPF_STATE_DEFAULT, 1=SPF_STATE_ONE, 2=SPF_STATE_MULT, 3=SPF_STATE_GOOD
   # Status: 1=Pending, 2=Resolved, 3=Rejected
   # STICKY_LABELS: 0=DISABLED, 1=ENABLED
+  # SubscriptionMode: 0=Regular, 1=CustomBillings, 2=ScheduledChargedImmediately, 3=ScheduledChargedLater, 4=Trial
+  # SubscriptionPlatform: 0=Default, 1=iOS, 2=Android
   # SupportedBrowserValue: 0=Unsupported, 1=Supported, -1=Other
   # SupportedMimeTypes: audio/aac=aac, application/vnd.android.package-archive=apk, image/apng=apng, application/x-freearc=arc, video/x-msvideo=avi, image/avif=avif, image/bmp=bmp, application/x-bzip2=bzip2, image/x-canon-cr3=cr3, application/vnd.openxmlformats-officedocument.wordprocessingml.document=docx, application/vnd.ms-fontobject=eot, application/epub+zip=epub, audio/x-flac=flac, video/x-flv=flv, image/gif=gif, application/gzip=gzip, image/heic=heic, image/heic-sequence=heics, image/heif=heif, image/heif-sequence=heifs, image/x-icon=ico, image/jpeg=jpg, image/jxl=jxl, application/vnd.apple.keynote=keynote, audio/x-m4a=m4a, video/x-m4v=m4v, audio/midi=midi, video/MP1S=mp1s, video/MP2P=mp2p, video/mp2t=mp2t, audio/mp4=mp4a, video/mp4=mp4v, audio/mpeg=mpeg, video/mpeg=mpg, application/vnd.apple.numbers=numbers, application/vnd.oasis.opendocument.presentation=odp, application/vnd.oasis.opendocument.spreadsheet=ods, application/vnd.oasis.opendocument.text=odt, audio/ogg=oga, application/ogg=ogg, video/ogg=ogv, audio/opus=opus, font/otf=otf, application/vnd.apple.pages=pages, application/pdf=pdf, image/png=png, application/vnd.openxmlformats-officedocument.presentationml.presentation=pptx, audio/qcelp=qcp, video/quicktime=qt, application/vnd.rar=rar, application/rtf=rtf, image/svg+xml=svg, application/x-shockwave-flash=swf, application/x-tar=tar, image/tiff=tiff, font/ttf=ttf, video/3gpp2=v3g2, video/3gpp=v3gp, audio/wav=wav, image/webp=webp, font/woff=woff, font/woff2=woff2, application/x-7z-compressed=x7zip, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet=xlsx, text/xml=xml, application/zip=zip, image/vnd.microsoft.icon=vdnMicrosoftIcon
   # SupportedProtonDocsMimeTypes: application/vnd.openxmlformats-officedocument.wordprocessingml.document=docx, application/vnd.oasis.opendocument.text=odt, text/plain=txt, text/markdown=md, text/html=html, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet=xlsx, text/csv=csv, text/tab-separated-values=tsv, application/vnd.oasis.opendocument.spreadsheet=ods
   # SWIPE_ACTION: -1=None, 0=Trash, 1=Spam, 2=Star, 3=Archive, 4=MarkAsRead, 5=LabelAs, 6=MoveTo
+  # TaxMode: 0=EXCLUSIVE, 1=INCLUSIVE, 2=REVERSE_CHARGE
   # TelemetryAccountCancellationEvents: start_cancellation=startCancellation, cancel_page=cancelPage, cancel_modal=cancelModal, feedback_modal=feedbackModal, resubscribe_modal=resubscribeModal, dashboard_reactivate=dashboardReactivate, upsell_modal=upsellModal
   # TelemetryAccountCancellationFlowFeedbackEvents: start_cancellation=startCancellation, feedback_step=feedbackStep, second_step=secondStep, confirm_cancellation=confirmCancellation, managed_externally=managedExternally
   # TelemetryAccountDashboardEvents: page_load=pageLoad, cross_product_click=crossProductClick, feature_card_click=featureCardClick, upgrade_button_click=upgradeButtonClick, upsell_cta_click=upsellCtaClick, download_cta_click=downloadCtaClick
@@ -343,6 +362,8 @@ components:
   # TelemetryCategoriesOnboardingEvents: onboarding_reply=onboarding_reply, category_nav=category_nav, recategorize_email=recategorize_email, settings_toggle_category_view=settings_toggle_category_view, settings_toggle_category=settings_toggle_category, settings_toggle_notification=settings_toggle_notification, report_unread_count=report_unread_count
   # TelemetryChangelog: opened=opened
   # TelemetryCollapsibleLeftSidebarEvents: toggle_left_sidebar=toggleLeftSidebar
+  # TelemetryContentSearchEvents: query_completed=query_completed, result_opened=result_opened, result_action=result_action, search_session_completed=search_session_completed
+  # TelemetryContentSearchIndexEvents: mailbox_index_completed=mailbox_index_completed
   # TelemetryDesktopEvents: client_first_launch=client_first_launch
   # TelemetryDocsEditorEvents: table_of_contents.available=table_of_contents_available, table_of_contents.opened=table_of_contents_opened, table_of_contents.heading_clicked=table_of_contents_heading_clicked
   # TelemetryDocsEvents: suggestion.created=suggestion_created, suggestion.resolved=suggestion_resolved, suggestion.comment=suggestion_commented
@@ -367,7 +388,7 @@ components:
   # TelemetryMailPagingControlsEvents: move_to_previous_page=move_to_previous_page, move_to_next_page=move_to_next_page, clicked_load_more_search_results=clicked_load_more_search_results, move_to_custom_page=move_to_custom_page
   # TelemetryMailSelectAllEvents: button_move_to_archive=button_move_to_archive, button_move_to_trash=button_move_to_trash, banner_move_to=banner_move_to, banner_label_as=banner_label_as, banner_mark_as_read=banner_mark_as_read, banner_mark_as_unread=banner_mark_as_unread, banner_permanent_delete=banner_permanent_delete
   # TelemetryMailTrial2024UpsellModal: no_thanks=noThanks, close_modal=closeModal, upsell=upsell
-  # TelemetryMeasurementGroups: account.any.signup=accountSignup, account.web.org_logo_upload=accountOrgLogoUpload, account.web.security_checkup=accountSecurityCheckup, account.web.safety_review_ctr=accountSafetyReviewCtr, account.web.safety_review_score_diff=accountSafetyReviewScoreDiff, account.web.recovery_settings=accountRecoverySettings, account.web.password_reminder=accountPasswordReminder, account.web.reset_password=accountResetPassword, account.web.unauth_lost_2fa=accountUnauthLost2FA, account.web.dashboard=accountDashboard, account.web.upgrade_page=accountUpgradePage, any.web.referral_discover=referralDiscover, any.web.always_on_upsell=alwaysOnUpsell, calendar.web.encrypted_search=calendarEncryptedSearch, calendar.web.ics_surgery=calendarIcsSurgery, calendar.web.timezone_selector=calendarTimeZoneSelector, calendar.web.video_conferencing=calendarVideoConferencing, meet.web.meet_funnel_telemetry=meetFunnelTelemetry, account.web.cancellation=accountCancellation, account.web.cancellation_feedback_first=accountCancellationFeedbackFirst, any.web.settings_heart_beat=settingsHeartBeat, any.web.calendar_settings_heart_beat=calendarSettingsHeartBeat, any.web.calendar_invite=calendarInvite, any.changelog_opened=changelogOpened, any.web.key_transparency=keyTransparency, any.web.subscription_modal=subscriptionModal, mail.web.onboarding=mailOnboarding, any.web.paid_users_nudge=paidUsersNudge, mail.web.privacy_dropdown=mailPrivacyDropdown, mail.web.select_all=mailSelectAll, mail.web.snooze=mailSnooze, mail.web.signup=mailSignup, mail.web.composer_assistant=mailComposerAssistant, mail.web.proton_tips=mailProtonTips, any.web.post_subscription_tour_events=postSubscriptionTourEvents, mail.desktop.default_mailto=mailDesktopDefaultMailto, mail.desktop.daily_stats=mailDesktopDailyStats, mail.web.clicks_mail_actions=mailActions, mail.web.list_settings=mailListSettings, mail.web.post_signup_one_dollar=mailPostSignupOneDollar, mail.web.paging_controls=mailPagingControls, mail.web.expand_blockquotes=mailExpandBlockquotes, mail.any.categories_view=categoriesView, mail.web.pass_nudge=passNudge, mail.web.newsletter_subscriptions=mailNewsletterSubscriptions, any.web.unlimited_offer_2025=unlimitedOffer2025, any.web.unlimited_to_duo_offer=unlimitedToDuoOffer, mail.es_migration_tool=esMigrationTool, any.web.security_center=securityCenter, any.web.vpn_drawer=vpnDrawer, payments.flow=paymentsFlow, drive.web.feature_performance_unauth=driveWebFeaturePerformance, drive.web.actions_unauth=driveWebActions, drive.web.post_signup_one_dollar=drivePostSignupOneDollar, mail.web.unlimited_offer_2025=driveUnlimitedOffer2025, any.web.collapsible_left_sidebar=collapsibleLeftSidebar, any.web.smart_banner=smartBanner, common.any.client_installs=clientInstalls, any.web.client_search=clientSearch, any.web.b2b_onboarding=b2bOnboarding, any.web.bring_your_own_email=bringYourOwnEmail, any.web.app_switcher=appSwitcher, account.web.explore_apps=accountExploreApps, any.web.prevent_wasm_loading=preventWasmLoading, common.web.suggestions=docsSuggestions, drive.docs.homepage=docsHomepage, drive.docs.editor=docsEditor, vpn.any.tv_signin=vpnTv, vpn.web.always_on_policy=vpnAlwaysOnPolicy, vpn.web.b2b_user_activity=vpnB2bUserActivity, mail.common.foreground_activity=mailForegroundActivity
+  # TelemetryMeasurementGroups: account.any.signup=accountSignup, account.web.org_logo_upload=accountOrgLogoUpload, account.web.security_checkup=accountSecurityCheckup, account.web.safety_review_ctr=accountSafetyReviewCtr, account.web.safety_review_score_diff=accountSafetyReviewScoreDiff, account.web.recovery_settings=accountRecoverySettings, account.web.password_reminder=accountPasswordReminder, account.web.reset_password=accountResetPassword, account.web.unauth_lost_2fa=accountUnauthLost2FA, account.web.dashboard=accountDashboard, account.web.upgrade_page=accountUpgradePage, any.web.referral_discover=referralDiscover, any.web.always_on_upsell=alwaysOnUpsell, calendar.web.encrypted_search=calendarEncryptedSearch, calendar.web.ics_surgery=calendarIcsSurgery, calendar.web.timezone_selector=calendarTimeZoneSelector, calendar.web.video_conferencing=calendarVideoConferencing, meet.web.meet_funnel_telemetry=meetFunnelTelemetry, account.web.cancellation=accountCancellation, account.web.cancellation_feedback_first=accountCancellationFeedbackFirst, any.web.settings_heart_beat=settingsHeartBeat, any.web.calendar_settings_heart_beat=calendarSettingsHeartBeat, any.web.calendar_invite=calendarInvite, any.changelog_opened=changelogOpened, any.web.key_transparency=keyTransparency, any.web.subscription_modal=subscriptionModal, mail.web.onboarding=mailOnboarding, any.web.paid_users_nudge=paidUsersNudge, mail.web.privacy_dropdown=mailPrivacyDropdown, mail.web.select_all=mailSelectAll, mail.web.snooze=mailSnooze, mail.web.signup=mailSignup, mail.web.composer_assistant=mailComposerAssistant, mail.web.proton_tips=mailProtonTips, any.web.post_subscription_tour_events=postSubscriptionTourEvents, mail.desktop.default_mailto=mailDesktopDefaultMailto, mail.desktop.daily_stats=mailDesktopDailyStats, mail.web.clicks_mail_actions=mailActions, mail.web.list_settings=mailListSettings, mail.web.post_signup_one_dollar=mailPostSignupOneDollar, mail.web.paging_controls=mailPagingControls, mail.web.expand_blockquotes=mailExpandBlockquotes, mail.any.categories_view=categoriesView, mail.web.pass_nudge=passNudge, mail.any.search=contentSearch, mail.any.search_index=contentSearchIndex, mail.web.newsletter_subscriptions=mailNewsletterSubscriptions, any.web.unlimited_offer_2025=unlimitedOffer2025, any.web.unlimited_to_duo_offer=unlimitedToDuoOffer, mail.es_migration_tool=esMigrationTool, any.web.security_center=securityCenter, any.web.vpn_drawer=vpnDrawer, payments.flow=paymentsFlow, drive.web.feature_performance_unauth=driveWebFeaturePerformance, drive.web.actions_unauth=driveWebActions, drive.web.post_signup_one_dollar=drivePostSignupOneDollar, mail.web.unlimited_offer_2025=driveUnlimitedOffer2025, any.web.collapsible_left_sidebar=collapsibleLeftSidebar, any.web.smart_banner=smartBanner, common.any.client_installs=clientInstalls, any.web.client_search=clientSearch, any.web.b2b_onboarding=b2bOnboarding, any.web.bring_your_own_email=bringYourOwnEmail, any.web.app_switcher=appSwitcher, account.web.explore_apps=accountExploreApps, any.web.prevent_wasm_loading=preventWasmLoading, common.web.suggestions=docsSuggestions, drive.docs.homepage=docsHomepage, drive.docs.editor=docsEditor, vpn.any.tv_signin=vpnTv, vpn.web.always_on_policy=vpnAlwaysOnPolicy, vpn.web.b2b_user_activity=vpnB2bUserActivity, mail.common.foreground_activity=mailForegroundActivity
   # TelemetryMeetFunnelTelemetry: spotlight_displayed=spotlight_displayed, explore_meet_clicked=explore_meet_clicked, meeting_created=meeting_created, meet_opened=meet_opened
   # TelemetryPaidUsersNudge: click_upsell_button=clickUpsellButton, click_top_navbar=clickTopNavbar, close_offer=closeOffer, user_subscribed=userSubscribed, click_hide_offer=clickHideOffer
   # TelemetryPassExtensionEvents: fe.pass_extension_installed=pass_extension_installed
@@ -399,6 +420,9 @@ components:
   # ThemeModeSetting: 0=Auto, 1=Dark, 2=Light
   # ThemeTypes: 0=Duotone, 1=Carbon, 2=Snow, 3=Monokai, 4=ContrastLight, 5=Legacy, 6=Classic, 7=ContrastDark, 8=PassDark, 9=Storefront, 10=WalletLight, 11=StorefrontWallet, 12=PassLight, 13=WalletDark, 14=LumoLight, 15=LumoDark
   # TOKEN_TYPES: email=EMAIL, sms=SMS, invite=INVITE, coupon=COUPON, captcha=CAPTCHA
+  # TransactionState: 0=SUCCESS, 1=VOIDED, 2=FAILURE, 3=TIMEOUT, 4=NEEDS_ATTENTION, 5=REFUNDED, 6=CHARGEBACK
+  # TransactionType: 0=AUTHORIZATION, 1=PAYMENT, 2=REFUND, 3=PAYMENT_REVERSAL, 4=CURRENCY_CONVERSION, 5=CREDIT, 6=GIFT_CARD, 7=BANK_TRANSFER, 8=BITCOIN, 9=CASH, 10=CHARGEBACK, 11=CREDIT_TRANSFER, 12=MIGRATION, 13=ADJUSTMENT_CREDIT, 14=TEST_CREDIT, 15=PREPAYMENT
+  # TrialType: 0=ReferralProgram, 1=FamilyPlan, 2=Manual
   # TwoFactorStatusFlags: 1=Totp, 2=Fido2
   # UNPAID_STATE: 0=NOT_UNPAID, 1=AVAILABLE, 2=OVERDUE
   # UNREAD_FAVICON: 0=DISABLED, 1=ENABLED
@@ -446,6 +470,7 @@ tags:
   - name: Settings
   - name: Tests
   - name: Vpn
+  - name: pass
 
 paths:
   /account/organization/events/auth:
@@ -9360,6 +9385,7 @@ paths:
                   type: string
                 Destination:
                   type: string
+                  description: required if type is external_email, optional & not used if type is recovery_email
       responses:
         "200":
           description: Success
@@ -16243,6 +16269,7 @@ paths:
                   type: string
                 WaitingRoom:
                   type: string
+                  description: // Make WaitingRoom mandatory when cleanup MeetWaitingRoom feature flag
       responses:
         "200":
           description: Success
@@ -16595,6 +16622,7 @@ paths:
                   type: string
                 WaitingRoom:
                   type: string
+                  description: // Make WaitingRoom mandatory when cleanup MeetWaitingRoom feature flag
       responses:
         "200":
           description: Success
@@ -17060,6 +17088,5262 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
+  /pass/v1/alias_sync/pending:
+    get:
+      tags: [pass]
+      summary: Get Pass Alias Sync Pending
+      operationId: getPassAliasSyncPending
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      PendingAliases:
+                        type: object
+  /pass/v1/alias_sync/share/{shareId}/create:
+    post:
+      tags: [pass]
+      summary: Post Pass Alias Sync Share Create
+      operationId: postPassAliasSyncShareCreate
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Items
+              properties:
+                Items:
+                  type: array
+                  items: {}
+                  description: Pending aliases to be created. At most 100
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Revisions:
+                        type: object
+  /pass/v1/alias_sync/status:
+    get:
+      tags: [pass]
+      summary: Get Pass Alias Sync Status
+      operationId: getPassAliasSyncStatus
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      SyncStatus:
+                        type: object
+  /pass/v1/alias_sync/sync:
+    post:
+      tags: [pass]
+      summary: Post Pass Alias Sync Sync
+      operationId: postPassAliasSyncSync
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                DefaultShareID:
+                  type: string
+                  description: ShareID to store the alias when syncing
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/breach:
+    get:
+      tags: [pass]
+      summary: Get Pass Breach
+      operationId: getPassBreach
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Breaches:
+                        type: object
+  /pass/v1/breach/address/{addresId}/breaches:
+    get:
+      tags: [pass]
+      summary: Get Pass Breach Address Breaches
+      operationId: getPassBreachAddressBreaches
+      parameters:
+        - name: addresId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Breaches:
+                        type: object
+  /pass/v1/breach/address/{addresId}/monitor:
+    put:
+      tags: [pass]
+      summary: Put Pass Breach Address Monitor
+      operationId: putPassBreachAddressMonitor
+      parameters:
+        - name: addresId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Monitor
+              properties:
+                Monitor:
+                  type: boolean
+                  description: Define whether to monitor this address or not
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/breach/address/{addresId}/resolved:
+    post:
+      tags: [pass]
+      summary: Post Pass Breach Address Resolved
+      operationId: postPassBreachAddressResolved
+      parameters:
+        - name: addresId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/breach/custom_email:
+    get:
+      tags: [pass]
+      summary: Get Pass Breach Custom Email
+      operationId: getPassBreachCustomEmail
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Emails:
+                        type: object
+    post:
+      tags: [pass]
+      summary: Post Pass Breach Custom Email
+      operationId: postPassBreachCustomEmail
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Email
+              properties:
+                Email:
+                  type: string
+                  description: Email to create a breach monitor for
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Email:
+                        type: object
+  /pass/v1/breach/custom_email/{customemailId}:
+    delete:
+      tags: [pass]
+      summary: Delete Pass Breach Custom Email
+      operationId: deletePassBreachCustomEmail
+      parameters:
+        - name: customemailId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/breach/custom_email/{customemailId}/breaches:
+    get:
+      tags: [pass]
+      summary: Get Pass Breach Custom Email Breaches
+      operationId: getPassBreachCustomEmailBreaches
+      parameters:
+        - name: customemailId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Breaches:
+                        type: object
+  /pass/v1/breach/custom_email/{customemailId}/breaches/{breacheId}/resolve:
+    put:
+      tags: [pass]
+      summary: Put Pass Breach Custom Email Breaches Resolve
+      operationId: putPassBreachCustomEmailBreachesResolve
+      parameters:
+        - name: customemailId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: breacheId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/breach/custom_email/{customemailId}/monitor:
+    put:
+      tags: [pass]
+      summary: Put Pass Breach Custom Email Monitor
+      operationId: putPassBreachCustomEmailMonitor
+      parameters:
+        - name: customemailId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Monitor
+              properties:
+                Monitor:
+                  type: boolean
+                  description: Define whether to monitor this custom email or not
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Email:
+                        type: object
+  /pass/v1/breach/custom_email/{customemailId}/resend_verification:
+    post:
+      tags: [pass]
+      summary: Post Pass Breach Custom Email Resend Verification
+      operationId: postPassBreachCustomEmailResendVerification
+      parameters:
+        - name: customemailId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/breach/custom_email/{customemailId}/resolved:
+    put:
+      tags: [pass]
+      summary: Put Pass Breach Custom Email Resolved
+      operationId: putPassBreachCustomEmailResolved
+      parameters:
+        - name: customemailId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Email:
+                        type: object
+  /pass/v1/breach/custom_email/{customemailId}/verify:
+    put:
+      tags: [pass]
+      summary: Put Pass Breach Custom Email Verify
+      operationId: putPassBreachCustomEmailVerify
+      parameters:
+        - name: customemailId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Code
+              properties:
+                Code:
+                  type: string
+                  description: Code to validate
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Email:
+                        type: object
+  /pass/v1/file:
+    post:
+      tags: [pass]
+      summary: Post Pass File
+      operationId: postPassFile
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Metadata
+                - ChunkCount
+              properties:
+                Metadata:
+                  type: string
+                  description: File metadata encrypted with an attachmentKey and encoded in Base64
+                ChunkCount:
+                  type: integer
+                  description: Number of chunks this file will have
+                EncryptionVersion:
+                  type: string
+                  description: File encryption version. 1 for old, 2 for separate tags.
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      File:
+                        type: object
+  /pass/v1/file/{fileId}/chunk:
+    post:
+      tags: [pass]
+      summary: Post Pass File Chunk
+      operationId: postPassFileChunk
+      parameters:
+        - name: fileId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/file/{fileId}/metadata:
+    put:
+      tags: [pass]
+      summary: Put Pass File Metadata
+      operationId: putPassFileMetadata
+      parameters:
+        - name: fileId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Metadata
+              properties:
+                Metadata:
+                  type: string
+                  description: File metadata encrypted with an attachmentKey and encoded in Base64
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      File:
+                        type: object
+  /pass/v1/invite:
+    get:
+      tags: [pass]
+      summary: Get Pass Invite
+      operationId: getPassInvite
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+  /pass/v1/invite/group:
+    get:
+      tags: [pass]
+      summary: Get Pass Invite Group
+      operationId: getPassInviteGroup
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Invites:
+                        type: object
+  /pass/v1/invite/group/{groupId}:
+    post:
+      tags: [pass]
+      summary: Post Pass Invite Group
+      operationId: postPassInviteGroup
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Keys
+              properties:
+                Keys:
+                  type: array
+                  items: {}
+                  description: Invite keys encrypted and signed with the User Key
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+    delete:
+      tags: [pass]
+      summary: Delete Pass Invite Group
+      operationId: deletePassInviteGroup
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/invite/{inviteId}:
+    post:
+      tags: [pass]
+      summary: Post Pass Invite
+      operationId: postPassInvite
+      parameters:
+        - name: inviteId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Keys
+              properties:
+                Keys:
+                  type: array
+                  items: {}
+                  description: Invite keys encrypted and signed with the User Key
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Share:
+                        type: object
+    delete:
+      tags: [pass]
+      summary: Delete Pass Invite
+      operationId: deletePassInvite
+      parameters:
+        - name: inviteId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/notification:
+    get:
+      tags: [pass]
+      summary: Get Pass Notification
+      operationId: getPassNotification
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Notifications:
+                        type: object
+  /pass/v1/notification/{notificationId}:
+    put:
+      tags: [pass]
+      summary: Put Pass Notification
+      operationId: putPassNotification
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - State
+              properties:
+                State:
+                  type: integer
+                  description: Notification state. 0 = Unread, 1 = Read, 2 = Dismissed
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/organization:
+    get:
+      tags: [pass]
+      summary: Get Pass Organization
+      operationId: getPassOrganization
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Organization:
+                        type: object
+  /pass/v1/organization/report:
+    get:
+      tags: [pass]
+      summary: Get Pass Organization Report
+      operationId: getPassOrganizationReport
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Report:
+                        type: object
+  /pass/v1/organization/report/client_data:
+    post:
+      tags: [pass]
+      summary: Post Pass Organization Report Client Data
+      operationId: postPassOrganizationReportClientData
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - ReusedPasswords
+                - Inactive2FA
+                - ExcludedItems
+                - WeakPasswords
+              properties:
+                ReusedPasswords:
+                  type: integer
+                  description: Number of reused passwords
+                Inactive2FA:
+                  type: integer
+                  description: Number of items with inactive 2FA
+                ExcludedItems:
+                  type: integer
+                  description: Number of excluded items
+                WeakPasswords:
+                  type: integer
+                  description: Number of weak passwords
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/organization/settings:
+    put:
+      tags: [pass]
+      summary: Put Pass Organization Settings
+      operationId: putPassOrganizationSettings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ShareMode:
+                  type: string
+                  description: Allowed ways to share within the organization.
+                ShareAcceptMode:
+                  type: string
+                  description: Who is allowed to accept an invite from outside the organization.
+                ItemShareMode:
+                  type: string
+                  description: Is item sharing enabled.
+                PublicLinkMode:
+                  type: string
+                  description: Are secure links enabled.
+                ForceLockSeconds:
+                  type: string
+                  description: Force pass to lock after given seconds of time. 0 means disabled.
+                ExportMode:
+                  type: string
+                  description: Allowed ways of exporting the data owned by the org.
+                VaultCreateMode:
+                  type: string
+                  description: Who can create vaults in the organization.
+                AliasCreateMode:
+                  type: string
+                  description: If it is allowed to create aliases in the organization.
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Organization:
+                        type: object
+  /pass/v1/organization/settings/password_policy:
+    put:
+      tags: [pass]
+      summary: Put Pass Organization Settings Password Policy
+      operationId: putPassOrganizationSettingsPasswordPolicy
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - RandomPasswordAllowed
+                - MemorablePasswordAllowed
+              properties:
+                RandomPasswordAllowed:
+                  type: boolean
+                  description: Whether subusers are allowed to generate random passwords
+                RandomPasswordMinLength:
+                  type: string
+                  description: Minimum password length. Default limit if null.
+                RandomPasswordMaxLength:
+                  type: string
+                  description: Maximum password length. Default limit if null.
+                RandomPasswordMustIncludeNumbers:
+                  type: string
+                  description: Whether the password must include numbers. If true, it must. If false, it must not. Cannot be changed if not null. Can be changed if null.
+                RandomPasswordMustIncludeSymbols:
+                  type: string
+                  description: Whether the password must include symbols. If true, it must. If false, it must not. Cannot be changed if not null. Can be changed if null.
+                RandomPasswordMustIncludeUppercase:
+                  type: string
+                  description: Whether the password must include uppercase characters. If true, it must. If false, it must not. Cannot be changed if not null. Can be changed if null.
+                MemorablePasswordAllowed:
+                  type: boolean
+                  description: Whether subusers are allowed to generate memorable passwords
+                MemorablePasswordMinWords:
+                  type: string
+                  description: Minimum amount of words for the memorable passwords. Default limit if null.
+                MemorablePasswordMaxWords:
+                  type: string
+                  description: Maximum amount of words for the memorable passwords. Default limit if null.
+                MemorablePasswordMustCapitalize:
+                  type: string
+                  description: Whether the password must capitalize words. If true, it must. If false, it must not. Cannot be changed if not null. Can be changed if null.
+                MemorablePasswordMustIncludeNumbers:
+                  type: string
+                  description: Whether the password must include numbers. If true, it must. If false, it must not. Cannot be changed if not null. Can be changed if null.
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Organization:
+                        type: object
+  /pass/v1/organization/urlpause:
+    get:
+      tags: [pass]
+      summary: Get Pass Organization Urlpause
+      operationId: getPassOrganizationUrlpause
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Entries:
+                        type: object
+    post:
+      tags: [pass]
+      summary: Post Pass Organization Urlpause
+      operationId: postPassOrganizationUrlpause
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Url
+                - Values
+              properties:
+                Url:
+                  type: string
+                  description: Url of the entry
+                Values:
+                  type: object
+                  description: Which properties are enabled for the entry
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Entry:
+                        type: object
+  /pass/v1/organization/urlpause/{urlpauseId}:
+    put:
+      tags: [pass]
+      summary: Put Pass Organization Urlpause
+      operationId: putPassOrganizationUrlpause
+      parameters:
+        - name: urlpauseId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - AutofillEnabled
+                - Autofill2faEnabled
+                - AutofillAutosuggestEnabled
+                - AutosaveEnabled
+                - PasskeysEnabled
+              properties:
+                AutofillEnabled:
+                  type: boolean
+                  description: Whether Autofill is enabled or not
+                Autofill2faEnabled:
+                  type: boolean
+                  description: Whether 2FA Autofill is enabled or not
+                AutofillAutosuggestEnabled:
+                  type: boolean
+                  description: Whether Autofill autosuggestion is enabled or not
+                AutosaveEnabled:
+                  type: boolean
+                  description: Whether Autosave is enabled or not
+                PasskeysEnabled:
+                  type: boolean
+                  description: Whether Passkeys are enabled or not
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+    delete:
+      tags: [pass]
+      summary: Delete Pass Organization Urlpause
+      operationId: deletePassOrganizationUrlpause
+      parameters:
+        - name: urlpauseId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/pat/monitor:
+    post:
+      tags: [pass]
+      summary: Post Pass Pat Monitor
+      operationId: postPassPatMonitor
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Records
+              properties:
+                Records:
+                  type: array
+                  items: {}
+                  description: Records to store
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/pat/monitor/{monitorId}:
+    get:
+      tags: [pass]
+      summary: Get Pass Pat Monitor
+      operationId: getPassPatMonitor
+      parameters:
+        - name: monitorId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Actions:
+                        type: object
+                        description: Actions made by this PAT
+                      Code:
+                        type: integer
+  /pass/v1/personal-access-token/{personalaccesstokenId}/access:
+    get:
+      tags: [pass]
+      summary: Get Pass Personal Access Token Access
+      operationId: getPassPersonalAccessTokenAccess
+      parameters:
+        - name: personalaccesstokenId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Shares:
+                        type: array
+                        items: {}
+                        description: List of shares
+                      LastToken:
+                        type: string
+                        description: Token to pass for getting the next page. Null if there is none
+                      Code:
+                        type: integer
+    post:
+      tags: [pass]
+      summary: Post Pass Personal Access Token Access
+      operationId: postPassPersonalAccessTokenAccess
+      parameters:
+        - name: personalaccesstokenId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - ShareID
+                - TargetType
+                - ShareRoleID
+                - Keys
+              properties:
+                ShareID:
+                  type: string
+                  description: Share ID of the user granting access
+                TargetID:
+                  type: string
+                  description: Target ID (for item, optional for vault)
+                TargetType:
+                  type: integer
+                  description: Target type (1=vault, 2=item)
+                ShareRoleID:
+                  type: string
+                  description: Share role ID
+                Keys:
+                  type: array
+                  items: {}
+                  description: Encrypted keys for the share
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Access:
+                        type: object
+                      Code:
+                        type: integer
+  /pass/v1/personal-access-token/{personalaccesstokenId}/access/{accesId}:
+    delete:
+      tags: [pass]
+      summary: Delete Pass Personal Access Token Access
+      operationId: deletePassPersonalAccessTokenAccess
+      parameters:
+        - name: personalaccesstokenId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: accesId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/public_link:
+    get:
+      tags: [pass]
+      summary: Get Pass Public Link
+      operationId: getPassPublicLink
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      PublicLinks:
+                        type: string
+  /pass/v1/public_link/content/{contentId}:
+    get:
+      tags: [pass]
+      summary: Get Pass Public Link Content
+      operationId: getPassPublicLinkContent
+      parameters:
+        - name: contentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      PublicLinkContent:
+                        type: object
+  /pass/v1/public_link/files/{fileId}:
+    get:
+      tags: [pass]
+      summary: Get Pass Public Link Files
+      operationId: getPassPublicLinkFiles
+      parameters:
+        - name: fileId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Files:
+                        type: object
+  /pass/v1/public_link/files/{fileId}/{stringId}/{stringId}:
+    get:
+      tags: [pass]
+      summary: Get Pass Public Link Files
+      operationId: getPassPublicLinkFiles
+      parameters:
+        - name: fileId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: stringId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: stringId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            text/plain:
+              schema:
+                type: string
+  /pass/v1/public_link/inactive:
+    delete:
+      tags: [pass]
+      summary: Delete Pass Public Link Inactive
+      operationId: deletePassPublicLinkInactive
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/public_link/{publiclinkId}:
+    delete:
+      tags: [pass]
+      summary: Delete Pass Public Link
+      operationId: deletePassPublicLink
+      parameters:
+        - name: publiclinkId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/share:
+    get:
+      tags: [pass]
+      summary: Get Pass Share
+      operationId: getPassShare
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+  /pass/v1/share/hide:
+    put:
+      tags: [pass]
+      summary: Put Pass Share Hide
+      operationId: putPassShareHide
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                SharesToHide:
+                  type: string
+                  description: List of share IDs to hide
+                SharesToUnhide:
+                  type: string
+                  description: List of share IDs to unhide
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+  /pass/v1/share/{shareId}:
+    get:
+      tags: [pass]
+      summary: Get Pass Share
+      operationId: getPassShare
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Share:
+                        type: object
+    delete:
+      tags: [pass]
+      summary: Delete Pass Share
+      operationId: deletePassShare
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/share/{shareId}/alias/bulk/get:
+    post:
+      tags: [pass]
+      summary: Post Pass Share Alias Bulk Get
+      operationId: postPassShareAliasBulkGet
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - ItemIDs
+              properties:
+                ItemIDs:
+                  type: array
+                  items: {}
+                  description: ItemsIDs to be retrieved. At most 100
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+  /pass/v1/share/{shareId}/alias/custom:
+    post:
+      tags: [pass]
+      summary: Post Pass Share Alias Custom
+      operationId: postPassShareAliasCustom
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Prefix
+                - SignedSuffix
+                - MailboxIDs
+                - Item
+              properties:
+                Prefix:
+                  type: string
+                  description: Prefix for the alias to be created (prefix.xxx@domain.com)
+                SignedSuffix:
+                  type: string
+                  description: Signed suffix for the alias to be created (xxx.asdaa3@domain.com.signature)
+                MailboxIDs:
+                  type: array
+                  items: {}
+                  description: IDs for the mailboxes that will receive emails sent to this alias
+                AliasName:
+                  type: string
+                  description: Optionally, the alias name to be used for this alias
+                Item:
+                  type: object
+                  description: Payload for the item creation
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Item:
+                        type: object
+  /pass/v1/share/{shareId}/alias/options:
+    get:
+      tags: [pass]
+      summary: Get Pass Share Alias Options
+      operationId: getPassShareAliasOptions
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Options:
+                        type: object
+  /pass/v1/share/{shareId}/alias/random:
+    post:
+      tags: [pass]
+      summary: Post Pass Share Alias Random
+      operationId: postPassShareAliasRandom
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - KeyRotation
+                - ContentFormatVersion
+                - Content
+                - ItemKey
+              properties:
+                KeyRotation:
+                  type: integer
+                  description: Rotation of the VaultKey used to encrypt this item
+                ContentFormatVersion:
+                  type: integer
+                  description: Version of the content format used to create the item
+                Content:
+                  type: string
+                  description: Encrypted item content encoded in Base64
+                ItemKey:
+                  type: string
+                  description: Item key encrypted with the VaultKey, contents encoded in base64
+                FolderID:
+                  type: string
+                  description: FolderID under which to create the item
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Item:
+                        type: object
+  /pass/v1/share/{shareId}/alias/{aliaId}:
+    get:
+      tags: [pass]
+      summary: Get Pass Share Alias
+      operationId: getPassShareAlias
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: aliaId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Alias:
+                        type: object
+  /pass/v1/share/{shareId}/alias/{aliaId}/breaches:
+    get:
+      tags: [pass]
+      summary: Get Pass Share Alias Breaches
+      operationId: getPassShareAliasBreaches
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: aliaId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Breaches:
+                        type: object
+  /pass/v1/share/{shareId}/alias/{aliaId}/breaches/resolved:
+    post:
+      tags: [pass]
+      summary: Post Pass Share Alias Breaches Resolved
+      operationId: postPassShareAliasBreachesResolved
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: aliaId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/share/{shareId}/alias/{aliaId}/breaches/{breacheId}/resolve:
+    post:
+      tags: [pass]
+      summary: Post Pass Share Alias Breaches Resolve
+      operationId: postPassShareAliasBreachesResolve
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: aliaId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: breacheId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/share/{shareId}/alias/{aliaId}/contact:
+    get:
+      tags: [pass]
+      summary: Get Pass Share Alias Contact
+      operationId: getPassShareAliasContact
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: aliaId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+    post:
+      tags: [pass]
+      summary: Post Pass Share Alias Contact
+      operationId: postPassShareAliasContact
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: aliaId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Email
+              properties:
+                Email:
+                  type: string
+                  description: Email to send emails to via this alias
+                Name:
+                  type: string
+                  description: Name to be shown for this contact
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Contact:
+                        type: object
+  /pass/v1/share/{shareId}/alias/{aliaId}/contact/{contactId}:
+    get:
+      tags: [pass]
+      summary: Get Pass Share Alias Contact
+      operationId: getPassShareAliasContact
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: aliaId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: contactId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Contact:
+                        type: object
+    delete:
+      tags: [pass]
+      summary: Delete Pass Share Alias Contact
+      operationId: deletePassShareAliasContact
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: aliaId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: contactId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/share/{shareId}/alias/{aliaId}/contact/{contactId}/blocked:
+    put:
+      tags: [pass]
+      summary: Put Pass Share Alias Contact Blocked
+      operationId: putPassShareAliasContactBlocked
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: aliaId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: contactId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Blocked
+              properties:
+                Blocked:
+                  type: boolean
+                  description: Whether emails from this email address will be forwarded to the user
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Contact:
+                        type: object
+  /pass/v1/share/{shareId}/alias/{aliaId}/mailbox:
+    post:
+      tags: [pass]
+      summary: Post Pass Share Alias Mailbox
+      operationId: postPassShareAliasMailbox
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: aliaId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - MailboxIDs
+              properties:
+                MailboxIDs:
+                  type: array
+                  items: {}
+                  description: IDs for the mailboxes that will receive emails sent to this alias
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Item:
+                        type: object
+  /pass/v1/share/{shareId}/alias/{aliaId}/name:
+    put:
+      tags: [pass]
+      summary: Put Pass Share Alias Name
+      operationId: putPassShareAliasName
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: aliaId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                Name:
+                  type: string
+                  description: Desired name for the alias
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/share/{shareId}/alias/{aliaId}/note:
+    put:
+      tags: [pass]
+      summary: Put Pass Share Alias Note
+      operationId: putPassShareAliasNote
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: aliaId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                Note:
+                  type: string
+                  description: Desired note for the alias
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/share/{shareId}/alias/{aliaId}/status:
+    put:
+      tags: [pass]
+      summary: Put Pass Share Alias Status
+      operationId: putPassShareAliasStatus
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: aliaId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Enable
+              properties:
+                Enable:
+                  type: boolean
+                  description: Desired alias status
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Item:
+                        type: object
+  /pass/v1/share/{shareId}/event:
+    get:
+      tags: [pass]
+      summary: Get Pass Share Event
+      operationId: getPassShareEvent
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+  /pass/v1/share/{shareId}/event/{eventId}:
+    get:
+      tags: [pass]
+      summary: Get Pass Share Event
+      operationId: getPassShareEvent
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Events:
+                        type: object
+  /pass/v1/share/{shareId}/folder:
+    get:
+      tags: [pass]
+      summary: Get Pass Share Folder
+      operationId: getPassShareFolder
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Folders:
+                        type: object
+                        description: Folders accessible from this share
+                      Code:
+                        type: integer
+    post:
+      tags: [pass]
+      summary: Post Pass Share Folder
+      operationId: postPassShareFolder
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - ContentFormatVersion
+                - Content
+                - KeyRotation
+                - FolderKey
+              properties:
+                ParentFolderID:
+                  type: string
+                  description: FolderID of the parent folder for this new folder. Use null for top folder.
+                ContentFormatVersion:
+                  type: integer
+                  description: Content format version for folder contents
+                Content:
+                  type: string
+                  description: Content encrypted with the folder key
+                KeyRotation:
+                  type: integer
+                  description: Rotation value for this key
+                FolderKey:
+                  type: string
+                  description: Encrypted folder key encoded in base64
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Folder:
+                        type: object
+                        description: Alias to create
+                      Code:
+                        type: integer
+    delete:
+      tags: [pass]
+      summary: Delete Pass Share Folder
+      operationId: deletePassShareFolder
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - FolderIDs
+              properties:
+                FolderIDs:
+                  type: array
+                  items: {}
+                  description: FolderIDs to be deleted
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/share/{shareId}/folder/{folderId}:
+    get:
+      tags: [pass]
+      summary: Get Pass Share Folder
+      operationId: getPassShareFolder
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: folderId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Folder:
+                        type: object
+                        description: Alias to create
+                      Code:
+                        type: integer
+    put:
+      tags: [pass]
+      summary: Put Pass Share Folder
+      operationId: putPassShareFolder
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: folderId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                Content:
+                  type: string
+                  description: If the content has to be updated this should contain the new content. Otherwise, null
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Folder:
+                        type: object
+                        description: Alias to create
+                      Code:
+                        type: integer
+  /pass/v1/share/{shareId}/folder/{folderId}/move:
+    put:
+      tags: [pass]
+      summary: Put Pass Share Folder Move
+      operationId: putPassShareFolderMove
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: folderId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - FolderKeys
+              properties:
+                ParentFolderID:
+                  type: string
+                  description: Id of the parent folder under which this folder is moved to. Null if it will be a top folder
+                FolderKeys:
+                  type: array
+                  items: {}
+                  description: FolderKeys encrypted with the parent folder keys or vault keys if it is a top folder
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Folder:
+                        type: object
+                        description: Alias to create
+                      Code:
+                        type: integer
+  /pass/v1/share/{shareId}/hide:
+    put:
+      tags: [pass]
+      summary: Put Pass Share Hide
+      operationId: putPassShareHide
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Share:
+                        type: object
+  /pass/v1/share/{shareId}/invite:
+    get:
+      tags: [pass]
+      summary: Get Pass Share Invite
+      operationId: getPassShareInvite
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+    post:
+      tags: [pass]
+      summary: Post Pass Share Invite
+      operationId: postPassShareInvite
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Keys
+                - Email
+                - TargetType
+                - ShareRoleID
+              properties:
+                Keys:
+                  type: array
+                  items: {}
+                  description: "List of keys encrypted for the other user's address key and signed with your address key"
+                Email:
+                  type: string
+                  description: Email of the target user
+                TargetType:
+                  type: integer
+                  description: Invite target type. 1 = Vault, 2 = Item
+                ShareRoleID:
+                  type: string
+                  description: ShareRoleID for this invite. The values are in the top level Pass docs.
+                SourceNewUserInviteID:
+                  type: string
+                  description: If this invite is generated from a new user invite. ID of the original new user invite
+                ItemID:
+                  type: string
+                  description: Invite encrypted item ID (only in case the invite is of type Item)
+                Data:
+                  type: string
+                  description: Base64 encrypted invite message encrypted with the object key
+                ExpirationTime:
+                  type: string
+                  description: Expiration time for the share
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/share/{shareId}/invite/batch:
+    post:
+      tags: [pass]
+      summary: Post Pass Share Invite Batch
+      operationId: postPassShareInviteBatch
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Invites
+              properties:
+                Invites:
+                  type: array
+                  items: {}
+                  description: Invites for existing users
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/share/{shareId}/invite/check_address:
+    post:
+      tags: [pass]
+      summary: Post Pass Share Invite Check Address
+      operationId: postPassShareInviteCheckAddress
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Emails
+              properties:
+                Emails:
+                  type: array
+                  items: {}
+                  description: Addresses to check. At most 10 addresses are allowed
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+  /pass/v1/share/{shareId}/invite/new_user:
+    post:
+      tags: [pass]
+      summary: Post Pass Share Invite New User
+      operationId: postPassShareInviteNewUser
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Email
+                - TargetType
+                - Signature
+                - ShareRoleID
+              properties:
+                Email:
+                  type: string
+                  description: Email of the target user
+                TargetType:
+                  type: integer
+                  description: Invite target type. 1 = Vault, 2 = Item
+                Signature:
+                  type: string
+                  description: "Base64 signature of \"inviteemail|base64(vaultKey)\" signed with the manager's address key"
+                ShareRoleID:
+                  type: string
+                  description: ShareRoleID for this invite. The values are in the top level Pass docs.
+                Data:
+                  type: string
+                  description: Base64 encrypted invite message encrypted with the object key
+                ItemID:
+                  type: string
+                  description: Invite encrypted item ID (only in case the invite is of type Item)
+                ExpirationTime:
+                  type: string
+                  description: Expiration time for the share
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/share/{shareId}/invite/new_user/batch:
+    post:
+      tags: [pass]
+      summary: Post Pass Share Invite New User Batch
+      operationId: postPassShareInviteNewUserBatch
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - NewUserInvites
+              properties:
+                NewUserInvites:
+                  type: array
+                  items: {}
+                  description: New user invites
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/share/{shareId}/invite/new_user/{newuserId}:
+    delete:
+      tags: [pass]
+      summary: Delete Pass Share Invite New User
+      operationId: deletePassShareInviteNewUser
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: newuserId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/share/{shareId}/invite/new_user/{newuserId}/keys:
+    post:
+      tags: [pass]
+      summary: Post Pass Share Invite New User Keys
+      operationId: postPassShareInviteNewUserKeys
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: newuserId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Keys
+              properties:
+                Keys:
+                  type: array
+                  items: {}
+                  description: "List of keys encrypted for the other user's address key and signed with your address key"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/share/{shareId}/invite/recommended_emails:
+    get:
+      tags: [pass]
+      summary: Get Pass Share Invite Recommended Emails
+      operationId: getPassShareInviteRecommendedEmails
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Recommendation:
+                        type: object
+  /pass/v1/share/{shareId}/invite/recommended_emails/organization:
+    get:
+      tags: [pass]
+      summary: Get Pass Share Invite Recommended Emails Organization
+      operationId: getPassShareInviteRecommendedEmailsOrganization
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Recommendation:
+                        type: object
+  /pass/v1/share/{shareId}/invite/recommended_emails/suggested:
+    get:
+      tags: [pass]
+      summary: Get Pass Share Invite Recommended Emails Suggested
+      operationId: getPassShareInviteRecommendedEmailsSuggested
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+  /pass/v1/share/{shareId}/invite/{inviteId}:
+    delete:
+      tags: [pass]
+      summary: Delete Pass Share Invite
+      operationId: deletePassShareInvite
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: inviteId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/share/{shareId}/invite/{inviteId}/reminder:
+    post:
+      tags: [pass]
+      summary: Post Pass Share Invite Reminder
+      operationId: postPassShareInviteReminder
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: inviteId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/share/{shareId}/item:
+    get:
+      tags: [pass]
+      summary: Get Pass Share Item
+      operationId: getPassShareItem
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Items:
+                        type: object
+    post:
+      tags: [pass]
+      summary: Post Pass Share Item
+      operationId: postPassShareItem
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - KeyRotation
+                - ContentFormatVersion
+                - Content
+                - ItemKey
+              properties:
+                KeyRotation:
+                  type: integer
+                  description: Rotation of the VaultKey used to encrypt this item
+                ContentFormatVersion:
+                  type: integer
+                  description: Version of the content format used to create the item
+                Content:
+                  type: string
+                  description: Encrypted item content encoded in Base64
+                ItemKey:
+                  type: string
+                  description: Item key encrypted with the VaultKey, contents encoded in base64
+                FolderID:
+                  type: string
+                  description: FolderID under which to create the item
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Item:
+                        type: object
+    delete:
+      tags: [pass]
+      summary: Delete Pass Share Item
+      operationId: deletePassShareItem
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Items
+              properties:
+                Items:
+                  type: array
+                  items: {}
+                  description: ItemIDs with their current revision. At most 100 items.
+                SkipTrash:
+                  type: string
+                  description: Skip checking that the items are in the trash. Allows to delete directly
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/share/{shareId}/item/folder:
+    put:
+      tags: [pass]
+      summary: Put Pass Share Item Folder
+      operationId: putPassShareItemFolder
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Items
+              properties:
+                FolderID:
+                  type: string
+                  description: FolderID to move the items into. Null to move to share root
+                Items:
+                  type: array
+                  items: {}
+                  description: List of items to move to specified folder
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Items:
+                        type: array
+                        items: {}
+                        description: Items moved
+                      Code:
+                        type: integer
+  /pass/v1/share/{shareId}/item/import/batch:
+    post:
+      tags: [pass]
+      summary: Post Pass Share Item Import Batch
+      operationId: postPassShareItemImportBatch
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Items
+              properties:
+                Items:
+                  type: array
+                  items: {}
+                  description: Items to be imported. At most 100
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Revisions:
+                        type: object
+  /pass/v1/share/{shareId}/item/read:
+    put:
+      tags: [pass]
+      summary: Put Pass Share Item Read
+      operationId: putPassShareItemRead
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - ItemTimes
+              properties:
+                ItemTimes:
+                  type: array
+                  items: {}
+                  description: List of items and times read for this vault
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/share/{shareId}/item/share:
+    put:
+      tags: [pass]
+      summary: Put Pass Share Item Share
+      operationId: putPassShareItemShare
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - ShareID
+                - Items
+              properties:
+                ShareID:
+                  type: string
+                  description: Encrypted ID of the destination share
+                Items:
+                  type: array
+                  items: {}
+                  description: Items to move to the destination share
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+  /pass/v1/share/{shareId}/item/trash:
+    post:
+      tags: [pass]
+      summary: Post Pass Share Item Trash
+      operationId: postPassShareItemTrash
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+  /pass/v1/share/{shareId}/item/untrash:
+    post:
+      tags: [pass]
+      summary: Post Pass Share Item Untrash
+      operationId: postPassShareItemUntrash
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Items
+              properties:
+                Items:
+                  type: array
+                  items: {}
+                  description: Pairs of item IDs with the latest revision. At most 100.
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+  /pass/v1/share/{shareId}/item/with_alias:
+    post:
+      tags: [pass]
+      summary: Post Pass Share Item With Alias
+      operationId: postPassShareItemWithAlias
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Alias
+                - Item
+              properties:
+                Alias:
+                  type: object
+                  description: Alias to create
+                Item:
+                  type: object
+                  description: Item to create
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Bundle:
+                        type: object
+  /pass/v1/share/{shareId}/item/{itemId}:
+    get:
+      tags: [pass]
+      summary: Get Pass Share Item
+      operationId: getPassShareItem
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Item:
+                        type: object
+    put:
+      tags: [pass]
+      summary: Put Pass Share Item
+      operationId: putPassShareItem
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - KeyRotation
+                - LastRevision
+                - Content
+                - ContentFormatVersion
+              properties:
+                KeyRotation:
+                  type: integer
+                LastRevision:
+                  type: integer
+                  description: Last item revision existing when the item was created
+                Content:
+                  type: string
+                  description: Encrypted item content encoded in Base64
+                ContentFormatVersion:
+                  type: integer
+                  description: Version of the content format used to create the item
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Item:
+                        type: object
+  /pass/v1/share/{shareId}/item/{itemId}/file/restore:
+    post:
+      tags: [pass]
+      summary: Post Pass Share Item File Restore
+      operationId: postPassShareItemFileRestore
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - FilesToRestore
+                - ItemKeyRotation
+              properties:
+                FilesToRestore:
+                  type: array
+                  items: {}
+                  description: Files to restore
+                ItemKeyRotation:
+                  type: integer
+                  description: ItemKeyRotation used to encrypt the files keys
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Result:
+                        type: object
+  /pass/v1/share/{shareId}/item/{itemId}/file/{fileId}/chunk/{chunkId}:
+    get:
+      tags: [pass]
+      summary: Get Pass Share Item File Chunk
+      operationId: getPassShareItemFileChunk
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: fileId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: chunkId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            text/plain:
+              schema:
+                type: string
+  /pass/v1/share/{shareId}/item/{itemId}/file/{fileId}/metadata:
+    put:
+      tags: [pass]
+      summary: Put Pass Share Item File Metadata
+      operationId: putPassShareItemFileMetadata
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: fileId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Metadata
+              properties:
+                Metadata:
+                  type: string
+                  description: New file metadata encrypted with the file key, encoded in Base64
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      File:
+                        type: object
+  /pass/v1/share/{shareId}/item/{itemId}/file/{fileId}/restore:
+    post:
+      tags: [pass]
+      summary: Post Pass Share Item File Restore
+      operationId: postPassShareItemFileRestore
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: fileId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - FileKey
+                - ItemKeyRotation
+              properties:
+                FileKey:
+                  type: string
+                  description: FileKey encrypted with the ItemKey, encoded in Base64
+                ItemKeyRotation:
+                  type: integer
+                  description: ItemKeyRotation used to encrypt the file key
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Result:
+                        type: object
+  /pass/v1/share/{shareId}/item/{itemId}/files:
+    get:
+      tags: [pass]
+      summary: Get Pass Share Item Files
+      operationId: getPassShareItemFiles
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Files:
+                        type: object
+  /pass/v1/share/{shareId}/item/{itemId}/flags:
+    put:
+      tags: [pass]
+      summary: Put Pass Share Item Flags
+      operationId: putPassShareItemFlags
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                SkipHealthCheck:
+                  type: string
+                  description: Whether to skip the security health checks. Null means leave it as it is now.
+                SkipWeakPasswordCheck:
+                  type: string
+                  description: Whether to skip the weak password check. Null means leave it as it is now.
+                SkipCompromisedPasswordCheck:
+                  type: string
+                  description: Whether to skip the compromised password check. Null means leave it as it is now.
+                SkipReusedPasswordCheck:
+                  type: string
+                  description: Whether to skip the reused password check. Null means leave it as it is now.
+                Skip2FACheck:
+                  type: string
+                  description: Whether to skip the 2FA check. Null means leave it as it is now.
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Item:
+                        type: object
+  /pass/v1/share/{shareId}/item/{itemId}/key:
+    get:
+      tags: [pass]
+      summary: Get Pass Share Item Key
+      operationId: getPassShareItemKey
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Keys:
+                        type: object
+  /pass/v1/share/{shareId}/item/{itemId}/key/latest:
+    get:
+      tags: [pass]
+      summary: Get Pass Share Item Key Latest
+      operationId: getPassShareItemKeyLatest
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Key:
+                        type: object
+  /pass/v1/share/{shareId}/item/{itemId}/lastuse:
+    put:
+      tags: [pass]
+      summary: Put Pass Share Item Lastuse
+      operationId: putPassShareItemLastuse
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                LastUseTime:
+                  type: string
+                  description: Time when the item was last used. If no value is passed then the current server time will be used.
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Revision:
+                        type: object
+  /pass/v1/share/{shareId}/item/{itemId}/link_files:
+    post:
+      tags: [pass]
+      summary: Post Pass Share Item Link Files
+      operationId: postPassShareItemLinkFiles
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - ItemRevision
+                - FilesToAdd
+                - FilesToRemove
+              properties:
+                ItemRevision:
+                  type: integer
+                  description: Last itemRevision
+                FilesToAdd:
+                  type: array
+                  items: {}
+                  description: List of files to be linked
+                FilesToRemove:
+                  type: array
+                  items: {}
+                  description: List of file ids to be removed
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Item:
+                        type: object
+  /pass/v1/share/{shareId}/item/{itemId}/pin:
+    post:
+      tags: [pass]
+      summary: Post Pass Share Item Pin
+      operationId: postPassShareItemPin
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Item:
+                        type: object
+    delete:
+      tags: [pass]
+      summary: Delete Pass Share Item Pin
+      operationId: deletePassShareItemPin
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Item:
+                        type: object
+  /pass/v1/share/{shareId}/item/{itemId}/public_link:
+    post:
+      tags: [pass]
+      summary: Post Pass Share Item Public Link
+      operationId: postPassShareItemPublicLink
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Revision
+                - ExpirationTime
+                - EncryptedItemKey
+                - EncryptedLinkKey
+                - LinkKeyShareKeyRotation
+              properties:
+                Revision:
+                  type: integer
+                  description: Last revision of the item
+                ExpirationTime:
+                  type: integer
+                  description: Expiration time for the link in seconds. Minimum 3600 (1h), at maximum 30 days in the future
+                MaxReadCount:
+                  type: string
+                  description: Maximum amount of times that the item can be read. Unlimited reads if null
+                EncryptedItemKey:
+                  type: string
+                  description: Encrypted item key encoded in base64
+                EncryptedLinkKey:
+                  type: string
+                  description: Link key encrypted with the share key encoded in base64
+                LinkKeyShareKeyRotation:
+                  type: integer
+                  description: ShareKey rotation used for encrypting the encryptedLinkKey
+                LinkKeyEncryptedWithItemKey:
+                  type: string
+                  description: If the link key is being encrypted with the item key
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      PublicLink:
+                        type: object
+  /pass/v1/share/{shareId}/item/{itemId}/revision:
+    get:
+      tags: [pass]
+      summary: Get Pass Share Item Revision
+      operationId: getPassShareItemRevision
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Revisions:
+                        type: object
+  /pass/v1/share/{shareId}/item/{itemId}/revisions:
+    delete:
+      tags: [pass]
+      summary: Delete Pass Share Item Revisions
+      operationId: deletePassShareItemRevisions
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Item:
+                        type: object
+  /pass/v1/share/{shareId}/item/{itemId}/revisions/files:
+    get:
+      tags: [pass]
+      summary: Get Pass Share Item Revisions Files
+      operationId: getPassShareItemRevisionsFiles
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Files:
+                        type: object
+  /pass/v1/share/{shareId}/key:
+    get:
+      tags: [pass]
+      summary: Get Pass Share Key
+      operationId: getPassShareKey
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      ShareKeys:
+                        type: object
+    post:
+      tags: [pass]
+      summary: Post Pass Share Key
+      operationId: postPassShareKey
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - CurrentKeyRotation
+                - VaultKey
+                - ItemKeys
+                - VaultKeyForShares
+                - ItemKeysForShares
+              properties:
+                CurrentKeyRotation:
+                  type: integer
+                  description: Current key rotation
+                VaultKey:
+                  type: string
+                  description: New vault key base64 encoded, encrypted and signed with the current primary user key
+                ItemKeys:
+                  type: array
+                  items: {}
+                  description: New encryption keys for the items in the vault
+                VaultKeyForShares:
+                  type: array
+                  items: {}
+                  description: Vault key encrypted for the users that have vault shares EXCEPT the current user
+                ItemKeysForShares:
+                  type: array
+                  items: {}
+                  description: Item key encrypted each share of type item
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      ShareKey:
+                        type: object
+  /pass/v1/share/{shareId}/key/pending:
+    get:
+      tags: [pass]
+      summary: Get Pass Share Key Pending
+      operationId: getPassShareKeyPending
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      PendingShareKeys:
+                        type: object
+    post:
+      tags: [pass]
+      summary: Post Pass Share Key Pending
+      operationId: postPassShareKeyPending
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Keys
+              properties:
+                Keys:
+                  type: array
+                  items: {}
+                  description: Pending share keys to promote
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      ShareKeys:
+                        type: object
+  /pass/v1/share/{shareId}/unhide:
+    put:
+      tags: [pass]
+      summary: Put Pass Share Unhide
+      operationId: putPassShareUnhide
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Share:
+                        type: object
+  /pass/v1/share/{shareId}/user:
+    get:
+      tags: [pass]
+      summary: Get Pass Share User
+      operationId: getPassShareUser
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+  /pass/v1/share/{shareId}/user/item/{itemId}:
+    get:
+      tags: [pass]
+      summary: Get Pass Share User Item
+      operationId: getPassShareUserItem
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+  /pass/v1/share/{shareId}/user/{userId}:
+    get:
+      tags: [pass]
+      summary: Get Pass Share User
+      operationId: getPassShareUser
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Share:
+                        type: object
+    put:
+      tags: [pass]
+      summary: Put Pass Share User
+      operationId: putPassShareUser
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ShareRoleID:
+                  type: string
+                  description: ShareRoleID to apply to this share
+                ExpireTime:
+                  type: string
+                  description: Expiration time to set for this share
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+    delete:
+      tags: [pass]
+      summary: Delete Pass Share User
+      operationId: deletePassShareUser
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/user/access:
+    get:
+      tags: [pass]
+      summary: Get Pass User Access
+      operationId: getPassUserAccess
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Access:
+                        type: object
+    post:
+      tags: [pass]
+      summary: Post Pass User Access
+      operationId: postPassUserAccess
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Access:
+                        type: object
+  /pass/v1/user/access/check:
+    get:
+      tags: [pass]
+      summary: Get Pass User Access Check
+      operationId: getPassUserAccessCheck
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Data:
+                        type: string
+  /pass/v1/user/alias/count:
+    get:
+      tags: [pass]
+      summary: Get Pass User Alias Count
+      operationId: getPassUserAliasCount
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      AliasCount:
+                        type: object
+  /pass/v1/user/alias/custom_domain:
+    get:
+      tags: [pass]
+      summary: Get Pass User Alias Custom Domain
+      operationId: getPassUserAliasCustomDomain
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      CustomDomains:
+                        type: object
+    post:
+      tags: [pass]
+      summary: Post Pass User Alias Custom Domain
+      operationId: postPassUserAliasCustomDomain
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Domain
+              properties:
+                Domain:
+                  type: string
+                  description: Domain to be created
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      CustomDomain:
+                        type: object
+  /pass/v1/user/alias/custom_domain/{customdomainId}:
+    get:
+      tags: [pass]
+      summary: Get Pass User Alias Custom Domain
+      operationId: getPassUserAliasCustomDomain
+      parameters:
+        - name: customdomainId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      CustomDomain:
+                        type: object
+    post:
+      tags: [pass]
+      summary: Post Pass User Alias Custom Domain
+      operationId: postPassUserAliasCustomDomain
+      parameters:
+        - name: customdomainId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      CustomDomainValidation:
+                        type: object
+    delete:
+      tags: [pass]
+      summary: Delete Pass User Alias Custom Domain
+      operationId: deletePassUserAliasCustomDomain
+      parameters:
+        - name: customdomainId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/user/alias/custom_domain/{customdomainId}/settings:
+    get:
+      tags: [pass]
+      summary: Get Pass User Alias Custom Domain Settings
+      operationId: getPassUserAliasCustomDomainSettings
+      parameters:
+        - name: customdomainId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Settings:
+                        type: object
+  /pass/v1/user/alias/custom_domain/{customdomainId}/settings/catch_all:
+    put:
+      tags: [pass]
+      summary: Put Pass User Alias Custom Domain Settings Catch All
+      operationId: putPassUserAliasCustomDomainSettingsCatchAll
+      parameters:
+        - name: customdomainId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - CatchAll
+              properties:
+                CatchAll:
+                  type: boolean
+                  description: Catch-all setting value
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Settings:
+                        type: object
+  /pass/v1/user/alias/custom_domain/{customdomainId}/settings/mailboxes:
+    put:
+      tags: [pass]
+      summary: Put Pass User Alias Custom Domain Settings Mailboxes
+      operationId: putPassUserAliasCustomDomainSettingsMailboxes
+      parameters:
+        - name: customdomainId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - MailboxIDs
+              properties:
+                MailboxIDs:
+                  type: array
+                  items: {}
+                  description: Mailbox IDs
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Settings:
+                        type: object
+  /pass/v1/user/alias/custom_domain/{customdomainId}/settings/name:
+    put:
+      tags: [pass]
+      summary: Put Pass User Alias Custom Domain Settings Name
+      operationId: putPassUserAliasCustomDomainSettingsName
+      parameters:
+        - name: customdomainId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                Name:
+                  type: string
+                  description: Custom domain default name
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Settings:
+                        type: object
+  /pass/v1/user/alias/custom_domain/{customdomainId}/settings/random_prefix:
+    put:
+      tags: [pass]
+      summary: Put Pass User Alias Custom Domain Settings Random Prefix
+      operationId: putPassUserAliasCustomDomainSettingsRandomPrefix
+      parameters:
+        - name: customdomainId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - RandomPrefixGeneration
+              properties:
+                RandomPrefixGeneration:
+                  type: boolean
+                  description: Random prefix generation setting value
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Settings:
+                        type: object
+  /pass/v1/user/alias/domain:
+    get:
+      tags: [pass]
+      summary: Get Pass User Alias Domain
+      operationId: getPassUserAliasDomain
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+  /pass/v1/user/alias/mailbox:
+    get:
+      tags: [pass]
+      summary: Get Pass User Alias Mailbox
+      operationId: getPassUserAliasMailbox
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+    post:
+      tags: [pass]
+      summary: Post Pass User Alias Mailbox
+      operationId: postPassUserAliasMailbox
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Email
+              properties:
+                Email:
+                  type: string
+                  description: Email to create the mailbox
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Mailbox:
+                        type: object
+  /pass/v1/user/alias/mailbox/{mailboxId}:
+    delete:
+      tags: [pass]
+      summary: Delete Pass User Alias Mailbox
+      operationId: deletePassUserAliasMailbox
+      parameters:
+        - name: mailboxId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                TransferMailboxID:
+                  type: string
+                  description: Mailbox ID to which to transfer all existing aliases (optional)
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/user/alias/mailbox/{mailboxId}/email:
+    put:
+      tags: [pass]
+      summary: Put Pass User Alias Mailbox Email
+      operationId: putPassUserAliasMailboxEmail
+      parameters:
+        - name: mailboxId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Email
+              properties:
+                Email:
+                  type: string
+                  description: New email for this mailbox
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Mailbox:
+                        type: object
+    delete:
+      tags: [pass]
+      summary: Delete Pass User Alias Mailbox Email
+      operationId: deletePassUserAliasMailboxEmail
+      parameters:
+        - name: mailboxId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/user/alias/mailbox/{mailboxId}/verify:
+    get:
+      tags: [pass]
+      summary: Get Pass User Alias Mailbox Verify
+      operationId: getPassUserAliasMailboxVerify
+      parameters:
+        - name: mailboxId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Mailbox:
+                        type: object
+    post:
+      tags: [pass]
+      summary: Post Pass User Alias Mailbox Verify
+      operationId: postPassUserAliasMailboxVerify
+      parameters:
+        - name: mailboxId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Code
+              properties:
+                Code:
+                  type: string
+                  description: Code to validate the mailbox
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Mailbox:
+                        type: object
+  /pass/v1/user/alias/missing:
+    get:
+      tags: [pass]
+      summary: Get Pass User Alias Missing
+      operationId: getPassUserAliasMissing
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+  /pass/v1/user/alias/settings:
+    get:
+      tags: [pass]
+      summary: Get Pass User Alias Settings
+      operationId: getPassUserAliasSettings
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Settings:
+                        type: string
+  /pass/v1/user/alias/settings/default_alias_domain:
+    put:
+      tags: [pass]
+      summary: Put Pass User Alias Settings Default Alias Domain
+      operationId: putPassUserAliasSettingsDefaultAliasDomain
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                DefaultAliasDomain:
+                  type: string
+                  description: Default domain when creating aliases
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Settings:
+                        type: object
+  /pass/v1/user/alias/settings/default_mailbox_id:
+    put:
+      tags: [pass]
+      summary: Put Pass User Alias Settings Default Mailbox Id
+      operationId: putPassUserAliasSettingsDefaultMailboxId
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - DefaultMailboxID
+              properties:
+                DefaultMailboxID:
+                  type: integer
+                  description: Default mailbox to use
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Settings:
+                        type: object
+  /pass/v1/user/coupon/redeem:
+    post:
+      tags: [pass]
+      summary: Post Pass User Coupon Redeem
+      operationId: postPassUserCouponRedeem
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Coupon
+              properties:
+                Coupon:
+                  type: string
+                  description: Coupon to redeem
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/user/default_share/{defaultshareId}:
+    put:
+      tags: [pass]
+      summary: Put Pass User Default Share
+      operationId: putPassUserDefaultShare
+      parameters:
+        - name: defaultshareId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/user/inapp_notifications_disabled:
+    put:
+      tags: [pass]
+      summary: Put Pass User Inapp Notifications Disabled
+      operationId: putPassUserInappNotificationsDisabled
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - InAppNotificationsDisabled
+              properties:
+                InAppNotificationsDisabled:
+                  type: boolean
+                  description: "Enable or disable the \"InApp notifications disabled\" setting"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/user/monitor:
+    put:
+      tags: [pass]
+      summary: Put Pass User Monitor
+      operationId: putPassUserMonitor
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ProtonAddress:
+                  type: string
+                  description: Enable or disable monitor for proton addresses. Null leaves the value as is
+                Aliases:
+                  type: string
+                  description: Enable or disable monitor for aliases. Null leaves the value as is
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Monitor:
+                        type: string
+  /pass/v1/user/session/lock:
+    post:
+      tags: [pass]
+      summary: Post Pass User Session Lock
+      operationId: postPassUserSessionLock
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - LockCode
+                - UnlockedSecs
+              properties:
+                LockCode:
+                  type: string
+                  description: Lock code to attach to this session
+                UnlockedSecs:
+                  type: integer
+                  description: Number of seconds the session will stay unlocked
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      LockData:
+                        type: object
+    delete:
+      tags: [pass]
+      summary: Delete Pass User Session Lock
+      operationId: deletePassUserSessionLock
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - LockCode
+              properties:
+                LockCode:
+                  type: string
+                  description: Lock code to attach to this session
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      LockData:
+                        type: object
+  /pass/v1/user/session/lock/check:
+    get:
+      tags: [pass]
+      summary: Get Pass User Session Lock Check
+      operationId: getPassUserSessionLockCheck
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      LockInfo:
+                        type: object
+  /pass/v1/user/session/lock/force_lock:
+    post:
+      tags: [pass]
+      summary: Post Pass User Session Lock Force Lock
+      operationId: postPassUserSessionLockForceLock
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/user/session/lock/unlock:
+    post:
+      tags: [pass]
+      summary: Post Pass User Session Lock Unlock
+      operationId: postPassUserSessionLockUnlock
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - LockCode
+              properties:
+                LockCode:
+                  type: string
+                  description: Lock code to attach to this session
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      LockData:
+                        type: object
+  /pass/v1/user/srp:
+    get:
+      tags: [pass]
+      summary: Get Pass User Srp
+      operationId: getPassUserSrp
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      HasSRP:
+                        type: boolean
+                        description: If the user has SRP enabled
+                      Code:
+                        type: integer
+    post:
+      tags: [pass]
+      summary: Post Pass User Srp
+      operationId: postPassUserSrp
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - SrpModulusID
+                - SrpVerifier
+                - SrpSalt
+              properties:
+                SrpModulusID:
+                  type: string
+                  description: SRP Parameter ID
+                SrpVerifier:
+                  type: string
+                  description: Base64 encoded SRP verifier
+                SrpSalt:
+                  type: string
+                  description: Base64 encoded SRP salt
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+    delete:
+      tags: [pass]
+      summary: Delete Pass User Srp
+      operationId: deletePassUserSrp
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/user/srp/auth:
+    post:
+      tags: [pass]
+      summary: Post Pass User Srp Auth
+      operationId: postPassUserSrpAuth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - ClientEphemeral
+                - ClientProof
+                - SrpSessionID
+              properties:
+                ClientEphemeral:
+                  type: string
+                  description: Base64 encoded SRP client ephemeral
+                ClientProof:
+                  type: string
+                  description: Base64 encoded SRP client proof
+                SrpSessionID:
+                  type: string
+                  description: SRP session ID
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      ServerProof:
+                        type: string
+                        description: Base64 encoded SRP server proof
+                      Code:
+                        type: integer
+  /pass/v1/user/srp/info:
+    get:
+      tags: [pass]
+      summary: Get Pass User Srp Info
+      operationId: getPassUserSrpInfo
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      SRPData:
+                        type: object
+  /pass/v1/user/sync_event:
+    get:
+      tags: [pass]
+      summary: Get Pass User Sync Event
+      operationId: getPassUserSyncEvent
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+  /pass/v1/user/sync_event/{synceventId}:
+    get:
+      tags: [pass]
+      summary: Get Pass User Sync Event
+      operationId: getPassUserSyncEvent
+      parameters:
+        - name: synceventId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Events:
+                        type: object
+  /pass/v1/vault:
+    post:
+      tags: [pass]
+      summary: Post Pass Vault
+      operationId: postPassVault
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - AddressID
+                - Content
+                - ContentFormatVersion
+                - EncryptedVaultKey
+              properties:
+                AddressID:
+                  type: string
+                  description: AddressID that should be displayed as the owner
+                Content:
+                  type: string
+                  description: Vault content protocol buffer data encrypted with the vault key
+                ContentFormatVersion:
+                  type: integer
+                  description: Vault content format version. Should be 1 for now.
+                EncryptedVaultKey:
+                  type: string
+                  description: Vault key encrypted and signed with the primary user key
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Share:
+                        type: object
+  /pass/v1/vault/share/{shareId}:
+    get:
+      tags: [pass]
+      summary: Get Pass Vault Share
+      operationId: getPassVaultShare
+      parameters:
+        - name: shareId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Share:
+                        type: string
   /pass/v1/vault/share/{vaultID}:
     get:
       tags: [Pass]
@@ -17078,6 +22362,154 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
+  /pass/v1/vault/usage/{usageId}:
+    get:
+      tags: [pass]
+      summary: Get Pass Vault Usage
+      operationId: getPassVaultUsage
+      parameters:
+        - name: usageId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      VaultFileStorageInfo:
+                        type: object
+  /pass/v1/vault/{vaultId}:
+    put:
+      tags: [pass]
+      summary: Put Pass Vault
+      operationId: putPassVault
+      parameters:
+        - name: vaultId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - Content
+                - ContentFormatVersion
+                - KeyRotation
+              properties:
+                Content:
+                  type: string
+                  description: Vault content protocol buffer data encrypted with the vault key
+                ContentFormatVersion:
+                  type: integer
+                  description: Vault content format version. Should be 1 for now.
+                KeyRotation:
+                  type: integer
+                  description: Key rotation used to encrypt the content
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+                      Share:
+                        type: object
+    delete:
+      tags: [pass]
+      summary: Delete Pass Vault
+      operationId: deletePassVault
+      parameters:
+        - name: vaultId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/vault/{vaultId}/owner:
+    put:
+      tags: [pass]
+      summary: Put Pass Vault Owner
+      operationId: putPassVaultOwner
+      parameters:
+        - name: vaultId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - NewOwnerShareID
+              properties:
+                NewOwnerShareID:
+                  type: string
+                  description: ShareID to move the ownership to. It has to have manager privileges
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
+  /pass/v1/vault/{vaultId}/primary:
+    put:
+      tags: [pass]
+      summary: Put Pass Vault Primary
+      operationId: putPassVaultPrimary
+      parameters:
+        - name: vaultId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Code:
+                        type: integer
   /permissions/v1/groups/{groupID}/roles:
     get:
       tags: [Permissions]

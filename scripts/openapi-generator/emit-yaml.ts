@@ -22,7 +22,8 @@ function emitHeader(lines: string[]): void {
   lines.push('  version: "1.0"');
   lines.push("  description: |");
   lines.push("    Auto-generated from ProtonMail/WebClients TypeScript source files.");
-  lines.push("    Source: https://github.com/ProtonMail/WebClients/tree/main/packages/shared/lib/api");
+  lines.push("    Sources: https://github.com/ProtonMail/WebClients/tree/main/packages/shared/lib/api");
+  lines.push("             https://github.com/ProtonMail/WebClients/blob/main/packages/pass/types/api/pass.ts");
   lines.push("");
   lines.push("servers:");
   lines.push("  - url: https://mail.proton.me/api");
@@ -158,7 +159,19 @@ function emitOperation(lines: string[], method: string, ep: Endpoint): void {
   lines.push(`            ${responseType}:`);
   lines.push("              schema:");
 
-  if (responseType === "application/json") {
+  if (responseType === "application/json" && ep.responseParams?.length) {
+    // Part of the API types what comes back as well as what goes out.
+    lines.push("                allOf:");
+    lines.push("                  - $ref: '#/components/schemas/ApiResponse'");
+    lines.push("                  - type: object");
+    lines.push("                    properties:");
+    for (const f of ep.responseParams) {
+      lines.push(`                      ${f.name}:`);
+      lines.push(`                        type: ${f.type}`);
+      if (f.type === "array") lines.push("                        items: {}");
+      if (f.description) lines.push(`                        description: ${esc(f.description)}`);
+    }
+  } else if (responseType === "application/json") {
     lines.push("                $ref: '#/components/schemas/ApiResponse'");
   } else if (responseType === "text/plain") {
     lines.push("                type: string");

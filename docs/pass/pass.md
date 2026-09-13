@@ -8,13 +8,13 @@ Holds `aliases`, `breaches`, `export`, `generate`, `import`, `invitations`, `ite
 
 ## `export`
 
-Write the vaults you own out as a Proton Pass archive, or to stdout with --dest -.
+Write the vaults you own out to a file, or to stdout with --dest -.
 
-This writes the same archive format Proton Pass writes, so the app can read it back.
+--format zip writes the archive Proton Pass reads back, with the attachments in it. --format json writes the document that archive holds, without them. --format csv writes a spreadsheet, which leaves out custom fields, attachments, passkeys and the keys of SSH items.
 
-Give a passphrase and the items are encrypted to it. Without one, the archive holds every password in the clear. Attachments are never encrypted, whether a passphrase is given or not.
+Give a passphrase and the items are encrypted to it. Without one, the file holds every password in the clear. A CSV cannot be encrypted, and attachments never are.
 
-Attachments are included; --no-attachments leaves them out, which is much faster.
+An archive includes the attachments; --no-attachments leaves them out, which is much faster.
 
 Only vaults you own are included. A vault somebody shared with you is theirs to back up.
 
@@ -26,6 +26,8 @@ proton pass export
 proton pass export --dest pass-backup.zip --passphrase-file ~/.backup-passphrase
 proton pass export --dest pass-backup.zip
 proton pass export --dest pass-backup.zip --no-attachments
+proton pass export --format csv --dest pass.csv
+proton pass export --format json --dest -
 ```
 
 | Flag | Description |
@@ -33,6 +35,7 @@ proton pass export --dest pass-backup.zip --no-attachments
 | `--dest string` | Write to this path, or - for stdout |
 | `--dest-dir string` | Write into this directory, keeping each item's own name |
 | `--force` | Overwrite a file that already exists |
+| `--format string` | How to lay the items down: zip, csv, json (default `zip`) |
 | `--no-attachments` | Leave attachments out, which is much faster |
 | `--passphrase-file string` | Read the passphrase that locks the file from a file |
 | `--passphrase-stdin` | Read the passphrase that locks the file from stdin |
@@ -72,13 +75,15 @@ proton pass generate --words 4 --separator space --no-digits
 
 ## `import`
 
-Read a Proton Pass archive back in, or one on stdin with -.
+Read items in from a password manager's export, or one on stdin with -.
 
-A vault in the file lands in the vault of that name, which is created if it does not exist.
+--manager names the program that wrote the file, and defaults to Proton Pass: its archive, the document inside one, or its CSV. Each other value reads what that program exports - 1Password .1pux, .1pif or .zip, Bitwarden .json or .zip, Dashlane .csv or .zip, KeePass .xml, Kaspersky .txt, and CSV or JSON for the rest.
+
+A vault, folder or group in the file lands in the vault of that name, which is created if it does not exist. Items in none land in your first vault. --vault puts everything into the one you name.
 
 Items are always added, never matched against what is already there, so reading the same file twice creates duplicates.
 
-The attachments in the archive are put back on their items, which needs a paid Pass plan. Whatever cannot be put back is named once the items have landed.
+Attachments in the file are put back on their items, which needs a paid Pass plan. Whatever cannot be put back is named once the items have landed.
 
 ```
 proton pass import PATH
@@ -87,12 +92,16 @@ proton pass import PATH
 ```bash
 proton pass import pass-backup.zip --passphrase-file ~/.backup-passphrase
 proton pass import --dry-run pass-backup.zip
+proton pass import bitwarden-export.json --manager bitwarden
+proton pass import chrome-passwords.csv --manager chrome --vault Personal
 ```
 
 | Flag | Description |
 | --- | --- |
+| `--manager string` | The password manager that wrote PATH: 1password, apple-passwords, bitwarden, brave, chrome, dashlane, edge, enpass, firefox, kaspersky, keepass, keeper, lastpass, nordpass, proton-pass, roboform, safari (default `proton-pass`) |
 | `--passphrase-file string` | Read the passphrase that locks the file from a file |
 | `--passphrase-stdin` | Read the passphrase that locks the file from stdin |
+| `--vault string` | Put everything into this vault |
 
 ---
 

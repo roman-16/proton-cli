@@ -12,6 +12,7 @@ import (
 	"github.com/roman-16/proton-cli/internal/crypto/aead"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/fetch"
+	"github.com/roman-16/proton-cli/internal/passfile"
 	"github.com/roman-16/proton-cli/internal/proton"
 	"github.com/roman-16/proton-cli/internal/ref"
 	pb "github.com/roman-16/proton-cli/internal/service/pass/proto"
@@ -125,7 +126,7 @@ func (f ItemField) Ref() string { return FieldRef(f.Section, f.Name) }
 
 // ItemsList reads what is in every vault, or in the one named.
 func (s *Service) ItemsList(ctx context.Context, vaultFilter string) ([]Item, error) {
-	full, err := s.itemsFull(ctx, vaultFilter)
+	full, err := s.itemsFull(ctx, vaultFilter, false)
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +142,12 @@ func (s *Service) ItemsList(ctx context.Context, vaultFilter string) ([]Item, er
 // The vaults are read at the same time and their items joined in the order the
 // vaults came in, so the answer does not depend on which vault replied first. A
 // vault that cannot be read is left out, as it was before.
-func (s *Service) itemsFull(ctx context.Context, vaultFilter string) ([]FullItem, error) {
+//
+// withTrashed says whether what is in the trash counts. A backup takes it, so
+// that a restored one puts the trash back as it was, and so does the check for
+// which alias addresses this account still holds - trashing an alias does not
+// give its address up.
+func (s *Service) itemsFull(ctx context.Context, vaultFilter string, withTrashed bool) ([]FullItem, error) {
 	vaults, err := s.VaultsList(ctx)
 	if err != nil {
 		return nil, err
@@ -162,7 +168,7 @@ func (s *Service) itemsFull(ctx context.Context, vaultFilter string) ([]FullItem
 			if err != nil {
 				return nil
 			}
-			items, err := s.fetchItems(ctx, v.ShareID, sk)
+			items, err := s.fetchItems(ctx, v.ShareID, sk, withTrashed)
 			if err != nil {
 				return nil
 			}
@@ -487,9 +493,11 @@ func (s *Service) ItemCreate(ctx context.Context, shareID string, nc NewItem) (s
 		if nc.URL != "" {
 			urls = append(urls, nc.URL)
 		}
-		item.Content.Content = &pb.Content_Login{Login: &pb.ItemLogin{
-			ItemUsername: nc.Username, ItemEmail: nc.Email, Password: nc.Password, Urls: urls, TotpUri: nc.TOTP,
-		}}
+		login := &pb.ItemLogin{
+			ItemUsername: nc.Username, ItemEmail: nc.Email, Password: nc.Password, TotpUri: nc.TOTP,
+		}
+		passfile.SetLoginURLs(login, urls)
+		item.Content.Content = &pb.Content_Login{Login: login}
 	case "note":
 		item.Content.Content = &pb.Content_Note{Note: &pb.ItemNote{}}
 	case "credit-card":
@@ -542,6 +550,9 @@ func (s *Service) ItemCreate(ctx context.Context, shareID string, nc NewItem) (s
 	}
 	return itemID, nil
 }
+
+// activeState is what Proton calls an item that is not in the trash.
+const activeState = 1
 
 // contentFormatVersion is the version of the item protobuf this writes. It
 // travels with every item, so a reader knows how to take the content apart, and
@@ -691,7 +702,7 @@ func (s *Service) ItemEdit(ctx context.Context, shareID, itemID string, patch Pa
 				l.ItemEmail = patch.Email
 			}
 			if patch.URL != "" {
-				l.Urls = []string{patch.URL}
+				passfile.SetLoginURLs(l, []string{patch.URL})
 			}
 			if patch.TOTP != "" {
 				l.TotpUri = patch.TOTP
@@ -881,7 +892,7 @@ func (s *Service) itemRevision(ctx context.Context, shareID, itemID string) (int
 	return r.Item.Revision, nil
 }
 
-func (s *Service) fetchItems(ctx context.Context, shareID string, sk *shareKeys) ([]FullItem, error) {
+func (s *Service) fetchItems(ctx context.Context, shareID string, sk *shareKeys, withTrashed bool) ([]FullItem, error) {
 	// Proton pages this by the token the previous answer ended with.
 	var since string
 	return proton.All(ctx, func(ctx context.Context, _ int) ([]FullItem, bool, error) {
@@ -916,7 +927,7 @@ func (s *Service) fetchItems(ctx context.Context, shareID string, sk *shareKeys)
 				skip.Record(ctx, skip.KindItem, "", skip.Malformed, err)
 				continue
 			}
-			if enc.State != 1 {
+			if enc.State != activeState && !withTrashed {
 				continue
 			}
 			shareKey, ok := sk.keys[enc.KeyRotation]
@@ -984,7 +995,7 @@ func itemFromProto(it *pb.Item) *FullItem {
 		item.Email = c.Login.ItemEmail
 		item.Password = c.Login.Password
 		item.TOTP = c.Login.TotpUri
-		item.URLs = c.Login.Urls
+		item.URLs = passfile.LoginURLs(c.Login)
 	case *pb.Content_CreditCard:
 		item.Holder = c.CreditCard.CardholderName
 		item.Number = c.CreditCard.Number

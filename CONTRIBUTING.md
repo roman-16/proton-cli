@@ -169,7 +169,7 @@ Proton's web client is the reference for endpoints, payload shapes, and crypto f
 just webclients
 ```
 
-`openapi.yaml` in the repository root is generated from that source and covers roughly 740 endpoints. Regenerate it with:
+`openapi.yaml` in the repository root is generated from that source and covers roughly 950 endpoints across 786 paths, Pass included. Regenerate it with:
 
 ```bash
 just openapi
