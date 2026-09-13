@@ -1,7 +1,7 @@
 {
-  "updated_at": "2026-09-12T08:10:32.295868497Z",
+  "updated_at": "2026-09-13T08:34:57.095383505Z",
   "totals": {
-    "downloads": 3042,
+    "downloads": 3121,
     "stars": 69,
     "forks": 10,
     "latest": "3.7.0"
@@ -475,6 +475,54 @@
         "3.6.0": 6,
         "3.7.0": 23
       }
+    },
+    {
+      "date": "2026-09-13",
+      "hours": 24.40688875416889,
+      "update": 21,
+      "script": 0,
+      "other": 58,
+      "platform": {
+        "darwin_amd64": 2,
+        "darwin_arm64": 2,
+        "linux_amd64": 22,
+        "linux_arm64": 3,
+        "windows_amd64": 32,
+        "windows_arm64": 18
+      },
+      "version": {
+        "1.1.1": 1,
+        "1.10.0": 1,
+        "1.11.0": 1,
+        "1.9.10": 1,
+        "1.9.11": 1,
+        "1.9.12": 1,
+        "1.9.13": 1,
+        "2.0.0": 1,
+        "2.1.0": 1,
+        "2.1.1": 1,
+        "2.10.0": 2,
+        "2.2.0": 1,
+        "2.2.1": 1,
+        "2.2.2": 1,
+        "2.3.0": 1,
+        "2.4.0": 1,
+        "2.4.1": 1,
+        "2.5.0": 2,
+        "2.6.0": 2,
+        "2.7.0": 2,
+        "2.8.0": 2,
+        "2.9.0": 2,
+        "3.0.0": 4,
+        "3.1.0": 3,
+        "3.2.0": 4,
+        "3.3.0": 2,
+        "3.3.1": 5,
+        "3.4.0": 5,
+        "3.5.0": 3,
+        "3.6.0": 2,
+        "3.7.0": 23
+      }
     }
   ],
   "traffic": [
@@ -652,13 +700,20 @@
       "cloners": 21,
       "views": 19,
       "visitors": 10
+    },
+    {
+      "date": "2026-09-12",
+      "clones": 23,
+      "cloners": 14,
+      "views": 47,
+      "visitors": 12
     }
   ],
   "traffic_window": {
-    "clones": 1570,
-    "cloners": 278,
-    "views": 418,
-    "visitors": 102
+    "clones": 1582,
+    "cloners": 284,
+    "views": 462,
+    "visitors": 110
   },
   "stars": [
     {
@@ -1260,6 +1315,10 @@
     {
       "date": "2026-09-12",
       "count": 69
+    },
+    {
+      "date": "2026-09-13",
+      "count": 69
     }
   ],
   "forks": [
@@ -1605,6 +1664,10 @@
     },
     {
       "date": "2026-09-12",
+      "count": 10
+    },
+    {
+      "date": "2026-09-13",
       "count": 10
     }
   ],
@@ -2623,26 +2686,30 @@
     },
     {
       "date": "2026-09-11",
-      "count": 0
+      "count": 29
     },
     {
       "date": "2026-09-12",
+      "count": 37
+    },
+    {
+      "date": "2026-09-13",
       "count": 0
     }
   ],
   "npm_platforms": {
-    "darwin-arm64": 2664,
-    "darwin-x64": 2518,
-    "linux-arm64": 2620,
-    "linux-x64": 2895,
-    "win32-arm64": 1666,
-    "win32-x64": 2687
+    "darwin-arm64": 2510,
+    "darwin-x64": 2367,
+    "linux-arm64": 2465,
+    "linux-x64": 2742,
+    "win32-arm64": 1703,
+    "win32-x64": 2543
   },
   "referrers": [
     {
       "name": "Google",
-      "count": 114,
-      "uniques": 43
+      "count": 118,
+      "uniques": 46
     },
     {
       "name": "github.com",
@@ -2650,14 +2717,14 @@
       "uniques": 10
     },
     {
-      "name": "search.brave.com",
-      "count": 22,
-      "uniques": 8
+      "name": "proton-cli.lerchster.dev",
+      "count": 25,
+      "uniques": 5
     },
     {
-      "name": "proton-cli.lerchster.dev",
-      "count": 21,
-      "uniques": 4
+      "name": "search.brave.com",
+      "count": 23,
+      "uniques": 9
     },
     {
       "name": "reddit.com",
@@ -2666,13 +2733,13 @@
     },
     {
       "name": "DuckDuckGo",
-      "count": 8,
-      "uniques": 4
+      "count": 10,
+      "uniques": 5
     },
     {
       "name": "search.nixos.org",
-      "count": 5,
-      "uniques": 4
+      "count": 6,
+      "uniques": 5
     },
     {
       "name": "perplexity.ai",
@@ -2693,13 +2760,13 @@
   "paths": [
     {
       "name": "/roman-16/proton-cli",
-      "count": 151,
-      "uniques": 76
+      "count": 162,
+      "uniques": 85
     },
     {
       "name": "/roman-16/proton-cli/issues",
-      "count": 30,
-      "uniques": 10
+      "count": 32,
+      "uniques": 11
     },
     {
       "name": "/roman-16/proton-cli/pulls",
@@ -2712,6 +2779,16 @@
       "uniques": 3
     },
     {
+      "name": "/roman-16/proton-cli/tree/main",
+      "count": 9,
+      "uniques": 8
+    },
+    {
+      "name": "/roman-16/proton-cli/blob/main/docs/install.md",
+      "count": 9,
+      "uniques": 7
+    },
+    {
       "name": "/roman-16/proton-cli/releases",
       "count": 8,
       "uniques": 5
@@ -2722,24 +2799,14 @@
       "uniques": 2
     },
     {
-      "name": "/roman-16/proton-cli/tree/main",
+      "name": "/roman-16/proton-cli/blob/main/docs/calendar/README.md",
       "count": 7,
-      "uniques": 6
+      "uniques": 5
     },
     {
       "name": "/roman-16/proton-cli/blob/main/docs/configuration.md",
       "count": 6,
       "uniques": 6
-    },
-    {
-      "name": "/roman-16/proton-cli/blob/main/docs/calendar/README.md",
-      "count": 6,
-      "uniques": 4
-    },
-    {
-      "name": "/roman-16/proton-cli/blob/main/docs/installation.md",
-      "count": 6,
-      "uniques": 4
     }
   ],
   "packaging": [
