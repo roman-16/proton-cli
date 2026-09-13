@@ -154,7 +154,7 @@ func TestPassAttachmentsNeedAPlan(t *testing.T) {
 	assertContains(t, stderr, "paid Pass plan")
 
 	// Nothing was created on the way to being refused.
-	for _, row := range runJSONArray(t, "pass", "items", "list") {
+	for _, row := range listAll(t, "pass", "items", "list") {
 		m, _ := row.(map[string]interface{})
 		if got, _ := m["name"].(string); got == name {
 			t.Fatalf("the refused item was created anyway: %v", m)

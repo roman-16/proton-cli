@@ -178,7 +178,10 @@ func writeTable[T any](u *UI, spec TableSpec[T], items []T) {
 				}
 				paint[i].role = c.role(it)
 			}
-			row[i] = v
+			// A row is one line. A cell is filled from a subject, a filename or a
+			// display name, and a line break inside one would end the row early and
+			// start what reads as another - one that says whatever its sender chose.
+			row[i] = oneLine(v)
 		}
 		rows = append(rows, row)
 		paints = append(paints, paint)
@@ -323,3 +326,16 @@ func (u *UI) Columns() int { return u.width() }
 func pad(s string, width int, right bool) string { return padCells(s, width, right) }
 
 func truncate(s string, max int) string { return truncateCells(s, max) }
+
+// oneLine folds a value onto the single line a table row has room for.
+func oneLine(s string) string {
+	if !strings.ContainsAny(s, "\r\n") {
+		return s
+	}
+	return strings.Join(strings.Fields(strings.Map(func(r rune) rune {
+		if r == '\r' || r == '\n' {
+			return ' '
+		}
+		return r
+	}, s)), " ")
+}

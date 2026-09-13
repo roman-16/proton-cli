@@ -38,6 +38,8 @@ export PROTON_CONFIRM='deletions=deny'
 
 A permanent removal then exits `6` and touches nothing. `--yes` does not answer a deny, so the `--yes` the agent needs for the trashing it *is* meant to do cannot quietly authorise more.
 
+This turns off `proton api` as well, reads included. A raw request can be anything, so it counts as a deletion whichever method it carries.
+
 `=deny` is the part that fences. A class written without it only makes the command ask first, and `--yes` answers that in advance.
 
 ```bash

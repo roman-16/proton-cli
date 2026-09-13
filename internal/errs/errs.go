@@ -115,6 +115,11 @@ type NotFound struct {
 	// Kind is the singular noun for what was looked for: "message", "contact".
 	Kind string
 	Ref  string
+	// Where names what was searched, as a phrase that follows the kind: "in that
+	// thread". It is for a lookup the reader chose the extent of - told only that
+	// no attachment matched, they cannot tell whether one message came up empty or
+	// a whole thread did.
+	Where string
 	// Try holds what to do about it. It is how a search that was itself
 	// incomplete admits as much: something that could not be decrypted was also
 	// not searched, and "no item matching that" is the wrong answer if the item
@@ -123,10 +128,14 @@ type NotFound struct {
 }
 
 func (e *NotFound) Error() string {
+	looked := strings.TrimSpace(e.Kind + " " + e.Where)
 	if e.Ref == "" {
-		return fmt.Sprintf("No %s found.", e.Kind)
+		if e.Where == "" {
+			return fmt.Sprintf("No %s found.", looked)
+		}
+		return fmt.Sprintf("No %s.", looked)
 	}
-	return fmt.Sprintf("No %s matching %q.", e.Kind, e.Ref)
+	return fmt.Sprintf("No %s matching %q.", looked, e.Ref)
 }
 func (e *NotFound) ExitCode() int   { return 3 }
 func (e *NotFound) Hints() []string { return e.Try }
@@ -207,6 +216,55 @@ func WithExit(code int, err error) error {
 		return nil
 	}
 	return &Exit{Code: code, Err: err}
+}
+
+// nameStandIn is what a value out of the account becomes wherever the account's
+// owner is not the only reader.
+const nameStandIn = "<name>"
+
+// Private is a failure about one of the account's own things, named so that the
+// person reading it knows which of theirs it was.
+//
+// Every other kind of value a message picks up has a shape - an address, an ID,
+// a path - and what has a shape can be found again and taken back out. A name
+// somebody gave a vault item has none: it is words, and no reader of the finished
+// sentence can tell it from the sentence. So the name travels beside the message
+// instead of only inside it, which is what lets a log carry the failure without
+// carrying the name.
+type Private struct {
+	Name string
+	Err  error
+}
+
+func (p *Private) Error() string { return p.Name + ": " + p.Err.Error() }
+func (p *Private) Unwrap() error { return p.Err }
+
+// Naming puts one of the account's own names in front of a failure. Returns nil
+// for nil err.
+func Naming(name string, err error) error {
+	if err == nil {
+		return nil
+	}
+	return &Private{Name: name, Err: err}
+}
+
+// Withheld is an error as a reader who is not the account's owner may have it:
+// what went wrong, with every name out of the account standing aside.
+//
+// It replaces rather than re-renders, because a name is only known to be one at
+// the point it was attached, and by then whatever sits above may have formatted
+// it into a sentence of its own.
+func Withheld(err error) string {
+	if err == nil {
+		return ""
+	}
+	msg := err.Error()
+	for e := err; e != nil; e = errors.Unwrap(e) {
+		if p, ok := e.(*Private); ok && p.Name != "" {
+			msg = strings.ReplaceAll(msg, p.Name, nameStandIn)
+		}
+	}
+	return msg
 }
 
 // Sentence normalises a message for direct display: a capital first letter and

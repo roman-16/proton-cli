@@ -3,6 +3,7 @@ package drive
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -111,7 +112,7 @@ func (s *Service) PlanUpload(ctx context.Context, dc *Context, destPath, name st
 			return nil, &errs.Exists{Kind: TypeFolder, Name: name, Where: destPath}
 		}
 		if target.Link.FileProperties == nil {
-			return nil, fmt.Errorf("%s: no file properties", name)
+			return nil, errs.Naming(name, errors.New("no file properties"))
 		}
 		plan.Revision, plan.target, plan.from = true, target, target.Link.FileProperties.ActiveRevision.ID
 	}

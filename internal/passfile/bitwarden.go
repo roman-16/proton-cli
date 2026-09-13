@@ -133,7 +133,7 @@ func readBitwardenZip(in source, z *zip.ReadCloser) (*Document, error) {
 	if data == nil {
 		return nil, notThisFormat(in, "bitwarden")
 	}
-	raw, err := readZipEntry(data)
+	raw, err := readZipEntry(in, data)
 	if err != nil {
 		return nil, err
 	}

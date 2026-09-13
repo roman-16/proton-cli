@@ -203,7 +203,7 @@ One line per group, with the verbs under it. Arguments, flags and examples are i
 - `proton update` - Update proton to the latest release
 - `proton version` - Print the version and build information
 
-`proton api` sends a request to an endpoint no command covers, and answers with Proton's own shape rather than this one; a dry run of it can only repeat the request back. `proton update` and `proton uninstall` change this machine rather than the account.
+`proton api` sends a request to an endpoint no command covers, and answers with Proton's own shape rather than this one; a dry run of it can only repeat the request back. It counts as a deletion whichever method it carries, so a confirmation policy covering `deletions` or `mutations` covers it too. `proton update` and `proton uninstall` change this machine rather than the account.
 
 ## Flags that work on every command
 

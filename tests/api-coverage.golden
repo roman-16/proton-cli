@@ -119,7 +119,6 @@ POST /calendar/v1/subscription/validate
 POST /calendar/v1/{id}/keys
 POST /calendar/v1/{id}/members
 POST /contacts/v4/contacts
-POST /core/v4/addresses
 POST /core/v4/auth/info
 POST /core/v4/keys/address
 POST /core/v4/labels

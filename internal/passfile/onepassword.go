@@ -143,7 +143,7 @@ func readOnePasswordArchive(in source, z *zip.ReadCloser) (*Document, error) {
 
 	var doc *Document
 	if data := zipEntry(z, "export.data"); data != nil {
-		raw, err := readZipEntry(data)
+		raw, err := readZipEntry(in, data)
 		if err != nil {
 			return nil, err
 		}
@@ -155,7 +155,7 @@ func readOnePasswordArchive(in source, z *zip.ReadCloser) (*Document, error) {
 		if pif == nil {
 			return nil, notThisFormat(in, "1password")
 		}
-		raw, err := readZipEntry(pif)
+		raw, err := readZipEntry(in, pif)
 		if err != nil {
 			return nil, err
 		}

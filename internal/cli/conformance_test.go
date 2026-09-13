@@ -1122,6 +1122,10 @@ func TestEveryVerbIsInTheVocabulary(t *testing.T) {
 // the same set, because the verb is what a user reads in the help and the action
 // is what actually decides at run time. Two lists that can disagree are one bug
 // away from a `delete` that never asks.
+//
+// An opaque verb is the one that answers through neither: it has nothing to
+// resolve, so it is put to the person at the gate and reports no action of its
+// own to carry the cost.
 func TestIrreversibleVerbsAndActionsAgree(t *testing.T) {
 	fromActions := map[string]bool{}
 	for _, a := range ui.Actions {
@@ -1130,8 +1134,13 @@ func TestIrreversibleVerbsAndActionsAgree(t *testing.T) {
 		}
 	}
 	for verb := range kit.Irreversible {
-		if !fromActions[verb] {
+		if !fromActions[verb] && !kit.Opaque[verb] {
 			t.Errorf("%q is declared irreversible but no action reports it as Forever", verb)
+		}
+	}
+	for verb := range kit.Opaque {
+		if !kit.Irreversible[verb] {
+			t.Errorf("%q is declared opaque but not irreversible; nothing about it is known", verb)
 		}
 	}
 	for verb := range fromActions {

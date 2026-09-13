@@ -91,7 +91,7 @@ type sealedAttachment struct {
 // describe is how the caller's own kind of attachment says what it is, so the
 // one on a message, the one in a thread and the one on a draft are all named the
 // same way.
-func MatchAttachment[T any](reference string, atts []T, describe func(T) Attachment) (T, error) {
+func MatchAttachment[T any](where, reference string, atts []T, describe func(T) Attachment) (T, error) {
 	for _, a := range atts {
 		if describe(a).ID == reference {
 			return a, nil
@@ -102,6 +102,13 @@ func MatchAttachment[T any](reference string, atts []T, describe func(T) Attachm
 		if strings.EqualFold(describe(a).Name, reference) {
 			matches = append(matches, a)
 		}
+	}
+	// The same lookup runs over one message, over a whole thread and over a
+	// draft, and only the caller knows which. Nothing was there is the one answer
+	// where that matters, so it is the one this states itself.
+	if len(matches) == 0 {
+		var zero T
+		return zero, &errs.NotFound{Kind: "attachment", Where: where, Ref: reference}
 	}
 	return ref.Pick("attachment", reference, matches,
 		func(a T) string { return describe(a).ID },
@@ -126,7 +133,7 @@ func (s *Service) AttachmentDownload(ctx context.Context, msgID, reference strin
 	if err != nil {
 		return nil, "", err
 	}
-	wanted, err := MatchAttachment(reference, r.Message.Attachments,
+	wanted, err := MatchAttachment("in that message", reference, r.Message.Attachments,
 		func(a sealedAttachment) Attachment {
 			return Attachment{ID: a.ID, Name: a.Name, Size: a.Size}
 		})

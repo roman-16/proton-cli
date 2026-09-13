@@ -152,12 +152,8 @@ func From(ctx context.Context) *Tally {
 // hand is a record nothing can check the names of, and the names are what decide
 // whether a value may be written at all.
 func Record(ctx context.Context, kind Kind, ref string, reason Reason, cause error) {
-	detail := ""
-	if cause != nil {
-		detail = cause.Error()
-	}
 	slog.DebugContext(ctx, "not shown",
-		"kind", string(kind), "reason", string(reason), "ref", ref, "error", detail)
+		"kind", string(kind), "reason", string(reason), "ref", ref, "error", cause)
 
 	t := From(ctx)
 	if t == nil {

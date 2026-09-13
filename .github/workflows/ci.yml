@@ -19,8 +19,8 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: jetify-com/devbox-install-action@v0.15.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: jetify-com/devbox-install-action@8c6a66ed6273138b1915457069de78cb52fe3bd7 # v0.15.0
       - run: devbox run just lint
       - run: git diff --exit-code
 
@@ -32,13 +32,13 @@ jobs:
       matrix:
         os: [macos-latest, ubuntu-latest]
     steps:
-      - uses: actions/checkout@v7
-      - uses: cachix/install-nix-action@v31
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
       - run: nix build --print-build-logs
 
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: jetify-com/devbox-install-action@v0.15.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: jetify-com/devbox-install-action@8c6a66ed6273138b1915457069de78cb52fe3bd7 # v0.15.0
       - run: devbox run just test-fast

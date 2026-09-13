@@ -110,9 +110,11 @@ Try:   mail
 | --- | --- |
 | `reads` | Anything that does not change state |
 | `mutations` | Anything that does |
-| `deletions` | `delete`, `empty`, `uninstall` |
+| `deletions` | `delete`, `empty`, `uninstall`, `api` |
 | `all` | Every command |
 | `default` | Nothing beyond the table above, so a narrower scope can opt out of a broader directive |
+
+`proton api` sends whatever request you type, so it counts as a deletion whichever method you give it. A policy covering `deletions` or `mutations` covers every raw request, `GET` included.
 
 ### Exceptions
 

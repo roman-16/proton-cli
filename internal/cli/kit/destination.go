@@ -88,7 +88,62 @@ func WriteNamed(path string, data []byte, force bool) (string, error) {
 	if !force && exists(path) {
 		return "", Fail("%s already exists.", path).Hint("--force to overwrite it.")
 	}
-	return path, os.WriteFile(path, data, 0o600)
+	return path, commit(path, data)
+}
+
+// commit puts data at path, whatever stands there now.
+//
+// The bytes go to a file of the payload's own beside the destination, and that
+// file is renamed onto it. Two things follow from the rename that would not be
+// true of a write to the path itself. The file that ends up there is the one
+// this made, so it is private however readable whatever it replaced was - a mode
+// handed to a write is a creation mode, and an overwrite creates nothing. And a
+// name cannot be turned into a link to somewhere else between the moment the
+// destination is checked and the moment it is written, because a rename replaces
+// a link rather than following it.
+func commit(path string, data []byte) error {
+	dir := filepath.Dir(path)
+	if err := EnsureDir(dir); err != nil {
+		return err
+	}
+	tmp, err := privateTemp(dir)
+	if err != nil {
+		return err
+	}
+	committed := false
+	defer func() {
+		_ = tmp.Close()
+		if !committed {
+			_ = os.Remove(tmp.Name())
+		}
+	}()
+	if _, err := tmp.Write(data); err != nil {
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(tmp.Name(), path); err != nil {
+		return err
+	}
+	committed = true
+	return nil
+}
+
+// privateTemp opens the file a payload is assembled in: in the directory it is
+// destined for, so the rename that publishes it stays within one filesystem, and
+// readable by nobody else from the moment it exists.
+func privateTemp(dir string) (*os.File, error) {
+	f, err := os.CreateTemp(dir, ".proton-cli-*")
+	if err != nil {
+		return nil, err
+	}
+	if err := f.Chmod(0o600); err != nil {
+		_ = f.Close()
+		_ = os.Remove(f.Name())
+		return nil, err
+	}
+	return f, nil
 }
 
 // Describe names the destination for a confirmation.
@@ -120,11 +175,6 @@ func (d *Destination) Write(c *Invocation, name string, data []byte) (string, er
 	if d.dest != "" {
 		return WriteNamed(d.dest, data, d.force)
 	}
-	if d.destDir != "" {
-		if err := EnsureDir(d.destDir); err != nil {
-			return "", err
-		}
-	}
 	target := filepath.Join(d.destDir, SafeFilename(name))
 	if !d.force {
 		free, err := freePath(target)
@@ -133,7 +183,7 @@ func (d *Destination) Write(c *Invocation, name string, data []byte) (string, er
 		}
 		target = free
 	}
-	return target, os.WriteFile(target, data, 0o600)
+	return target, commit(target, data)
 }
 
 // Stream writes one payload without ever holding it whole in memory.
@@ -160,7 +210,7 @@ func (d *Destination) StreamDiscovered(c *Invocation, write func(io.Writer) (str
 	if err != nil {
 		return "", err
 	}
-	tmp, err := os.CreateTemp(dir, ".proton-cli-*")
+	tmp, err := privateTemp(dir)
 	if err != nil {
 		return "", err
 	}
@@ -171,9 +221,6 @@ func (d *Destination) StreamDiscovered(c *Invocation, write func(io.Writer) (str
 			_ = os.Remove(tmp.Name())
 		}
 	}()
-	if err := tmp.Chmod(0o600); err != nil {
-		return "", err
-	}
 	name, err := write(tmp)
 	if err != nil {
 		return "", err

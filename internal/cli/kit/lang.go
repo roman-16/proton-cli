@@ -141,9 +141,25 @@ var Verbs = map[string]string{
 //
 // `leave` is here for what it takes back: only the person who shared the thing
 // can grant it again, so nothing this account does undoes it.
+//
+// `api` is here for the reason it is a mutation: a raw request is whatever the
+// caller made it. Nothing on the command line says which requests destroy - the
+// endpoint that permanently deletes a message is a PUT - so a policy that read
+// the method would be a fence with the one thing it was put up for on the far
+// side of it.
 var Irreversible = map[string]bool{
-	"delete": true, "empty": true, "leave": true, "uninstall": true,
+	"api": true, "delete": true, "empty": true, "leave": true, "uninstall": true,
 }
+
+// Opaque marks a command whose effect the CLI models nothing of, and so the one
+// kind of mutation that is settled before the work rather than during it.
+//
+// A mutation normally waits: by the time it reports what it will do, the filter
+// has run and the question can name the eight messages rather than guess. A raw
+// request has nothing to resolve and nothing better to say afterwards than it
+// can say now - the method and the path are the whole of what will happen - so
+// it is put to the person at the gate, where a command that changes nothing is.
+var Opaque = map[string]bool{"api": true}
 
 // OnThisMachine marks a command that changes this computer rather than the
 // account, and is the third thing declared about a mutation, beside whether it

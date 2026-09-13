@@ -450,7 +450,7 @@ func convAttachmentsDownloadCmd() *cobra.Command {
 				return wrongTable(err, "attachments download")
 			}
 			if one {
-				at, err := mailsvc.MatchAttachment(c.Args[1], list,
+				at, err := mailsvc.MatchAttachment("in that thread", c.Args[1], list,
 					func(a mailsvc.ConversationAttachment) mailsvc.Attachment {
 						return mailsvc.Attachment{ID: a.ID, Name: a.Name, Size: a.Size}
 					})

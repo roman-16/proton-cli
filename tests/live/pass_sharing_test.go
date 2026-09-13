@@ -60,7 +60,7 @@ func TestPassVaultSharingRoundTrip(t *testing.T) {
 	// The item reads on the other account, which is the proof the keys opened.
 	var found bool
 	waitFor(60*time.Second, 3*time.Second, func() bool {
-		for _, row := range runJSONArraySecondary(t, "pass", "items", "list") {
+		for _, row := range listAllSecondary(t, "pass", "items", "list") {
 			m, _ := row.(map[string]interface{})
 			if n, _ := m["name"].(string); n == secret {
 				found = true

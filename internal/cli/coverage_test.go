@@ -129,10 +129,16 @@ var untested = map[string]string{
 
 	// Deleting an address. Proton allows one a year, and the paid account - the
 	// one account that may delete at all - refuses the command outright, so
-	// nothing here spends it. Adding one is reached instead by the run that mints
-	// the fixture address, which is why it is not on this list.
+	// nothing here spends it.
 	"PUT /core/v4/addresses/{id}/delete":          "Proton allows one address deletion a year, and no test may spend it",
 	"GET /core/v4/addresses/allowAddressDeletion": "only deleting an address asks whether the year's allowance is still there",
+
+	// Adding one. The forwarding fixture is the only address a run makes, and the
+	// deletion above is why it is minted once and then kept: an address made per
+	// run would spend the year's allowance and leave nothing to spend it on. So
+	// the only run that reaches this is the first one on an account that has not
+	// got the fixture yet, and every test account has had it for a while.
+	"POST /core/v4/addresses": "the fixture address is minted once in an account's life, and every test account is past that moment",
 
 	// Turning on the short-domain address. An account has one for its lifetime
 	// and the paid account's is already on, so the only account a run could turn

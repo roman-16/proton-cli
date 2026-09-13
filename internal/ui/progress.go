@@ -85,7 +85,7 @@ func NewProgress(u *UI) progress.Sink {
 	if !u.animates() {
 		return progress.Nop{}
 	}
-	return &Progress{w: u.Err, style: u.errStyle, active: true, interval: redrawEvery, width: func() int {
+	return &Progress{w: u.drawing, style: u.errStyle, active: true, interval: redrawEvery, width: func() int {
 		if cols := u.err.columns(); cols > 0 {
 			return cols
 		}

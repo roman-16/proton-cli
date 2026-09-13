@@ -3,9 +3,12 @@ package ui
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"strings"
 	"testing"
+
+	"github.com/roman-16/proton-cli/internal/errs"
 )
 
 // recorded runs one log call through the pair of loggers a UI builds and returns
@@ -161,6 +164,41 @@ func TestAskedForDetailTheScreenKeepsTheRecord(t *testing.T) {
 		if !strings.Contains(screen, want) {
 			t.Errorf("the screen dropped %q from a debug record: %q", want, screen)
 		}
+	}
+}
+
+// A warning is a sentence to the person whose account it is, so it names the
+// address it is about and the screen keeps it. The same sentence in the file is
+// read by whoever a report was sent to, and does not.
+func TestASentenceKeepsItsAddressOnTheScreenAndLosesItInTheFile(t *testing.T) {
+	screen, file := recorded(t, slog.LevelWarn, func(log, _ *slog.Logger) {
+		log.Warn("Encryption for jane@proton.me could not be turned back on.")
+	})
+	if !strings.Contains(screen, "jane@proton.me") {
+		t.Errorf("the screen stopped naming the address: %q", screen)
+	}
+	message, _ := file[0]["msg"].(string)
+	if strings.Contains(message, "jane@proton.me") {
+		t.Errorf("the address survived into the log: %q", message)
+	}
+	if !strings.Contains(message, "@proton.me") || !strings.Contains(message, "turned back on") {
+		t.Errorf("the message lost what it was saying: %q", message)
+	}
+}
+
+// A name somebody gave a vault item is words, so nothing can find it in a
+// finished sentence. It is taken back out by the error that attached it.
+func TestANameOutOfTheAccountIsRecordedAsAStandIn(t *testing.T) {
+	_, file := recorded(t, slog.LevelDebug, func(log, _ *slog.Logger) {
+		log.Debug("api request failed", "method", "POST",
+			"error", errs.Naming("Bank login", errors.New("unsupported item type")))
+	})
+	value, _ := file[0]["error"].(string)
+	if strings.Contains(value, "Bank login") {
+		t.Errorf("the item's name survived into the log: %q", value)
+	}
+	if !strings.Contains(value, "unsupported item type") {
+		t.Errorf("the error lost what it was saying: %q", value)
 	}
 }
 

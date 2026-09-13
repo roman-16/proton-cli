@@ -108,7 +108,7 @@ func (r *Redactor) Apply(name, value string) (string, bool) {
 	case Route:
 		return r.route(value), true
 	case Text:
-		return r.text(value), true
+		return r.Text(value), true
 	}
 	return value, true
 }
@@ -218,7 +218,11 @@ func WithoutPath(err error) error {
 	return err
 }
 
-// text rewrites prose that was assembled somewhere this package cannot reach.
+// Text rewrites prose that was assembled somewhere this package cannot reach.
+//
+// It is what a message is put through on its way to a destination somebody other
+// than the person at the terminal will read, as well as what the Text policy
+// applies to a value.
 //
 // An error message is the value most worth having and the one value whose
 // content cannot be predicted: it may have picked up an address from a
@@ -229,7 +233,7 @@ func WithoutPath(err error) error {
 // host is not a directory; paths go before IDs because a path may contain one
 // and the whole path is leaving anyway; and URLs go first, since everything
 // after would otherwise read one as several of its parts.
-func (r *Redactor) text(value string) string {
+func (r *Redactor) Text(value string) string {
 	value = urlInText.ReplaceAllStringFunc(value, r.url)
 	value = emailInText.ReplaceAllStringFunc(value, r.address)
 	value = pathInText.ReplaceAllString(value, "${1}"+pathStandIn)

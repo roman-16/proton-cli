@@ -51,7 +51,7 @@ func gate(c *Invocation) error {
 	case confirm.Deny:
 		return refused(c.Cmd, decision.Class)
 	case confirm.Ask:
-		if cmd.Mutating {
+		if cmd.Mutating && !Opaque[c.Cmd.Name()] {
 			return nil
 		}
 		return askToRun(c, decision.Class)
@@ -72,17 +72,17 @@ func refused(cmd *cobra.Command, class confirm.Class) error {
 	return errs.Problemf("%s is turned off by your confirmation policy.", subject).Exit(ExitRefused)
 }
 
-// askToRun stops a command that changes nothing, naming it, because there is
-// nothing else true to say about it yet.
+// askToRun stops a command whose whole description is the line that was typed,
+// naming it back, because there is nothing else true to say about it.
 func askToRun(c *Invocation, class confirm.Class) error {
 	if c.App.Yes {
 		return nil
 	}
 	if !c.UI().CanPrompt() {
-		return Fail("running %s needs confirmation. %s", named(c.Cmd), policyAsks(class)).
+		return Fail("running %s needs confirmation. %s", invoked(c), policyAsks(class)).
 			Hint("--yes to confirm.")
 	}
-	ok, err := c.UI().Confirm(fmt.Sprintf("Would run %s. Continue?", named(c.Cmd)))
+	ok, err := c.UI().Confirm(fmt.Sprintf("Would run %s. Continue?", invoked(c)))
 	if err != nil {
 		return err
 	}
@@ -90,6 +90,19 @@ func askToRun(c *Invocation, class confirm.Class) error {
 		return Fail("Cancelled.")
 	}
 	return nil
+}
+
+// invoked is the command as it was typed, with the arguments of one whose effect
+// they decide.
+//
+// `proton api` names nothing a person can answer about. `proton api DELETE
+// /pass/v1/vault/{id}` is the entire question.
+func invoked(c *Invocation) string {
+	name := named(c.Cmd)
+	if c.Cmd == nil || !Opaque[c.Cmd.Name()] {
+		return name
+	}
+	return strings.TrimSpace(name + " " + strings.Join(c.Args, " "))
 }
 
 // policyAsks says why a command nobody would otherwise be asked about is asking.

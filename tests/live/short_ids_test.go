@@ -283,12 +283,11 @@ func TestShortIDRoundTripContacts(t *testing.T) {
 
 func TestShortIDRoundTripPass(t *testing.T) {
 	name := testID() + "-shortid-pass"
-	stdout := runOK(t, "pass", "items", "create",
-		"--type", "note", "--name", name, "--note", "x")
+	ref := createItem(t, "--type", "note", "--name", name, "--note", "x")
 	// Creating answers with SHARE_ID/ITEM_ID; a short ID works on either half.
-	shareID, itemID, ok := strings.Cut(strings.TrimSpace(stdout), "/")
+	shareID, itemID, ok := strings.Cut(ref, "/")
 	if !ok {
-		t.Fatalf("expected SHARE_ID/ITEM_ID on stdout, got %q", stdout)
+		t.Fatalf("expected SHARE_ID/ITEM_ID on stdout, got %q", ref)
 	}
 	cleanupRun(t, "Delete pass item: proton pass items delete "+name,
 		"pass", "items", "delete", name)

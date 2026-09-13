@@ -93,7 +93,7 @@ Exit `2` with a page and a token is Proton asking for a CAPTCHA. Only a person c
 
 One line per group, with the verbs under it. Arguments, flags and examples are in `{{.Program}} <command> --help`.
 {{.Commands}}
-`{{.Program}} api` sends a request to an endpoint no command covers, and answers with Proton's own shape rather than this one; a dry run of it can only repeat the request back. `{{.Program}} update` and `{{.Program}} uninstall` change this machine rather than the account.
+`{{.Program}} api` sends a request to an endpoint no command covers, and answers with Proton's own shape rather than this one; a dry run of it can only repeat the request back. It counts as a deletion whichever method it carries, so a confirmation policy covering `deletions` or `mutations` covers it too. `{{.Program}} update` and `{{.Program}} uninstall` change this machine rather than the account.
 
 ## Flags that work on every command
 

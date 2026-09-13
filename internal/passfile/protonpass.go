@@ -66,7 +66,7 @@ func readProtonArchive(in source, z *zip.ReadCloser) (*Document, error) {
 				document = f
 			}
 		default:
-			if base := f.Name[strings.LastIndexAny(f.Name, `/\`)+1:]; base != "" {
+			if base := zipBase(f.Name); base != "" {
 				files[base] = f
 			}
 		}
@@ -74,7 +74,7 @@ func readProtonArchive(in source, z *zip.ReadCloser) (*Document, error) {
 	if document == nil {
 		return nil, notThisFormat(in, Proton)
 	}
-	body, err := readZipEntry(document)
+	body, err := readZipEntry(in, document)
 	if err != nil {
 		return nil, err
 	}
@@ -89,15 +89,6 @@ func readProtonArchive(in source, z *zip.ReadCloser) (*Document, error) {
 	}
 	doc.closers = append(doc.closers, z)
 	return doc, nil
-}
-
-func readZipEntry(f *zip.File) ([]byte, error) {
-	r, err := f.Open()
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = r.Close() }()
-	return io.ReadAll(io.LimitReader(r, 1<<30))
 }
 
 func decryptDocument(in source, body []byte) ([]byte, error) {

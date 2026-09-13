@@ -17,6 +17,7 @@ import (
 
 	"github.com/roman-16/proton-cli/internal/errs"
 	pb "github.com/roman-16/proton-cli/internal/service/pass/proto"
+	"github.com/roman-16/proton-cli/internal/units"
 )
 
 // Document is a file's worth of items, in the shape they will be landed.
@@ -225,8 +226,12 @@ func notThisFormat(in source, name string) error {
 	return p
 }
 
-// unreadable is what a reader says when the file is the right kind and still
-// will not come apart.
+// tooLarge is what an archive holding a file this will not read whole says.
+func tooLarge(in source) error {
+	return errs.Problemf("%s holds a file over %s, which is more than this reads.",
+		in.path, units.Size(maxEntry))
+}
+
 // notInProtonColumns is what a CSV that was written by something else gets, and
 // it is the one refusal that has to point at the flag: every other format was
 // named, and this one is what a file falls back to.

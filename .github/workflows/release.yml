@@ -45,13 +45,13 @@ jobs:
       version: ${{ steps.decide.outputs.version }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Set up Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
 
@@ -84,8 +84,19 @@ jobs:
           # A tag outlives the run that pushed it, so a resumed release is the
           # tag's own commit - the one the checks ran against - and not whatever
           # main has become since.
+          #
+          # Which is only true of a commit the checks actually reached, and
+          # ancestry is how that is asked: the commit an interrupted release
+          # tagged is behind the one CI has just finished on, while a commit that
+          # entered the repository as a tag rather than through main is nowhere in
+          # that history. Publishing the second would build and sign whatever it
+          # contained, so the release stops rather than resolving it.
           if git rev-parse --verify --quiet "refs/tags/$tag" >/dev/null; then
             sha=$(git rev-parse "$tag^{commit}")
+            if ! git merge-base --is-ancestor "$sha" "$HEAD_SHA"; then
+              echo "::error::$tag names $sha, which is not in the history that passed CI at $HEAD_SHA."
+              exit 1
+            fi
             echo "Tag $tag exists; resuming the release from $sha."
           else
             sha="$HEAD_SHA"
@@ -112,13 +123,13 @@ jobs:
       goreleaser: ${{ steps.goreleaser.outcome }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           ref: ${{ needs.resolve.outputs.sha }}
 
       - name: Set up Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
 
@@ -170,7 +181,7 @@ jobs:
       - name: Run GoReleaser
         id: goreleaser
         continue-on-error: true
-        uses: goreleaser/goreleaser-action@v7
+        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
         with:
           distribution: goreleaser
           version: "~> v2"
@@ -225,10 +236,10 @@ jobs:
       pages: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Configure Pages
-        uses: actions/configure-pages@v6
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
 
       # reprepro keeps no database between runs, so the pool is rebuilt from
       # scratch every release and whatever is not handed to it is dropped. The
@@ -268,7 +279,7 @@ jobs:
 
       - name: Build signed APT repository
         id: apt
-        uses: morph027/apt-repo-action@v3
+        uses: morph027/apt-repo-action@2acc5b2a47fc257aa6503ef77ca64ff6b0e31298 # v3
         with:
           repo-name: proton-cli
           scan-dir: debs
@@ -279,7 +290,7 @@ jobs:
           signing-key-passphrase: ${{ secrets.GPG_PRIVATE_KEY_PASSPHRASE }}
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v5
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: ${{ steps.apt.outputs.dir }}
 
@@ -295,7 +306,7 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deploy
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
 
   npm-publish:
     needs: [resolve, release]
@@ -305,12 +316,12 @@ jobs:
       id-token: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.resolve.outputs.tag }}
 
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 26
           registry-url: "https://registry.npmjs.org"

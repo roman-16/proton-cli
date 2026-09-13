@@ -14,6 +14,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/roman-16/proton-cli/internal/errs"
 	pb "github.com/roman-16/proton-cli/internal/service/pass/proto"
 )
 
@@ -144,11 +145,11 @@ func (d *ExportDocument) Count() int {
 func ExportItem(in StoredItem) (*ExportedItem, error) {
 	content, kind, err := exportContent(in.Item)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", in.Item.GetMetadata().GetName(), err)
+		return nil, errs.Naming(in.Item.GetMetadata().GetName(), err)
 	}
 	extra, err := exportList(in.Item.GetExtraFields())
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", in.Item.GetMetadata().GetName(), err)
+		return nil, errs.Naming(in.Item.GetMetadata().GetName(), err)
 	}
 	files := in.Files
 	if files == nil {

@@ -123,6 +123,11 @@ type UI struct {
 	// retired by whichever of them writes first. Nil when this run may not draw
 	// one.
 	sp *spinner
+
+	// drawing is the commentary stream under the guard, for the one other thing
+	// that draws in place rather than writing a line: a transfer bar. Its cursor
+	// movement is this CLI's own, which is exactly what Err carries for nobody.
+	drawing io.Writer
 }
 
 // Options configures a UI. Out, Err and In default to the process streams.
@@ -189,6 +194,8 @@ func New(opts Options) *UI {
 		u.sp = newSpinner(errw, u.errStyle)
 		u.Out, u.Err = yielding{to: out, sp: u.sp}, yielding{to: errw, sp: u.sp}
 	}
+	u.drawing = u.Err
+	u.Out, u.Err = guard(u.Out, outStream), guard(u.Err, errStream)
 	u.Log, u.Trace = newLoggers(u.Err, u.errStyle, opts.LogLevel, opts.Salt, opts.Log, opts.Run)
 	return u
 }

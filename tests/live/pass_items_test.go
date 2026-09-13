@@ -41,16 +41,12 @@ func TestPassItemsCRUDLogin(t *testing.T) {
 	name := testID() + "-login"
 	url := "https://" + name + ".example.invalid/"
 
-	stdout := runOK(t, "pass", "items", "create",
+	createItem(t,
 		"--type", "login",
 		"--name", name,
 		"--username", "tester",
 		"--secret-file", secretFile(t, "password", "s3cret!"),
 		"--url", url)
-	itemID := strings.TrimSpace(stdout)
-	if !looksLikePairRef(itemID) {
-		t.Fatalf("expected SHARE_ID/ITEM_ID on stdout, got %q", stdout)
-	}
 	cleanupRun(t, fmt.Sprintf("Delete item: proton pass items delete %s", name),
 		"pass", "items", "delete", name)
 
@@ -71,12 +67,8 @@ func TestPassItemsCRUDLogin(t *testing.T) {
 // new item's ID rather than in it.
 func TestPassItemsCreateGeneratedPassword(t *testing.T) {
 	name := testID() + "-generated"
-	stdout, stderr := runOKStderr(t, "pass", "items", "create", "--name", name,
+	ref, stderr := createItemReported(t, "--name", name,
 		"--username", "tester", "--generate-password", "--words", "4")
-	ref := strings.TrimSpace(stdout)
-	if !looksLikePairRef(ref) {
-		t.Fatalf("expected SHARE_ID/ITEM_ID on stdout, got %q", stdout)
-	}
 	cleanupRun(t, fmt.Sprintf("Delete item: proton pass items delete -- %s", ref),
 		"pass", "items", "delete", "--", ref)
 
@@ -93,10 +85,7 @@ func TestPassItemsCreateGeneratedPassword(t *testing.T) {
 
 func TestPassItemsCreateNote(t *testing.T) {
 	name := testID() + "-note"
-	assertBarePairRef(t, runOK(t, "pass", "items", "create",
-		"--type", "note",
-		"--name", name,
-		"--note", "secret note content"), "pass items create")
+	createItem(t, "--type", "note", "--name", name, "--note", "secret note content")
 	cleanupRun(t, fmt.Sprintf("Delete note: proton pass items delete %s", name),
 		"pass", "items", "delete", name)
 
@@ -107,7 +96,7 @@ func TestPassItemsCreateNote(t *testing.T) {
 
 func TestPassItemsCreateCardShowsPIN(t *testing.T) {
 	name := testID() + "-card"
-	stdout := runOK(t, "pass", "items", "create",
+	createItem(t,
 		"--type", "credit-card",
 		"--name", name,
 		"--holder", "Test Holder",
@@ -115,10 +104,6 @@ func TestPassItemsCreateCardShowsPIN(t *testing.T) {
 		"--secret-file", secretFile(t, "number", "4111111111111111"),
 		"--secret-file", secretFile(t, "cvv", "123"),
 		"--secret-file", secretFile(t, "pin", "7890"))
-	id := strings.TrimSpace(stdout)
-	if !looksLikeID(id) {
-		t.Fatalf("expected bare ID on stdout, got %q", stdout)
-	}
 	cleanupRun(t, fmt.Sprintf("Delete card: proton pass items delete %s", name),
 		"pass", "items", "delete", name)
 
@@ -135,9 +120,9 @@ func TestPassItemsCreateCardShowsPIN(t *testing.T) {
 // of the same type make `trash --type credit-card` match nothing, silently.
 func TestPassCreditCardTypeConsistent(t *testing.T) {
 	name := testID() + "-cc"
-	ref := strings.TrimSpace(runOK(t, "pass", "items", "create", "--type", "credit-card",
+	ref := createItem(t, "--type", "credit-card",
 		"--name", name, "--holder", "Roman", "--expiry", "2030-01",
-		"--secret-file", secretFile(t, "number", "4111111111111111")))
+		"--secret-file", secretFile(t, "number", "4111111111111111"))
 	cleanupRun(t, fmt.Sprintf("Delete card: proton pass items delete %s", name),
 		"pass", "items", "delete", name)
 
@@ -159,13 +144,12 @@ func TestPassCreditCardTypeConsistent(t *testing.T) {
 
 func TestPassItemsTrashRestoreDelete(t *testing.T) {
 	name := testID() + "-trash"
-	stdout := runOK(t, "pass", "items", "create",
-		"--type", "login", "--name", name,
-		"--username", "u", "--secret-file", secretFile(t, "password", "p"))
 	// Creating answers with SHARE_ID/ITEM_ID, which is the reference every item
 	// verb takes - and the only way to reach a trashed item, since searching by
 	// name does not find one.
-	ref := strings.TrimSpace(stdout)
+	ref := createItem(t,
+		"--type", "login", "--name", name,
+		"--username", "u", "--secret-file", secretFile(t, "password", "p"))
 	cleanupRun(t, fmt.Sprintf("Delete item: proton pass items delete -- %s", ref),
 		"pass", "items", "delete", "--", ref)
 
@@ -212,10 +196,10 @@ func TestPassBatchTrashDurationUnitMonths(t *testing.T) {
 func TestPassItemTypesAndFields(t *testing.T) {
 	// Identity with core fields plus custom text/hidden fields.
 	idName := testID() + "-identity"
-	idRef := strings.TrimSpace(runOK(t, "pass", "items", "create", "--type", "identity",
+	idRef := createItem(t, "--type", "identity",
 		"--name", idName, "--full-name", "Jane Roe", "--email", "jane@example.com",
 		"--organization", "Acme", "--field", "Note=hello-field",
-		"--secret-file", secretFile(t, "PIN", "4321")))
+		"--secret-file", secretFile(t, "PIN", "4321"))
 	cleanupRun(t, fmt.Sprintf("Delete pass item: proton pass items delete %s", idRef),
 		"pass", "items", "delete", "--", idRef)
 	gotID := runOK(t, "pass", "items", "get", "--", idRef)
@@ -224,17 +208,17 @@ func TestPassItemTypesAndFields(t *testing.T) {
 	assertContains(t, gotID, "hello-field")
 
 	// Wi-Fi.
-	wifiRef := strings.TrimSpace(runOK(t, "pass", "items", "create", "--type", "wifi",
+	wifiRef := createItem(t, "--type", "wifi",
 		"--name", testID()+"-wifi", "--ssid", "MyTestNet", "--security", "WPA2",
-		"--secret-file", secretFile(t, "password", "pw")))
+		"--secret-file", secretFile(t, "password", "pw"))
 	cleanupRun(t, fmt.Sprintf("Delete pass item: proton pass items delete %s", wifiRef),
 		"pass", "items", "delete", "--", wifiRef)
 	assertContains(t, runOK(t, "pass", "items", "get", "--", wifiRef), "MyTestNet")
 
 	// SSH key.
-	sshRef := strings.TrimSpace(runOK(t, "pass", "items", "create", "--type", "ssh-key",
+	sshRef := createItem(t, "--type", "ssh-key",
 		"--name", testID()+"-ssh", "--public-key", "ssh-ed25519 AAAATESTKEY",
-		"--secret-file", secretFile(t, "private-key", "PRIVATE-TEST")))
+		"--secret-file", secretFile(t, "private-key", "PRIVATE-TEST"))
 	cleanupRun(t, fmt.Sprintf("Delete pass item: proton pass items delete %s", sshRef),
 		"pass", "items", "delete", "--", sshRef)
 	assertContains(t, runOK(t, "pass", "items", "get", "--", sshRef), "ssh-ed25519 AAAATESTKEY")
@@ -243,9 +227,9 @@ func TestPassItemTypesAndFields(t *testing.T) {
 func TestPassLoginTOTPRoundTrips(t *testing.T) {
 	name := testID() + "-totp"
 	secret := "JBSWY3DPEHPK3PXP"
-	ref := strings.TrimSpace(runOK(t, "pass", "items", "create", "--type", "login",
+	ref := createItem(t, "--type", "login",
 		"--name", name, "--username", "me@example.com",
-		"--secret-file", secretFile(t, "totp-uri", "otpauth://totp/Example:me?secret="+secret+"&issuer=Example")))
+		"--secret-file", secretFile(t, "totp-uri", "otpauth://totp/Example:me?secret="+secret+"&issuer=Example"))
 	cleanupRun(t, fmt.Sprintf("Delete pass item: proton pass items delete %s", ref),
 		"pass", "items", "delete", "--", ref)
 
@@ -255,9 +239,9 @@ func TestPassLoginTOTPRoundTrips(t *testing.T) {
 // Pass keeps every edit, so a password changed by mistake can be read back.
 func TestPassItemRevisionsShowWhatItUsedToBe(t *testing.T) {
 	name := testID() + "-history"
-	ref := strings.TrimSpace(runOK(t, "pass", "items", "create",
+	ref := createItem(t,
 		"--name", name, "--username", "first",
-		"--secret-file", secretFile(t, "password", "first-secret")))
+		"--secret-file", secretFile(t, "password", "first-secret"))
 	cleanupRun(t, fmt.Sprintf("Delete item: proton pass items delete %s", ref),
 		"pass", "items", "delete", "--", ref)
 
@@ -303,9 +287,9 @@ func TestPassItemRevisionsShowWhatItUsedToBe(t *testing.T) {
 // version, so the history keeps the restore too.
 func TestPassItemRevisionsRestoreWhatItUsedToBe(t *testing.T) {
 	name := testID() + "-restore"
-	ref := strings.TrimSpace(runOK(t, "pass", "items", "create",
+	ref := createItem(t,
 		"--name", name, "--username", "first",
-		"--secret-file", secretFile(t, "password", "first-secret")))
+		"--secret-file", secretFile(t, "password", "first-secret"))
 	cleanupRun(t, fmt.Sprintf("Delete item: proton pass items delete %s", ref),
 		"pass", "items", "delete", "--", ref)
 
@@ -337,8 +321,8 @@ func TestPassItemRevisionsRestoreWhatItUsedToBe(t *testing.T) {
 // ID, because an item in Pass is only unique together with its vault.
 func TestPassItemsMoveBetweenVaults(t *testing.T) {
 	name := testID() + "-move"
-	ref := strings.TrimSpace(runOK(t, "pass", "items", "create", "--name", name,
-		"--username", "tester", "--secret-file", secretFile(t, "password", "travels-with-it")))
+	ref := createItem(t, "--name", name,
+		"--username", "tester", "--secret-file", secretFile(t, "password", "travels-with-it"))
 	cleanupRun(t, fmt.Sprintf("Delete item: proton pass items delete -- %s", ref),
 		"pass", "items", "delete", "--", ref)
 
@@ -369,8 +353,8 @@ func TestPassItemsMoveBetweenVaults(t *testing.T) {
 // that one of its items is wanted often.
 func TestPassItemPinAndUnpin(t *testing.T) {
 	name := testID() + "-pin"
-	ref := strings.TrimSpace(runOK(t, "pass", "items", "create",
-		"--name", name, "--username", "someone"))
+	ref := createItem(t,
+		"--name", name, "--username", "someone")
 	cleanupRun(t, fmt.Sprintf("Delete item: proton pass items delete %s", ref),
 		"pass", "items", "delete", "--", ref)
 
@@ -386,10 +370,10 @@ func TestPassItemPinAndUnpin(t *testing.T) {
 func TestPassItemTOTPCode(t *testing.T) {
 	name := testID() + "-totp"
 	secret := "GEZDGNBVGY3TQOJQ"
-	ref := strings.TrimSpace(runOK(t, "pass", "items", "create",
+	ref := createItem(t,
 		"--name", name, "--username", "someone",
 		"--secret-file", secretFile(t, "totp-uri",
-			"otpauth://totp/Example:someone?secret="+secret+"&issuer=Example")))
+			"otpauth://totp/Example:someone?secret="+secret+"&issuer=Example"))
 	cleanupRun(t, fmt.Sprintf("Delete item: proton pass items delete %s", ref),
 		"pass", "items", "delete", "--", ref)
 
@@ -420,8 +404,8 @@ func TestPassItemTOTPCode(t *testing.T) {
 // An item with no second factor says so rather than printing a code for nothing.
 func TestPassItemTOTPWithoutASecret(t *testing.T) {
 	name := testID() + "-nototp"
-	ref := strings.TrimSpace(runOK(t, "pass", "items", "create",
-		"--name", name, "--username", "someone"))
+	ref := createItem(t,
+		"--name", name, "--username", "someone")
 	cleanupRun(t, fmt.Sprintf("Delete item: proton pass items delete %s", ref),
 		"pass", "items", "delete", "--", ref)
 
@@ -438,9 +422,9 @@ func TestPassItemTOTPWithoutASecret(t *testing.T) {
 // --field accepts.
 func TestPassItemFieldsCarryTheirSection(t *testing.T) {
 	name := testID() + "-sections"
-	ref := strings.TrimSpace(runOK(t, "pass", "items", "create", "--type", "custom", "--name", name,
+	ref := createItem(t, "--type", "custom", "--name", name,
 		"--field", "Network/SSID=home", "--secret-file", secretFile(t, "Network/Key", "hunter2"),
-		"--field", "Admin/URL=http://192.168.0.1", "--field", "Loose=1"))
+		"--field", "Admin/URL=http://192.168.0.1", "--field", "Loose=1")
 	cleanupRun(t, fmt.Sprintf("Delete item: proton pass items delete %s", ref),
 		"pass", "items", "delete", "--", ref)
 
@@ -503,10 +487,10 @@ func TestPassItemFieldsCarryTheirSection(t *testing.T) {
 // only its own would leave the account doubled, and doubled again next run.
 func TestPassExportAndImportRoundTrip(t *testing.T) {
 	name := testID() + "-backup"
-	ref := strings.TrimSpace(runOK(t, "pass", "items", "create", "--name", name,
+	ref := createItem(t, "--name", name,
 		"--username", "jane", "--url", "https://example.com",
 		"--secret-file", secretFile(t, "password", "hunter2"),
-		"--field", "Recovery codes=abc-def"))
+		"--field", "Recovery codes=abc-def")
 	cleanupRun(t, fmt.Sprintf("Delete item: proton pass items delete %s", ref),
 		"pass", "items", "delete", "--", ref)
 
@@ -552,7 +536,7 @@ func TestPassExportAndImportRoundTrip(t *testing.T) {
 	// Reading it back adds the items again rather than matching them, so there
 	// are now two of everything - including two of the one this test made.
 	restored := ""
-	for _, row := range runJSONArray(t, "pass", "items", "list") {
+	for _, row := range listAll(t, "pass", "items", "list") {
 		m, _ := row.(map[string]interface{})
 		if n, _ := m["name"].(string); n != name {
 			continue
@@ -671,9 +655,9 @@ func TestPassExportWithAPassphrase(t *testing.T) {
 // whole cleanup however much the account holds.
 func TestPassImportKeepsDatesAndTrash(t *testing.T) {
 	name := testID() + "-dated"
-	ref := strings.TrimSpace(runOK(t, "pass", "items", "create", "--name", name,
+	ref := createItem(t, "--name", name,
 		"--username", "jane", "--url", "https://example.com",
-		"--secret-file", secretFile(t, "password", "hunter2")))
+		"--secret-file", secretFile(t, "password", "hunter2"))
 	cleanupRun(t, fmt.Sprintf("Delete item: proton pass items delete %s", ref),
 		"pass", "items", "delete", "--", ref)
 	runOK(t, "--yes", "pass", "items", "trash", "--", ref)
@@ -751,9 +735,9 @@ func exportedItem(t *testing.T, body []byte, vault, name string) map[string]inte
 // The spreadsheet is Proton Pass's own columns, so what this writes it reads.
 func TestPassExportCSVRoundTrip(t *testing.T) {
 	name := testID() + "-csv"
-	ref := strings.TrimSpace(runOK(t, "pass", "items", "create", "--name", name,
+	ref := createItem(t, "--name", name,
 		"--username", "jane", "--url", "https://example.com",
-		"--secret-file", secretFile(t, "password", "hunter2")))
+		"--secret-file", secretFile(t, "password", "hunter2"))
 	cleanupRun(t, fmt.Sprintf("Delete item: proton pass items delete %s", ref),
 		"pass", "items", "delete", "--", ref)
 
@@ -844,7 +828,7 @@ func TestPassImportFromBitwarden(t *testing.T) {
 		})
 	runOK(t, "pass", "import", export, "--manager", "bitwarden")
 
-	rows := runJSONArray(t, "pass", "items", "list", "--vault", name)
+	rows := listAll(t, "pass", "items", "list", "--vault", name)
 	if len(rows) != 3 {
 		t.Fatalf("the import put %d items in %s, want 3", len(rows), name)
 	}
@@ -906,15 +890,54 @@ func importVault(t *testing.T) string {
 	return name
 }
 
-// itemInVault is one item of a vault, by name.
+// itemInVault is one item of a vault, by name, once Pass is listing it.
+//
+// An import returns when Proton has taken the items, which is a moment before a
+// listing of that vault has them - so reading one back is a race that waiting
+// settles and retrying the whole test would not.
 func itemInVault(t *testing.T, vault, name string) map[string]interface{} {
 	t.Helper()
-	for _, row := range runJSONArray(t, "pass", "items", "list", "--vault", vault) {
-		m, _ := row.(map[string]interface{})
-		if n, _ := m["name"].(string); n == name {
-			return m
+	var found map[string]interface{}
+	if !waitFor(30*time.Second, time.Second, func() bool {
+		for _, row := range listAll(t, "pass", "items", "list", "--vault", vault) {
+			m, _ := row.(map[string]interface{})
+			if n, _ := m["name"].(string); n == name {
+				found = m
+				return true
+			}
 		}
+		return false
+	}) {
+		t.Fatalf("%s holds no item called %s", vault, name)
 	}
-	t.Fatalf("%s holds no item called %s", vault, name)
-	return nil
+	return found
+}
+
+// createItem makes an item and does not return until Proton will answer about
+// it.
+//
+// Pass takes a write before every reader of it agrees the thing is there, so a
+// test that creates an item and immediately updates, moves or reads it is racing
+// a propagation it has no part in - and loses with a 422 saying the item does
+// not exist. Waiting here rather than in each test is what keeps that race out
+// of all of them.
+func createItem(t *testing.T, args ...string) string {
+	t.Helper()
+	ref, _ := createItemReported(t, args...)
+	return ref
+}
+
+// createItemReported is createItem for a test whose subject is what creating one
+// says on the commentary stream - the password it made up, most of all.
+func createItemReported(t *testing.T, args ...string) (ref, stderr string) {
+	t.Helper()
+	stdout, stderr := runOKStderr(t, append([]string{"pass", "items", "create"}, args...)...)
+	ref = assertBarePairRef(t, stdout, "pass items create")
+	if !waitFor(30*time.Second, time.Second, func() bool {
+		_, _, code := run(t, "pass", "items", "get", "--", ref)
+		return code == 0
+	}) {
+		t.Fatalf("pass never answered about the item it had just made: %s", ref)
+	}
+	return ref, stderr
 }

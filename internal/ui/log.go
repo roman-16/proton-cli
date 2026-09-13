@@ -29,6 +29,17 @@ const undeclared = "<undeclared>"
 type redacting struct {
 	inner    slog.Handler
 	redactor *redact.Redactor
+	// shared says somebody other than the person the run happened in front of
+	// will read this, which is what the message itself is rewritten for.
+	//
+	// A record's attributes are named, so a policy can be declared for each and
+	// held to wherever it goes. Its message is one sentence assembled by whoever
+	// wrote it, and a sentence has no name to declare anything about - so the only
+	// thing that can be done to it is the weakest policy, and the only place worth
+	// doing it is the destination that leaves the machine. The screen keeps the
+	// sentence whole: a warning there is the run speaking to the person whose
+	// account it is, and an address of theirs on their own terminal is theirs.
+	shared bool
 }
 
 func (h redacting) Enabled(ctx context.Context, level slog.Level) bool {
@@ -36,7 +47,11 @@ func (h redacting) Enabled(ctx context.Context, level slog.Level) bool {
 }
 
 func (h redacting) Handle(ctx context.Context, r slog.Record) error {
-	clean := slog.NewRecord(r.Time, r.Level, r.Message, r.PC)
+	message := r.Message
+	if h.shared {
+		message = h.redactor.Text(message)
+	}
+	clean := slog.NewRecord(r.Time, r.Level, message, r.PC)
 	r.Attrs(func(a slog.Attr) bool {
 		if attr, ok := h.attr(a); ok {
 			clean.AddAttrs(attr)
@@ -87,6 +102,10 @@ func (h redacting) attr(a slog.Attr) (slog.Attr, bool) {
 // stringify renders a value for redaction. Anything that is not already text is
 // asked for its own string form, which is what an error, a stringer and a
 // number all answer to.
+//
+// An error is asked for the form that withholds the account's own names, because
+// this is where an error stops being a value a command may still phrase for its
+// reader and becomes a line in a file.
 func stringify(v slog.Value) string {
 	switch v.Kind() {
 	case slog.KindString:
@@ -94,11 +113,11 @@ func stringify(v slog.Value) string {
 	case slog.KindInt64:
 		return strconv.FormatInt(v.Int64(), 10)
 	case slog.KindAny:
-		if err, ok := v.Any().(error); ok {
-			if err == nil {
-				return ""
-			}
-			return err.Error()
+		switch value := v.Any().(type) {
+		case nil:
+			return ""
+		case error:
+			return errs.Withheld(value)
 		}
 	}
 	return v.String()
@@ -111,11 +130,13 @@ func (h redacting) WithAttrs(attrs []slog.Attr) slog.Handler {
 			kept = append(kept, clean)
 		}
 	}
-	return redacting{inner: h.inner.WithAttrs(kept), redactor: h.redactor}
+	h.inner = h.inner.WithAttrs(kept)
+	return h
 }
 
 func (h redacting) WithGroup(name string) slog.Handler {
-	return redacting{inner: h.inner.WithGroup(name), redactor: h.redactor}
+	h.inner = h.inner.WithGroup(name)
+	return h
 }
 
 // spoken is the screen's half of the logging: what a record looks like to the
@@ -242,6 +263,7 @@ func newLoggers(errw io.Writer, style Style, level slog.Level, salt []byte, file
 	}
 	recorded := redacting{
 		redactor: redactor,
+		shared:   true,
 		inner:    slog.NewJSONHandler(file, &slog.HandlerOptions{Level: slog.LevelDebug}),
 	}.WithAttrs([]slog.Attr{slog.String("run", run)})
 	return slog.New(fanout{screen, recorded}), slog.New(recorded)

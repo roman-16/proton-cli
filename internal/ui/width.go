@@ -53,13 +53,13 @@ const (
 )
 
 func runeCells(r rune) int {
+	// A rune a terminal would act on is drawn as what it is rather than obeyed, so
+	// it is measured as what it is drawn as. The two have to agree: a row carrying
+	// one would otherwise be laid out to a width it does not occupy. See guard.go.
+	if drawn := shown(r, nil); drawn != "" {
+		return len(drawn)
+	}
 	switch {
-	case r == 0:
-		return 0
-	case r < 0x20, r >= 0x7F && r < 0xA0:
-		// Control characters are not drawn. They should not reach a table cell,
-		// but counting them as printable would misalign the row if they did.
-		return 0
 	case r < 0x7F:
 		return 1
 	case unicode.In(r, unicode.Mn, unicode.Me, unicode.Cf):

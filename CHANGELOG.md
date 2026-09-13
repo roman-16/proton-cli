@@ -6,6 +6,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 Adding a version section here is what publishes a release, so this file is the one place a version is decided: see [Releases](CONTRIBUTING.md#releases). Versions that shipped before this file existed are on the [releases page](https://github.com/roman-16/proton-cli/releases).
 
+## [3.8.0] - 2026-09-13
+
+### Added
+
+- `pass import` reads exports from sixteen password managers, and `--manager` names which one wrote the file. `pass export --format csv|json` writes the two flat shapes beside the archive.
+- Files go on a Pass item with `--attach` and `--detach`, and `pass items attachments` lists, downloads, renames and restores them. They need a paid Pass plan, and a backup carries them both ways.
+- A message Proton distrusts carries `phishing`, `suspicious` or `dmarc_failed` in a listing and a read. `mail messages mark legitimate` and `mark phishing` answer a verdict.
+- `account keys reactivate` opens the keys a password reset locked, with the previous password, a recovery phrase or a recovery file. `drive volumes list`, `restore` and `delete` handle the Drive volume the same reset locked.
+
+### Changed
+
+- Data sealed to a key a password reset locked says so and names the remedy, instead of failing as a bug worth reporting.
+- A message that will not decrypt fails the read rather than printing `(decryption failed)` where the body goes. A thread drops that message and warns, an export keeps the armour, and a reply refuses rather than quoting ciphertext.
+- Every Drive command works in the active volume rather than whichever one Proton lists first.
+- Both attachment download commands take an attachment's own name, not only its ID.
+- YAML is rendered from the JSON, so `api` keeps Proton's key order and an integer too wide for `int64`.
+
+### Fixed
+
+- A Pass backup restores with its dates, its trash and its alias addresses intact, and an export carries trashed items.
+- An archive too large to read says so, instead of being reported as a file some other password manager wrote.
+- Prompts are no longer padded to a common column.
+
+### Security
+
+- A raw `proton api` request counts as a deletion whichever method it carries, so `PROTON_CONFIRM='deletions=deny'` covers it. Proton deletes with `PUT` as well as `DELETE`, so a fence reading the method never held. That policy now turns `proton api` off entirely, reads included.
+- An export written with `--force` is private whatever the permissions of the file it replaced. Files are published by rename, so a destination cannot be swapped for a symlink between the moment it is checked and the moment it is written.
+- Text from a message can no longer drive your terminal. On a terminal only `proton`'s own styling is passed through and anything else is shown; redirected and piped output carries its bytes exactly.
+- The log `proton report` collects no longer keeps an address written into a warning, or the name of a Pass item written into an error.
+- Release artifacts are built from actions pinned to commits rather than moveable tags, and only from a commit the checks ran on.
+
 ## [3.7.0] - 2026-09-10
 
 ### Added

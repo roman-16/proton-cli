@@ -246,6 +246,30 @@ func runJSONArray(t *testing.T, args ...string) []interface{} {
 	return parseJSONArray(t, runOK(t, asJSON(args)...))
 }
 
+// listAll is runJSONArray for a listing a test searches rather than samples.
+//
+// A page holds fifty rows unless something says otherwise, so a test asking
+// whether the account holds the thing it just made is otherwise asking only
+// about the first page of it. What is on that page depends on how much the
+// account happens to hold, which is how a test that looks for one item passes
+// for a year and then fails without anything having changed.
+func listAll(t *testing.T, args ...string) []interface{} {
+	t.Helper()
+	return runJSONArray(t, whole(args)...)
+}
+
+// listAllSecondary is listAll on the second account.
+func listAllSecondary(t *testing.T, args ...string) []interface{} {
+	t.Helper()
+	return runJSONArraySecondary(t, whole(args)...)
+}
+
+// whole asks for every row rather than a page. It goes at the end, where a
+// listing's own flags go: --page-size belongs to the leaf command, not the root.
+func whole(args []string) []string {
+	return append(append([]string{}, args...), "--page-size", "0")
+}
+
 // runArgs executes the CLI as the primary account without a *testing.T, so the
 // fixtures and cleanups that run outside a test can invoke it.
 func runArgs(stdin io.Reader, args ...string) (stdout, stderr string, exitCode int, err error) {

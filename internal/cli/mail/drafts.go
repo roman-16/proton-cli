@@ -131,7 +131,7 @@ func draftsUpdateCmd() *cobra.Command {
 // matchDraftAttachment resolves a --detach value against the draft's own
 // attachments, which are named the way every other attachment is.
 func matchDraftAttachment(draft *mailsvc.Draft, spec string) (string, error) {
-	at, err := mailsvc.MatchAttachment(spec, draft.AttachmentList(),
+	at, err := mailsvc.MatchAttachment("on that draft", spec, draft.AttachmentList(),
 		func(a mailsvc.DraftAttachment) mailsvc.Attachment {
 			return mailsvc.Attachment{ID: a.ID, Name: a.Name, Size: a.Size}
 		})

@@ -98,14 +98,10 @@ func (a *App) Ended(code int, err error) {
 	if !a.started.IsZero() {
 		elapsed = time.Since(a.started).Milliseconds()
 	}
-	detail := ""
-	if err != nil {
-		detail = err.Error()
-	}
 	if code == 0 {
-		a.UI.Trace.Info("run finished", "exit", code, "duration", elapsed, "error", detail)
+		a.UI.Trace.Info("run finished", "exit", code, "duration", elapsed, "error", err)
 	} else {
-		a.UI.Trace.Error("run failed", "exit", code, "duration", elapsed, "error", detail)
+		a.UI.Trace.Error("run failed", "exit", code, "duration", elapsed, "error", err)
 	}
 	_ = a.run.Close()
 }

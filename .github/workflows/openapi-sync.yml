@@ -21,9 +21,9 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: jetify-com/devbox-install-action@v0.15.0
+      - uses: jetify-com/devbox-install-action@8c6a66ed6273138b1915457069de78cb52fe3bd7 # v0.15.0
 
       - name: Regenerate openapi.yaml
         run: |

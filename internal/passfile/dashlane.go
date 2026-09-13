@@ -97,7 +97,7 @@ func readDashlaneZip(in source, z *zip.ReadCloser) (*Document, error) {
 			continue
 		}
 		found = true
-		raw, err := readZipEntry(f)
+		raw, err := readZipEntry(in, f)
 		if err != nil {
 			return nil, err
 		}
@@ -215,17 +215,4 @@ func dashlaneIdentity(r row) *pb.ItemIdentity {
 		idn.Company = r.get("item_name")
 	}
 	return idn
-}
-
-func zipEntry(z *zip.ReadCloser, name string) *zip.File {
-	for _, f := range z.File {
-		if strings.EqualFold(zipBase(f.Name), name) {
-			return f
-		}
-	}
-	return nil
-}
-
-func zipBase(name string) string {
-	return name[strings.LastIndexAny(name, `/\`)+1:]
 }

@@ -18,13 +18,18 @@ func TestPassVaultsList(t *testing.T) {
 	assertContains(t, stdout, "ID")
 }
 
-// createVault makes a vault, waiting out the seconds Proton goes on counting one
-// that has just been deleted.
+// createVault makes a vault and does not return until Proton will answer about
+// it, waiting out both of the delays around one.
 //
 // The free plan allows two and the fixture holds one, so every test that makes a
 // vault takes the same spare slot. The lease hands it over the moment the delete
 // returns, but the quota it is counted against catches up a few seconds later,
 // and until it does the answer is that you cannot have another.
+//
+// The second delay is at the other end: Pass answers a write before every reader
+// of it agrees the thing is there, so a name resolved moments after the vault
+// was made can be resolved against a listing that has not got it yet. Waiting
+// here rather than in each test is what keeps that race out of all of them.
 func createVault(t *testing.T, name string) string {
 	t.Helper()
 	var ref string
@@ -41,6 +46,11 @@ func createVault(t *testing.T, name string) string {
 	})
 	if ref == "" {
 		t.Fatal("the spare vault slot never came back")
+	}
+	if !waitFor(30*time.Second, time.Second, func() bool {
+		return strings.Contains(runOK(t, "pass", "vaults", "list"), name)
+	}) {
+		t.Fatalf("pass never listed the vault it had just made: %s", name)
 	}
 	return ref
 }
