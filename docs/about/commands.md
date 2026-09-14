@@ -221,8 +221,14 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton pass aliases enable`](../pass/aliases.md#enable) | Start receiving mail sent to an alias |
 | [`proton pass aliases list`](../pass/aliases.md#list) | List your aliases |
 | [`proton pass aliases options`](../pass/aliases.md#options) | List the suffixes and mailboxes an alias can use |
+| [`proton pass breaches create`](../pass/breaches.md#create) | Have Proton watch an address you own elsewhere |
+| [`proton pass breaches delete`](../pass/breaches.md#delete) | Stop Proton watching an address you added |
+| [`proton pass breaches disable`](../pass/breaches.md#disable) | Stop Proton watching an address |
+| [`proton pass breaches enable`](../pass/breaches.md#enable) | Have Proton watch an address again |
 | [`proton pass breaches get`](../pass/breaches.md#get) | Show the breaches one address has appeared in |
 | [`proton pass breaches list`](../pass/breaches.md#list) | List the addresses Proton watches, and how many breaches each is in |
+| [`proton pass breaches resend`](../pass/breaches.md#resend) | Send the confirmation code again |
+| [`proton pass breaches verify`](../pass/breaches.md#verify) | Confirm an address with the code Proton emailed it |
 | [`proton pass invitations accept`](../pass/invitations.md#accept) | Take what somebody offered you |
 | [`proton pass invitations decline`](../pass/invitations.md#decline) | Turn down what somebody offered you |
 | [`proton pass invitations list`](../pass/invitations.md#list) | List what other people have offered you |

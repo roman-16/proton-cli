@@ -210,6 +210,16 @@ List items across your vaults.
 
 Takes the same filters as trash and delete, so you can preview a selection here before acting on it.
 
+--risk is Pass Monitor's password health, and keeps only the logins that fail one check. A RISK column says what was found, numbering the logins that share one password so two pairs do not read as one group of four. Anything excluded from Proton's security checks is left out of all of them.
+
+--risk weak is this program's own reading: a password shorter than twelve characters, or shorter than sixteen and drawn from fewer than three of lowercase, uppercase, digits and symbols. Pass judges strength its own way, so the two can disagree.
+
+--risk missing-2fa names the logins for sites that offer a time-based code and have neither a code nor a passkey stored against them.
+
+--risk compromised asks a public corpus of leaked passwords whether yours are in it, one request per password you have stored. It is the only check that reaches the network, and it sends the first six hexadecimal characters of each password's SHA-1 - one bucket in sixteen million - to credential-check.protonweb.com, never the password and never the whole hash.
+
+No check prints a password; `items get` is still the only command that does.
+
 ```
 proton pass items list
 ```
@@ -218,6 +228,10 @@ proton pass items list
 proton pass items list
 proton pass items list --vault Work
 proton pass items list --type login
+proton pass items list --risk reused
+proton pass items list --risk weak --vault Work
+proton pass items list --risk missing-2fa
+proton pass items list --risk compromised
 ```
 
 | Flag | Description |
@@ -227,6 +241,7 @@ proton pass items list --type login
 | `--older-than string` | Match items older than DURATION (e.g. 30d, 2w, 1h) |
 | `--page int` | Which page of results, counting from zero |
 | `--page-size int` | How many items per page; 0 for all of them (default `50`) |
+| `--risk string` | Keep only the logins failing this password check: compromised, missing-2fa, reused, weak |
 | `--sort string` | Order by: name, type, modified, created (default `name`) |
 | `--type string` | Match only this kind of item: login, note, credit-card, wifi, ssh-key, identity, alias, custom |
 | `--vault string` | Match only this vault, by name or ID |

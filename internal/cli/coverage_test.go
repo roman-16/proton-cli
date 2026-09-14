@@ -87,6 +87,21 @@ var untested = map[string]string{
 	"GET /pass/v1/user/alias/mailbox/{n}/verify":  "sending the confirmation code again",
 	"POST /pass/v1/user/alias/mailbox/{n}/verify": "handing the confirmation code back",
 
+	// Confirming a watched address, which is the same guard a third time. A run
+	// adds one address and spends the one verification email that costs; asking
+	// for the email again is what the quota is counted in, and the code itself
+	// arrives at a domain that takes no mail, so there is nothing to hand back
+	// even if spending an attempt every run were free.
+	//
+	// The last two follow from it. Proton is not watching an address nobody has
+	// verified, so there is nothing there to read and nothing to pause - it
+	// refuses both, and so does the CLI, before the request. What is tested is
+	// adding the address, the three refusals, and removing it.
+	"POST /pass/v1/breach/custom_email/{id}/resend_verification": "asking for a second verification email is what Proton's quota counts",
+	"PUT /pass/v1/breach/custom_email/{id}/verify":               "handing back a code that arrives in a mailbox no run can read",
+	"GET /pass/v1/breach/custom_email/{id}/breaches":             "needs a verified address added by hand, and no run can verify one",
+	"PUT /pass/v1/breach/custom_email/{id}/monitor":              "the same: Proton is not watching an unverified address, so there is nothing to pause",
+
 	// The auto-reply is a paid feature, so only the paid account could reach it -
 	// and it is the one setting a run cannot put back. Proton keeps the last
 	// message even while the auto-reply is off and offers no way to clear it
@@ -119,13 +134,8 @@ var untested = map[string]string{
 	"PUT /drive/devices/{id}":    "the same, and it fires only for a computer named before Proton moved the name onto the root",
 	"DELETE /drive/devices/{id}": "the same, and deleting the one computer an account has cannot be undone by a run",
 
-	// Reading a breach needs an address that has been in one. TestPassBreaches...
-	// asks for the list and stops when every watched address is clean, which is
-	// the good outcome and an untestable one.
-	"GET /pass/v1/breach/address/{id}/breaches":      "needs a watched address that has actually been breached",
-	"GET /pass/v1/breach/custom_email/{id}/breaches": "needs a breached address added by hand, which is the same problem",
-	"POST /mail/v4/messages/{id}/unsubscribe":        "reaching it needs a message from a real mailing list carrying a List-Unsubscribe header, which no seeding can put on these accounts",
-	"GET /calendar/v1/{id}/events/{id}/attendees":    "reaching it needs an event with more attendees than a page holds, which would mean inviting a hundred addresses from these accounts",
+	"POST /mail/v4/messages/{id}/unsubscribe":     "reaching it needs a message from a real mailing list carrying a List-Unsubscribe header, which no seeding can put on these accounts",
+	"GET /calendar/v1/{id}/events/{id}/attendees": "reaching it needs an event with more attendees than a page holds, which would mean inviting a hundred addresses from these accounts",
 
 	// Deleting an address. Proton allows one a year, and the paid account - the
 	// one account that may delete at all - refuses the command outright, so

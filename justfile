@@ -108,6 +108,10 @@ webclients:
     update 2>/dev/null || clone
     git -C {{ webClients }} --no-pager log --max-count=1 --format='WebClients %h %cs %s'
 
+[doc("Rewrite the list of domains that offer a two-factor code, from 2fa.directory")]
+twofa:
+    go run ./scripts/twofa
+
 [doc("Regenerate the Pass protobuf bindings")]
 proto:
     protoc --proto_path=internal/service/pass/proto/protos \

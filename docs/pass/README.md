@@ -361,18 +361,49 @@ proton pass settings extra-password disable
 
 To change it, turn it off and on again.
 
-## History and breaches
+## History
 
 ```bash
 proton pass items revisions list github.com    # every edit, newest first
 proton pass items revisions get github.com 3   # one version, decrypted
 proton pass items revisions restore github.com 3
-proton pass breaches list                      # worst first
-proton pass breaches get jane@proton.me
 ```
 
 Pass keeps every edit, so a password changed by mistake can be read back. A revision written under a key this account no longer holds is still listed by its number.
 
 `revisions restore` writes that version as the newest one, so nothing in the history is lost. It changes the item's fields; attachments are left as they are.
 
-`breaches` is Pass Monitor: which of your addresses have turned up in somebody else's data breach, when, and what was exposed. If a password leaked in the clear it shows the last few characters, which is what tells you which one to change. Nothing here writes.
+## Check your passwords
+
+```bash
+proton pass items list --risk reused           # which logins share a password
+proton pass items list --risk weak
+proton pass items list --risk missing-2fa      # a site offers a code and you store none
+proton pass items list --risk compromised      # the password has leaked somewhere
+```
+
+This is Pass Monitor's password health. Each check keeps only the logins that fail it and adds a RISK column saying what was found. Logins sharing one password carry the same number, so two pairs do not read as one group of four. Anything you excluded from Proton's security checks is left out of all of them.
+
+`--risk weak` is `proton`'s own reading: a password shorter than twelve characters, or shorter than sixteen and drawn from fewer than three of lowercase, uppercase, digits and symbols. Pass judges strength its own way, so the two can disagree.
+
+`--risk compromised` is the only check that reaches the network. It sends the first six hexadecimal characters of each password's SHA-1 to `credential-check.protonweb.com`, never the password and never the whole hash, and asks one question per password you have stored.
+
+No check prints a password. `proton pass items get` is still the only command that does.
+
+## Breaches
+
+```bash
+proton pass breaches list                      # worst first
+proton pass breaches get jane@proton.me
+proton pass breaches create me@example.com     # watch an address you own elsewhere
+proton pass breaches verify me@example.com --code 123456
+proton pass breaches disable jane.work@proton.me
+```
+
+`breaches` is Pass Monitor's other half: which of your addresses have turned up in somebody else's data breach, when, and what was exposed. If a password leaked in the clear it shows the last few characters, which is what tells you which one to change.
+
+Three kinds of address are watched, shown in the TYPE column: `proton` for the ones on your account, `alias` for the hide-my-email aliases in your vaults, and `custom` for the ones you added. Listing the aliases reads your vaults, so `breaches list` costs what `items list` costs.
+
+STATE says what has to happen next. An address you added is `unverified` until you hand back the code Proton emailed it with `verify`; `resend` sends the code again. Until then Proton is not watching it, so `get`, `enable` and `disable` refuse. `paused` means you told Proton to stop watching, which `enable` undoes.
+
+`delete` removes an address you added, and its breach history with it. To stop Proton watching one of your own addresses or an alias, use `disable`. Pausing an alias also leaves it out of the password checks above, which is the same switch.

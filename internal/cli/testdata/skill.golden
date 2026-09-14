@@ -53,7 +53,7 @@ These are the listings that can be narrowed, and what narrows them. The same fla
 - `proton mail messages list --after string --before string --folder string --from string --keyword string --newer-than string --older-than string --page int --page-size int --starred --subject string --to string --unread`
 - `proton pass aliases list --vault string`
 - `proton pass items attachments list REF --removed`
-- `proton pass items list --desc --newer-than string --older-than string --page int --page-size int --sort string --type string --vault string`
+- `proton pass items list --desc --newer-than string --older-than string --page int --page-size int --risk string --sort string --type string --vault string`
 
 Mail looks in the inbox unless told otherwise, and `--folder all` is what a question about "my mail" usually means.
 
@@ -168,7 +168,7 @@ One line per group, with the verbs under it. Arguments, flags and examples are i
 - `proton pass` - export, generate, import
 - `proton pass aliases` - Hide-my-email addresses that forward to you: create, disable, enable, list, options
 - `proton pass aliases contacts` - Addresses an alias can write to: allow, block, create, delete, list
-- `proton pass breaches` - Addresses that have appeared in a data breach: get, list
+- `proton pass breaches` - Addresses that have appeared in a data breach: create, delete, disable, enable, get, list, resend, verify
 - `proton pass invitations` - What other people have offered you: accept, decline, list
 - `proton pass items` - Logins, notes, cards and the rest: create, delete, get, list, move, pin, totp, trash, unpin, update
 - `proton pass items attachments` - Files attached to an item: download, list, restore, update

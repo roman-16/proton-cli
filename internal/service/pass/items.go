@@ -51,6 +51,19 @@ type Item struct {
 	// request of its own, so it is read with the item rather than listed.
 	Alias       string `json:"alias,omitempty"`
 	AliasStatus string `json:"alias_status,omitempty"`
+
+	// Risk is what a password-health check found wrong with this login, and is
+	// set only on the rows a listing that asked for one hands back.
+	Risk Risk `json:"risk,omitempty"`
+	// ReuseGroup ties together the logins that share one password, so two pairs
+	// never read as one group of four. It is set only by the reuse check.
+	ReuseGroup int `json:"reuse_group,omitempty"`
+
+	// monitored is whether Proton's security checks apply to this item, and
+	// breached is whether an alias's address has turned up in a leak. Both are
+	// item flags, so both are known without a request of their own.
+	monitored bool
+	breached  bool
 }
 
 // FullItem is one item decrypted whole, secrets included.
@@ -92,12 +105,25 @@ type FullItem struct {
 	// hasAttachments is the item saying it carries files, which is what lets a
 	// backup read only the items that have any.
 	hasAttachments bool
+	// hasPasskeys says the login can be signed into without a password at all,
+	// which is a second factor by another name and what stops the two-factor
+	// check reporting it.
+	hasPasskeys bool
 }
 
-// aliasDisabled is the item flag Proton sets on an alias that has been switched
-// off, so whether an alias is receiving is known from the item itself rather than
-// from a request per address.
-const aliasDisabled = 1 << 2
+// The item flags this CLI reads.
+//
+// skipHealthCheck is one bit with two names in Proton's own interface: it is
+// what excludes a login from the password checks, and it is also what turns dark
+// web monitoring off for an alias. One bit, so one thing here.
+const (
+	skipHealthCheck = 1 << 0
+	emailBreached   = 1 << 1
+	// aliasDisabled says an alias has been switched off, so whether an alias is
+	// receiving is known from the item itself rather than from a request per
+	// address.
+	aliasDisabled = 1 << 2
+)
 
 // aliasStatus is the word for an alias's switch. Only an alias has one.
 func aliasStatus(kind string, flags int) string {
@@ -351,6 +377,8 @@ func (s *Service) ItemGet(ctx context.Context, shareID, itemID string) (*FullIte
 	out.ModifyTime = r.Item.ModifyTime
 	out.Alias = r.Item.AliasEmail
 	out.AliasStatus = aliasStatus(out.Type, r.Item.Flags)
+	out.monitored = r.Item.Flags&skipHealthCheck == 0
+	out.breached = r.Item.Flags&emailBreached != 0
 	if r.Item.Flags&hasFiles != 0 {
 		// The item says whether it carries files, so an item with none costs no
 		// request to find that out.
@@ -971,6 +999,8 @@ func (s *Service) fetchItems(ctx context.Context, shareID string, sk *shareKeys,
 			item.Alias = enc.AliasEmail
 			item.AliasStatus = aliasStatus(item.Type, enc.Flags)
 			item.Shares = enc.ShareCount
+			item.monitored = enc.Flags&skipHealthCheck == 0
+			item.breached = enc.Flags&emailBreached != 0
 			item.hasAttachments = enc.Flags&hasFiles != 0
 			out = append(out, *item)
 		}
@@ -996,6 +1026,7 @@ func itemFromProto(it *pb.Item) *FullItem {
 		item.Password = c.Login.Password
 		item.TOTP = c.Login.TotpUri
 		item.URLs = passfile.LoginURLs(c.Login)
+		item.hasPasskeys = len(c.Login.Passkeys) > 0
 	case *pb.Content_CreditCard:
 		item.Holder = c.CreditCard.CardholderName
 		item.Number = c.CreditCard.Number

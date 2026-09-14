@@ -740,6 +740,24 @@ var examples = map[string][]string{
 	"proton pass breaches get": {
 		"proton pass breaches get jane@proton.me",
 	},
+	"proton pass breaches create": {
+		"proton pass breaches create me@example.com",
+	},
+	"proton pass breaches verify": {
+		"proton pass breaches verify me@example.com --code 123456",
+	},
+	"proton pass breaches resend": {
+		"proton pass breaches resend me@example.com",
+	},
+	"proton pass breaches delete": {
+		"proton pass breaches delete me@example.com",
+	},
+	"proton pass breaches enable": {
+		"proton pass breaches enable jane@proton.me",
+	},
+	"proton pass breaches disable": {
+		"proton pass breaches disable jane@proton.me",
+	},
 	"proton pass export": {
 		"proton pass export --dest pass-backup.zip --passphrase-file ~/.backup-passphrase",
 		"proton pass export --dest pass-backup.zip",
@@ -764,6 +782,10 @@ var examples = map[string][]string{
 		"proton pass items list",
 		"proton pass items list --vault Work",
 		"proton pass items list --type login",
+		"proton pass items list --risk reused",
+		"proton pass items list --risk weak --vault Work",
+		"proton pass items list --risk missing-2fa",
+		"proton pass items list --risk compromised",
 	},
 	"proton pass items get": {
 		"proton pass items get github.com",

@@ -3,12 +3,14 @@ package pass
 import (
 	stdctx "context"
 	"fmt"
+	"net/http"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/roman-16/proton-cli/internal/cli/kit"
+	"github.com/roman-16/proton-cli/internal/credcheck"
 	"github.com/roman-16/proton-cli/internal/otp"
 	passsvc "github.com/roman-16/proton-cli/internal/service/pass"
 	"github.com/roman-16/proton-cli/internal/ui"
@@ -90,6 +92,19 @@ func itemColumns() []ui.Column[passsvc.Item] {
 	}
 }
 
+// riskColumn says what a check found, and which logins share one password.
+//
+// The group number is what makes a reuse listing readable: without it two pairs
+// sharing two different passwords read as one group of four.
+func riskColumn() ui.Column[passsvc.Item] {
+	return ui.Column[passsvc.Item]{Header: "RISK", Cell: func(it passsvc.Item) string {
+		if it.ReuseGroup > 0 {
+			return fmt.Sprintf("%s #%d", it.Risk, it.ReuseGroup)
+		}
+		return string(it.Risk)
+	}}
+}
+
 // itemOrder is how a Pass listing may be ordered. Every vault's items arrive as
 // one batch and are decrypted here, so the whole set is in hand.
 func itemOrder() kit.Comparators[passsvc.Item] {
@@ -105,33 +120,86 @@ func itemsListCmd() *cobra.Command {
 	var f filters
 	var page kit.Page
 	var order kit.Order
+	risk := &kit.Enum{
+		Name: "risk", Usage: "Keep only the logins failing this password check",
+		Values: passsvc.Risks(),
+	}
 	c := &cobra.Command{
 		Use:   "list",
 		Short: "List items across your vaults",
 		Long: "List items across your vaults.\n\n" +
 			"Takes the same filters as trash and delete, so you can preview a selection\n" +
-			"here before acting on it.",
+			"here before acting on it.\n\n" +
+			"--risk is Pass Monitor's password health, and keeps only the logins that\n" +
+			"fail one check. A RISK column says what was found, numbering the logins that\n" +
+			"share one password so two pairs do not read as one group of four. Anything\n" +
+			"excluded from Proton's security checks is left out of all of them.\n\n" +
+			"--risk weak is this program's own reading: a password shorter than twelve\n" +
+			"characters, or shorter than sixteen and drawn from fewer than three of\n" +
+			"lowercase, uppercase, digits and symbols. Pass judges strength its own way,\n" +
+			"so the two can disagree.\n\n" +
+			"--risk missing-2fa names the logins for sites that offer a time-based code\n" +
+			"and have neither a code nor a passkey stored against them.\n\n" +
+			"--risk compromised asks a public corpus of leaked passwords whether yours\n" +
+			"are in it, one request per password you have stored. It is the only check\n" +
+			"that reaches the network, and it sends the first six hexadecimal characters\n" +
+			"of each password's SHA-1 - one bucket in sixteen million - to\n" +
+			credcheck.Host + ", never the password and never the whole hash.\n\n" +
+			"No check prints a password; `items get` is still the only command that does.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
-			items, err := matchItems(c.Ctx, c, &f)
+			items, err := matchRiskyItems(c, &f, risk)
 			if err != nil {
 				return err
 			}
 			if err := kit.Sort(order, items, itemOrder()); err != nil {
 				return err
 			}
+			columns := itemColumns()
+			if risk.Set() {
+				columns = append(columns, riskColumn())
+			}
 			rows, total := kit.Slice(page, items)
 			return kit.List(c, ui.TableSpec[passsvc.Item]{
-				Noun: "items", Columns: itemColumns(),
+				Noun: "items", Columns: columns,
 				Total: total, Page: page.Number, PageSize: page.Size,
-				Filtered: f.narrowed(),
+				Filtered: f.narrowed() || risk.Set(),
 			}, rows)
 		}),
 	}
 	f.registerNarrowing(c)
+	risk.Register(c)
 	order.Register(c, "name", "type", "modified", "created")
 	page.Register(c, "items")
 	return c
 }
+
+// matchRiskyItems is the listing with a check in front of it, or the ordinary
+// listing when none was asked for.
+//
+// A check reads the logins and nothing else, so --type is the one filter it has
+// no room for: asking for weak notes is asking for nothing.
+func matchRiskyItems(c *kit.Invocation, f *filters, risk *kit.Enum) ([]passsvc.Item, error) {
+	chosen, err := risk.Value()
+	if err != nil || chosen == "" {
+		if err != nil {
+			return nil, err
+		}
+		return matchItems(c.Ctx, c, f)
+	}
+	if kind, _ := f.itemType.Value(); kind != "" && kind != "login" {
+		return nil, kit.Fail("--risk looks at logins, so --type %s selects nothing.", kind)
+	}
+	vaultRef, err := kit.Expand(c.App, f.vault)
+	if err != nil {
+		return nil, err
+	}
+	return c.App.Pass.AtRisk(c.Ctx, vaultRef, passsvc.Risk(chosen),
+		&http.Client{Timeout: corpusTimeout})
+}
+
+// corpusTimeout bounds one bucket fetch. The corpus is somebody else's host, and
+// a listing that hangs on it is worse than one that says it could not be read.
+const corpusTimeout = 30 * time.Second
 
 func itemsGetCmd() *cobra.Command {
 	return &cobra.Command{

@@ -15,6 +15,7 @@ DELETE /mail/v4/attachments/{id}
 DELETE /mail/v4/filters/{id}
 DELETE /mail/v4/forwardings/{id}
 DELETE /mail/v4/messages/empty
+DELETE /pass/v1/breach/custom_email/{id}
 DELETE /pass/v1/invite/{id}
 DELETE /pass/v1/public_link/{id}
 DELETE /pass/v1/share/{id}/alias/{id}/contact/{n}
@@ -90,11 +91,13 @@ GET /mail/v4/messages
 GET /mail/v4/messages/{id}
 GET /mail/v4/settings
 GET /pass/v1/breach
+GET /pass/v1/breach/address/{id}/breaches
 GET /pass/v1/invite
 GET /pass/v1/public_link
 GET /pass/v1/share
 GET /pass/v1/share/{id}/alias/options
 GET /pass/v1/share/{id}/alias/{id}
+GET /pass/v1/share/{id}/alias/{id}/breaches
 GET /pass/v1/share/{id}/alias/{id}/contact
 GET /pass/v1/share/{id}/invite
 GET /pass/v1/share/{id}/item
@@ -158,6 +161,7 @@ POST /mail/v4/messages
 POST /mail/v4/messages/apply-filters
 POST /mail/v4/messages/{id}
 POST /mail/v4/messages/{id}/cancel_send
+POST /pass/v1/breach/custom_email
 POST /pass/v1/file
 POST /pass/v1/file/{id}/chunk
 POST /pass/v1/invite/{id}
@@ -231,12 +235,14 @@ PUT /mail/v4/messages/unread
 PUT /mail/v4/messages/{id}
 PUT /mail/v4/messages/{id}/mark/ham
 PUT /mail/v4/settings/viewmode
+PUT /pass/v1/breach/address/{id}/monitor
 PUT /pass/v1/share/{id}/alias/{id}/contact/{n}/blocked
 PUT /pass/v1/share/{id}/alias/{id}/name
 PUT /pass/v1/share/{id}/alias/{id}/status
 PUT /pass/v1/share/{id}/item/share
 PUT /pass/v1/share/{id}/item/{id}
 PUT /pass/v1/share/{id}/item/{id}/file/{id}/metadata
+PUT /pass/v1/share/{id}/item/{id}/flags
 PUT /pass/v1/share/{id}/user/{id}
 PUT /pass/v1/user/alias/settings/default_mailbox_id
 PUT /pass/v1/vault/{id}

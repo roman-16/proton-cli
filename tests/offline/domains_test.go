@@ -67,9 +67,18 @@ func TestFlagValueOutsideItsDomainIsRefused(t *testing.T) {
 			[]string{"--sort accepts:", "name", "size", "modified"}},
 		{[]string{"pass", "items", "list", "--sort", "nope"},
 			[]string{"--sort accepts:", "name", "type", "modified", "created"}},
+		{[]string{"pass", "items", "list", "--risk", "nope"},
+			[]string{"--risk accepts:", "compromised", "missing-2fa", "reused", "weak"}},
 	} {
 		refuses(t, 1, tt.args, tt.phrases...)
 	}
+}
+
+// A password check looks at logins, so asking for weak notes is asking for
+// nothing - and it is the command line alone that says so.
+func TestARiskOnSomethingWithNoPasswordIsRefused(t *testing.T) {
+	refuses(t, 1, []string{"pass", "items", "list", "--risk", "weak", "--type", "note"},
+		"--risk looks at logins")
 }
 
 // A tag is referenced by name only, so Proton's own number for it is refused

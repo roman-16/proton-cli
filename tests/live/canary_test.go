@@ -43,29 +43,34 @@ var collections = []struct {
 	name string
 	args []string
 	id   string
-	// label is the field a row is named by in the report, so what turned up is
-	// readable rather than an identifier nobody can place.
-	label string
+	// fields are what a row is read by in the report, so what turned up is
+	// readable rather than an identifier nobody can place - and, where a row
+	// carries a state a run could change, what says the state came back too.
+	fields []string
 }{
 	// The newest of the inbox, because a run can leave mail behind: sharing
 	// something makes Proton write to you when the other side answers. Only the
 	// newest are photographed - the rest is somebody's real mail and none of the
 	// suite's business.
-	{"inbox", []string{"mail", "messages", "list", "--folder", "inbox", "--page-size", "25"}, "id", "subject"},
-	{"calendars", []string{"calendar", "settings", "calendars", "list"}, "id", "name"},
-	{"vaults", []string{"pass", "vaults", "list"}, "share_id", "name"},
-	{"pass items", []string{"pass", "items", "list"}, "item_id", "name"},
-	{"labels", []string{"mail", "settings", "labels", "list"}, "id", "name"},
-	{"folders", []string{"mail", "settings", "folders", "list"}, "id", "name"},
-	{"filters", []string{"mail", "settings", "filters", "list"}, "id", "name"},
-	{"addresses", []string{"mail", "settings", "addresses", "list"}, "id", "name"},
-	{"forwardings", []string{"mail", "settings", "forwarding", "list"}, "id", "to"},
-	{"contacts", []string{"contacts", "list"}, "id", "name"},
-	{"contact groups", []string{"contacts", "groups", "list"}, "id", "name"},
-	{"alias mailboxes", []string{"pass", "settings", "mailboxes", "list"}, "id", "email"},
-	{"alias contacts", []string{"pass", "aliases", "contacts", "list", fixture.PaidAlias}, "id", "email"},
-	{"secure links", []string{"pass", "links", "list"}, "link_id", "item_id"},
-	{"drive root", []string{"drive", "items", "list", "/"}, "id", "name"},
+	{"inbox", []string{"mail", "messages", "list", "--folder", "inbox", "--page-size", "25"}, "id", []string{"subject"}},
+	{"calendars", []string{"calendar", "settings", "calendars", "list"}, "id", []string{"name"}},
+	{"vaults", []string{"pass", "vaults", "list"}, "share_id", []string{"name"}},
+	{"pass items", []string{"pass", "items", "list"}, "item_id", []string{"name"}},
+	// The one listing whose rows carry a state a test can change, so the state is
+	// compared beside the address: a run that left Proton no longer watching one
+	// is exactly as much of a residue as one that left an address behind.
+	{"watched addresses", []string{"pass", "breaches", "list"}, "address_id", []string{"email", "state"}},
+	{"labels", []string{"mail", "settings", "labels", "list"}, "id", []string{"name"}},
+	{"folders", []string{"mail", "settings", "folders", "list"}, "id", []string{"name"}},
+	{"filters", []string{"mail", "settings", "filters", "list"}, "id", []string{"name"}},
+	{"addresses", []string{"mail", "settings", "addresses", "list"}, "id", []string{"name"}},
+	{"forwardings", []string{"mail", "settings", "forwarding", "list"}, "id", []string{"to"}},
+	{"contacts", []string{"contacts", "list"}, "id", []string{"name"}},
+	{"contact groups", []string{"contacts", "groups", "list"}, "id", []string{"name"}},
+	{"alias mailboxes", []string{"pass", "settings", "mailboxes", "list"}, "id", []string{"email"}},
+	{"alias contacts", []string{"pass", "aliases", "contacts", "list", fixture.PaidAlias}, "id", []string{"email"}},
+	{"secure links", []string{"pass", "links", "list"}, "link_id", []string{"item_id"}},
+	{"drive root", []string{"drive", "items", "list", "/"}, "id", []string{"name"}},
 }
 
 // settingsPages are the values a run must leave exactly as it found them,
@@ -119,7 +124,7 @@ func paidCameBack() bool {
 func takePhotograph() paid.Photograph {
 	out := paid.Photograph{}
 	for _, c := range collections {
-		rows, ok := readRows(c.args, c.id, c.label)
+		rows, ok := readRows(c.args, c.id, c.fields)
 		if !ok {
 			fmt.Fprintf(os.Stderr, "could not read %s from the paid account\n", c.name)
 			return nil
@@ -138,7 +143,7 @@ func takePhotograph() paid.Photograph {
 }
 
 // readRows lists a collection and returns one line per row.
-func readRows(args []string, idKey, labelKey string) ([]string, bool) {
+func readRows(args []string, idKey string, fields []string) ([]string, bool) {
 	body, _, code, err := runAs(account.Paid, nil, asJSON(args)...)
 	if err != nil || code != 0 {
 		return nil, false
@@ -154,8 +159,13 @@ func readRows(args []string, idKey, labelKey string) ([]string, bool) {
 		if id == "" {
 			id, _ = m["id"].(string)
 		}
-		label, _ := m[labelKey].(string)
-		out = append(out, strings.TrimSpace(label+" "+id))
+		line := make([]string, 0, len(fields)+1)
+		for _, f := range fields {
+			if v, _ := m[f].(string); v != "" {
+				line = append(line, v)
+			}
+		}
+		out = append(out, strings.TrimSpace(strings.Join(append(line, id), " ")))
 	}
 	// Sorted, because a listing's order is Proton's to choose and two runs have
 	// to be comparable.

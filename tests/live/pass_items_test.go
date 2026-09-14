@@ -166,6 +166,73 @@ func TestPassItemsListVaultFilter(t *testing.T) {
 	runOK(t, "pass", "items", "list", "--vault", vault)
 }
 
+// Pass Monitor's password health: every check over the account's real logins.
+//
+// What each one finds is whatever is in the vaults, so the assertion is on the
+// shape - a row is a login, and it says which check it failed - rather than on
+// how many there are. Two logins are made first so the reuse check has a pair to
+// find whatever else is there.
+func TestPassItemsListByRisk(t *testing.T) {
+	// A secret never arrives as a flag value, so the password the pair shares is
+	// written where the binary reads one from.
+	shared := filepath.Join(t.TempDir(), "shared-password")
+	if err := os.WriteFile(shared, []byte("proton-cli-test-Shared-8!"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{testID() + "-risk-a", testID() + "-risk-b"} {
+		runOK(t, "pass", "items", "create", "--type", "login", "--name", name,
+			"--secret-file", "password="+shared, "--url", "https://github.com")
+		cleanupRun(t, "Delete: proton pass items delete "+name,
+			"pass", "items", "delete", name)
+	}
+
+	for _, risk := range []string{"compromised", "missing-2fa", "reused", "weak"} {
+		rows := runJSONArray(t, "pass", "items", "list", "--risk", risk)
+		for _, row := range rows {
+			m, _ := row.(map[string]interface{})
+			if got, _ := m["type"].(string); got != "login" {
+				t.Errorf("--risk %s returned an item of type %q", risk, got)
+			}
+			if got, _ := m["risk"].(string); got != risk {
+				t.Errorf("--risk %s returned a row marked %q", risk, got)
+			}
+			// A listing never prints a secret, whatever it was selected by.
+			if _, printed := m["password"]; printed {
+				t.Fatalf("--risk %s put a password in the listing", risk)
+			}
+		}
+	}
+
+	// The two made above share a password and point at a site that offers a code,
+	// so both checks have something they must find.
+	for _, risk := range []string{"reused", "missing-2fa"} {
+		var found int
+		for _, row := range runJSONArray(t, "pass", "items", "list", "--risk", risk) {
+			m, _ := row.(map[string]interface{})
+			if name, _ := m["name"].(string); strings.Contains(name, "-risk-") {
+				found++
+			}
+		}
+		if found != 2 {
+			t.Errorf("--risk %s found %d of the two logins this test made", risk, found)
+		}
+	}
+
+	// Grouping is what makes a reuse listing readable, so the pair has to carry
+	// one number between them.
+	groups := map[float64]int{}
+	for _, row := range runJSONArray(t, "pass", "items", "list", "--risk", "reused") {
+		m, _ := row.(map[string]interface{})
+		if name, _ := m["name"].(string); strings.Contains(name, "-risk-") {
+			n, _ := m["reuse_group"].(float64)
+			groups[n]++
+		}
+	}
+	if len(groups) != 1 {
+		t.Errorf("the two logins sharing one password landed in %d groups", len(groups))
+	}
+}
+
 func TestPassBatchTrashDryRunByType(t *testing.T) {
 	_, stderr, code := run(t, "--dry-run", "pass", "items", "trash", "--type", "note")
 	if code != 0 {
