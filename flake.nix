@@ -24,7 +24,7 @@
           __structuredAttrs = true;
 
           src = self;
-          vendorHash = "sha256-/bUSjdXg+bb+HdBmWrE2M5PDDhivVdh5FfaRp/Nkcvw=";
+          vendorHash = "sha256-Mt6+PZXvfeJzwBZDWVwZlpsAywYQ2DbnzC4j1NaiOVU=";
 
           subPackages = [ "cmd/proton" ];
 
