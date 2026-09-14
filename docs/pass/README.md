@@ -104,6 +104,21 @@ proton pass items attachments restore Passport passport.pdf
 
 Attachments are not part of an item's version history. `items revisions restore` puts the fields back and leaves the files as they are.
 
+## Passkeys
+
+A login can carry passkeys: credentials a site registered so that it signs you in with no password at all.
+
+```bash
+proton pass items passkeys list github.com
+proton pass items passkeys remove github.com roman
+```
+
+They are made between the site and the browser, so there is no way to add one from here. `items get` shows which a login carries; `passkeys list` shows the domain, the username, when it was made and on what, and `--output json` adds the site's own name, the name it shows you as, the note and the build of Pass that made it.
+
+A passkey is named by its username or by its ID. Taking one off writes a new version of the item, so `items revisions restore` puts it back - but the site keeps its half of the credential either way, and will still offer to sign you in with a passkey this account no longer holds.
+
+A login whose only way in is a passkey has no password to check, so `items list --risk missing-2fa` leaves it out.
+
 ## Move it
 
 ```bash

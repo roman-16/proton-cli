@@ -4,7 +4,7 @@ Logins, notes, cards and the rest.
 
 Every command under `proton pass items`, with the arguments and flags it takes. For these commands in use, see [the pass guide](README.md).
 
-Holds `attachments`, `create`, `delete`, `get`, `list`, `move`, `pin`, `revisions`, `share`, `totp`, `trash`, `unpin` and `update`.
+Holds `attachments`, `create`, `delete`, `get`, `list`, `move`, `passkeys`, `pin`, `revisions`, `share`, `totp`, `trash`, `unpin` and `update`.
 
 ## `attachments`
 
@@ -263,6 +263,46 @@ proton pass items move github.com --into Work
 | Flag | Description |
 | --- | --- |
 | `--into string` | Which vault to put it in, by name or ID |
+
+## `passkeys`
+
+Passkeys stored against a login.
+
+Holds `list` and `remove`.
+
+### `passkeys list`
+
+List the passkeys stored against a login.
+
+A passkey signs in without a password, so a login that carries one may hold no password at all.
+
+--output json carries what a row leaves out: the site's own name, the name it shows you as, the passkey's note, and the build of Pass that made it.
+
+```
+proton pass items passkeys list REF
+```
+
+```bash
+proton pass items passkeys list github.com
+```
+
+### `passkeys remove`
+
+Take a passkey off a login.
+
+PASSKEY_REF is the username or the ID `passkeys list` shows.
+
+The site keeps its half of the credential, so it will still offer to sign you in with a passkey this account no longer holds.
+
+Taking one off is a new version of the item, so `items revisions restore` puts it back.
+
+```
+proton pass items passkeys remove REF PASSKEY_REF...
+```
+
+```bash
+proton pass items passkeys remove github.com roman
+```
 
 ## `pin`
 

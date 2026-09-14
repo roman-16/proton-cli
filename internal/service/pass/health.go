@@ -155,7 +155,7 @@ func missing2FA(logins []FullItem) []Item {
 // hasSecondFactor reports whether anything on the login is already a second
 // factor: the code field, a custom field holding one, or a passkey.
 func hasSecondFactor(it FullItem) bool {
-	if it.TOTP != "" || it.hasPasskeys {
+	if it.TOTP != "" || len(it.Passkeys) > 0 {
 		return true
 	}
 	for _, f := range it.Fields {

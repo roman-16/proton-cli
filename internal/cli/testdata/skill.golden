@@ -173,6 +173,7 @@ One line per group, with the verbs under it. Arguments, flags and examples are i
 - `proton pass invitations` - What other people have offered you: accept, decline, list
 - `proton pass items` - Logins, notes, cards and the rest: create, delete, get, list, move, pin, totp, trash, unpin, update
 - `proton pass items attachments` - Files attached to an item: download, list, restore, update
+- `proton pass items passkeys` - Passkeys stored against a login: list, remove
 - `proton pass items revisions` - Earlier versions of an item: get, list, restore
 - `proton pass items share` - Who else can open an item: add, confirm, get, remove, update
 - `proton pass links` - Links that show an item to somebody without an account: create, get, list, revoke

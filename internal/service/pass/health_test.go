@@ -102,7 +102,7 @@ func TestMissing2FAWantsASiteThatOffersOneAndNothingStoredAgainstIt(t *testing.T
 	withField.Fields = []ItemField{{Name: "2fa", Type: "totp", Value: "otpauth://totp/x"}}
 
 	withPasskey := login("has-passkey", "M3ssier-Object-88!", "https://github.com")
-	withPasskey.hasPasskeys = true
+	withPasskey.Passkeys = []Passkey{{KeyID: "7f3a1c9d", Domain: "github.com", Username: "roman"}}
 
 	rows := missing2FA([]FullItem{
 		login("bare", "M3ssier-Object-88!", "https://github.com"),

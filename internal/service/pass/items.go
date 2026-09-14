@@ -96,6 +96,10 @@ type FullItem struct {
 	// extra custom fields (any item type)
 	Fields []ItemField `json:"fields"`
 
+	// Passkeys are the credentials a site registered against a login, which is
+	// how one can be signed into with no password at all.
+	Passkeys []Passkey `json:"passkeys"`
+
 	// Attachments are the files the item carries, which a listing leaves out for
 	// the reason it leaves the secrets out: reading them costs requests of their
 	// own.
@@ -105,10 +109,42 @@ type FullItem struct {
 	// hasAttachments is the item saying it carries files, which is what lets a
 	// backup read only the items that have any.
 	hasAttachments bool
-	// hasPasskeys says the login can be signed into without a password at all,
-	// which is a second factor by another name and what stops the two-factor
-	// check reporting it.
-	hasPasskeys bool
+}
+
+// Passkey is one credential a site registered against a login.
+//
+// It carries what names the passkey and nothing that signs with it. The key
+// material is Pass's to use in a ceremony no terminal takes part in, so the only
+// thing that reads it here is `pass export`, which writes the item whole.
+type Passkey struct {
+	KeyID       string `json:"key_id"`
+	Domain      string `json:"domain,omitempty"`
+	RPName      string `json:"rp_name,omitempty"`
+	Username    string `json:"username,omitempty"`
+	DisplayName string `json:"display_name,omitempty"`
+	Created     int64  `json:"created,omitempty"`
+	Note        string `json:"note,omitempty"`
+	// Device is where the passkey was made and AppVersion which build of Pass made
+	// it. Both are empty for one written before Pass recorded them.
+	Device     string `json:"device,omitempty"`
+	AppVersion string `json:"app_version,omitempty"`
+}
+
+func passkeyFromProto(p *pb.Passkey) Passkey {
+	out := Passkey{
+		KeyID:       p.GetKeyId(),
+		Domain:      p.GetDomain(),
+		RPName:      p.GetRpName(),
+		Username:    p.GetUserName(),
+		DisplayName: p.GetUserDisplayName(),
+		Created:     int64(p.GetCreateTime()),
+		Note:        p.GetNote(),
+	}
+	if made := p.GetCreationData(); made != nil {
+		out.Device = strings.TrimSpace(made.GetOsName() + " " + made.GetOsVersion())
+		out.AppVersion = made.GetAppVersion()
+	}
+	return out
 }
 
 // The item flags this CLI reads.
@@ -635,6 +671,8 @@ type Patch struct {
 	// off it, named by ID.
 	Attach []Upload
 	Detach []string
+	// RemovePasskeys are the passkeys to take off a login, by key ID.
+	RemovePasskeys []string
 }
 
 // Scalars are the single-valued fields a patch can carry. They are their own
@@ -656,7 +694,8 @@ func (p Patch) Empty() bool {
 // onlyFiles reports whether the patch leaves the item's own fields alone, which
 // is what an edit that adds or removes a file and nothing else is.
 func (p Patch) onlyFiles() bool {
-	return p.Scalars == Scalars{} && len(p.Identity) == 0 && p.ExtraFields.Empty()
+	return p.Scalars == Scalars{} && len(p.Identity) == 0 && p.ExtraFields.Empty() &&
+		len(p.RemovePasskeys) == 0
 }
 
 func (s *Service) ItemEdit(ctx context.Context, shareID, itemID string, patch Patch) error {
@@ -734,6 +773,9 @@ func (s *Service) ItemEdit(ctx context.Context, shareID, itemID string, patch Pa
 			}
 			if patch.TOTP != "" {
 				l.TotpUri = patch.TOTP
+			}
+			if len(patch.RemovePasskeys) > 0 {
+				l.Passkeys = keptPasskeys(l.GetPasskeys(), patch.RemovePasskeys)
 			}
 		case *pb.Content_CreditCard:
 			cc := content.CreditCard
@@ -1026,7 +1068,9 @@ func itemFromProto(it *pb.Item) *FullItem {
 		item.Password = c.Login.Password
 		item.TOTP = c.Login.TotpUri
 		item.URLs = passfile.LoginURLs(c.Login)
-		item.hasPasskeys = len(c.Login.Passkeys) > 0
+		for _, p := range c.Login.GetPasskeys() {
+			item.Passkeys = append(item.Passkeys, passkeyFromProto(p))
+		}
 	case *pb.Content_CreditCard:
 		item.Holder = c.CreditCard.CardholderName
 		item.Number = c.CreditCard.Number
@@ -1051,6 +1095,20 @@ func itemFromProto(it *pb.Item) *FullItem {
 		}
 	}
 	return item
+}
+
+// keptPasskeys is the login's passkeys with the named ones gone.
+//
+// A key ID nothing matches cannot reach here: the command resolves every
+// reference against the listing before it asks for the edit.
+func keptPasskeys(have []*pb.Passkey, remove []string) []*pb.Passkey {
+	out := make([]*pb.Passkey, 0, len(have))
+	for _, p := range have {
+		if !slices.Contains(remove, p.GetKeyId()) {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 func itemTypeName(it *pb.Item) string {

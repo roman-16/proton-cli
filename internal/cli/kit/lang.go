@@ -285,6 +285,7 @@ var Placeholders = map[string]Placeholder{
 	"KEY":               {Means: "a setting key"},
 	"METHOD":            {Means: "an HTTP method"},
 	"NEW_NAME":          {Means: "the name to change something to"},
+	"PASSKEY_REF":       {Means: "a passkey stored against the addressed login", Picks: PicksHolding},
 	"PATH":              {Means: "a Drive path that does not exist yet"},
 	"PHOTO_REF":         {Means: "a photo, when the command already addresses an album", Picks: "drive photos"},
 	"REF":               {Means: "a full ID, a short ID, or a human handle", Picks: PicksAddressed},

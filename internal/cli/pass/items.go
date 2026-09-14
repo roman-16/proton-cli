@@ -25,7 +25,7 @@ var itemTypes = []string{"login", "note", "credit-card", "wifi", "ssh-key", "ide
 
 func itemsCmd() *cobra.Command {
 	c := &cobra.Command{Use: "items", Short: "Logins, notes, cards and the rest"}
-	c.AddCommand(attachmentsCmd(), itemsListCmd(), itemsGetCmd(), itemsCreateCmd(), itemsUpdateCmd(),
+	c.AddCommand(attachmentsCmd(), passkeysCmd(), itemsListCmd(), itemsGetCmd(), itemsCreateCmd(), itemsUpdateCmd(),
 		itemsMoveCmd(), itemsRevisionsCmd(), itemsTOTPCmd(), itemsShareCmd(),
 		itemsPinCmd("pin", "Keep items at the top of the list", ui.Pinned, true),
 		itemsPinCmd("unpin", "Stop keeping items at the top", ui.Unpinned, false),
@@ -247,6 +247,7 @@ func itemFields(it *passsvc.FullItem) []ui.Field {
 	for _, u := range it.URLs {
 		fields = append(fields, ui.Field{Label: "URL", Value: u})
 	}
+	fields = append(fields, passkeyFields(it.Passkeys)...)
 	fields = append(fields,
 		ui.Field{Label: "Cardholder", Value: it.Holder},
 		ui.Field{Label: "Number", Value: it.Number},

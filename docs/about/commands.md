@@ -247,6 +247,8 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton pass items get`](../pass/items.md#get) | Show one item, decrypted |
 | [`proton pass items list`](../pass/items.md#list) | List items across your vaults |
 | [`proton pass items move`](../pass/items.md#move) | Put an item in another vault |
+| [`proton pass items passkeys list`](../pass/items.md#passkeys-list) | List the passkeys stored against a login |
+| [`proton pass items passkeys remove`](../pass/items.md#passkeys-remove) | Take a passkey off a login |
 | [`proton pass items pin`](../pass/items.md#pin) | Keep items at the top of the list |
 | [`proton pass items revisions get`](../pass/items.md#revisions-get) | Show one earlier version, decrypted |
 | [`proton pass items revisions list`](../pass/items.md#revisions-list) | Show what an item used to be |

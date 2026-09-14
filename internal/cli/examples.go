@@ -822,6 +822,12 @@ var examples = map[string][]string{
 	"proton pass items attachments restore": {
 		"proton pass items attachments restore github.com passport.pdf",
 	},
+	"proton pass items passkeys list": {
+		"proton pass items passkeys list github.com",
+	},
+	"proton pass items passkeys remove": {
+		"proton pass items passkeys remove github.com roman",
+	},
 	"proton pass items create": {
 		"proton pass items create --name GitHub --username roman --url github.com --generate-password",
 		"proton pass items create --type note --name Passport --attach ~/scans/passport.pdf",
