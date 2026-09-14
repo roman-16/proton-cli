@@ -178,6 +178,11 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton mail settings autoreply enable`](../mail/settings.md#autoreply-enable) | Turn the auto-reply on, keeping its schedule |
 | [`proton mail settings autoreply get`](../mail/settings.md#autoreply-get) | Show the auto-reply and its schedule |
 | [`proton mail settings autoreply set`](../mail/settings.md#autoreply-set) | Configure the auto-reply and turn it on |
+| [`proton mail settings domains create`](../mail/settings.md#domains-create) | Add a custom domain to the account |
+| [`proton mail settings domains delete`](../mail/settings.md#domains-delete) | Remove a custom domain |
+| [`proton mail settings domains get`](../mail/settings.md#domains-get) | Show a domain's DNS entries and their status |
+| [`proton mail settings domains list`](../mail/settings.md#domains-list) | List the custom domains on the account |
+| [`proton mail settings domains update`](../mail/settings.md#domains-update) | Set the address that catches stray mail |
 | [`proton mail settings filters apply`](../mail/settings.md#filters-apply) | Run filters over mail that is already in the mailbox |
 | [`proton mail settings filters create`](../mail/settings.md#filters-create) | Create a filter |
 | [`proton mail settings filters delete`](../mail/settings.md#filters-delete) | Delete filters |

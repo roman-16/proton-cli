@@ -64,6 +64,10 @@ var collections = []struct {
 	{"folders", []string{"mail", "settings", "folders", "list"}, "id", []string{"name"}},
 	{"filters", []string{"mail", "settings", "filters", "list"}, "id", []string{"name"}},
 	{"addresses", []string{"mail", "settings", "addresses", "list"}, "id", []string{"name"}},
+	// The catch-all is compared beside the domain for the reason a watched
+	// address's state is: a run that left stray mail arriving somewhere else has
+	// changed where somebody's real mail goes, and the domain is still there.
+	{"domains", []string{"mail", "settings", "domains", "list"}, "id", []string{"domain", "catch_all"}},
 	{"forwardings", []string{"mail", "settings", "forwarding", "list"}, "id", []string{"to"}},
 	{"contacts", []string{"contacts", "list"}, "id", []string{"name"}},
 	{"contact groups", []string{"contacts", "groups", "list"}, "id", []string{"name"}},

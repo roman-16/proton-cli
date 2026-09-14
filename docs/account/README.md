@@ -132,6 +132,9 @@ These commands ask for your password again even when you are signed in:
 - `mail settings addresses delete`
 - `mail settings addresses disable`
 - `mail settings addresses enable`
+- `mail settings domains create`
+- `mail settings domains delete`
+- `mail settings domains update`
 - `mail settings forwarding accept`
 - `mail settings forwarding create`
 - `mail settings forwarding delete`

@@ -49,6 +49,12 @@ type Address struct {
 	// EndToEnd says whether mail arriving here is end-to-end encrypted. It is off
 	// for an address that forwards to somewhere outside Proton.
 	EndToEnd bool `json:"end_to_end"`
+	// DomainID is the custom domain the address is on, empty on a Proton one, and
+	// CatchAll says whether it takes mail sent to a name that domain has not got.
+	// Both are facts about the domain rather than about the address, so neither is
+	// part of what an address reports.
+	DomainID string `json:"-"`
+	CatchAll bool   `json:"-"`
 }
 
 // CanSend reports whether Proton permits composing from this address.
@@ -74,6 +80,8 @@ type rawAddress struct {
 	Receive     int
 	HasKeys     int
 	Flags       int
+	DomainID    string
+	CatchAll    bool
 }
 
 func (s *Service) AddressesList(ctx context.Context) ([]Address, error) {
@@ -88,6 +96,7 @@ func (s *Service) AddressesList(ctx context.Context) ([]Address, error) {
 			Type: a.Type, Status: a.Status, Order: a.Order,
 			Send: a.Send, Receive: a.Receive, HasKeys: a.HasKeys != 0,
 			EndToEnd: keys.EndToEnd(a.Flags),
+			DomainID: a.DomainID, CatchAll: a.CatchAll,
 		})
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Order < out[j].Order })
@@ -304,7 +313,8 @@ func (s *Service) orUnusableDomain(ctx context.Context, u *keys.Unlocked, domain
 		return refusal
 	}
 	return errs.Problemf("This account cannot add an address on %s.", domain).
-		Hint(strings.Join(usable, ", "))
+		Hint(strings.Join(usable, ", ") +
+			" - or `proton mail settings domains create " + domain + "` to set it up")
 }
 
 // usableDomains are the domains an address may be added on: Proton's own, the

@@ -3,6 +3,7 @@ DELETE /calendar/v1/{id}/invitations/{id}
 DELETE /calendar/v1/{id}/members/{id}
 DELETE /core/v4/labels
 DELETE /core/v4/labels/{id}
+DELETE /domains/{id}
 DELETE /drive/photos/volumes/{id}/albums/{id}
 DELETE /drive/photos/volumes/{id}/links/{id}/tags
 DELETE /drive/shares/{id}/files/{id}/revisions/{id}
@@ -57,6 +58,7 @@ GET /core/v5/events/{id}
 GET /domains
 GET /domains/available
 GET /domains/premium
+GET /domains/{id}
 GET /drive/me/settings
 GET /drive/photos/volumes/{id}/albums
 GET /drive/photos/volumes/{id}/albums/{id}/children
@@ -128,6 +130,7 @@ POST /contacts/v4/contacts
 POST /core/v4/auth/info
 POST /core/v4/keys/address
 POST /core/v4/labels
+POST /domains
 POST /drive/blocks
 POST /drive/photos/volumes/{id}/albums
 POST /drive/photos/volumes/{id}/albums/{id}/add-multiple
@@ -206,6 +209,7 @@ PUT /core/v4/labels/{id}
 PUT /core/v4/settings/weekstart
 PUT /core/v4/users/lock
 PUT /core/v4/users/unlock
+PUT /domains/{id}/catchall
 PUT /drive/photos/volumes/{id}/albums/{id}
 PUT /drive/shares/{id}/files/{id}/revisions/{id}
 PUT /drive/shares/{id}/links/{id}/move

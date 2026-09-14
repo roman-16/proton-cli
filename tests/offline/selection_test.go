@@ -53,6 +53,30 @@ func TestAnAddressToAddHasToBeAnAddress(t *testing.T) {
 	}
 }
 
+// A domain to add is a bare name, so an address, a URL and a path are all wrong
+// before anybody is signed in.
+func TestADomainToAddHasToBeADomain(t *testing.T) {
+	for _, bad := range []string{"example", "me@example.com", "https://example.com", "example.com/mail"} {
+		refuses(t, 1, []string{"mail", "settings", "domains", "create", bad},
+			"is not a domain name", "example.com")
+	}
+}
+
+// Setting a catch-all and turning one off are opposite requests, and a command
+// line asking for both settles nothing.
+func TestSettingAndClearingACatchAllAtOnceIsRefused(t *testing.T) {
+	refuses(t, 1, []string{"mail", "settings", "domains", "update", "example.com",
+		"--catch-all", "work@example.com", "--clear-catch-all"},
+		"--catch-all and --clear-catch-all contradict each other")
+}
+
+// The one field a domain has is the one the command exists to write, so naming
+// neither is a command line with nothing in it.
+func TestUpdatingADomainWithNothingToChangeIsRefused(t *testing.T) {
+	refuses(t, 1, []string{"mail", "settings", "domains", "update", "example.com"},
+		"Nothing to change", "--clear-catch-all")
+}
+
 func TestSendingNeedsSomethingToSend(t *testing.T) {
 	refuses(t, 1, []string{"mail", "messages", "send"}, "required")
 	refuses(t, 1, []string{"mail", "messages", "send", "--subject", "x", "--body", "y"},

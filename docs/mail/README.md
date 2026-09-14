@@ -367,6 +367,51 @@ proton mail settings forwarding decline jane@proton.me
 
 A forwarding is named by the other party's address, in either direction. Only a pending forwarding sent to one of your addresses can be accepted or declined, and accepting needs no plan.
 
+## Set up a custom domain
+
+```bash
+proton mail settings domains create example.com
+proton mail settings domains get example.com
+proton mail settings domains list
+```
+
+Adding a domain needs a paid Mail plan, and how many you may have depends on it. Without one, every command here says so.
+
+**Changing a domain asks for your password**, even when you are signed in. That is `create`, `update` and `delete`. With no terminal, pass `--password-file` or `--password-stdin`. The other commands that do this are listed in [Account](../account/README.md#commands-that-ask-for-the-password-again).
+
+`get` shows every DNS entry the domain needs and re-checks your DNS each time it runs. Add the entries at your registrar, then run it again. Each check reads `ok`, or what Proton found instead: `missing`, `wrong`, `duplicate`, `wrong-priority`, `backup`, `error`, `warning`, `delegated` or `relaxed`.
+
+```console
+$ proton mail settings domains get example.com
+Domain:        example.com
+Status:        unverified
+Addresses:     0
+Catch-all:     (none)
+Verification:  missing
+               TXT  @  protonmail-verification=7c1e4f9a2b8d6503e1f74a0cc9b2d81e5f3a6740
+```
+
+No address can be added on the domain until Proton has seen the verification entry. Every entry has to stay in place afterwards: removing the verification entry gives the domain up.
+
+`list` shows the last check rather than making a new one. Its `DNS` column reads `ok`, or names the checks that are not passing.
+
+## Catch mail sent to a name that does not exist
+
+```bash
+proton mail settings domains update example.com --catch-all work@example.com
+proton mail settings domains update example.com --clear-catch-all
+```
+
+Mail sent to a name your domain has not got arrives at the catch-all address instead of being refused. `--catch-all` takes one of your addresses on that domain. One address catches at a time, so naming another moves it.
+
+## Remove a custom domain
+
+```bash
+proton mail settings domains delete example.com
+```
+
+Every address on the domain stops sending and receiving, and the mail they hold stays. Adding the domain again needs its DNS entries verified from scratch.
+
 ## Add an address
 
 ```bash

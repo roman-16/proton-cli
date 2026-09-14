@@ -4,7 +4,7 @@ How Mail behaves.
 
 Every command under `proton mail settings`, with the arguments and flags it takes. For these commands in use, see [the mail guide](README.md).
 
-Holds `addresses`, `autoreply`, `filters`, `folders`, `forwarding`, `get`, `labels`, `list`, `senders` and `set`.
+Holds `addresses`, `autoreply`, `domains`, `filters`, `folders`, `forwarding`, `get`, `labels`, `list`, `senders` and `set`.
 
 ## `addresses`
 
@@ -256,6 +256,119 @@ proton mail settings autoreply set --message 'On holiday.' --start 2026-07-01T09
 | `--password-stdin` | Read the account password from stdin |
 | `--repeat string` | How the schedule repeats: fixed, daily, weekly, monthly, permanent (default `fixed`) |
 | `--start string` | Start of the window (grammar depends on --repeat) |
+| `--totp string` | Two-factor code |
+
+## `domains`
+
+Custom domains, and where stray mail goes.
+
+A custom domain sends and receives under your own name. Adding one needs a paid Mail plan, and how many you may have depends on it.
+
+A domain carries no mail until its DNS entries are in place. `get` shows them and says which ones Proton can see.
+
+Holds `create`, `delete`, `get`, `list` and `update`.
+
+### `domains create`
+
+Add a custom domain to the account.
+
+DOMAIN is a domain you own, written as example.com. Adding one needs a paid Mail plan.
+
+The domain carries no mail until its verification entry is in your DNS, and no address can be added on it until Proton has seen that entry. `get` shows every entry the domain needs.
+
+Asks for your password even when you are signed in. With no terminal to ask, pass --password-file or --password-stdin.
+
+```
+proton mail settings domains create DOMAIN
+```
+
+```bash
+proton mail settings domains create example.com
+```
+
+| Flag | Description |
+| --- | --- |
+| `--password-file string` | Read the account password from a file |
+| `--password-stdin` | Read the account password from stdin |
+| `--totp string` | Two-factor code |
+
+### `domains delete`
+
+Remove a custom domain.
+
+Every address on the domain stops sending and receiving, and the mail they hold stays. Adding the domain again needs its DNS entries verified from scratch.
+
+Asks for your password even when you are signed in. With no terminal to ask, pass --password-file or --password-stdin.
+
+```
+proton mail settings domains delete REF
+```
+
+```bash
+proton mail settings domains delete example.com
+```
+
+| Flag | Description |
+| --- | --- |
+| `--password-file string` | Read the account password from a file |
+| `--password-stdin` | Read the account password from stdin |
+| `--totp string` | Two-factor code |
+
+### `domains get`
+
+Show a domain's DNS entries and their status.
+
+Reads the domain's DNS again each time it runs, so what it reports is what Proton can see now.
+
+Each check reads ok, missing, wrong, duplicate, wrong-priority, backup, error, warning, delegated or relaxed. Every entry has to stay in place: removing the verification entry gives the domain up.
+
+```
+proton mail settings domains get REF
+```
+
+```bash
+proton mail settings domains get example.com
+```
+
+### `domains list`
+
+List the custom domains on the account.
+
+STATUS is active, unverified or warning. DNS is ok, or the checks that are not passing. Both come from the last check Proton made; `get` checks again.
+
+```
+proton mail settings domains list
+```
+
+```bash
+proton mail settings domains list
+```
+
+### `domains update`
+
+Set the address that catches stray mail.
+
+Mail sent to a name that does not exist at the domain arrives at the catch-all address instead of being refused.
+
+--catch-all takes one of your addresses on that domain. One address catches at a time, so naming another moves it. --clear-catch-all turns it off.
+
+Asks for your password even when you are signed in. With no terminal to ask, pass --password-file or --password-stdin.
+
+```
+proton mail settings domains update REF
+```
+
+```bash
+proton mail settings domains update example.com --catch-all work@example.com
+proton mail settings domains update example.com --clear-catch-all
+```
+
+| Flag | Description |
+| --- | --- |
+| `--catch-all string` | Address that takes mail sent to a name the domain has not got |
+| `--clear-catch-all` | Refuse mail sent to a name the domain has not got |
+| `--password-file string` | Read the account password from a file |
+| `--password-stdin` | Read the account password from stdin |
 | `--totp string` | Two-factor code |
 
 ## `filters`

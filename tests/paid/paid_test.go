@@ -4,6 +4,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/roman-16/proton-cli/tests/fixture"
 )
 
 // Every rule says why, because that sentence is what somebody reads when a test
@@ -80,6 +82,40 @@ func TestEveryRestrictionIsEnforced(t *testing.T) {
 		if OffLimits(wrapped) == "" {
 			t.Errorf("%v is allowed once flags are added", args)
 		}
+	}
+}
+
+// The one command that is judged by what it was pointed at: something the run
+// made is allowed, and everything else - the account's own domain, a reference
+// that could resolve to it, nothing at all - is not.
+func TestACommandAimedAtSomethingTheRunMadeIsAllowed(t *testing.T) {
+	ours := fixture.TestPrefix + "123.example.com"
+	for _, args := range [][]string{
+		{"mail", "settings", "domains", "delete", ours},
+		{"--yes", "mail", "settings", "domains", "delete", "--", ours},
+	} {
+		if why := OffLimits(args); why != "" {
+			t.Errorf("%v is refused, and it names a domain the run made: %s", args, why)
+		}
+	}
+	for _, args := range [][]string{
+		{"mail", "settings", "domains", "delete", "lerchster.dev"},
+		{"mail", "settings", "domains", "delete"},
+		{"mail", "settings", "domains", "delete", "--yes"},
+		{"mail", "settings", "domains", "delete", ours, "someone-elses.example"},
+	} {
+		if OffLimits(args) == "" {
+			t.Errorf("%v is allowed, and it does not name a domain the run made", args)
+		}
+	}
+}
+
+// Being pointed at something the run made excuses that command alone. Every
+// other rule is about what the command does, so no argument gets round one.
+func TestNamingSomethingTheRunMadeDoesNotExcuseTheOtherRules(t *testing.T) {
+	args := []string{"drive", "trash", "empty", fixture.TestPrefix + "folder"}
+	if OffLimits(args) == "" {
+		t.Error("emptying the trash was allowed for naming something the run made")
 	}
 }
 

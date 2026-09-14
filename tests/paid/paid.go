@@ -23,8 +23,10 @@ import (
 	"fmt"
 	"slices"
 	"sort"
+	"strings"
 
 	"github.com/roman-16/proton-cli/tests/argv"
+	"github.com/roman-16/proton-cli/tests/fixture"
 )
 
 // A Restriction is one command the paid account refuses, and why.
@@ -41,6 +43,14 @@ type Restriction struct {
 	// commands whose target is a setting key rather than the verb. Empty means
 	// the whole command is refused.
 	Value string
+	// OnlyOurs narrows the restriction to a target the run did not make, for the
+	// command whose danger is not what it does but what it might be aimed at.
+	// Deleting a domain the suite created is reversible; the same words pointed at
+	// somebody's real domain take every address on it down, and only the reference
+	// tells the two apart. So the command is allowed against something carrying
+	// the suite's own prefix and refused against everything else - a reference
+	// that resolved wrongly is refused, and so is one written by hand.
+	OnlyOurs bool
 	// Why is what somebody reads when a test they just wrote refuses to run.
 	Why string
 }
@@ -81,6 +91,10 @@ func Restrictions() []Restriction {
 		Command: []string{"mail", "settings", "autoreply", "set"},
 		Why: "Proton keeps the last auto-reply message even while it is off and offers no way to clear it," +
 			" so writing one cannot be undone - `set --message \"\"` is refused",
+	}, {
+		Command: []string{"mail", "settings", "domains", "delete"}, OnlyOurs: true,
+		Why: "it takes down every address on the domain, and the account's own domain carries real mail" +
+			" - name a domain the run made, carrying " + fixture.TestPrefix,
 	}, {
 		Command: []string{"mail", "settings", "filters", "apply"},
 		Why:     "it runs a filter over the whole mailbox, and where real mail was filed from is not recorded",
@@ -130,15 +144,41 @@ func FixtureOnly() []Restriction {
 // the flags a caller puts around it are not a way around it.
 func OffLimits(args []string) string {
 	for _, r := range Restrictions() {
-		if !argv.Has(args, r.Command...) {
+		at := argv.At(args, r.Command...)
+		if at < 0 {
 			continue
 		}
 		if r.Value != "" && !slices.Contains(args, r.Value) {
 			continue
 		}
+		if r.OnlyOurs && aimedAtOurs(args[at+len(r.Command):]) {
+			continue
+		}
 		return r.Why
 	}
 	return ""
+}
+
+// aimedAtOurs reports whether everything the command was pointed at is
+// something the suite made.
+//
+// A flag is not a target, so it is passed over; everything else has to carry the
+// prefix, and a command pointed at nothing at all is pointed at whatever the
+// reference happens to match. The reading is deliberately crude: a flag's value
+// counts as a target and would be refused, which is the direction to be wrong
+// in.
+func aimedAtOurs(rest []string) bool {
+	targets := 0
+	for _, arg := range rest {
+		if arg == "--" || strings.HasPrefix(arg, "-") {
+			continue
+		}
+		if !strings.Contains(arg, fixture.TestPrefix) {
+			return false
+		}
+		targets++
+	}
+	return targets > 0
 }
 
 // Notices are the subjects Proton writes to the account about, unprompted, when

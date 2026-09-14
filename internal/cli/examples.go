@@ -582,6 +582,14 @@ var examples = map[string][]string{
 	"proton mail settings addresses enable":  {"proton mail settings addresses enable work@example.com"},
 	"proton mail settings addresses disable": {"proton mail settings addresses disable work@example.com"},
 	"proton mail settings addresses delete":  {"proton mail settings addresses delete work@example.com"},
+	"proton mail settings domains list":      {"proton mail settings domains list"},
+	"proton mail settings domains get":       {"proton mail settings domains get example.com"},
+	"proton mail settings domains create":    {"proton mail settings domains create example.com"},
+	"proton mail settings domains update": {
+		"proton mail settings domains update example.com --catch-all work@example.com",
+		"proton mail settings domains update example.com --clear-catch-all",
+	},
+	"proton mail settings domains delete": {"proton mail settings domains delete example.com"},
 	"proton mail settings filters apply": {
 		"proton mail settings filters apply",
 		"proton mail settings filters apply Newsletters",

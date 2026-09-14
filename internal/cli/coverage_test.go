@@ -72,6 +72,14 @@ var unreachable = map[string]string{
 	"GET /drive/volumes/{id}":               "only a locked volume the volume listing left out is read alone, and no test account has one",
 
 	"POST /drive/volumes": "a volume is made once in an account's life, and every test account is long past that moment",
+
+	// Asking what the account's plan allows. It is sent only once a listing of
+	// custom domains has already failed, and the only account whose listing fails
+	// is one with no organization - which answers this with a refusal rather than
+	// an answer, and a refusal is not coverage. An account that has an
+	// organization never fails the listing, so no run can be in the state where
+	// this is both sent and answered.
+	"GET /core/v4/organizations": "only a failed domain listing asks, and an account whose listing fails has no organization to answer about",
 }
 
 // untested are the requests a run could make and does not. Each is a gap somebody
