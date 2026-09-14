@@ -68,9 +68,18 @@ try {
     $dest = Join-Path $InstallDir 'proton.exe'
     Move-Item -Path "$tmp\$asset" -Destination $dest -Force
 
+    # The binary answering is the only proof the install worked: a checksum says
+    # the bytes arrived, not that they run on this machine. Its own words stay on
+    # the far side of 2>$null, because a native command writing to stderr under
+    # 2>&1 throws here before anything can read them.
+    $reported = & $dest --version 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        throw "proton.exe was installed to $dest but does not run on this machine (exit $LASTEXITCODE)."
+    }
+
     # `--version` prints "proton version X.Y.Z"; the bare number reads better in
     # a sentence that already names the program.
-    $installed = ((& $dest --version 2>$null) -split '\s+')[-1]
+    $installed = ($reported -split '\s+')[-1]
     Write-Success "Installed proton $installed → $dest"
 
     # An install answers to both names. Windows has no symlink an ordinary user

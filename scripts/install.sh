@@ -1,26 +1,35 @@
 #!/bin/sh
-# proton-cli installer.
-#
-# Downloads the latest proton-cli release for your OS/architecture from GitHub
-# Releases, verifies its SHA-256 checksum, and installs it as `proton`, with
-# `proton-cli` linked beside it. No Go toolchain and no package manager
-# required.
-#
-# Usage:
-#   curl -fsSL https://raw.githubusercontent.com/roman-16/proton-cli/main/scripts/install.sh | sh
-#
-# Options (after `... | sh -s --`):
-#   --version <X.Y.Z>   Install a specific release (default: latest).
-#   --install-dir <dir> Install into <dir> (default: ~/.local/bin).
-#   --help              Show this help.
-#
-# Environment overrides:
-#   PROTON_CLI_VERSION      Same as --version.
-#   PROTON_CLI_INSTALL_DIR  Same as --install-dir.
-#
-# Windows: use the PowerShell installer instead:
-#   irm https://raw.githubusercontent.com/roman-16/proton-cli/main/scripts/install.ps1 | iex
 set -eu
+
+# The help this script answers with is the first thing in it, so a reader who
+# pipes it into a pager and a reader who asks for --help are shown one text. The
+# script is meant to arrive through a pipe, where there is no file to read it
+# back out of.
+usage() {
+	cat <<-'EOF'
+		proton-cli installer.
+
+		Downloads the latest proton-cli release for your OS/architecture from GitHub
+		Releases, verifies its SHA-256 checksum, and installs it as `proton`, with
+		`proton-cli` linked beside it. No Go toolchain and no package manager
+		required.
+
+		Usage:
+		  curl -fsSL https://raw.githubusercontent.com/roman-16/proton-cli/main/scripts/install.sh | sh
+
+		Options (after `... | sh -s --`):
+		  --version <X.Y.Z>   Install a specific release (default: latest).
+		  --install-dir <dir> Install into <dir> (default: ~/.local/bin).
+		  --help              Show this help.
+
+		Environment overrides:
+		  PROTON_CLI_VERSION      Same as --version.
+		  PROTON_CLI_INSTALL_DIR  Same as --install-dir.
+
+		Windows: use the PowerShell installer instead:
+		  irm https://raw.githubusercontent.com/roman-16/proton-cli/main/scripts/install.ps1 | iex
+	EOF
+}
 
 REPO="roman-16/proton-cli"
 # The project is proton-cli, which is what names the release asset; the program
@@ -33,6 +42,7 @@ INSTALL_DIR="${PROTON_CLI_INSTALL_DIR:-$HOME/.local/bin}"
 main() {
 	parse_args "$@"
 	need_cmd uname
+	need_cmd install
 	need_downloader
 
 	os="$(detect_os)"
@@ -58,18 +68,31 @@ main() {
 	success "Checksum verified"
 
 	mkdir -p "$INSTALL_DIR"
-	install -m 0755 "$tmp/$asset" "$INSTALL_DIR/$BIN" 2>/dev/null ||
-		die "could not install to $INSTALL_DIR (set --install-dir to a writable directory)"
+	if ! failure="$(install -m 0755 "$tmp/$asset" "$INSTALL_DIR/$BIN" 2>&1)"; then
+		die "could not install to $INSTALL_DIR:
+      $failure
+    Set --install-dir to install somewhere else."
+	fi
+
+	# The binary answering is the only proof the install worked: a checksum says
+	# the bytes arrived, not that they run on this machine.
+	if ! version="$("$INSTALL_DIR/$BIN" --version 2>&1)"; then
+		die "$BIN was installed to $(tilde "$INSTALL_DIR/$BIN") but does not run on this machine:
+      $version"
+	fi
 
 	# `--version` prints "proton version X.Y.Z"; the bare number reads better in a
 	# sentence that already names the program.
-	installed="$("$INSTALL_DIR/$BIN" --version 2>/dev/null | awk '{print $NF}')"
+	installed="$(printf '%s\n' "$version" | awk 'NR == 1 { print $NF }')"
 	success "Installed ${BIN}${installed:+ $installed} → $(tilde "$INSTALL_DIR/$BIN")"
 
 	# An install answers to both names, so the second one is part of installing
 	# rather than an extra somebody has to know to ask for.
-	if ln -sf "$BIN" "$INSTALL_DIR/$ALIAS" 2>/dev/null; then
+	if failure="$(ln -sf "$BIN" "$INSTALL_DIR/$ALIAS" 2>&1)"; then
 		success "${ALIAS} → ${BIN}"
+	else
+		warn "$ALIAS was not linked beside $BIN, so only $BIN works here:
+      $failure"
 	fi
 
 	check_path
@@ -126,13 +149,6 @@ parse_args() {
 		*) die "unknown option: $1 (see --help)" ;;
 		esac
 	done
-}
-
-# usage prints the header comment, which is the same text a reader opening this
-# file sees first. It stops at the first line that is not a comment, so the help
-# cannot drift out of step with the block it comes from.
-usage() {
-	awk 'NR == 1 { next } /^#/ { sub(/^# ?/, ""); print; next } { exit }' "$0"
 }
 
 detect_os() {
@@ -200,7 +216,7 @@ download() {
 	if [ "$DL" = curl ]; then
 		curl -fsSL --proto '=https' --tlsv1.2 --retry 3 --connect-timeout 10 -o "$2" "$1"
 	else
-		wget -q --https-only -O "$2" "$1"
+		wget -q --https-only --timeout=10 --tries=3 -O "$2" "$1"
 	fi
 }
 

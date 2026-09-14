@@ -20,13 +20,14 @@ tests/
 ├── account/    which accounts exist, what their variables are called, whether they are configured
 ├── argv/       finding a command inside an argument list
 ├── fixture/    what an account holds for the suite to read
+├── install/    the install script, run the way it is delivered and read for what it accepts
 ├── paid/       what may not be done to the paid account, and how to tell it came back
 ├── rules/      the rules the live suite is held to, read from its source
 ├── offline/    the real binary, no session, and the API pointed at a dead port
 └── live/       the suite that needs Proton
 ```
 
-Everything but `live/` runs in `just test-fast`, and everything but `live/` and `rules/` has ordinary unit tests beside it. That is the point of them being packages: a source-scanning guard that could not be unit-tested was silently wrong for a long time.
+Everything but `live/` runs in `just test-fast`, and everything but `live/`, `rules/` and `install/` has ordinary unit tests beside it. That is the point of them being packages: a source-scanning guard that could not be unit-tested was silently wrong for a long time.
 
 ### Inside `live/`
 
