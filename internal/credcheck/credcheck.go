@@ -7,9 +7,15 @@
 // what comes back is a list this machine matches against locally. Neither the
 // password nor its whole hash ever leaves.
 //
-// SHA-1 is the corpus's choice, not a security decision here: nothing about this
-// rests on the hash being hard to invert, only on a bucket being too crowded to
-// point at anybody.
+// SHA-1 is the corpus's index, not a security decision here. The password is not
+// being stored, compared or authenticated against - it is being looked up, and a
+// lookup has to use the key the index was built with, so no other algorithm can
+// answer the question at all. Nothing rests on the hash being hard to invert or
+// free of collisions, only on a bucket being too crowded to point at anybody.
+//
+// A static analyser reads "password into SHA-1" and reports weak password
+// hashing. Both halves of that are true and the conclusion is not; there is
+// nothing to harden, because the only alternative to this hash is not asking.
 //
 // It is the only thing in this CLI that talks to a host which is not the Proton
 // API, so it takes its own client and holds no session: the corpus is public and
