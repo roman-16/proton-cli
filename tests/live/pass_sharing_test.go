@@ -186,6 +186,49 @@ func TestPassVaultInviteDeclined(t *testing.T) {
 	}
 }
 
+// A vault can be offered to somebody with no Proton account. Nothing is
+// encrypted to them - there is no key to encrypt to - so what Proton stores is a
+// signature binding the address to the vault key, and what it sends is an email
+// inviting them to make an account.
+//
+// Handing the keys over afterwards is the half no run can reach: it needs the
+// mailbox to become a Proton account. See `untested` in
+// internal/cli/coverage_test.go.
+func TestPassVaultShareWithSomebodyOutsideProton(t *testing.T) {
+	outsider := externalRecipient(t)
+	name := testID() + "-outside-vault"
+	out, stderr, code := runPaid(t, "--yes", "pass", "vaults", "create", "--name", name)
+	if code != 0 {
+		t.Fatalf("could not make a vault: %s", truncateOutput(stderr))
+	}
+	vault := strings.TrimSpace(out)
+	cleanupRunPaid(t, "Delete vault: proton pass vaults delete "+vault,
+		"pass", "vaults", "delete", vault)
+
+	_, offered := runOKStderrPaid(t, "pass", "vaults", "share", "add", vault, outsider)
+	assertContains(t, offered, "has no Proton account")
+
+	shared := runJSONPaid(t, "pass", "vaults", "share", "get", vault)
+	if !strings.Contains(fmt.Sprintf("%v", shared["invited"]), outsider) {
+		t.Fatalf("the held offer is not on the vault it was made for: %v", shared["invited"])
+	}
+
+	// Which of the two it is - nobody was offered it, or they were and have not
+	// signed up - is the whole difference to somebody wondering why nothing
+	// arrived.
+	_, refusal, code := runPaid(t, "pass", "vaults", "share", "confirm", vault, outsider)
+	if code != 3 {
+		t.Errorf("confirming an offer to somebody with no account exited %d, want 3", code)
+	}
+	assertContains(t, refusal, "has not created a Proton account yet")
+
+	runOKPaid(t, "pass", "vaults", "share", "remove", vault, outsider)
+	left := runJSONPaid(t, "pass", "vaults", "share", "get", vault)
+	if strings.Contains(fmt.Sprintf("%v", left["invited"]), outsider) {
+		t.Errorf("the held offer is still there after being withdrawn: %v", left["invited"])
+	}
+}
+
 // memberEmail is the address Proton reports for the owner of a share, or for
 // somebody who is not.
 //

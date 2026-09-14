@@ -1,6 +1,7 @@
 package drive
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
@@ -11,12 +12,29 @@ import (
 	"log/slog"
 
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	"github.com/roman-16/proton-cli/internal/account/keys"
 	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
+	"github.com/roman-16/proton-cli/internal/errs"
 )
 
 // This file holds the node-key crypto for Drive: passphrase unlocking, name
 // (de/re-)encryption, hash-key derivation and new-node key generation. Kept
 // separate from the API surface in drive.go / items.go / trash.go.
+
+// addressKeyRing is the key Proton publishes for an address, which is what a
+// signature by that address is checked against. An address Proton publishes
+// nothing for is refused with a sentence rather than an empty ring, so a caller
+// cannot mistake "nobody vouches for this" for "this verified".
+func (s *Service) addressKeyRing(ctx context.Context, email string) (*pgp.KeyRing, error) {
+	kr, err := keys.Published(ctx, s.C, email)
+	if err != nil {
+		return nil, err
+	}
+	if kr == nil {
+		return nil, errs.Problemf("Proton publishes no key for %s, so nothing can vouch for this.", email)
+	}
+	return kr, nil
+}
 
 func unlockNode(l *Link, parentKR, addrKR *pgp.KeyRing) (*pgp.KeyRing, error) {
 	enc, err := pgp.NewPGPMessageFromArmored(l.NodePassphrase)

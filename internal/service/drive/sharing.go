@@ -16,6 +16,7 @@ import (
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/fetch"
 	"github.com/roman-16/proton-cli/internal/proton"
+	"github.com/roman-16/proton-cli/internal/skip"
 )
 
 const (
@@ -375,21 +376,28 @@ func (s *Service) ShareStatusOf(ctx context.Context, dc *Context, path string) (
 		if sid == dc.ShareID {
 			continue
 		}
+		// A share that will not answer is recorded whole rather than in pieces:
+		// what went missing is everybody and every link on it, and a screen that
+		// showed the half that answered without saying so would be a wrong answer
+		// about who can reach this file.
 		raws, err := s.fetchShareURLs(ctx, sid)
-		if err == nil {
-			for _, u := range raws {
-				gen, custom := s.decryptURLPassword(dc, u)
-				link := u.toShareLink(gen)
-				link.CustomPassword = custom
-				st.Links = append(st.Links, link)
-			}
+		if err != nil {
+			skip.Record(ctx, skip.KindShare, sid, skip.Unreadable, err)
+			continue
 		}
-		if members, err := s.ListMembers(ctx, sid); err == nil {
-			st.Members = append(st.Members, members...)
+		members, invites, err := s.whoHolds(ctx, sid)
+		if err != nil {
+			skip.Record(ctx, skip.KindShare, sid, skip.Unreadable, err)
+			continue
 		}
-		if invites, err := s.ListOutgoingInvites(ctx, sid); err == nil {
-			st.Invitees = append(st.Invitees, invites...)
+		for _, u := range raws {
+			gen, custom := s.decryptURLPassword(dc, u)
+			link := u.toShareLink(gen)
+			link.CustomPassword = custom
+			st.Links = append(st.Links, link)
 		}
+		st.Members = append(st.Members, members...)
+		st.Invitees = append(st.Invitees, invites...)
 	}
 	return st, nil
 }

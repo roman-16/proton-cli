@@ -27,9 +27,20 @@ import (
 
 func vaultsShareCmd() *cobra.Command {
 	c := &cobra.Command{Use: "share", Short: "Who else can open a vault"}
-	c.AddCommand(shareAddCmd(vaultTarget), shareGetCmd(vaultTarget),
+	c.AddCommand(shareAddCmd(vaultTarget), shareConfirmCmd(vaultTarget), shareGetCmd(vaultTarget),
 		shareUpdateCmd(vaultTarget), shareRemoveCmd(vaultTarget))
 	return c
+}
+
+// waiting words how far an unanswered offer has got, for the person reading it.
+func waiting(stage passsvc.Stage) string {
+	switch stage {
+	case passsvc.StageNoAccount:
+		return "waiting for a Proton account"
+	case passsvc.StageReady:
+		return "ready to confirm"
+	}
+	return "not yet accepted"
 }
 
 // target is what a sharing command acts on: a whole vault, or one item in one.
@@ -56,15 +67,23 @@ var vaultTarget = target{
 		return vault.ShareID, "", vault.Name, nil
 	},
 	short: map[string]string{
-		"add":    "Offer a vault to somebody",
-		"get":    "Show who can open a vault",
-		"update": "Change what somebody may do with a vault",
-		"remove": "Take somebody's access to a vault away",
+		"add":     "Offer a vault to somebody",
+		"confirm": "Let somebody into a vault once they join Proton",
+		"get":     "Show who can open a vault",
+		"update":  "Change what somebody may do with a vault",
+		"remove":  "Take somebody's access to a vault away",
 	},
 	long: map[string]string{
 		"add": "Offer a vault to somebody.\n\n" +
-			"They are sent an invitation and see nothing until they take it. Only\n" +
-			"another Proton account can be invited.",
+			"They are sent an invitation and see nothing until they take it.\n\n" +
+			"EMAIL may be an address outside Proton. Proton emails them an invitation to\n" +
+			"create an account, and nothing reaches them until they have one and you run\n" +
+			"`share confirm`.",
+		"confirm": "Let somebody into a vault once they join Proton.\n\n" +
+			"Use it for an address that had no Proton account when you offered it. It is\n" +
+			"refused until the account exists, and `share get` says who is ready.\n" +
+			"Afterwards they hold an ordinary invitation, which they still have to\n" +
+			"accept.",
 		"get": "Show who can open a vault.\n\n" +
 			"Members have accepted; the invited have not answered yet.",
 		"update": "Change what somebody may do with a vault.\n\n" +
@@ -92,15 +111,24 @@ var itemTarget = target{
 		return shareID, itemID, it.Name, nil
 	},
 	short: map[string]string{
-		"add":    "Offer one item to somebody",
-		"get":    "Show how an item is shared",
-		"update": "Change what somebody may do with an item",
-		"remove": "Take somebody's access to an item away",
+		"add":     "Offer one item to somebody",
+		"confirm": "Let somebody into an item once they join Proton",
+		"get":     "Show how an item is shared",
+		"update":  "Change what somebody may do with an item",
+		"remove":  "Take somebody's access to an item away",
 	},
 	long: map[string]string{
 		"add": "Offer one item to somebody, leaving the vault around it alone.\n\n" +
 			"What travels is the item's own key rather than the vault's, so they can\n" +
-			"open that item and nothing else sealed under the same share.",
+			"open that item and nothing else sealed under the same share.\n\n" +
+			"EMAIL may be an address outside Proton. Proton emails them an invitation to\n" +
+			"create an account, and nothing reaches them until they have one and you run\n" +
+			"`share confirm`.",
+		"confirm": "Let somebody into an item once they join Proton.\n\n" +
+			"Use it for an address that had no Proton account when you offered it. It is\n" +
+			"refused until the account exists, and `share get` says who is ready.\n" +
+			"Afterwards they hold an ordinary invitation, which they still have to\n" +
+			"accept.",
 		"get": "Show how an item is shared: who holds it, who has been offered it,\n" +
 			"and the links made for it.\n\n" +
 			"A link's URL carries the key that opens the item, so this prints it in\n" +
@@ -116,7 +144,7 @@ var itemTarget = target{
 
 func itemsShareCmd() *cobra.Command {
 	c := &cobra.Command{Use: "share", Short: "Who else can open an item"}
-	c.AddCommand(shareAddCmd(itemTarget), shareGetCmd(itemTarget),
+	c.AddCommand(shareAddCmd(itemTarget), shareConfirmCmd(itemTarget), shareGetCmd(itemTarget),
 		shareUpdateCmd(itemTarget), shareRemoveCmd(itemTarget))
 	return c
 }
@@ -143,19 +171,69 @@ func shareAddCmd(t target) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return kit.Mutate(c, ui.ResultSpec{
+			var stage passsvc.Stage
+			if err := kit.Mutate(c, ui.ResultSpec{
 				Action: ui.Invited, Kind: "invitations", Count: 1, Name: c.Args[1],
 				Detail: "to " + name,
 			}, func() error {
-				if itemID != "" {
-					return c.App.Pass.ItemShare(c.Ctx, shareID, itemID, c.Args[1], role)
-				}
-				return c.App.Pass.VaultShare(c.Ctx, shareID, c.Args[1], role)
-			})
+				var err error
+				stage, err = offer(c, shareID, itemID, c.Args[1], role)
+				return err
+			}); err != nil {
+				return err
+			}
+			if stage == passsvc.StageNoAccount {
+				warnHeld(c, t.noun)
+			}
+			return nil
 		}),
 	}
 	access.Register(c)
 	return c
+}
+
+// offer makes the offer the target calls for: the item's keys, or the vault's.
+func offer(c *kit.Invocation, shareID, itemID, email, role string) (passsvc.Stage, error) {
+	if itemID != "" {
+		return c.App.Pass.ItemShare(c.Ctx, shareID, itemID, email, role)
+	}
+	return c.App.Pass.VaultShare(c.Ctx, shareID, email, role)
+}
+
+// warnHeld says what an offer to an address outside Proton is and is not.
+//
+// The ✓ above it is true - the offer was made - and on its own it would read as
+// the whole job. It is half of it, and the other half needs this account back at
+// a terminal at a moment nothing announces, so the sentence says that too.
+func warnHeld(c *kit.Invocation, noun string) {
+	c.Warn("%s has no Proton account, so there is no key to send yet. Proton has "+
+		"emailed an invitation to create one. Nothing reaches them until they have an "+
+		"account and you run `%s pass %ss share confirm %s %s`, and nothing will remind you.",
+		c.Args[1], kit.Program, noun, c.Args[0], c.Args[1])
+}
+
+// Handing the keys over is its own verb because a CLI has no moment to do it in.
+// A web client asks about the held offers it finds on the next launch; here the
+// person who made the offer is the only one who can finish it, and asking them
+// is the only honest alternative to never finishing it at all.
+func shareConfirmCmd(t target) *cobra.Command {
+	return &cobra.Command{
+		Use:   "confirm REF EMAIL",
+		Short: t.short["confirm"],
+		Long:  t.long["confirm"],
+		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
+			shareID, itemID, name, err := t.resolve(c, c.Args[0])
+			if err != nil {
+				return err
+			}
+			return kit.Mutate(c, ui.ResultSpec{
+				Action: ui.Confirmed, Kind: "shares", Count: 1, Name: c.Args[1],
+				Detail: "on " + name,
+			}, func() error {
+				return c.App.Pass.ConfirmInvite(c.Ctx, shareID, itemID, c.Args[1])
+			})
+		}),
+	}
 }
 
 func shareGetCmd(t target) *cobra.Command {
@@ -186,7 +264,7 @@ func shareGetCmd(t target) *cobra.Command {
 			}
 			for _, i := range invited {
 				fields = append(fields, ui.Field{
-					Label: "Invited", Value: i.Email + " (" + i.Access + ", not yet accepted)",
+					Label: "Invited", Value: i.Email + " (" + i.Access + ", " + waiting(i.Stage) + ")",
 				})
 			}
 			var links []passsvc.SecureLink
@@ -250,13 +328,11 @@ func shareUpdateCmd(t target) *cobra.Command {
 				}
 				// Somebody who has not answered holds no share to change, so the
 				// offer is withdrawn and made again at the access asked for.
-				if err := c.App.Pass.InviteRevoke(c.Ctx, shareID, held.invite.ID); err != nil {
+				if err := c.App.Pass.InviteRevoke(c.Ctx, shareID, *held.invite); err != nil {
 					return err
 				}
-				if itemID != "" {
-					return c.App.Pass.ItemShare(c.Ctx, shareID, itemID, held.email(), role)
-				}
-				return c.App.Pass.VaultShare(c.Ctx, shareID, held.email(), role)
+				_, err := offer(c, shareID, itemID, held.email(), role)
+				return err
 			})
 		}),
 	}
@@ -285,7 +361,7 @@ func shareRemoveCmd(t target) *cobra.Command {
 				if held.member != nil {
 					return c.App.Pass.MemberRemove(c.Ctx, shareID, held.member.ShareID)
 				}
-				return c.App.Pass.InviteRevoke(c.Ctx, shareID, held.invite.ID)
+				return c.App.Pass.InviteRevoke(c.Ctx, shareID, *held.invite)
 			})
 		}),
 	}
@@ -336,7 +412,7 @@ func whoHolds(c *kit.Invocation, shareID, itemID, name, email string) (held, err
 		addresses = append(addresses, m.Email)
 	}
 	for _, i := range invites {
-		addresses = append(addresses, i.Email+" (not yet accepted)")
+		addresses = append(addresses, i.Email+" ("+waiting(i.Stage)+")")
 	}
 	fail := kit.Fail("Nobody at %s holds %s.", email, name).Exit(3)
 	if len(addresses) == 0 {

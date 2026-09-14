@@ -124,9 +124,33 @@ proton drive items share update /Reports jane@proton.me --edit=false
 proton drive items share remove /Documents/report.pdf bob@proton.me
 ```
 
-`share update` applies whether they have accepted yet or not. Nothing is re-encrypted: the key they hold still opens the share, and only what they may do with it changes.
+`share update` applies whether they have accepted yet or not. Only what they may do with it changes.
 
 `share resend` sends an unanswered invitation again rather than cancelling and inviting afresh.
+
+### With somebody who is not on Proton
+
+Invite any address. Proton emails one without an account an invitation to create one.
+
+```bash
+proton drive items share add /Documents/project sam@example.com
+proton drive items share get /Documents/project
+proton drive items share confirm /Documents/project sam@example.com
+```
+
+Nothing reaches them until they have an account and you run `share confirm`. `share get` says which it is:
+
+```console
+$ proton drive items share get /Documents/project
+Path:     /Documents/project
+Type:     folder
+Invited:  sam@example.com (viewer, waiting for a Proton account)
+Invited:  kim@example.com (editor, ready to confirm)
+```
+
+`confirm` is refused while they read `waiting for a Proton account`. Nothing tells you when that changes, so check with `share get`.
+
+`update`, `resend` and `remove` work on these the way they work on any invitation.
 
 ### What is shared, and by whom
 

@@ -62,13 +62,15 @@ proton pass vaults list
 
 Who else can open a vault.
 
-Holds `add`, `get`, `remove` and `update`.
+Holds `add`, `confirm`, `get`, `remove` and `update`.
 
 ### `share add`
 
 Offer a vault to somebody.
 
-They are sent an invitation and see nothing until they take it. Only another Proton account can be invited.
+They are sent an invitation and see nothing until they take it.
+
+EMAIL may be an address outside Proton. Proton emails them an invitation to create an account, and nothing reaches them until they have one and you run `share confirm`.
 
 ```
 proton pass vaults share add REF EMAIL
@@ -82,6 +84,20 @@ proton pass vaults share add Work jane@proton.me --access editor
 | Flag | Description |
 | --- | --- |
 | `--access string` | What they may do with it: viewer, editor, manager (default `viewer`) |
+
+### `share confirm`
+
+Let somebody into a vault once they join Proton.
+
+Use it for an address that had no Proton account when you offered it. It is refused until the account exists, and `share get` says who is ready. Afterwards they hold an ordinary invitation, which they still have to accept.
+
+```
+proton pass vaults share confirm REF EMAIL
+```
+
+```bash
+proton pass vaults share confirm Work jane@example.com
+```
 
 ### `share get`
 

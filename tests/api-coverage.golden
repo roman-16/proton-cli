@@ -7,6 +7,7 @@ DELETE /drive/photos/volumes/{id}/albums/{id}
 DELETE /drive/photos/volumes/{id}/links/{id}/tags
 DELETE /drive/shares/{id}/files/{id}/revisions/{id}
 DELETE /drive/shares/{id}/urls/{id}
+DELETE /drive/v2/shares/{id}/external-invitations/{id}
 DELETE /drive/v2/shares/{id}/invitations/{id}
 DELETE /drive/v2/shares/{id}/members/{id}
 DELETE /drive/v2/urls/{id}/bookmark
@@ -19,6 +20,7 @@ DELETE /pass/v1/breach/custom_email/{id}
 DELETE /pass/v1/invite/{id}
 DELETE /pass/v1/public_link/{id}
 DELETE /pass/v1/share/{id}/alias/{id}/contact/{n}
+DELETE /pass/v1/share/{id}/invite/new_user/{id}
 DELETE /pass/v1/share/{id}/invite/{id}
 DELETE /pass/v1/share/{id}/item
 DELETE /pass/v1/share/{id}/item/{id}/pin
@@ -74,6 +76,7 @@ GET /drive/urls/{id}/links/{id}/revisions/{id}/verification
 GET /drive/v2/shared-bookmarks
 GET /drive/v2/shares/invitations
 GET /drive/v2/shares/invitations/{id}
+GET /drive/v2/shares/{id}/external-invitations
 GET /drive/v2/shares/{id}/invitations
 GET /drive/v2/shares/{id}/members
 GET /drive/volumes
@@ -146,6 +149,8 @@ POST /drive/urls/{id}/files/{id}/checkAvailableHashes
 POST /drive/urls/{id}/folders
 POST /drive/v2/shares/invitations/{id}/accept
 POST /drive/v2/shares/invitations/{id}/reject
+POST /drive/v2/shares/{id}/external-invitations
+POST /drive/v2/shares/{id}/external-invitations/{id}/sendemail
 POST /drive/v2/shares/{id}/invitations
 POST /drive/v2/shares/{id}/invitations/{id}/sendemail
 POST /drive/v2/urls/{id}/bookmark
@@ -169,6 +174,7 @@ POST /pass/v1/share/{id}/alias/custom
 POST /pass/v1/share/{id}/alias/{id}/contact
 POST /pass/v1/share/{id}/alias/{id}/mailbox
 POST /pass/v1/share/{id}/invite
+POST /pass/v1/share/{id}/invite/new_user
 POST /pass/v1/share/{id}/item
 POST /pass/v1/share/{id}/item/import/batch
 POST /pass/v1/share/{id}/item/trash
@@ -207,6 +213,7 @@ PUT /drive/shares/{id}/links/{id}/rename
 PUT /drive/shares/{id}/urls/{id}
 PUT /drive/unauth/v2/volumes/{id}/links/{id}/rename
 PUT /drive/urls/{id}/files/{id}/revisions/{id}
+PUT /drive/v2/shares/{id}/external-invitations/{id}
 PUT /drive/v2/shares/{id}/invitations/{id}
 PUT /drive/v2/shares/{id}/members/{id}
 PUT /drive/v2/volumes/{id}/trash/restore_multiple

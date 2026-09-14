@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"sort"
+	"strings"
 
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
 
@@ -38,6 +40,18 @@ import (
 // invitation is signed under the same context, so both open with one rule.
 const inviteContext = "pass.invite.vault.existing-user"
 
+// newUserContext is the context on an offer to somebody with no Proton account.
+// Nothing encrypted travels under it - there is no key to travel to - so what it
+// signs is the address and the share key together.
+const newUserContext = "pass.invite.vault.new-user"
+
+// The states Proton gives such an offer: it waits for the person to create an
+// account, and then for the key.
+const (
+	newUserWaiting = 1
+	newUserReady   = 2
+)
+
 // What a vault can be shared as. Proton sends these as strings.
 const (
 	roleManager = "1"
@@ -52,6 +66,27 @@ var roleWords = map[string]string{
 
 // VaultRoles are the ways a vault can be shared, for --access.
 func VaultRoles() []string { return []string{"viewer", "editor", "manager"} }
+
+// Stage is how far an offer nobody has accepted has got.
+//
+// An address outside Proton publishes no key, so there is nothing to encrypt the
+// share key to and the offer is held: Proton emails an invitation to create an
+// account, and only once there is one can the key travel - sent by the person who
+// offered it, since nobody else holds it. That is two states a Proton address
+// never passes through, and every command that acts on "whoever this address is"
+// has to tell them apart.
+type Stage string
+
+const (
+	// StageOffered is an invitation to a Proton address, waiting to be accepted.
+	StageOffered Stage = "offered"
+	// StageNoAccount is an offer to an address outside Proton, held until the
+	// person creates an account.
+	StageNoAccount Stage = "no-account"
+	// StageReady is such an offer whose invitee has since created one, so the keys
+	// are the inviter's to hand over.
+	StageReady Stage = "ready"
+)
 
 // roleFor turns the word somebody typed into what Proton wants.
 func roleFor(access string) (string, error) {
@@ -79,7 +114,14 @@ type Invite struct {
 	Access  string `json:"access"`
 	// Items is how many things are in the vault, as the sender counted them.
 	Items int `json:"items,omitempty"`
+	// Stage is how far an offer of yours has got, and is empty on one you were
+	// sent: how far it has got is whether you have answered it.
+	Stage Stage `json:"stage,omitempty"`
 }
+
+// outside reports whether the offer is held for somebody with no Proton account,
+// which is what decides the endpoint every verb reaches it through.
+func (i Invite) outside() bool { return i.Stage == StageNoAccount || i.Stage == StageReady }
 
 // Kind is what the invitation offers, for a listing that carries both.
 func (i Invite) Kind() string {
@@ -89,15 +131,16 @@ func (i Invite) Kind() string {
 	return "vault"
 }
 
-// VaultShare offers a vault to somebody.
+// VaultShare offers a vault to somebody, and says which kind of offer it turned
+// out to be.
 //
 // Every rotation of the share key is sent, because an item made before the last
 // rotation is still sealed under the older one - somebody given only the newest
 // key would see a vault half of which will not open.
-func (s *Service) VaultShare(ctx context.Context, shareID, email, access string) error {
+func (s *Service) VaultShare(ctx context.Context, shareID, email, access string) (Stage, error) {
 	sk, err := s.decryptShareKeys(ctx, shareID)
 	if err != nil {
-		return err
+		return "", err
 	}
 	return s.invite(ctx, shareID, "", email, access, sk.keys)
 }
@@ -107,12 +150,12 @@ func (s *Service) VaultShare(ctx context.Context, shareID, email, access string)
 // What travels is the item's own key rather than the vault's, which is what
 // makes the difference: the person invited can open that item and has no way to
 // reach anything else sealed under the same share.
-func (s *Service) ItemShare(ctx context.Context, shareID, itemID, email, access string) error {
-	keys, err := s.itemKeys(ctx, shareID, itemID)
+func (s *Service) ItemShare(ctx context.Context, shareID, itemID, email, access string) (Stage, error) {
+	item, err := s.itemKeys(ctx, shareID, itemID)
 	if err != nil {
-		return err
+		return "", err
 	}
-	return s.invite(ctx, shareID, itemID, email, access, keys)
+	return s.invite(ctx, shareID, itemID, email, access, item)
 }
 
 // itemKeys opens every rotation of one item's key.
@@ -172,10 +215,221 @@ func (s *Service) itemKeys(ctx context.Context, shareID, itemID string) (map[int
 //
 // A vault invitation and an item invitation differ only in which keys travel and
 // what the request says they are for, so they are one request built twice.
-func (s *Service) invite(ctx context.Context, shareID, itemID, email, access string, keys map[int][]byte) error {
+//
+// An address Proton publishes no key for cannot be sent anything, so the offer is
+// held instead: a signature over the address and the share key together, which
+// commits the keys this offer is for to the person named, so that handing them
+// over later against whatever key Proton publishes for them then is safe.
+func (s *Service) invite(ctx context.Context, shareID, itemID, email, access string, open map[int][]byte) (Stage, error) {
 	role, err := roleFor(access)
 	if err != nil {
+		return "", err
+	}
+	u, err := s.keys(ctx)
+	if err != nil {
+		return "", err
+	}
+	addrRings, _, err := u.PrimaryAddr()
+	if err != nil {
+		return "", err
+	}
+	inviteeKR, err := keys.Published(ctx, s.C, email)
+	if err != nil {
+		return "", err
+	}
+	body := map[string]any{"Email": email, "ShareRoleID": role, "TargetType": targetVault}
+	if itemID != "" {
+		body["TargetType"], body["ItemID"] = targetItem, itemID
+	}
+	if inviteeKR == nil {
+		sig, err := s.signForNewUser(ctx, shareID, email, addrRings.Write)
+		if err != nil {
+			return "", err
+		}
+		body["Signature"] = sig
+		return StageNoAccount, s.C.Decode(ctx, proton.Request{
+			Method: "POST", Path: "/pass/v1/share/" + shareID + "/invite/new_user", Body: body,
+		}, nil)
+	}
+	sealed, err := sealKeys(open, inviteeKR, addrRings.Write, email)
+	if err != nil {
+		return "", err
+	}
+	body["Keys"] = sealed
+	return StageOffered, s.C.Decode(ctx, proton.Request{
+		Method: "POST", Path: "/pass/v1/share/" + shareID + "/invite",
+		Body: body,
+	}, nil)
+}
+
+// sealKeys encrypts every rotation to the invitee and signs each with this
+// account's address key, which is the one thing an offer carries whether it was
+// made to somebody with an account or to somebody who has since got one.
+func sealKeys(open map[int][]byte, to, signWith *pgp.KeyRing, email string) ([]map[string]any, error) {
+	rotations := make([]int, 0, len(open))
+	for r := range open {
+		rotations = append(rotations, r)
+	}
+	sort.Ints(rotations)
+
+	sealed := make([]map[string]any, 0, len(rotations))
+	for _, rotation := range rotations {
+		msg, err := to.EncryptWithContext(
+			pgp.NewPlainMessage(open[rotation]), signWith,
+			pgp.NewSigningContext(inviteContext, true),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("encrypt the key for %s: %w", email, err)
+		}
+		sealed = append(sealed, map[string]any{
+			"Key":         base64.StdEncoding.EncodeToString(msg.GetBinary()),
+			"KeyRotation": rotation,
+		})
+	}
+	return sealed, nil
+}
+
+// newUserSigned is what an offer to an address outside Proton commits to: the
+// address and the share's newest key, together, so neither can be changed under
+// the other between the offer and the keys.
+func newUserSigned(email string, shareKey []byte) *pgp.PlainMessage {
+	body := make([]byte, 0, len(email)+1+len(shareKey))
+	body = append(body, email...)
+	body = append(body, '|')
+	return pgp.NewPlainMessage(append(body, shareKey...))
+}
+
+func (s *Service) signForNewUser(ctx context.Context, shareID, email string, signWith *pgp.KeyRing) (string, error) {
+	sk, err := s.decryptShareKeys(ctx, shareID)
+	if err != nil {
+		return "", err
+	}
+	shareKey, _ := sk.latest()
+	sig, err := signWith.SignDetachedWithContext(
+		newUserSigned(email, shareKey), pgp.NewSigningContext(newUserContext, true))
+	if err != nil {
+		return "", fmt.Errorf("sign the offer to %s: %w", email, err)
+	}
+	return base64.StdEncoding.EncodeToString(sig.GetBinary()), nil
+}
+
+// sentInvite is an offer to somebody who already had a Proton account.
+type sentInvite struct {
+	InviteID     string
+	InvitedEmail string
+	InviterEmail string
+	ShareRoleID  string
+	TargetType   int
+	TargetID     string
+}
+
+// newUserInvite is an offer made to an address outside Proton. The signature is
+// this account's own, over the address and the share key together, and is what
+// confirming checks before any key goes anywhere.
+type newUserInvite struct {
+	NewUserInviteID string
+	InvitedEmail    string
+	InviterEmail    string
+	ShareRoleID     string
+	TargetType      int
+	TargetID        string
+	State           int
+	Signature       string
+}
+
+// invitesOn is every offer standing on a share, in Proton's two shapes. One
+// request carries both, so who is waiting is never answered in halves.
+func (s *Service) invitesOn(ctx context.Context, shareID string) ([]sentInvite, []newUserInvite, error) {
+	var r struct {
+		Invites        []sentInvite
+		NewUserInvites []newUserInvite
+	}
+	if err := s.C.Decode(ctx, proton.Request{
+		Method: "GET", Path: "/pass/v1/share/" + shareID + "/invite",
+	}, &r); err != nil {
+		return nil, nil, err
+	}
+	return r.Invites, r.NewUserInvites, nil
+}
+
+// newUserStage reads Proton's number, and calls a state this build has not been
+// told about one that is not ready: confirming sends keys, and a state nobody
+// recognises is not grounds to send any.
+func newUserStage(state int) Stage {
+	if state == newUserReady {
+		return StageReady
+	}
+	return StageNoAccount
+}
+
+// InvitesSent lists who has been offered something of yours and has not answered.
+//
+// Proton keeps an item's invitations on the share the item lives in, so one
+// request answers for the vault and for everything in it; itemID narrows that to
+// the invitations about one item.
+func (s *Service) InvitesSent(ctx context.Context, shareID, itemID string) ([]Invite, error) {
+	sent, held, err := s.invitesOn(ctx, shareID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Invite, 0, len(sent)+len(held))
+	for _, i := range sent {
+		out = append(out, Invite{
+			ID: i.InviteID, ShareID: shareID, Email: i.InvitedEmail, ItemID: itemOf(i.TargetType, i.TargetID),
+			Inviter: i.InviterEmail, Access: roleWord(i.ShareRoleID), Stage: StageOffered,
+		})
+	}
+	for _, i := range held {
+		out = append(out, Invite{
+			ID: i.NewUserInviteID, ShareID: shareID, Email: i.InvitedEmail, ItemID: itemOf(i.TargetType, i.TargetID),
+			Inviter: i.InviterEmail, Access: roleWord(i.ShareRoleID), Stage: newUserStage(i.State),
+		})
+	}
+	out = slices.DeleteFunc(out, func(i Invite) bool { return i.ItemID != itemID })
+	sort.SliceStable(out, func(i, j int) bool { return out[i].Email < out[j].Email })
+	return out, nil
+}
+
+// itemOf is the item an offer is about, and nothing at all for one about a whole
+// vault: a vault offer's target is the vault, which is not an item ID.
+func itemOf(targetType int, targetID string) string {
+	if targetType == targetItem {
+		return targetID
+	}
+	return ""
+}
+
+// ConfirmInvite hands the keys to somebody who was offered this before they had
+// a Proton account and has since made one.
+//
+// The signature checked here is this account's own, made when the offer went out.
+// It says which address these keys were promised to, so checking it against the
+// address Proton now reports is what stops a substituted invitee from being
+// handed them. It is required and it is contextual: a signature made for anything
+// else vouches for nothing.
+//
+// What travels is the keys of whatever the offer was about - the item's when it
+// was one item, the vault's when it was the vault - which is the same rule an
+// offer to a Proton address follows.
+func (s *Service) ConfirmInvite(ctx context.Context, shareID, itemID, email string) error {
+	_, held, err := s.invitesOn(ctx, shareID)
+	if err != nil {
 		return err
+	}
+	for _, i := range held {
+		if !strings.EqualFold(i.InvitedEmail, email) || itemOf(i.TargetType, i.TargetID) != itemID {
+			continue
+		}
+		return s.confirm(ctx, shareID, i)
+	}
+	return errs.Problemf("Nobody at %s was offered this before they had a Proton account.", email).
+		Hint("`share get` shows who is waiting").Exit(3)
+}
+
+func (s *Service) confirm(ctx context.Context, shareID string, held newUserInvite) error {
+	if newUserStage(held.State) != StageReady {
+		return errs.Problemf("%s has not created a Proton account yet.", held.InvitedEmail).
+			Hint("Proton has emailed them an invitation to create one").Exit(3)
 	}
 	u, err := s.keys(ctx)
 	if err != nil {
@@ -185,96 +439,46 @@ func (s *Service) invite(ctx context.Context, shareID, itemID, email, access str
 	if err != nil {
 		return err
 	}
-	inviteeKR, err := s.publicKeyRing(ctx, email)
+	sk, err := s.decryptShareKeys(ctx, shareID)
 	if err != nil {
 		return err
 	}
-
-	rotations := make([]int, 0, len(keys))
-	for r := range keys {
-		rotations = append(rotations, r)
+	shareKey, _ := sk.latest()
+	raw, err := base64.StdEncoding.DecodeString(held.Signature)
+	if err != nil {
+		return fmt.Errorf("the offer's signature is not base64: %w", err)
 	}
-	sort.Ints(rotations)
-
-	sealedKeys := make([]map[string]any, 0, len(rotations))
-	for _, rotation := range rotations {
-		sealed, err := inviteeKR.EncryptWithContext(
-			pgp.NewPlainMessage(keys[rotation]), addrRings.Write,
-			pgp.NewSigningContext(inviteContext, true),
-		)
-		if err != nil {
-			return fmt.Errorf("encrypt the key for %s: %w", email, err)
+	if err := addrRings.Write.VerifyDetachedWithContext(
+		newUserSigned(held.InvitedEmail, shareKey), pgp.NewPGPSignature(raw), pgp.GetUnixTime(),
+		pgp.NewVerificationContext(newUserContext, true, 0)); err != nil {
+		return errs.Problemf(
+			"The offer to %s is not the one this account signed, so no key will be handed over.",
+			held.InvitedEmail).
+			Hint("`share remove` withdraws it; offer it to them again afterwards").Exit(3)
+	}
+	inviteeKR, err := keys.Published(ctx, s.C, held.InvitedEmail)
+	if err != nil {
+		return err
+	}
+	if inviteeKR == nil {
+		return errs.Problemf("Proton publishes no key for %s yet, so there is nothing to hand the keys to.",
+			held.InvitedEmail).Exit(3)
+	}
+	open := sk.keys
+	if itemID := itemOf(held.TargetType, held.TargetID); itemID != "" {
+		if open, err = s.itemKeys(ctx, shareID, itemID); err != nil {
+			return err
 		}
-		sealedKeys = append(sealedKeys, map[string]any{
-			"Key":         base64.StdEncoding.EncodeToString(sealed.GetBinary()),
-			"KeyRotation": rotation,
-		})
 	}
-
-	body := map[string]any{
-		"Keys": sealedKeys, "Email": email,
-		"ShareRoleID": role, "TargetType": targetVault,
-	}
-	if itemID != "" {
-		body["TargetType"], body["ItemID"] = targetItem, itemID
+	sealed, err := sealKeys(open, inviteeKR, addrRings.Write, held.InvitedEmail)
+	if err != nil {
+		return err
 	}
 	return s.C.Decode(ctx, proton.Request{
-		Method: "POST", Path: "/pass/v1/share/" + shareID + "/invite",
-		Body: body,
+		Method: "POST",
+		Path:   "/pass/v1/share/" + shareID + "/invite/new_user/" + held.NewUserInviteID + "/keys",
+		Body:   map[string]any{"Keys": sealed},
 	}, nil)
-}
-
-// publicKeyRing is the key Proton publishes for an address, refused with a
-// sentence rather than an empty ring when there is none.
-func (s *Service) publicKeyRing(ctx context.Context, email string) (*pgp.KeyRing, error) {
-	kr, err := keys.Published(ctx, s.C, email)
-	if err != nil {
-		return nil, err
-	}
-	if kr == nil {
-		return nil, errs.Problemf("%s is not a Proton address, so there is no key to share with.", email).
-			Hint("a vault can only be shared with another Proton account")
-	}
-	return kr, nil
-}
-
-// InvitesSent lists who has been offered something of yours and has not answered.
-//
-// Proton keeps an item's invitations on the share the item lives in, so one
-// request answers for the vault and for everything in it; itemID narrows that to
-// the invitations about one item.
-func (s *Service) InvitesSent(ctx context.Context, shareID, itemID string) ([]Invite, error) {
-	var r struct {
-		Invites []struct {
-			InviteID     string
-			InvitedEmail string
-			InviterEmail string
-			ShareRoleID  string
-			TargetType   int
-			TargetID     string
-		}
-	}
-	if err := s.C.Decode(ctx, proton.Request{
-		Method: "GET", Path: "/pass/v1/share/" + shareID + "/invite",
-	}, &r); err != nil {
-		return nil, err
-	}
-	out := make([]Invite, 0, len(r.Invites))
-	for _, i := range r.Invites {
-		invite := Invite{
-			ID: i.InviteID, ShareID: shareID, Email: i.InvitedEmail,
-			Inviter: i.InviterEmail, Access: roleWord(i.ShareRoleID),
-		}
-		if i.TargetType == targetItem {
-			invite.ItemID = i.TargetID
-		}
-		if invite.ItemID != itemID {
-			continue
-		}
-		out = append(out, invite)
-	}
-	sort.SliceStable(out, func(i, j int) bool { return out[i].Email < out[j].Email })
-	return out, nil
 }
 
 // roleWord names a role, falling back to the number for one this version has
@@ -289,11 +493,18 @@ func roleWord(id string) string {
 	return "role " + id
 }
 
-// InviteRevoke withdraws an offer nobody has answered.
-func (s *Service) InviteRevoke(ctx context.Context, shareID, inviteID string) error {
-	return s.C.Decode(ctx, proton.Request{
-		Method: "DELETE", Path: "/pass/v1/share/" + shareID + "/invite/" + inviteID,
-	}, nil)
+// InviteRevoke withdraws an offer nobody has answered, of either kind.
+//
+// Proton keeps an offer to an address outside Proton on an endpoint of its own,
+// and each path is written out rather than assembled: a path built behind a call
+// is a request nothing can see this CLI is able to send.
+func (s *Service) InviteRevoke(ctx context.Context, shareID string, invite Invite) error {
+	if invite.outside() {
+		return s.C.Decode(ctx, proton.Request{Method: "DELETE",
+			Path: fmt.Sprintf("/pass/v1/share/%s/invite/new_user/%s", shareID, invite.ID)}, nil)
+	}
+	return s.C.Decode(ctx, proton.Request{Method: "DELETE",
+		Path: fmt.Sprintf("/pass/v1/share/%s/invite/%s", shareID, invite.ID)}, nil)
 }
 
 // InvitesReceived lists what other people have offered you.

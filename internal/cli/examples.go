@@ -294,6 +294,9 @@ var examples = map[string][]string{
 		"proton drive items share add /Documents jane@example.com",
 		"proton drive items share add /Documents jane@example.com --edit --message 'Have a look'",
 	},
+	"proton drive items share confirm": {
+		"proton drive items share confirm /Documents jane@example.com",
+	},
 	"proton drive items share remove": {"proton drive items share remove /Documents jane@example.com"},
 	"proton drive invitations list":   {"proton drive invitations list"},
 	"proton drive invitations accept": {
@@ -637,6 +640,9 @@ var examples = map[string][]string{
 		"proton pass vaults share add Work jane@proton.me",
 		"proton pass vaults share add Work jane@proton.me --access editor",
 	},
+	"proton pass vaults share confirm": {
+		"proton pass vaults share confirm Work jane@example.com",
+	},
 	"proton pass vaults share get": {
 		"proton pass vaults share get Work",
 	},
@@ -652,6 +658,9 @@ var examples = map[string][]string{
 	"proton pass items share add": {
 		"proton pass items share add github.com jane@proton.me",
 		"proton pass items share add github.com jane@proton.me --access editor",
+	},
+	"proton pass items share confirm": {
+		"proton pass items share confirm github.com jane@example.com",
 	},
 	"proton pass items share get": {
 		"proton pass items share get github.com",

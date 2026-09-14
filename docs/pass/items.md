@@ -339,13 +339,15 @@ proton pass items revisions restore github.com 3
 
 Who else can open an item.
 
-Holds `add`, `get`, `remove` and `update`.
+Holds `add`, `confirm`, `get`, `remove` and `update`.
 
 ### `share add`
 
 Offer one item to somebody, leaving the vault around it alone.
 
 What travels is the item's own key rather than the vault's, so they can open that item and nothing else sealed under the same share.
+
+EMAIL may be an address outside Proton. Proton emails them an invitation to create an account, and nothing reaches them until they have one and you run `share confirm`.
 
 ```
 proton pass items share add REF EMAIL
@@ -359,6 +361,20 @@ proton pass items share add github.com jane@proton.me --access editor
 | Flag | Description |
 | --- | --- |
 | `--access string` | What they may do with it: viewer, editor, manager (default `viewer`) |
+
+### `share confirm`
+
+Let somebody into an item once they join Proton.
+
+Use it for an address that had no Proton account when you offered it. It is refused until the account exists, and `share get` says who is ready. Afterwards they hold an ordinary invitation, which they still have to accept.
+
+```
+proton pass items share confirm REF EMAIL
+```
+
+```bash
+proton pass items share confirm github.com jane@example.com
+```
 
 ### `share get`
 

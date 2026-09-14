@@ -17,8 +17,19 @@ import (
 func shareCmd() *cobra.Command {
 	c := &cobra.Command{Use: "share", Short: "Public links and the people you share with"}
 	c.AddCommand(shareGetCmd(), shareLinkCmd(), shareUnlinkCmd(), shareAddCmd(),
-		shareUpdateCmd(), shareResendCmd(), shareRemoveCmd())
+		shareConfirmCmd(), shareUpdateCmd(), shareResendCmd(), shareRemoveCmd())
 	return c
+}
+
+// waiting words how far an unanswered offer has got, for the person reading it.
+func waiting(stage drivesvc.Stage) string {
+	switch stage {
+	case drivesvc.StageNoAccount:
+		return "waiting for a Proton account"
+	case drivesvc.StageReady:
+		return "ready to confirm"
+	}
+	return "not yet accepted"
 }
 
 func shareGetCmd() *cobra.Command {
@@ -55,7 +66,7 @@ func shareGetCmd() *cobra.Command {
 			}
 			for _, p := range st.Invitees {
 				fields = append(fields, ui.Field{
-					Label: "Invited", Value: p.Email + " (" + p.Role + ", not yet accepted)",
+					Label: "Invited", Value: p.Email + " (" + p.Role + ", " + waiting(p.Stage) + ")",
 				})
 			}
 			if len(st.Links) == 0 && len(st.Members) == 0 && len(st.Invitees) == 0 {
@@ -181,21 +192,77 @@ func shareAddCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "add PATH EMAIL",
 		Short: "Invite someone to a file or folder",
+		Long: "Invite someone to a file or folder.\n\n" +
+			"EMAIL may be an address outside Proton. Proton emails them an invitation to\n" +
+			"create an account, and nothing reaches them until they have one and you run\n" +
+			"`share confirm`.",
+		RunE: kit.Run(nil, func(c *kit.Invocation) error {
+			dc, err := t.context(c)
+			if err != nil {
+				return err
+			}
+			var stage drivesvc.Stage
+			if err := kit.Mutate(c, ui.ResultSpec{
+				Action: ui.Invited, Count: 1, Name: c.Args[1],
+				Detail: "to " + c.Args[0],
+			}, func() error {
+				var err error
+				stage, err = c.App.Drive.InviteMember(c.Ctx, dc, c.Args[0], c.Args[1], edit, message)
+				return err
+			}); err != nil {
+				return err
+			}
+			if stage == drivesvc.StageNoAccount {
+				warnHeld(c, "drive items share confirm")
+			}
+			return nil
+		}),
+	}
+	c.Flags().BoolVar(&edit, "edit", false, "Allow editing rather than only viewing")
+	c.Flags().StringVar(&message, "message", "", "Note to include in the invitation email")
+	t.register(c, manages)
+	return c
+}
+
+// warnHeld says what an invitation to an address outside Proton is and is not.
+//
+// The ✓ above it is true - the offer was made - and on its own it would read as
+// the whole job. It is half of it, and the other half needs this account back at
+// a terminal at a moment nothing announces, so the sentence says that too.
+func warnHeld(c *kit.Invocation, confirm string) {
+	c.Warn("%s has no Proton account, so there is no key to send yet. Proton has "+
+		"emailed an invitation to create one. Nothing reaches them until they have an "+
+		"account and you run `%s %s %s %s`, and nothing will remind you.",
+		c.Args[1], kit.Program, confirm, c.Args[0], c.Args[1])
+}
+
+// Handing the key over is its own verb because a CLI has no moment to do it in.
+// A web client converts the held offer out of an event nobody asked for; here
+// the person who made the offer is the only one who can finish it, and asking
+// them is the only honest alternative to never finishing it at all.
+func shareConfirmCmd() *cobra.Command {
+	var t tree
+	c := &cobra.Command{
+		Use:   "confirm PATH EMAIL",
+		Short: "Let somebody in once they join Proton",
+		Long: "Let somebody in once they join Proton.\n\n" +
+			"Use it for an address that had no Proton account when you invited it. It is\n" +
+			"refused until the account exists, and `share get` says who is ready.\n" +
+			"Afterwards they hold an ordinary invitation, which they still have to\n" +
+			"accept.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			dc, err := t.context(c)
 			if err != nil {
 				return err
 			}
 			return kit.Mutate(c, ui.ResultSpec{
-				Action: ui.Invited, Count: 1, Name: c.Args[1],
-				Detail: "to " + c.Args[0],
+				Action: ui.Confirmed, Count: 1, Name: c.Args[1],
+				Detail: "on " + c.Args[0],
 			}, func() error {
-				return c.App.Drive.InviteMember(c.Ctx, dc, c.Args[0], c.Args[1], edit, message)
+				return c.App.Drive.ConfirmInvite(c.Ctx, dc, c.Args[0], c.Args[1])
 			})
 		}),
 	}
-	c.Flags().BoolVar(&edit, "edit", false, "Allow editing rather than only viewing")
-	c.Flags().StringVar(&message, "message", "", "Note to include in the invitation email")
 	t.register(c, manages)
 	return c
 }

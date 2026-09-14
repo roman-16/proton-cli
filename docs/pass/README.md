@@ -203,11 +203,33 @@ proton pass items share get github.com          # members, invitations and links
 proton pass items share remove github.com jane@proton.me
 ```
 
-**It only works with another Proton account.**
-
 Sharing a vault shares everything in it. Sharing one item lets the person open that item and nothing else in the vault.
 
 `--access` is `viewer`, `editor` or `manager`. `share get` shows the people who accepted as members and the rest as invited. `update` and `remove` act on the address whichever it turns out to be.
+
+### Share with somebody who is not on Proton
+
+Offer it to any address. Proton emails one without an account an invitation to create one.
+
+```bash
+proton pass vaults share add Work sam@example.com
+proton pass vaults share get Work
+proton pass vaults share confirm Work sam@example.com
+```
+
+Nothing reaches them until they have an account and you run `share confirm`. `share get` says which it is:
+
+```console
+$ proton pass vaults share get Work
+Name:     Work
+Member:   you@proton.me (owner)
+Invited:  sam@example.com (viewer, waiting for a Proton account)
+Invited:  kim@example.com (editor, ready to confirm)
+```
+
+`confirm` is refused while they read `waiting for a Proton account`. Nothing tells you when that changes, so check with `share get`.
+
+`items share` takes the same three commands.
 
 ### Hand a vault over
 

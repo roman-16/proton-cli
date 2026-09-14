@@ -180,19 +180,40 @@ func TestDriveShareLinkUpdatesTheLinkItAlreadyHas(t *testing.T) {
 	assertField(t, runOK(t, "drive", "items", "share", "get", folder), "Link Password:", "hunter2")
 }
 
-func TestDriveShareAddNotProtonUser(t *testing.T) {
-	folder := "/" + testID() + "-member"
+// Somebody with no Proton account can be invited. There is no key to send them,
+// so Proton holds the offer and emails them an invitation to create an account -
+// and everything the other verbs do to an ordinary invitation they do to this
+// one, which is the half of the feature a run can reach.
+func TestDriveShareWithSomebodyOutsideProton(t *testing.T) {
+	outsider := externalRecipient(t)
+	folder := "/" + testID() + "-outside"
 	runOK(t, "drive", "items", "create", folder)
 	cleanupRun(t, fmt.Sprintf("Delete folder: proton drive items delete --permanent %s", folder),
 		"drive", "items", "delete", folder)
 
-	_, stderr, code := run(t, "drive", "items", "share", "add", folder, "nobody-"+testID()+"@example.invalid")
-	if code == 0 {
-		t.Error("expected non-zero exit inviting a non-Proton address")
+	_, stderr := runOKStderr(t, "drive", "items", "share", "add", folder, outsider)
+	assertContains(t, stderr, "has no Proton account")
+
+	status := runOK(t, "drive", "items", "share", "get", folder)
+	assertContains(t, status, outsider)
+	assertContains(t, status, "waiting for a Proton account")
+
+	// Which of the two it is - nobody was invited, or they were and have not
+	// signed up - is the whole difference to somebody wondering why nothing
+	// arrived.
+	_, refusal, code := run(t, "drive", "items", "share", "confirm", folder, outsider)
+	if code != 3 {
+		t.Errorf("confirming an offer to somebody with no account exited %d, want 3", code)
 	}
-	if !strings.Contains(stderr, "not a Proton address") {
-		t.Errorf("expected 'not a Proton address' error, got: %s", stderr)
-	}
+	assertContains(t, refusal, "has not created a Proton account yet")
+
+	runOK(t, "drive", "items", "share", "update", folder, outsider, "--edit")
+	assertContains(t, runOK(t, "drive", "items", "share", "get", folder), "editor")
+	runOK(t, "drive", "items", "share", "resend", folder, outsider)
+
+	runOK(t, "drive", "items", "share", "remove", folder, outsider)
+	after := runOKBothStreams(t, "drive", "items", "share", "get", folder)
+	assertNotContains(t, after, outsider)
 }
 
 func TestDriveShareAddDryRun(t *testing.T) {

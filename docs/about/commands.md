@@ -82,6 +82,7 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton drive items revisions list`](../drive/items.md#revisions-list) | List a file's earlier versions |
 | [`proton drive items revisions restore`](../drive/items.md#revisions-restore) | Restore a file to an earlier version |
 | [`proton drive items share add`](../drive/items.md#share-add) | Invite someone to a file or folder |
+| [`proton drive items share confirm`](../drive/items.md#share-confirm) | Let somebody in once they join Proton |
 | [`proton drive items share get`](../drive/items.md#share-get) | Show how a file or folder is shared |
 | [`proton drive items share link`](../drive/items.md#share-link) | Create or update the public link for a file or folder |
 | [`proton drive items share remove`](../drive/items.md#share-remove) | Revoke someone's access, or cancel their invitation |
@@ -246,6 +247,7 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton pass items revisions list`](../pass/items.md#revisions-list) | Show what an item used to be |
 | [`proton pass items revisions restore`](../pass/items.md#revisions-restore) | Put an item back to an earlier version |
 | [`proton pass items share add`](../pass/items.md#share-add) | Offer one item to somebody |
+| [`proton pass items share confirm`](../pass/items.md#share-confirm) | Let somebody into an item once they join Proton |
 | [`proton pass items share get`](../pass/items.md#share-get) | Show how an item is shared |
 | [`proton pass items share remove`](../pass/items.md#share-remove) | Take somebody's access to an item away |
 | [`proton pass items share update`](../pass/items.md#share-update) | Change what somebody may do with an item |
@@ -280,6 +282,7 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton pass vaults get`](../pass/vaults.md#get) | Show one vault in full |
 | [`proton pass vaults list`](../pass/vaults.md#list) | List your vaults |
 | [`proton pass vaults share add`](../pass/vaults.md#share-add) | Offer a vault to somebody |
+| [`proton pass vaults share confirm`](../pass/vaults.md#share-confirm) | Let somebody into a vault once they join Proton |
 | [`proton pass vaults share get`](../pass/vaults.md#share-get) | Show who can open a vault |
 | [`proton pass vaults share remove`](../pass/vaults.md#share-remove) | Take somebody's access to a vault away |
 | [`proton pass vaults share update`](../pass/vaults.md#share-update) | Change what somebody may do with a vault |

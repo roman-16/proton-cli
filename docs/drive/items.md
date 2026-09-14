@@ -290,11 +290,13 @@ proton drive items revisions restore /Documents/report.pdf 5bH2mQxK
 
 Public links and the people you share with.
 
-Holds `add`, `get`, `link`, `remove`, `resend`, `unlink` and `update`.
+Holds `add`, `confirm`, `get`, `link`, `remove`, `resend`, `unlink` and `update`.
 
 ### `share add`
 
 Invite someone to a file or folder.
+
+EMAIL may be an address outside Proton. Proton emails them an invitation to create an account, and nothing reaches them until they have one and you run `share confirm`.
 
 ```
 proton drive items share add PATH EMAIL
@@ -310,6 +312,25 @@ proton drive items share add /Documents jane@example.com --edit --message 'Have 
 | `--computer string` | Work inside this computer's files, by name or ID |
 | `--edit` | Allow editing rather than only viewing |
 | `--message string` | Note to include in the invitation email |
+| `--shared string` | Work inside an item shared with you, by name or ID |
+
+### `share confirm`
+
+Let somebody in once they join Proton.
+
+Use it for an address that had no Proton account when you invited it. It is refused until the account exists, and `share get` says who is ready. Afterwards they hold an ordinary invitation, which they still have to accept.
+
+```
+proton drive items share confirm PATH EMAIL
+```
+
+```bash
+proton drive items share confirm /Documents jane@example.com
+```
+
+| Flag | Description |
+| --- | --- |
+| `--computer string` | Work inside this computer's files, by name or ID |
 | `--shared string` | Work inside an item shared with you, by name or ID |
 
 ### `share get`

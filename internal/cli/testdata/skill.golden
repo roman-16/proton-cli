@@ -136,7 +136,7 @@ One line per group, with the verbs under it. Arguments, flags and examples are i
 - `proton drive invitations` - Shares other people have offered you: accept, decline, list
 - `proton drive items` - Files and folders: copy, create, delete, download, get, list, move, trash, update, upload
 - `proton drive items revisions` - Earlier versions of a file: delete, download, list, restore
-- `proton drive items share` - Public links and the people you share with: add, get, link, remove, resend, unlink, update
+- `proton drive items share` - Public links and the people you share with: add, confirm, get, link, remove, resend, unlink, update
 - `proton drive photos` - Your photo library: delete, download, favorite, list, trash, unfavorite, upload
 - `proton drive photos albums` - Photo albums: add, create, delete, list, remove, update
 - `proton drive settings` - How Drive behaves: get, list, set
@@ -173,7 +173,7 @@ One line per group, with the verbs under it. Arguments, flags and examples are i
 - `proton pass items` - Logins, notes, cards and the rest: create, delete, get, list, move, pin, totp, trash, unpin, update
 - `proton pass items attachments` - Files attached to an item: download, list, restore, update
 - `proton pass items revisions` - Earlier versions of an item: get, list, restore
-- `proton pass items share` - Who else can open an item: add, get, remove, update
+- `proton pass items share` - Who else can open an item: add, confirm, get, remove, update
 - `proton pass links` - Links that show an item to somebody without an account: create, get, list, revoke
 - `proton pass settings domains` - The domains an alias can be made on: list
 - `proton pass settings extra-password` - The extra password Pass can be protected with: disable, enable, get
@@ -182,7 +182,7 @@ One line per group, with the verbs under it. Arguments, flags and examples are i
 - `proton pass sharing` - Items you have shared with other people: list
 - `proton pass trash` - Items you have removed but not yet deleted: empty, list, restore
 - `proton pass vaults` - The vaults your items live in: create, delete, get, list, transfer, update
-- `proton pass vaults share` - Who else can open a vault: add, get, remove, update
+- `proton pass vaults share` - Who else can open a vault: add, confirm, get, remove, update
 
 ### account - Your Proton account, its settings and your session
 

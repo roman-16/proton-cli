@@ -150,6 +150,19 @@ var untested = map[string]string{
 	// got the fixture yet, and every test account has had it for a while.
 	"POST /core/v4/addresses": "the fixture address is minted once in an account's life, and every test account is past that moment",
 
+	// Handing the keys to somebody who was offered a vault before they had a
+	// Proton account. Reaching it needs the mailbox the offer went to to become a
+	// Proton account between one command and the next, which is somebody at a
+	// signup form and not something a run can arrange - and once it happened the
+	// account would exist for good, so the state could not be made again.
+	//
+	// Everything up to it is tested: the offer is made, listed as waiting,
+	// refused for confirmation while it is, and withdrawn. Drive's half of the
+	// same feature is covered the same way, and its conversion is one request the
+	// suite already sends - an ordinary invitation - so what is untested here is
+	// the Pass request alone.
+	"POST /pass/v1/share/{id}/invite/new_user/{id}/keys": "reaching it needs a mailbox to become a Proton account mid-run, which nobody can arrange",
+
 	// Turning on the short-domain address. An account has one for its lifetime
 	// and the paid account's is already on, so the only account a run could turn
 	// one on for is a free one, which Proton does not let have it. The refusal on
