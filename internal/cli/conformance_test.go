@@ -325,7 +325,9 @@ func TestSharedFlagNamesShareOneMeaning(t *testing.T) {
 // different meaning has to pick a different name, because this fails on any
 // command that declares one of them itself.
 var kitOwnedFlags = map[string]string{
+	"after":                  "kit.DayRange",
 	"all":                    "kit.All",
+	"before":                 "kit.DayRange",
 	"clear-link-password":    "kit.LinkPassword",
 	"eo-password-file":       "kit.EOPassword",
 	"extra-password-file":    "kit.ExtraPassword",
@@ -343,7 +345,9 @@ var kitOwnedFlags = map[string]string{
 // kitFlagUsage is what kit itself registers each of those with, so the guard
 // below can tell kit's own registration from a command redeclaring the name.
 var kitFlagUsage = map[string]string{
+	"after":                  kit.AfterUsage,
 	"all":                    kit.AllUsage,
+	"before":                 kit.BeforeUsage,
 	"clear-link-password":    kit.ClearLinkPasswordUsage,
 	"eo-password-file":       kit.EOPasswordFileUsage,
 	"extra-password-file":    kit.ExtraPasswordFileUsage,
@@ -1192,6 +1196,160 @@ func TestNoErrorIsSkippedInSilence(t *testing.T) {
 			t.Fatalf("walk %s: %v", dir, err)
 		}
 	}
+}
+
+// ── rule 16: a name out of the account travels beside the error ──
+
+// Every other value a message picks up has a shape redact can find again - an
+// address, an ID, an absolute path. What somebody called a vault item, an event
+// or an attachment is words, and no reader of the finished sentence can tell it
+// from the sentence, so a log carrying that message carries the name with it.
+//
+// errs.Naming is what separates the two readers: the person is told which of
+// their things failed, and the file gets <name> in its place. Formatting one in
+// with %s tells the person the same thing and hands the file the name, which is
+// why this fails on it.
+//
+// It reads the arguments rather than the sentence, so what it catches is exactly
+// the shape that leaks: a field of something fetched from the account going into
+// a message. A name held in a local first is invisible here - the check is a net
+// under the rule, not the rule itself, which is written in AGENTS.md.
+//
+// kit is outside it. It phrases what the command line got wrong, so the Name it
+// formats in is a flag's own - `--%s accepts:` - and never the account's.
+var accountNames = map[string]bool{"Name": true, "Subject": true, "Title": true}
+
+// phrasing is what turns a failure into a sentence for a person.
+var phrasing = map[string]bool{"Fail": true, "Problemf": true, "Unsupportedf": true}
+
+func TestTheAccountsOwnNamesReachErrorsThroughNaming(t *testing.T) {
+	fset := token.NewFileSet()
+	for _, dir := range []string{"../cli", "../service"} {
+		err := filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
+			switch {
+			case err != nil || d.IsDir():
+				return err
+			case !strings.HasSuffix(p, ".go") || strings.HasSuffix(p, "_test.go"):
+				return nil
+			case strings.HasPrefix(filepath.ToSlash(p), "../cli/kit/"):
+				return nil
+			}
+			file, perr := parser.ParseFile(fset, p, nil, parser.SkipObjectResolution)
+			if perr != nil {
+				t.Fatalf("parse %s: %v", p, perr)
+			}
+			for _, call := range namedOutsideNaming(file) {
+				t.Errorf("%s:%d: a name out of the account goes into a failure with %%s; "+
+					"wrap it in errs.Naming so the log can stand it aside",
+					filepath.ToSlash(p), fset.Position(call.Pos()).Line)
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("walk %s: %v", dir, err)
+		}
+	}
+}
+
+// namedOutsideNaming are the messages built from a thing's own name with nothing
+// carrying that name beside them. The wrapper encloses the call it is given, so
+// the question is whether one of them is inside one.
+func namedOutsideNaming(file *ast.File) []*ast.CallExpr {
+	var named, phrased []*ast.CallExpr
+	ast.Inspect(file, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		sel, ok := call.Fun.(*ast.SelectorExpr)
+		if !ok {
+			return true
+		}
+		switch {
+		case sel.Sel.Name == "Naming":
+			named = append(named, call)
+		case phrasing[sel.Sel.Name] && carriesAName(call):
+			phrased = append(phrased, call)
+		}
+		return true
+	})
+	var out []*ast.CallExpr
+	for _, call := range phrased {
+		if slices.ContainsFunc(named, func(n *ast.CallExpr) bool {
+			return n.Pos() < call.Pos() && call.End() <= n.End()
+		}) {
+			continue
+		}
+		out = append(out, call)
+	}
+	return out
+}
+
+// The checker earns its own test: reading no name out of any message would pass
+// forever while every one of them carried one.
+func TestTheNamingCheckerFindsAMessageCarryingAName(t *testing.T) {
+	const src = `package p
+
+func bare() error {
+	return kit.Fail("%s is a %s, not a login.", it.Name, it.Type)
+}
+
+func wrapped() error {
+	return errs.Naming(it.Name, kit.Fail("%s carries no two-factor secret.", it.Name).
+		Hint("store one first"))
+}
+
+func unnamed() error {
+	return kit.Fail("A vault needs a name.").Hint("--name Work")
+}
+`
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "p.go", src, parser.SkipObjectResolution)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	found := namedOutsideNaming(file)
+	if len(found) != 1 {
+		t.Fatalf("found %d messages carrying a name, want 1 (the bare one)", len(found))
+	}
+	if line := fset.Position(found[0].Pos()).Line; line != 4 {
+		t.Errorf("reported line %d, want 4", line)
+	}
+}
+
+func TestTheNamingCheckerKnowsANameFromAWord(t *testing.T) {
+	for _, c := range []struct {
+		src  string
+		want bool
+	}{
+		{`kit.Fail("%s carries no two-factor secret.", it.Name)`, true},
+		{`errs.Problemf("%s could not be read: %v.", f.File.Name, err)`, true},
+		{`kit.Fail("A vault needs a name.")`, false},
+		{`errs.Problemf("%q is not a time zone this machine knows.", name)`, false},
+		{`kit.Fail("could not read PATH from stdin: %v", err)`, false},
+		// What kit says about a flag of its own, which is why kit is not walked.
+		{`Fail("--%s accepts: %s", e.Name, strings.Join(e.Values, ", "))`, true},
+	} {
+		expr, err := parser.ParseExpr(c.src)
+		if err != nil {
+			t.Fatalf("parse %s: %v", c.src, err)
+		}
+		if got := carriesAName(expr.(*ast.CallExpr)); got != c.want {
+			t.Errorf("%s: carries a name = %v, want %v", c.src, got, c.want)
+		}
+	}
+}
+
+// carriesAName reports whether one of the values a message is built from is a
+// thing's own name, read off whatever it was fetched from.
+func carriesAName(call *ast.CallExpr) bool {
+	for _, arg := range call.Args[min(1, len(call.Args)):] {
+		sel, ok := arg.(*ast.SelectorExpr)
+		if ok && accountNames[sel.Sel.Name] {
+			return true
+		}
+	}
+	return false
 }
 
 // ── helpers ──

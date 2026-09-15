@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 Adding a version section here is what publishes a release, so this file is the one place a version is decided: see [Releases](CONTRIBUTING.md#releases). Versions that shipped before this file existed are on the [releases page](https://github.com/roman-16/proton-cli/releases).
 
+## [4.1.0] - 2026-09-15
+
+### Changed
+
+- **Breaking.** A calendar listing given one end of its range takes the other 30 days away from it, rather than always ending 30 days from today. `calendar events list --after 2027-01-01` lists that January instead of nothing, and `--after 2020-01-01` lists January 2020 rather than everything since. `events export` and `reminders list` read the same way.
+- **Breaking.** A mail listing refuses `--before` earlier than `--after`, as a calendar listing already did. It used to return an empty listing and exit `0`.
+- A malformed `--after` or `--before` on a mail listing is refused before signing in, as `--after expects YYYY-MM-DD.` rather than as Go's own parse error.
+
+### Fixed
+
+- `calendar events list` and `events export` said to narrow the range with `--start` and `--end`; the flags are `--after` and `--before`. All three calendar listings now state their default range as well.
+- `mail messages reply --help` described `--all`; the flag is `--everyone`.
+- `pass items totp` on an item with no two-factor secret said to store one with `--totp-uri`, which no longer exists. It names `--secret-file totp-uri=FILE`, and so does the refusal of a secret no code can come out of.
+
+### Security
+
+- The diagnostic log no longer keeps the name of a Pass item, vault, attachment or Drive file written into a failure. `proton report` stands `<name>` in its place.
+
 ## [4.0.0] - 2026-09-15
 
 ### Added

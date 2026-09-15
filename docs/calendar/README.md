@@ -14,7 +14,7 @@ proton calendar events get "Team sync"
 
 Every calendar is included unless `--calendar` narrows it.
 
-`--after` and `--before` are the first and last **whole** days to include, read in your own zone, and both are included. Without them you get the next 30 days.
+`--after` and `--before` are the first and last **whole** days to include, read in your own zone, and both are included. Without them you get the next 30 days, starting today. Name one and the other is 30 days away from it, so `--after 2027-01-01` lists that January.
 
 An event is on a day when it touches any part of it, so a query for one day inside a three-day event returns it.
 

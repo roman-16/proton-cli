@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
 	"github.com/roman-16/proton-cli/internal/account/keys"
@@ -205,8 +206,10 @@ type ListOptions struct {
 	Folder string
 	// Keyword, From, To and Subject are the server's text predicates.
 	Keyword, From, To, Subject string
-	// After and Before bound the range by date, as YYYY-MM-DD.
-	After, Before string
+	// After and Before bound the range by date: the first and last day to
+	// include, both of them whole and both of them included. The zero time is an
+	// end nobody named.
+	After, Before time.Time
 	Unread        bool
 
 	// Page and PageSize are the caller's page of the result, counting from zero.
@@ -268,7 +271,7 @@ func window[T any](ctx context.Context, page, size int, fetch func(ctx context.C
 // unmatched filter.
 func (o ListOptions) Narrowed() bool {
 	return o.Keyword != "" || o.From != "" || o.To != "" || o.Subject != "" ||
-		o.After != "" || o.Before != "" || o.Unread
+		!o.After.IsZero() || !o.Before.IsZero() || o.Unread
 }
 
 // decryptBody decrypts an armored PGP body with decKR and, when verKR is

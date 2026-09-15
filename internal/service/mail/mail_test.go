@@ -4,9 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/roman-16/proton-cli/internal/account/keys"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/roman-16/proton-cli/internal/account/keys"
 
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
 	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
@@ -98,10 +101,7 @@ func TestOppositeKind(t *testing.T) {
 }
 
 func TestListQueryDefaults(t *testing.T) {
-	q, err := listQuery(ListOptions{}, false)
-	if err != nil {
-		t.Fatalf("listQuery: %v", err)
-	}
+	q := listQuery(ListOptions{}, false)
 	if q.Get("LabelID") != "0" { // empty folder defaults to the inbox
 		t.Errorf("LabelID = %q, want 0 (inbox)", q.Get("LabelID"))
 	}
@@ -119,10 +119,7 @@ func TestListQueryFieldMapping(t *testing.T) {
 		Keyword: "invoice", From: "a@x.com", To: "b@x.com",
 		Subject: "hi", Folder: "inbox", PageSize: 10, Unread: true,
 	}
-	q, err := listQuery(opts, false)
-	if err != nil {
-		t.Fatalf("listQuery: %v", err)
-	}
+	q := listQuery(opts, false)
 	checks := map[string]string{
 		"LabelID": "0",
 		"Keyword": "invoice",
@@ -142,10 +139,7 @@ func TestListQueryFieldMapping(t *testing.T) {
 }
 
 func TestListQueryRecipientsForConversations(t *testing.T) {
-	q, err := listQuery(ListOptions{To: "b@x.com", PageSize: 5}, true)
-	if err != nil {
-		t.Fatalf("listQuery: %v", err)
-	}
+	q := listQuery(ListOptions{To: "b@x.com", PageSize: 5}, true)
 	if q.Get("Recipients") != "b@x.com" {
 		t.Errorf("a thread query should map To\u2192Recipients, got %q", q.Get("Recipients"))
 	}
@@ -154,19 +148,24 @@ func TestListQueryRecipientsForConversations(t *testing.T) {
 	}
 }
 
+// Both named days are included whole, so the window opens at the midnight the
+// first day begins with and closes at the last second of the last.
 func TestListQueryDates(t *testing.T) {
-	q, err := listQuery(ListOptions{After: "2020-01-01", Before: "2099-12-31"}, false)
-	if err != nil {
-		t.Fatalf("valid dates errored: %v", err)
+	after := time.Date(2026, 3, 4, 0, 0, 0, 0, time.Local)
+	before := time.Date(2026, 3, 6, 17, 42, 0, 0, time.Local)
+	q := listQuery(ListOptions{After: after, Before: before}, false)
+
+	wantBegin := after.Unix()
+	wantEnd := time.Date(2026, 3, 7, 0, 0, 0, 0, time.Local).Unix() - 1
+	if q.Get("Begin") != strconv.FormatInt(wantBegin, 10) {
+		t.Errorf("Begin = %q, want %d", q.Get("Begin"), wantBegin)
 	}
-	if q.Get("Begin") == "" || q.Get("End") == "" {
-		t.Errorf("expected Begin and End set, got Begin=%q End=%q", q.Get("Begin"), q.Get("End"))
+	if q.Get("End") != strconv.FormatInt(wantEnd, 10) {
+		t.Errorf("End = %q, want %d", q.Get("End"), wantEnd)
 	}
-	if _, err := listQuery(ListOptions{After: "nope"}, false); err == nil {
-		t.Error("invalid --after should error")
-	}
-	if _, err := listQuery(ListOptions{Before: "nope"}, false); err == nil {
-		t.Error("invalid --before should error")
+
+	if q := listQuery(ListOptions{}, false); q.Has("Begin") || q.Has("End") {
+		t.Errorf("a query with no days bounds the range: Begin=%q End=%q", q.Get("Begin"), q.Get("End"))
 	}
 }
 

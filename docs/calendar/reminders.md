@@ -10,6 +10,8 @@ Holds `list` and `watch`.
 
 List every reminder your events will raise between two dates.
 
+With neither --after nor --before it covers the next 30 days, starting today. With one of them, the other is 30 days away from it.
+
 A reminder is listed on the day it goes off, not the day its event is on. An event with two reminders is two rows; a recurring event is one row per occurrence.
 
 Emailed reminders are sent by Proton and are left out.

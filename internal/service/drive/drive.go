@@ -408,7 +408,7 @@ func (s *Service) ResolvePath(ctx context.Context, dc *Context, path string) (*R
 		return st.at, nil
 	}
 	if !st.at.IsFolder {
-		return nil, errs.Problemf("%s is not a folder.", st.at.Name)
+		return nil, errs.Naming(st.at.Name, errs.Problemf("%s is not a folder.", st.at.Name))
 	}
 	return nil, &errs.NotFound{Kind: "path", Ref: st.missing[0]}
 }

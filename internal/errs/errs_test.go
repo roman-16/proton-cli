@@ -20,6 +20,21 @@ func TestANamedFailureIsWithheldFromEverybodyButItsOwner(t *testing.T) {
 	}
 }
 
+// A sentence that already reads as a sentence keeps it, and the name still
+// travels beside it. "GitHub: GitHub carries no two-factor secret." is what
+// naming it twice would say, which is why a message holding the name is left as
+// its author wrote it.
+func TestANameWrittenIntoTheSentenceIsNotSaidTwice(t *testing.T) {
+	err := Naming("GitHub", Problemf("%s carries no two-factor secret.", "GitHub"))
+
+	if got, want := err.Error(), "GitHub carries no two-factor secret."; got != want {
+		t.Errorf("the reader is told twice:\n got %q\nwant %q", got, want)
+	}
+	if got, want := Withheld(err), "<name> carries no two-factor secret."; got != want {
+		t.Errorf("the log kept the name:\n got %q\nwant %q", got, want)
+	}
+}
+
 // The name is taken out of the finished sentence, so it goes whether or not
 // whatever wrapped it kept the shape it was attached in.
 func TestANameIsWithheldFromUnderAWrapping(t *testing.T) {

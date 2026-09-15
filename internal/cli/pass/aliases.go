@@ -2,6 +2,7 @@ package pass
 
 import (
 	"github.com/roman-16/proton-cli/internal/cli/kit"
+	"github.com/roman-16/proton-cli/internal/errs"
 	passsvc "github.com/roman-16/proton-cli/internal/service/pass"
 	"github.com/roman-16/proton-cli/internal/ui"
 	"github.com/spf13/cobra"
@@ -68,7 +69,7 @@ func aliasesToggleCmd(use, short string, action ui.Action, enabled bool) *cobra.
 				return err
 			}
 			if it.Type != "alias" {
-				return kit.Fail("%s is a %s, not an alias.", it.Name, it.Type)
+				return errs.Naming(it.Name, kit.Fail("%s is a %s, not an alias.", it.Name, it.Type))
 			}
 			return kit.Mutate(c, ui.ResultSpec{
 				Action: action, Kind: "aliases", Count: 1, Name: it.Name,

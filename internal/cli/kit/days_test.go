@@ -61,25 +61,51 @@ func TestDayRangeAcceptsARangeAndASingleDay(t *testing.T) {
 	}
 }
 
-// Whichever end was left out keeps the default, so naming one day does not silently
-// widen or narrow the other.
-func TestDayRangeFallsBackForTheEndLeftOut(t *testing.T) {
-	fallbackFirst := time.Date(2026, 1, 1, 0, 0, 0, 0, time.Local)
-	fallbackLast := time.Date(2026, 1, 30, 0, 0, 0, 0, time.Local)
-
-	first, last := asked(t, "", "").Or(fallbackFirst, fallbackLast)
-	if !first.Equal(fallbackFirst) || !last.Equal(fallbackLast) {
-		t.Errorf("with neither flag = (%s, %s), want the default", first, last)
+// The end left out sits the default span away from the one given, so a day past
+// the default range lists the days around it rather than nothing at all.
+func TestDayRangeSlidesTheEndLeftOut(t *testing.T) {
+	day := func(y int, m time.Month, d int) time.Time {
+		return time.Date(y, m, d, 0, 0, 0, 0, time.Local)
 	}
+	defaultFirst, defaultLast := day(2026, 1, 1), day(2026, 1, 30)
 
-	first, last = asked(t, "2026-08-14", "").Or(fallbackFirst, fallbackLast)
-	if !first.Equal(time.Date(2026, 8, 14, 0, 0, 0, 0, time.Local)) || !last.Equal(fallbackLast) {
-		t.Errorf("with only --after = (%s, %s)", first, last)
+	for _, tc := range []struct {
+		name, first, last string
+		wantFirst         time.Time
+		wantLast          time.Time
+	}{
+		{"neither", "", "", defaultFirst, defaultLast},
+		{"only --after", "2027-08-14", "", day(2027, 8, 14), day(2027, 9, 12)},
+		{"only --before", "", "2025-08-20", day(2025, 7, 22), day(2025, 8, 20)},
+		{"both", "2026-08-14", "2026-08-20", day(2026, 8, 14), day(2026, 8, 20)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			first, last := asked(t, tc.first, tc.last).Or(defaultFirst, defaultLast)
+			if !first.Equal(tc.wantFirst) || !last.Equal(tc.wantLast) {
+				t.Errorf("range = (%s, %s), want (%s, %s)", first, last, tc.wantFirst, tc.wantLast)
+			}
+		})
 	}
+}
 
-	first, last = asked(t, "", "2026-08-20").Or(fallbackFirst, fallbackLast)
-	if !first.Equal(fallbackFirst) || !last.Equal(time.Date(2026, 8, 20, 0, 0, 0, 0, time.Local)) {
-		t.Errorf("with only --before = (%s, %s)", first, last)
+// A range that names one end is never a range that cannot hold anything, which is
+// what a fixed default end makes of a day beyond it: an empty answer to a
+// question the reader never asked.
+func TestDayRangeNamingOneEndAlwaysHoldsIt(t *testing.T) {
+	now := time.Now()
+	defaultFirst := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
+	defaultLast := defaultFirst.AddDate(0, 0, 29)
+
+	for _, tc := range []struct{ name, first, last string }{
+		{"an --after past the default end", defaultLast.AddDate(0, 0, 200).Format(dayLayout), ""},
+		{"a --before before the default start", "", defaultFirst.AddDate(0, 0, -200).Format(dayLayout)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			first, last := asked(t, tc.first, tc.last).Or(defaultFirst, defaultLast)
+			if last.Before(first) {
+				t.Errorf("range = (%s, %s), which closes before it opens", first, last)
+			}
+		})
 	}
 }
 

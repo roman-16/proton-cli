@@ -106,7 +106,8 @@ func eventsListCmd() *cobra.Command {
 		Use:   "list",
 		Short: "List events in a date range",
 		Long: "List what is on your calendars between two dates.\n\n" +
-			"--start and --end are whole days in your own zone, both included.\n\n" +
+			"With neither --after nor --before it covers the next 30 days, starting today.\n" +
+			"With one of them, the other is 30 days away from it.\n\n" +
 			"Each occurrence of a recurring event is listed on its own day, with a\n" +
 			"reference that names that occurrence.\n\n" +
 			"Covers every calendar unless --calendar narrows it to one.",
@@ -953,7 +954,8 @@ func eventsExportCmd() *cobra.Command {
 		Use:   "export",
 		Short: "Write events out as an .ics file",
 		Long: "Write events out as an .ics file.\n\n" +
-			"--start and --end are whole days in your own zone, both included.\n\n" +
+			"With neither --after nor --before it covers the next 30 days, starting today.\n" +
+			"With one of them, the other is 30 days away from it.\n\n" +
 			"A recurring series is written once, with its rule, so another client reads\n" +
 			"it back as the same series.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {

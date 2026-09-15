@@ -30,8 +30,7 @@ type filters struct {
 	// for: a bulk verb refuses an empty selection, and a folder nobody named
 	// would otherwise look like a narrowing and let it through.
 	whereByDefault string
-	after          string
-	before         string
+	days           kit.DayRange
 	age            kit.Range
 	all            bool
 	// page is where in the result to read. A listing pairs --limit with --page; a
@@ -56,8 +55,7 @@ func (f *filters) registerNarrowing(c *cobra.Command, folder string) {
 	fl.StringVar(&f.to, "to", "", "Match a recipient's address")
 	fl.StringVar(&f.subject, "subject", "", "Match text in the subject")
 	fl.StringVar(&f.keyword, "keyword", "", "Match text anywhere, including display names and bodies")
-	fl.StringVar(&f.after, "after", "", "First day to include (YYYY-MM-DD)")
-	fl.StringVar(&f.before, "before", "", "Last day to include (YYYY-MM-DD)")
+	f.days.Register(c)
 	f.age.Register(fl, "messages")
 	registerFolder(c, &f.folder, "", folder)
 }
@@ -79,7 +77,7 @@ const defaultLimit = 150
 // part of it: opening a different folder is still a listing.
 func (f *filters) narrowed() bool {
 	return f.unread || f.starred || f.from != "" || f.to != "" || f.subject != "" ||
-		f.keyword != "" || f.after != "" || f.before != "" || f.age.Set()
+		f.keyword != "" || f.days.Set() || f.age.Set()
 }
 
 // set reports whether the user asked for a filtered selection at all.
@@ -95,10 +93,11 @@ func (f *filters) list() (mailsvc.ListOptions, error) {
 	if folder == "" {
 		folder = f.whereByDefault
 	}
+	after, before := f.days.Days()
 	opts := mailsvc.ListOptions{
 		Keyword: f.keyword, From: f.from, To: f.to, Subject: f.subject,
 		Folder: folder, Unread: f.unread,
-		After: f.after, Before: f.before,
+		After: after, Before: before,
 		Page: f.page.Number, PageSize: f.page.Size,
 	}
 	// A duration is the same bound as a date, said relatively. Whichever is
@@ -108,14 +107,14 @@ func (f *filters) list() (mailsvc.ListOptions, error) {
 		if err != nil {
 			return opts, kit.Fail("--older-than: %v", err)
 		}
-		opts.Before = time.Now().Add(-d).Format("2006-01-02")
+		opts.Before = time.Now().Add(-d)
 	}
 	if f.age.NewerThan != "" {
 		d, err := units.ParseDuration(f.age.NewerThan)
 		if err != nil {
 			return opts, kit.Fail("--newer-than: %v", err)
 		}
-		opts.After = time.Now().Add(-d).Format("2006-01-02")
+		opts.After = time.Now().Add(-d)
 	}
 	return opts, nil
 }

@@ -46,6 +46,8 @@ func remindersListCmd() *cobra.Command {
 		Use:   "list",
 		Short: "List the reminders due in a date range",
 		Long: "List every reminder your events will raise between two dates.\n\n" +
+			"With neither --after nor --before it covers the next 30 days, starting today.\n" +
+			"With one of them, the other is 30 days away from it.\n\n" +
 			"A reminder is listed on the day it goes off, not the day its event is on.\n" +
 			"An event with two reminders is two rows; a recurring event is one row per\n" +
 			"occurrence.\n\n" +

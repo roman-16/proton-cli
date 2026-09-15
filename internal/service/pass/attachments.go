@@ -673,8 +673,8 @@ func (l StorageLimits) CheckUpload(uploads []Upload) error {
 	var total int64
 	for _, up := range uploads {
 		if l.MaxFileSize > 0 && up.Size > l.MaxFileSize {
-			return errs.Problemf("%s is %s; an attachment may be at most %s.",
-				up.Name, units.Size(up.Size), units.Size(l.MaxFileSize))
+			return errs.Naming(up.Name, errs.Problemf("%s is %s; an attachment may be at most %s.",
+				up.Name, units.Size(up.Size), units.Size(l.MaxFileSize)))
 		}
 		total += up.Size
 	}

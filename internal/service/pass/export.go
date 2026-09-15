@@ -116,7 +116,8 @@ func (s *Service) WriteArchive(ctx context.Context, w io.Writer, plan *ExportPla
 					report = sink(i+1, len(plan.Files))
 				}
 				if err := s.AttachmentDownload(ctx, f.ShareID, f.ItemID, f.File, w, report); err != nil {
-					return errs.Problemf("%s could not be read, so the archive would be short of it: %v.", f.File.Name, err)
+					return errs.Naming(f.File.Name, errs.Problemf(
+						"%s could not be read, so the archive would be short of it: %v.", f.File.Name, err))
 				}
 				return nil
 			},

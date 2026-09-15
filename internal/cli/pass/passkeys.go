@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/roman-16/proton-cli/internal/cli/kit"
+	"github.com/roman-16/proton-cli/internal/errs"
 	passsvc "github.com/roman-16/proton-cli/internal/service/pass"
 	"github.com/roman-16/proton-cli/internal/ui"
 	"github.com/roman-16/proton-cli/internal/units"
@@ -110,8 +111,8 @@ func loginOf(c *kit.Invocation, ref string) (*passsvc.FullItem, error) {
 		return nil, err
 	}
 	if it.Type != "login" {
-		return nil, kit.Fail("%s is a %s, not a login.", it.Name, it.Type).
-			Hint("only a login carries passkeys; `proton pass items list --type login` shows yours.")
+		return nil, errs.Naming(it.Name, kit.Fail("%s is a %s, not a login.", it.Name, it.Type).
+			Hint("only a login carries passkeys; `proton pass items list --type login` shows yours."))
 	}
 	return it, nil
 }

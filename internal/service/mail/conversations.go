@@ -32,10 +32,7 @@ func toConversation(c rawConversation) Conversation {
 }
 
 func (s *Service) ConversationsList(ctx context.Context, opts ListOptions) ([]Conversation, int, error) {
-	q, err := listQuery(opts, true)
-	if err != nil {
-		return nil, 0, err
-	}
+	q := listQuery(opts, true)
 	return window(ctx, opts.Page, opts.PageSize, func(ctx context.Context, page, size int) ([]Conversation, int, error) {
 		q.Set("Page", fmt.Sprintf("%d", page))
 		q.Set("PageSize", fmt.Sprintf("%d", size))

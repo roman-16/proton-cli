@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/roman-16/proton-cli/internal/cli/kit"
+	"github.com/roman-16/proton-cli/internal/errs"
 	passsvc "github.com/roman-16/proton-cli/internal/service/pass"
 	"github.com/roman-16/proton-cli/internal/ui"
 )
@@ -169,8 +170,8 @@ func aliasOf(c *kit.Invocation, ref string) (string, string, error) {
 		return "", "", err
 	}
 	if it.Type != "alias" {
-		return "", "", kit.Fail("%s is a %s, not an alias.", it.Name, it.Type).
-			Hint("only an alias has contacts; `proton pass aliases list` shows yours.")
+		return "", "", errs.Naming(it.Name, kit.Fail("%s is a %s, not an alias.", it.Name, it.Type).
+			Hint("only an alias has contacts; `proton pass aliases list` shows yours."))
 	}
 	return shareID, itemID, nil
 }

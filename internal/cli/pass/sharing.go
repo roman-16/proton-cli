@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/roman-16/proton-cli/internal/cli/kit"
+	"github.com/roman-16/proton-cli/internal/errs"
 	passsvc "github.com/roman-16/proton-cli/internal/service/pass"
 	"github.com/roman-16/proton-cli/internal/ui"
 	"github.com/roman-16/proton-cli/internal/units"
@@ -414,11 +415,11 @@ func whoHolds(c *kit.Invocation, shareID, itemID, name, email string) (held, err
 	for _, i := range invites {
 		addresses = append(addresses, i.Email+" ("+waiting(i.Stage)+")")
 	}
-	fail := kit.Fail("Nobody at %s holds %s.", email, name).Exit(3)
 	if len(addresses) == 0 {
-		return held{}, fail.Hint("it is not shared with anybody")
+		addresses = []string{"it is not shared with anybody"}
 	}
-	return held{}, fail.Hint(addresses...)
+	return held{}, errs.Naming(name, kit.Fail("Nobody at %s holds %s.", email, name).
+		Exit(3).Hint(addresses...))
 }
 
 // ── handing a vault over ──
@@ -441,9 +442,9 @@ func vaultsTransferCmd() *cobra.Command {
 				return err
 			}
 			if held.member == nil {
-				return kit.Fail("%s has been offered %s and has not taken it yet.",
+				return errs.Naming(vault.Name, kit.Fail("%s has been offered %s and has not taken it yet.",
 					held.email(), vault.Name).
-					Hint("a vault can only be handed to somebody who accepted it").Exit(3)
+					Hint("a vault can only be handed to somebody who accepted it").Exit(3))
 			}
 			return kit.Mutate(c, ui.ResultSpec{
 				Action: ui.Transferred, Kind: "vaults", Count: 1, Name: vault.Name,

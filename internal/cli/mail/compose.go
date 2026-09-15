@@ -387,8 +387,7 @@ func replyCmd() *cobra.Command {
 		"Reply to a message.\n\n"+
 			"The original is quoted below your text, the subject gains \"Re:\", and the reply\n"+
 			"leaves from the address the original arrived on.\n\n"+
-			"--all includes everyone who was on the message. --draft stops before sending,\n"+
-			"so you can edit it with `mail drafts update`.", false)
+			"--draft stops before sending, so you can edit it with `mail drafts update`.", false)
 }
 
 func forwardCmd() *cobra.Command {

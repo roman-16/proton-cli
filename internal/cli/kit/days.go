@@ -1,6 +1,7 @@
 package kit
 
 import (
+	"math"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -11,7 +12,8 @@ import (
 // A listing over a range of days judges two things nobody needs a session to
 // judge: that each date is a date, and that the range runs forwards. Declaring the
 // pair once is what has Run refuse both of those before the first request, and
-// keeps every listing that takes a range taking the same one.
+// keeps every listing that takes a range taking the same one - a mail listing and
+// a calendar listing are the same question about two collections.
 //
 // The pair is --after and --before, which is what narrows a selection everywhere
 // in this CLI. --start and --end describe the thing being written - an event's
@@ -21,6 +23,13 @@ import (
 
 // dayLayout is the only form a day is written in, given or printed.
 const dayLayout = "2006-01-02"
+
+// AfterUsage and BeforeUsage are what the pair says for itself, wherever it is
+// registered.
+const (
+	AfterUsage  = "First day to include (YYYY-MM-DD)"
+	BeforeUsage = "Last day to include (YYYY-MM-DD)"
+)
 
 // DayRange is the pair of flags naming the first and last whole day of a range.
 //
@@ -34,21 +43,50 @@ type DayRange struct {
 
 // Register binds --after and --before to cmd.
 func (d *DayRange) Register(cmd *cobra.Command) {
-	cmd.Flags().StringVar(&d.first, "after", "", "First day to include (YYYY-MM-DD)")
-	cmd.Flags().StringVar(&d.last, "before", "", "Last day to include (YYYY-MM-DD)")
+	cmd.Flags().StringVar(&d.first, "after", "", AfterUsage)
+	cmd.Flags().StringVar(&d.last, "before", "", BeforeUsage)
 	registerCheck(cmd, "after", nil, d)
 }
 
-// Or returns the range asked for, falling back to the given days for whichever end
-// was left out. Run has already validated the flags by the time a body can call it.
+// Set reports whether either end was named, which is what tells a narrowed
+// listing from a whole one.
+func (d *DayRange) Set() bool { return d.first != "" || d.last != "" }
+
+// Days are the two days as given, with the zero time for an end left out. It is
+// what a listing reads when it has no range of its own to fall back on: mail is
+// bounded by the folder rather than by a window.
+func (d *DayRange) Days() (first, last time.Time) {
+	first, _ = parseDay(d.first)
+	last, _ = parseDay(d.last)
+	return first, last
+}
+
+// Or returns the range asked for, over a listing whose own range is the given
+// days. Run has already validated the flags by the time a body can call it.
+//
+// An end nobody named never contradicts one they did. Given one end alone, the
+// other sits the default span away from it, so a day past the end of the default
+// range answers with the days around it - the window it stands in - rather than
+// with a range that closes before it opens and an empty answer that reads as
+// "nothing there".
 func (d *DayRange) Or(first, last time.Time) (time.Time, time.Time) {
-	if t, err := parseDay(d.first); err == nil && !t.IsZero() {
-		first = t
-	}
-	if t, err := parseDay(d.last); err == nil && !t.IsZero() {
-		last = t
+	span := spanDays(first, last)
+	asked, askedLast := d.Days()
+	switch {
+	case !asked.IsZero() && !askedLast.IsZero():
+		return asked, askedLast
+	case !asked.IsZero():
+		return asked, asked.AddDate(0, 0, span)
+	case !askedLast.IsZero():
+		return askedLast.AddDate(0, 0, -span), askedLast
 	}
 	return first, last
+}
+
+// spanDays is how many whole days a range covers, counted as days rather than as
+// hours so that the clocks changing inside it does not shorten it.
+func spanDays(first, last time.Time) int {
+	return int(math.Round(last.Sub(first).Hours() / 24))
 }
 
 func (d *DayRange) validate() error {

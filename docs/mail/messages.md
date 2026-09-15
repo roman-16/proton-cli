@@ -393,7 +393,7 @@ Reply to a message.
 
 The original is quoted below your text, the subject gains "Re:", and the reply leaves from the address the original arrived on.
 
---all includes everyone who was on the message. --draft stops before sending, so you can edit it with `mail drafts update`.
+--draft stops before sending, so you can edit it with `mail drafts update`.
 
 ```
 proton mail messages reply REF

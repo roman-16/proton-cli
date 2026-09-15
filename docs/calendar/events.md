@@ -68,7 +68,7 @@ proton calendar events delete 4f2a1b9c@2026-05-04T09:00 --onwards
 
 Write events out as an .ics file.
 
---start and --end are whole days in your own zone, both included.
+With neither --after nor --before it covers the next 30 days, starting today. With one of them, the other is 30 days away from it.
 
 A recurring series is written once, with its rule, so another client reads it back as the same series.
 
@@ -131,7 +131,7 @@ curl -s https://example.com/team.ics | proton calendar events import -
 
 List what is on your calendars between two dates.
 
---start and --end are whole days in your own zone, both included.
+With neither --after nor --before it covers the next 30 days, starting today. With one of them, the other is 30 days away from it.
 
 Each occurrence of a recurring event is listed on its own day, with a reference that names that occurrence.
 

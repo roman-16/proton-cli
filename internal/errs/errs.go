@@ -236,7 +236,17 @@ type Private struct {
 	Err  error
 }
 
-func (p *Private) Error() string { return p.Name + ": " + p.Err.Error() }
+// Error names the thing exactly once: in front of a failure that does not say
+// which of yours it was, and nowhere at all when the sentence already reads as
+// one. "GitHub carries no two-factor secret." is what a person should be told,
+// and prefixing it again would make it the two-line form nobody would write.
+func (p *Private) Error() string {
+	msg := p.Err.Error()
+	if p.Name == "" || strings.Contains(msg, p.Name) {
+		return msg
+	}
+	return p.Name + ": " + msg
+}
 func (p *Private) Unwrap() error { return p.Err }
 
 // Naming puts one of the account's own names in front of a failure. Returns nil

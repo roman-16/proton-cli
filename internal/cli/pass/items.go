@@ -11,6 +11,7 @@ import (
 
 	"github.com/roman-16/proton-cli/internal/cli/kit"
 	"github.com/roman-16/proton-cli/internal/credcheck"
+	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/otp"
 	passsvc "github.com/roman-16/proton-cli/internal/service/pass"
 	"github.com/roman-16/proton-cli/internal/ui"
@@ -298,12 +299,11 @@ var sharedWithEveryItem = map[string]bool{"email": true}
 // An empty type is one not yet known, which is what an edit has until the item
 // is fetched: the grammar can still be judged, the placement cannot.
 func (d *fields) checkFields(itemType string) error {
-	// A two-factor secret is a two-factor secret whichever flag carried it, so
-	// --totp-uri is held to what --totp-field is: a value no code can come out of
-	// is refused here rather than stored and found useless later.
+	// A value no code can come out of is refused here rather than stored and found
+	// useless later, on the day somebody needs the code.
 	if d.nc.TOTP != "" {
 		if _, err := otp.Parse(d.nc.TOTP); err != nil {
-			return kit.Fail("--totp-uri: %v.", err).
+			return kit.Fail("--secret-file totp-uri: %v.", err).
 				Hint("an otpauth:// URI, or the secret on its own")
 		}
 	}
@@ -1083,8 +1083,8 @@ func itemsTOTPCmd() *cobra.Command {
 				}
 			}
 			if secret == "" {
-				return kit.Fail("%s carries no two-factor secret.", it.Name).
-					Hint("`pass items update " + c.Args[0] + " --totp-uri …` stores one.")
+				return errs.Naming(it.Name, kit.Fail("%s carries no two-factor secret.", it.Name).
+					Hint("`pass items update "+c.Args[0]+" --secret-file totp-uri=FILE` stores one."))
 			}
 			s, err := otp.Parse(secret)
 			if err != nil {

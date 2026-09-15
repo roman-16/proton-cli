@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/roman-16/proton-cli/internal/cli/kit"
+	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/ical"
 	"github.com/roman-16/proton-cli/internal/mailtext"
 	mailsvc "github.com/roman-16/proton-cli/internal/service/mail"
@@ -475,7 +476,7 @@ func convAttachmentsDownloadCmd() *cobra.Command {
 				for _, at := range list {
 					data, _, err := c.App.Mail.AttachmentDownload(c.Ctx, at.MessageID, at.ID)
 					if err != nil {
-						return kit.Fail("could not download %s: %v", at.Name, err)
+						return errs.Naming(at.Name, kit.Fail("could not download %s: %v", at.Name, err))
 					}
 					if _, err := dest.Write(c, at.Name, data); err != nil {
 						return err

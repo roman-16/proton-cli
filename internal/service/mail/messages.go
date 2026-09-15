@@ -10,13 +10,9 @@ import (
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
 	"github.com/roman-16/proton-cli/internal/account/keys"
 	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
-	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
 	"github.com/roman-16/proton-cli/internal/skip"
 )
-
-// dayLayout is the only form --after and --before are written in.
-const dayLayout = "2006-01-02"
 
 type rawListMessage struct {
 	ID             string
@@ -43,10 +39,7 @@ func toMessage(m rawListMessage) Message {
 }
 
 func (s *Service) List(ctx context.Context, opts ListOptions) ([]Message, int, error) {
-	q, err := listQuery(opts, false)
-	if err != nil {
-		return nil, 0, err
-	}
+	q := listQuery(opts, false)
 	return window(ctx, opts.Page, opts.PageSize, func(ctx context.Context, page, size int) ([]Message, int, error) {
 		q.Set("Page", fmt.Sprintf("%d", page))
 		q.Set("PageSize", fmt.Sprintf("%d", size))
@@ -69,7 +62,7 @@ func (s *Service) List(ctx context.Context, opts ListOptions) ([]Message, int, e
 // Which page of them to read is set per request, since one call may span several.
 // Its recipients flag renames the To field to "Recipients", as the conversations
 // endpoint expects.
-func listQuery(opts ListOptions, recipients bool) (url.Values, error) {
+func listQuery(opts ListOptions, recipients bool) url.Values {
 	folder := opts.Folder
 	if folder == "" {
 		folder = "inbox"
@@ -104,21 +97,20 @@ func listQuery(opts ListOptions, recipients bool) (url.Values, error) {
 	// in - the same days --after and --before mean on a calendar listing. A bound
 	// read as UTC would move by the reader's offset, which is a day of mail
 	// appearing or vanishing depending on where they are.
-	if opts.After != "" {
-		t, err := time.ParseInLocation(dayLayout, opts.After, time.Local)
-		if err != nil {
-			return nil, errs.Problemf("invalid --after: %v", err)
-		}
-		q.Set("Begin", fmt.Sprintf("%d", t.Unix()))
+	if !opts.After.IsZero() {
+		q.Set("Begin", fmt.Sprintf("%d", startOfDay(opts.After).Unix()))
 	}
-	if opts.Before != "" {
-		t, err := time.ParseInLocation(dayLayout, opts.Before, time.Local)
-		if err != nil {
-			return nil, errs.Problemf("invalid --before: %v", err)
-		}
-		q.Set("End", fmt.Sprintf("%d", t.AddDate(0, 0, 1).Unix()-1))
+	if !opts.Before.IsZero() {
+		q.Set("End", fmt.Sprintf("%d", startOfDay(opts.Before).AddDate(0, 0, 1).Unix()-1))
 	}
-	return q, nil
+	return q
+}
+
+// startOfDay is the midnight a day opens with, which is what turns a bound into
+// the whole day it names.
+func startOfDay(t time.Time) time.Time {
+	y, m, d := t.In(time.Local).Date()
+	return time.Date(y, m, d, 0, 0, 0, 0, time.Local)
 }
 
 type rawMessage struct {

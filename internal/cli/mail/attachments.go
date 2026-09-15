@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 
 	"github.com/roman-16/proton-cli/internal/cli/kit"
+	"github.com/roman-16/proton-cli/internal/errs"
 	mailsvc "github.com/roman-16/proton-cli/internal/service/mail"
 	"github.com/roman-16/proton-cli/internal/ui"
 	"github.com/roman-16/proton-cli/internal/units"
@@ -129,7 +130,7 @@ func downloadAll(c *kit.Invocation, msgID string, dest *kit.Destination, include
 		for _, at := range atts {
 			data, _, err := c.App.Mail.AttachmentDownload(c.Ctx, msgID, at.ID)
 			if err != nil {
-				return kit.Fail("could not download %s: %v", at.Name, err)
+				return errs.Naming(at.Name, kit.Fail("could not download %s: %v", at.Name, err))
 			}
 			written, err := dest.Write(c, at.Name, data)
 			if err != nil {
