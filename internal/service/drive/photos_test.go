@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/roman-16/proton-cli/internal/proton"
@@ -18,6 +19,9 @@ import (
 // linkInfo and linkShare stand in for the SRP handshake, which is proved against
 // Proton and cannot be canned.
 type stubDoer struct {
+	// mu guards reqs, because a command that asks for several things at once
+	// records through one stub from a goroutine each.
+	mu       sync.Mutex
 	reqs     []proton.Request
 	respBody []byte
 	routes   map[string]string
@@ -29,8 +33,14 @@ type stubDoer struct {
 	proved    string
 }
 
+func (s *stubDoer) record(r proton.Request) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.reqs = append(s.reqs, r)
+}
+
 func (s *stubDoer) PublicLinkInfo(_ context.Context, token string) (*proton.PublicLinkInfo, error) {
-	s.reqs = append(s.reqs, proton.Request{Method: "GET", Path: "/drive/urls/" + token + "/info"})
+	s.record(proton.Request{Method: "GET", Path: "/drive/urls/" + token + "/info"})
 	if s.linkInfo == nil {
 		return nil, errors.New("no public link info canned")
 	}
@@ -38,7 +48,7 @@ func (s *stubDoer) PublicLinkInfo(_ context.Context, token string) (*proton.Publ
 }
 
 func (s *stubDoer) PublicLinkAuth(_ context.Context, token string, _ *proton.PublicLinkInfo, password string) (*proton.PublicLinkShare, error) {
-	s.reqs = append(s.reqs, proton.Request{Method: "POST", Path: "/drive/urls/" + token + "/auth"})
+	s.record(proton.Request{Method: "POST", Path: "/drive/urls/" + token + "/auth"})
 	s.proved = password
 	if s.linkShare == nil {
 		return nil, errors.New("no public link share canned")
@@ -59,12 +69,12 @@ func (s *stubDoer) body(r proton.Request) []byte {
 }
 
 func (s *stubDoer) Do(_ context.Context, r proton.Request) (*proton.Response, error) {
-	s.reqs = append(s.reqs, r)
+	s.record(r)
 	return &proton.Response{Status: 200, Body: s.body(r)}, nil
 }
 
 func (s *stubDoer) Decode(_ context.Context, r proton.Request, out any) error {
-	s.reqs = append(s.reqs, r)
+	s.record(r)
 	body := s.body(r)
 	if out == nil || body == nil {
 		return nil

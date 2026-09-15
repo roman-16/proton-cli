@@ -6,6 +6,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 Adding a version section here is what publishes a release, so this file is the one place a version is decided: see [Releases](CONTRIBUTING.md#releases). Versions that shipped before this file existed are on the [releases page](https://github.com/roman-16/proton-cli/releases).
 
+## [4.0.0] - 2026-09-15
+
+### Added
+
+- `pass breaches` watches an address for leaks: the account's own addresses and the hide-my-email aliases in your vaults are listed beside each other, and an address you own elsewhere can be added, verified, paused and removed. `pass items list --risk compromised|missing-2fa|reused|weak` is the password half; only `compromised` reaches the network, sending six characters of a password's SHA-1 and never the password.
+- `drive items share add` and `pass vaults|items share add` take an address with no Proton account. Proton emails an invitation, `share get` says who is ready, and `share confirm` hands the key over once they have joined. `update`, `remove` and `resend` reach the held offers too.
+- `mail settings domains` handles a custom domain: add one, read every DNS entry it needs beside the verdict Proton's last check reached, point stray mail at a catch-all address, and give the domain up. Needs a paid Mail plan.
+- `pass items passkeys list` and `passkeys delete` show what a login signs in with and take one off. A login whose only way in is a passkey no longer reads as a login with nothing in it.
+
+### Changed
+
+- **Breaking.** One name per idea across the tree: `--page-size` is `--limit`, `--edit` is `--access viewer|editor`, `--move-to` is `--into`, `--plain` is `--html=false`, `--message` on `mail settings autoreply set` is `--body`, `--clear-catch-all` is `--catch-all none`, and `update`'s `--check` and `--reinstall` are `--dry-run` and `--force`.
+- **Breaking.** A Pass vault's `--icon` and `--color` take Pass's names rather than numbers: `--icon star --color teal`.
+- **Breaking.** Calendar listings take `--after` and `--before` rather than `--start` and `--end`, both days included and read in your working zone. Mail's `--before` now includes its own day too.
+- **Breaking.** One command per idea: `mail messages expire` is `mail messages update --expires`, `drive items share link` and `unlink` are the `drive links` collection, `mail settings senders forget` is `remove`, and `calendar settings calendars share list` is `share get`.
+- **Breaking.** `contacts groups` and `contacts keys` take an address as an argument rather than `--email`.
+
+### Removed
+
+- Every `--…-stdin` flag. The matching `--…-file` takes `-` for standard input.
+- `pass aliases options`. `pass settings domains list` and `pass settings mailboxes list` say the same.
+
+### Fixed
+
+- A listing the CLI pages itself answers whole unless a page is asked for. `pass aliases list` reported fewer aliases than the account holds, which read as a short answer rather than a wrong one.
+- `curl … | sh -s -- --help` prints the help instead of failing with an awk error - the one flow the script's own header documents.
+- An installed binary that cannot run on the machine fails the install and shows what the program said, instead of reporting success with the version silently missing.
+- The install script's `wget` fallback gives up as quickly as its `curl` path rather than retrying for a quarter of an hour.
+
 ## [3.8.0] - 2026-09-13
 
 ### Added

@@ -225,8 +225,8 @@ func TestDriveSharedLinkTakesUploadsWhenItAllowsEditing(t *testing.T) {
 	folder, url := sharedLink(t, "linkedit", "edit-payload", "--access", "editor")
 
 	root := runJSONSecondary(t, "drive", "items", "get", "/", "--link", url)
-	if root["link_access"] != "edit" {
-		t.Errorf("link_access = %v, want edit", root["link_access"])
+	if root["link_access"] != "editor" {
+		t.Errorf("link_access = %v, want editor", root["link_access"])
 	}
 
 	dir := t.TempDir()
@@ -325,8 +325,8 @@ func TestDriveSharedLinkThatAllowsViewingRefusesUploads(t *testing.T) {
 	writeLocal(t, src, "nope")
 
 	info := runJSONSecondary(t, "drive", "items", "get", "/", "--link", url)
-	if info["link_access"] != "view" {
-		t.Errorf("link_access = %v, want view", info["link_access"])
+	if info["link_access"] != "viewer" {
+		t.Errorf("link_access = %v, want viewer", info["link_access"])
 	}
 
 	_, stderr, code := runSecondary(t, "drive", "items", "upload", src, "/", "--link", url)

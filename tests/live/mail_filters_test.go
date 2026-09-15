@@ -2,6 +2,7 @@ package live
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -150,6 +151,30 @@ func filterStatus(t *testing.T, id string) int {
 	return -1
 }
 
+// filterOrder is the order the account's filters run in.
+func filterOrder(t *testing.T) []string {
+	t.Helper()
+	var order []string
+	for _, row := range runJSONArray(t, "--full-ids", "mail", "settings", "filters", "list") {
+		f, _ := row.(map[string]interface{})
+		id, _ := f["id"].(string)
+		order = append(order, id)
+	}
+	return order
+}
+
+// inertFilter creates a filter that matches nothing, for the tests about where a
+// filter sits rather than what it does.
+func inertFilter(t *testing.T, name string, flags ...string) string {
+	t.Helper()
+	sieve := fmt.Sprintf("require [\"fileinto\"];\n# %s\nif header :contains \"Subject\" \"%s\" {\n  fileinto \"Archive\";\n}\n", name, name)
+	args := append([]string{"mail", "settings", "filters", "create", "--name", name, "--sieve", sieve}, flags...)
+	id := strings.TrimSpace(runOK(t, args...))
+	cleanupRun(t, fmt.Sprintf("Delete filter: proton mail settings filters delete -- %s", id),
+		"mail", "settings", "filters", "delete", "--", id)
+	return id
+}
+
 func TestMailFiltersUpdate(t *testing.T) {
 	name := testID() + "-filter"
 	sieve := `require ["fileinto"]; if header :contains "Subject" "` + name + `" { fileinto "Archive"; }`
@@ -165,15 +190,7 @@ func TestMailFiltersUpdate(t *testing.T) {
 // A filter ordinarily acts once, as mail arrives. Running it again over what is
 // already here is the catching-up.
 func TestMailFiltersApplyToExistingMail(t *testing.T) {
-	name := testID() + "-apply"
-	sieve := fmt.Sprintf("require [\"fileinto\"];\n# %s\nif header :contains \"Subject\" \"%s\" {\n  fileinto \"Archive\";\n}\n", name, name)
-	stdout, stderr, code := run(t, "mail", "settings", "filters", "create", "--name", name, "--sieve", sieve)
-	if code != 0 {
-		t.Fatalf("filter create failed (exit %d): %s", code, truncateOutput(stderr))
-	}
-	id := strings.TrimSpace(stdout)
-	cleanupRun(t, fmt.Sprintf("Delete filter: proton mail settings filters delete %s", id),
-		"mail", "settings", "filters", "delete", "--", id)
+	id := inertFilter(t, testID()+"-apply")
 
 	// One apply, not two. Proton runs this over the whole mailbox as a background
 	// job, meters it hard, and refuses a second while the first is going - so
@@ -182,39 +199,36 @@ func TestMailFiltersApplyToExistingMail(t *testing.T) {
 	runOKUntilFree(t, "mail", "settings", "filters", "apply", "--", id)
 }
 
-// A half-stated order is one nobody can predict, so naming some of them is
-// refused rather than leaving the rest wherever they fell.
-func TestMailFiltersReorderNeedsEveryFilter(t *testing.T) {
-	name := testID() + "-order"
-	sieve := fmt.Sprintf("require [\"fileinto\"];\n# %s\nif header :contains \"Subject\" \"%s\" {\n  fileinto \"Archive\";\n}\n", name, name)
-	stdout, stderr, code := run(t, "mail", "settings", "filters", "create", "--name", name, "--sieve", sieve)
-	if code != 0 {
-		t.Fatalf("filter create failed (exit %d): %s", code, truncateOutput(stderr))
-	}
-	id := strings.TrimSpace(stdout)
-	cleanupRun(t, fmt.Sprintf("Delete filter: proton mail settings filters delete %s", id),
-		"mail", "settings", "filters", "delete", "--", id)
+// The first rule to file a message wins, so naming a filter moves it to the
+// front and everything else keeps the order it was in. An order the account is
+// already in is refused rather than written.
+//
+// Both filters are created turned off, because Proton will have only one filter
+// running on a free account and the order is over every filter either way.
+func TestMailFiltersReorderMovesTheNamedFilterToTheFront(t *testing.T) {
+	inertFilter(t, testID()+"-order-ahead", "--disabled")
+	last := inertFilter(t, testID()+"-order-behind", "--disabled")
 
-	all := runJSONArray(t, "mail", "settings", "filters", "list")
-	if len(all) < 2 {
-		// One filter is already in the only order there is.
-		runOK(t, "mail", "settings", "filters", "reorder", "--", id, id)
-		return
+	before := filterOrder(t)
+	if before[len(before)-1] != last {
+		t.Fatalf("a new filter runs last, so the order should end in %s: %v", last, before)
 	}
-	var ids []string
-	for _, row := range all {
-		m, _ := row.(map[string]interface{})
-		if fid, _ := m["id"].(string); fid != "" {
-			ids = append(ids, fid)
+
+	runOK(t, "mail", "settings", "filters", "reorder", "--", last)
+
+	want := []string{last}
+	for _, id := range before {
+		if id != last {
+			want = append(want, id)
 		}
 	}
-	runOK(t, append([]string{"mail", "settings", "filters", "reorder", "--"}, ids...)...)
-
-	_, stderr, code = run(t, "mail", "settings", "filters", "reorder", "--", ids[0], ids[0])
-	if code != 1 {
-		t.Errorf("naming fewer filters than exist should exit 1, got %d", code)
+	if got := filterOrder(t); !slices.Equal(got, want) {
+		t.Errorf("the filters run in the order %v, want %v", got, want)
 	}
-	if !strings.Contains(stderr, "name every filter") {
-		t.Errorf("the refusal should say to name them all, got: %s", stderr)
+
+	_, stderr, code := run(t, "mail", "settings", "filters", "reorder", "--", last)
+	if code != 1 || !strings.Contains(stderr, "already in that order") {
+		t.Errorf("reordering to the order the account is already in exited %d: %s",
+			code, truncateOutput(stderr))
 	}
 }
