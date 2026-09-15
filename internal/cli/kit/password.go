@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/roman-16/proton-cli/internal/app"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/spf13/cobra"
 )
@@ -13,9 +14,9 @@ import (
 // that opens an account: what somebody else will type to read a public link or a
 // message sent outside Proton.
 //
-// Like every other secret here it is read from a file or from standard input and
-// never from a flag value: argv is readable by every user on the machine through
-// ps, and it survives in shell history and in unit files.
+// Like every other secret here it arrives as a path, with `-` for standard
+// input, and never as a flag value: argv is readable by every user on the
+// machine through ps, and it survives in shell history and in unit files.
 //
 // It has flags of its own rather than naming a field the way Secrets does,
 // because a link has one password and a message has one - NAME=FILE is what an
@@ -33,21 +34,17 @@ type Password struct {
 	// what decides whether the clear flag exists at all.
 	clearUsage string
 	fileUsage  string
-	stdinUsage string
 
 	file   string
-	stdin  bool
 	clear  bool
 	reader io.Reader
 }
 
 // The one thing each of these says, wherever it appears.
 const (
-	LinkPasswordFileUsage  = "Read the public link's password from a file"
-	LinkPasswordStdinUsage = "Read the public link's password from stdin"
+	LinkPasswordFileUsage  = "Read the public link's password from a file, or - for stdin"
 	ClearLinkPasswordUsage = "Remove the public link's password"
-	EOPasswordFileUsage    = "Read the password for recipients outside Proton from a file"
-	EOPasswordStdinUsage   = "Read the password for recipients outside Proton from stdin"
+	EOPasswordFileUsage    = "Read the password for recipients outside Proton from a file, or - for stdin"
 )
 
 // LinkPassword is what somebody must type to open a Drive public link, for the
@@ -60,8 +57,7 @@ const (
 func LinkPassword() *Password {
 	return &Password{
 		name: "link-password", label: "A link password", max: 50,
-		fileUsage: LinkPasswordFileUsage, stdinUsage: LinkPasswordStdinUsage,
-		clearUsage: ClearLinkPasswordUsage,
+		fileUsage: LinkPasswordFileUsage, clearUsage: ClearLinkPasswordUsage,
 	}
 }
 
@@ -71,7 +67,7 @@ func LinkPassword() *Password {
 func LinkPasswordToOpen() *Password {
 	return &Password{
 		name: "link-password", label: "A link password", max: 50,
-		fileUsage: LinkPasswordFileUsage, stdinUsage: LinkPasswordStdinUsage,
+		fileUsage: LinkPasswordFileUsage,
 	}
 }
 
@@ -84,7 +80,7 @@ func LinkPasswordToOpen() *Password {
 func EOPassword() *Password {
 	return &Password{
 		name: "eo-password", label: "A password for recipients outside Proton", min: 8,
-		fileUsage: EOPasswordFileUsage, stdinUsage: EOPasswordStdinUsage,
+		fileUsage: EOPasswordFileUsage,
 	}
 }
 
@@ -92,22 +88,20 @@ func EOPassword() *Password {
 func (p *Password) Declare(c *cobra.Command) {
 	f := c.Flags()
 	f.StringVar(&p.file, p.name+"-file", "", p.fileUsage)
-	f.BoolVar(&p.stdin, p.name+"-stdin", false, p.stdinUsage)
-	names := []string{p.name + "-file", p.name + "-stdin"}
-	if p.clearUsage != "" {
-		f.BoolVar(&p.clear, "clear-"+p.name, false, p.clearUsage)
-		names = append(names, "clear-"+p.name)
+	if p.clearUsage == "" {
+		return
 	}
-	c.MarkFlagsMutuallyExclusive(names...)
+	f.BoolVar(&p.clear, "clear-"+p.name, false, p.clearUsage)
+	c.MarkFlagsMutuallyExclusive(p.name+"-file", "clear-"+p.name)
 }
 
-// Supply claims standard input if it was asked for, before anything else can
+// Supply claims standard input if the path says so, before anything else can
 // drain it.
 func (p *Password) Supply(c *Invocation) error {
-	if !p.stdin {
+	if p.file != app.Stdin {
 		return nil
 	}
-	r, err := c.App.Stdin("--" + p.name + "-stdin")
+	r, err := c.App.Stdin("--" + p.name + "-file " + app.Stdin)
 	if err != nil {
 		return err
 	}
@@ -117,7 +111,7 @@ func (p *Password) Supply(c *Invocation) error {
 
 // Wanted reports whether the password was spoken about at all, which is what
 // decides whether the thing being written gets one.
-func (p *Password) Wanted() bool { return p.file != "" || p.stdin || p.clear }
+func (p *Password) Wanted() bool { return p.file != "" || p.clear }
 
 // Cleared reports whether the password is being taken off rather than set.
 func (p *Password) Cleared() bool { return p.clear }
@@ -132,14 +126,6 @@ func (p *Password) Value() (string, error) {
 	switch {
 	case p.clear:
 		return "", nil
-	case p.file != "":
-		b, err := os.ReadFile(p.file)
-		if err != nil {
-			return "", errs.Problemf("Could not read %s: %v", p.file, err)
-		}
-		if v = strings.TrimSpace(string(b)); v == "" {
-			return "", errs.Problemf("%s is empty.", p.file)
-		}
 	case p.reader != nil:
 		b, err := io.ReadAll(p.reader)
 		if err != nil {
@@ -148,9 +134,17 @@ func (p *Password) Value() (string, error) {
 		if v = strings.TrimSpace(string(b)); v == "" {
 			return "", errs.Problemf("Nothing arrived on stdin.")
 		}
+	case p.file != "":
+		b, err := os.ReadFile(p.file)
+		if err != nil {
+			return "", errs.Problemf("Could not read %s: %v", p.file, err)
+		}
+		if v = strings.TrimSpace(string(b)); v == "" {
+			return "", errs.Problemf("%s is empty.", p.file)
+		}
 	default:
 		return "", errs.Problemf("%s is required.", p.label).
-			Hint("--" + p.name + "-file FILE, or --" + p.name + "-stdin")
+			Hint("--" + p.name + "-file FILE, or --" + p.name + "-file " + app.Stdin)
 	}
 	if p.min > 0 && len([]rune(v)) < p.min {
 		return "", errs.Problemf("%s must be at least %d characters.", p.label, p.min)

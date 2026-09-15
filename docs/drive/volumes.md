@@ -39,6 +39,13 @@ proton drive volumes list
 proton drive volumes list
 ```
 
+| Flag | Description |
+| --- | --- |
+| `--desc` | Reverse the order |
+| `--limit int` | How many volumes per page; 0 for all of them |
+| `--page int` | Which page of results, counting from zero |
+| `--sort string` | Order by: created, used (default `created`) |
+
 ## `restore`
 
 Put the files of a locked volume back.

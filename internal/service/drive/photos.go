@@ -319,6 +319,46 @@ func (s *Service) AlbumCreate(ctx context.Context, dc *Context, name string) (st
 	return r.Album.Link.LinkID, nil
 }
 
+// AlbumRename changes what an album is called.
+//
+// An album is a link in the photo volume, so it renames the way anything else
+// does: the new name encrypted to the volume root's key, and a hash of it so
+// Proton can refuse a name the root already holds without reading either.
+func (s *Service) AlbumRename(ctx context.Context, dc *Context, albumLinkID, oldName, newName string) error {
+	root, rootKR, err := s.photosRoot(ctx, dc)
+	if err != nil {
+		return err
+	}
+	hashKey, err := hashKeyOf(root, rootKR)
+	if err != nil {
+		return err
+	}
+	newHash, err := lookupHash(strings.ToLower(newName), hashKey)
+	if err != nil {
+		return err
+	}
+	oldHash, err := lookupHash(strings.ToLower(oldName), hashKey)
+	if err != nil {
+		return err
+	}
+	encName, err := encryptName(newName, rootKR, dc.Addr.Write)
+	if err != nil {
+		return err
+	}
+	err = s.C.Decode(ctx, proton.Request{
+		Method: "PUT",
+		Path:   fmt.Sprintf("/drive/shares/%s/links/%s/rename", dc.ShareID, albumLinkID),
+		Body: map[string]any{
+			"Name": encName, "Hash": newHash, "OriginalHash": oldHash,
+			"NameSignatureEmail": dc.AddrEmail,
+		},
+	}, nil)
+	if proton.AlreadyExists(err) {
+		return &errs.Exists{Kind: "album", Name: newName, Where: "your photos"}
+	}
+	return err
+}
+
 // AlbumAddPhotos adds existing timeline photos to an album. Each photo's node
 // passphrase and name are re-encrypted to the album's node key (the same
 // re-wrap used by Copy), and a fresh name hash is computed against the album's

@@ -110,7 +110,7 @@ A reason survives only when it changes what the reader does, and then as a fact 
 - Output shown is output the build prints. Take it from a real run or from the golden files under `internal/ui/testdata/`; never write it from memory.
 - Placeholders are the names in `kit.Placeholders`, in capitals: `REF`, `PATH`, `EMAIL`. A value the reader replaces in a copyable line is a realistic example instead: `alice@proton.me`, `/Documents/report.pdf`, `Invoice #2291`.
 - Full flag names in every example; a single-letter form only where the page is about the short forms.
-- Never a real secret, token or address. A password comes from `--password-file` or `--password-stdin` in every example, as it does in the tool.
+- Never a real secret, token or address. A password comes from `--password-file` in every example, as it does in the tool.
 - Every invocation must exist. `TestEveryCommandTheDocsShowExists` resolves each one, including inline spans that start with an app name, against the command tree and fails on a command or flag that is not there.
 - Show the smallest example that does the task, then the one variation people reach for. Everything else is the reference's job.
 

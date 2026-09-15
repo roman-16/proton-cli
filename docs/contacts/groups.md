@@ -10,7 +10,7 @@ Holds `add`, `create`, `delete`, `get`, `list`, `remove` and `update`.
 
 Add contacts to a group.
 
-Proton groups addresses rather than people, so a colleague's work address can be in a group while their personal one is not. Naming a contact means all of their addresses; --email narrows it to the ones you name, and then exactly one contact may be named.
+Proton groups addresses rather than people, so a colleague's work address can be in a group while their personal one is not. Naming a contact means all of their addresses, and naming one of their addresses means that one.
 
 ```
 proton contacts groups add REF CONTACT_REF...
@@ -19,10 +19,6 @@ proton contacts groups add REF CONTACT_REF...
 ```bash
 proton contacts groups add Team jane
 ```
-
-| Flag | Description |
-| --- | --- |
-| `--email stringArray` | Act on this address only, rather than all of the contact's (repeatable) |
 
 ## `create`
 
@@ -78,11 +74,18 @@ proton contacts groups list
 proton contacts groups list
 ```
 
+| Flag | Description |
+| --- | --- |
+| `--desc` | Reverse the order |
+| `--limit int` | How many groups per page; 0 for all of them |
+| `--page int` | Which page of results, counting from zero |
+| `--sort string` | Order by: name (default `name`) |
+
 ## `remove`
 
 Remove contacts from a group.
 
-Proton groups addresses rather than people, so a colleague's work address can be in a group while their personal one is not. Naming a contact means all of their addresses; --email narrows it to the ones you name, and then exactly one contact may be named.
+Proton groups addresses rather than people, so a colleague's work address can be in a group while their personal one is not. Naming a contact means all of their addresses, and naming one of their addresses means that one.
 
 ```
 proton contacts groups remove REF CONTACT_REF...
@@ -91,10 +94,6 @@ proton contacts groups remove REF CONTACT_REF...
 ```bash
 proton contacts groups remove Team jane
 ```
-
-| Flag | Description |
-| --- | --- |
-| `--email stringArray` | Act on this address only, rather than all of the contact's (repeatable) |
 
 ## `update`
 

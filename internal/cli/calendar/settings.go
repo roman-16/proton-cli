@@ -158,7 +158,8 @@ func calendarList(c *kit.Invocation) *kit.Lookup[calsvc.Calendar] {
 }
 
 func calendarsListCmd() *cobra.Command {
-	return &cobra.Command{
+	var held kit.Held[calsvc.Calendar]
+	c := &cobra.Command{
 		Use:   "list",
 		Short: "List your calendars",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
@@ -166,12 +167,15 @@ func calendarsListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return kit.List(c, ui.TableSpec[calsvc.Calendar]{
+			return held.Answer(c, ui.TableSpec[calsvc.Calendar]{
 				Noun: "calendars", Columns: calendarColumns(),
-				Total: ui.Unknown, Page: ui.Unpaged,
 			}, cals)
 		}),
 	}
+	held.Register(c, "calendars",
+		kit.Key[calsvc.Calendar]{Name: "name", Less: func(a, b calsvc.Calendar) int { return kit.Fold(a.Name, b.Name) }},
+	)
+	return c
 }
 
 func calendarsCreateCmd() *cobra.Command {
@@ -351,7 +355,7 @@ func calendarsDeleteCmd() *cobra.Command {
 		Short: "Delete calendars, and every event in them",
 		Long: "Delete calendars, and every event in them.\n\n" +
 			"Asks for your password even when you are signed in. With no terminal to ask,\n" +
-			"pass --password-file or --password-stdin.",
+			"pass --password-file, which takes - for stdin.",
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			if err := reauth.Supply(c); err != nil {
 				return err

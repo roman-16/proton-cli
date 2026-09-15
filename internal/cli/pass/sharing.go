@@ -491,7 +491,8 @@ func receivedColumns() []ui.Column[passsvc.Invite] {
 }
 
 func invitationsListCmd() *cobra.Command {
-	return &cobra.Command{
+	var held kit.Held[passsvc.Invite]
+	c := &cobra.Command{
 		Use:   "list",
 		Short: "List what other people have offered you",
 		Long: "List what other people have offered you.\n\n" +
@@ -503,11 +504,16 @@ func invitationsListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return kit.List(c, ui.TableSpec[passsvc.Invite]{
-				Noun: "invitations", Columns: receivedColumns(), Total: len(rows), Page: ui.Unpaged,
+			return held.Answer(c, ui.TableSpec[passsvc.Invite]{
+				Noun: "invitations", Columns: receivedColumns(),
 			}, rows)
 		}),
 	}
+	held.Register(c, "invitations",
+		kit.Key[passsvc.Invite]{Name: "vault", Less: func(a, b passsvc.Invite) int { return kit.Fold(a.Vault, b.Vault) }},
+		kit.Key[passsvc.Invite]{Name: "sender", Less: func(a, b passsvc.Invite) int { return kit.Fold(a.Inviter, b.Inviter) }},
+	)
+	return c
 }
 
 func invitationsAcceptCmd() *cobra.Command {

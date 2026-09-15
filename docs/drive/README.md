@@ -2,7 +2,7 @@
 
 Upload, download, share and organize Proton Drive as ordinary paths. Files are encrypted before they leave your machine and decrypted after they arrive, block by block, with your keys.
 
-This page is what people actually do. For every command and flag, see the reference: [items](items.md), [trash](trash.md), [photos](photos.md), [computers](computers.md), [shared](shared.md), [sharing](sharing.md), [invitations](invitations.md), [settings](settings.md), [volumes](volumes.md).
+This page is what people actually do. For every command and flag, see the reference: [items](items.md), [links](links.md), [trash](trash.md), [photos](photos.md), [computers](computers.md), [shared](shared.md), [sharing](sharing.md), [invitations](invitations.md), [settings](settings.md), [volumes](volumes.md).
 
 ## Look around
 
@@ -105,22 +105,28 @@ Neither command touches the version the file is at now. Restoring it would do no
 ### A public link
 
 ```bash
-proton drive items share link /Documents/report.pdf --expires 7d \
+proton drive links create /Documents/report.pdf --expires 7d \
   --link-password-file /run/secrets/report-link
-proton drive items share get /Documents/report.pdf     # who has access, plus the link
-proton drive items share unlink /Documents/report.pdf
+proton drive links get /Documents/report.pdf     # the URL, and what it allows
+proton drive links list                          # every link you have open
+proton drive links revoke /Documents/report.pdf
 ```
 
-The password comes from a file or from standard input, never from a flag value, and is at most 50 characters.
+An item carries one link, so `create` on an item that already has one changes that link and the URL you sent keeps working.
+
+The password comes from a file, never from a flag value, and is at most 50 characters. `--link-password-file -` reads it from standard input.
 
 - `--expires never` makes an expiring link permanent.
 - `--clear-link-password` removes the password.
+- `--access editor` lets anyone holding the link upload into it.
+
+`links list` leaves the URLs out. To read one back, run `links get`.
 
 ### With named people
 
 ```bash
-proton drive items share add /Documents/project bob@proton.me --edit --message "Draft for review"
-proton drive items share update /Reports jane@proton.me --edit=false
+proton drive items share add /Documents/project bob@proton.me --access editor --message "Draft for review"
+proton drive items share update /Reports jane@proton.me --access viewer
 proton drive items share remove /Documents/report.pdf bob@proton.me
 ```
 
@@ -156,7 +162,8 @@ Invited:  kim@example.com (editor, ready to confirm)
 
 ```bash
 proton drive shared list       # what other people have shared with you
-proton drive sharing list      # what you have left open
+proton drive sharing list      # who you have let in
+proton drive links list        # what a URL opens
 proton drive invitations list
 proton drive invitations accept INVITATION_ID
 ```
@@ -187,13 +194,13 @@ proton drive items download / --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ
 
 A link to a single file is `/` itself. Quote the link: the password is what follows the `#`, which a shell would otherwise drop.
 
-A link with a password of its own takes it from a file or from standard input, as `items share link` does:
+A link with a password of its own takes it from a file, as `links create` does:
 
 ```bash
 proton drive items download / --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL' --link-password-file /run/secrets/q3-link --dest-dir .
 ```
 
-A link that allows editing takes new files and folders. `items get /` shows `Link Access: edit` on one:
+A link that allows editing takes new files and folders. `items get /` shows `Link Access: editor` on one:
 
 ```bash
 proton drive items upload ./photo.jpg / --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL'
@@ -256,6 +263,7 @@ Photos have no path; address them by ID.
 
 ```bash
 proton drive photos albums create --name Holiday
+proton drive photos albums update Holiday --name "Holiday 2026"
 proton drive photos albums add ALBUM_ID PHOTO_ID...
 proton drive photos list --album ALBUM_ID
 proton drive photos albums delete Holiday --delete-photos

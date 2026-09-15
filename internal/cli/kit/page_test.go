@@ -46,10 +46,10 @@ func TestPageRefusesWhatNoSessionCouldMakeRight(t *testing.T) {
 		want string
 	}{
 		{"a page before the first", Page{Number: -1, Size: 50}, "--page counts from zero."},
-		{"a negative size", Page{Size: -5}, "--page-size is a count; 0 lists all of them."},
+		{"a negative size", Page{Size: -5}, "--limit is a count; 0 lists all of them."},
 		// Zero is the whole collection, so there is no second page of it to
 		// ask for and answering with an empty one would look like the end.
-		{"a page of an unpaged listing", Page{Number: 2}, "--page 2 asks for a page of a listing --page-size 0 does not cut into."},
+		{"a page of an unpaged listing", Page{Number: 2}, "--page 2 asks for a page of a listing --limit 0 does not cut into."},
 		{"the first page whole", Page{}, ""},
 		{"an ordinary page", Page{Number: 3, Size: 25}, ""},
 	} {

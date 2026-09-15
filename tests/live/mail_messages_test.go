@@ -20,7 +20,7 @@ func TestMailMessagesListSent(t *testing.T) {
 }
 
 func TestMailMessagesListJSONFieldNames(t *testing.T) {
-	data := runJSON(t, "mail", "messages", "list", "--page-size", "1")
+	data := runJSON(t, "mail", "messages", "list", "--limit", "1")
 	msgs, ok := data["messages"].([]interface{})
 	if !ok {
 		t.Fatal("expected messages array")
@@ -36,7 +36,7 @@ func TestMailMessagesListJSONFieldNames(t *testing.T) {
 }
 
 func TestMailMessagesListPageSize(t *testing.T) {
-	data := runJSON(t, "mail", "messages", "list", "--page-size", "3")
+	data := runJSON(t, "mail", "messages", "list", "--limit", "3")
 	msgs := data["messages"].([]interface{})
 	if len(msgs) > 3 {
 		t.Errorf("expected at most 3 messages, got %d", len(msgs))
@@ -50,7 +50,7 @@ func TestMailMessagesListUnreadFlag(t *testing.T) {
 // A page size of zero is the whole folder in one answer, whatever it costs
 // underneath. Nothing is left to page towards, so there is no page to report.
 func TestMailMessagesListWholeCollection(t *testing.T) {
-	data := runJSON(t, "mail", "messages", "list", "--folder", "all", "--page-size", "0")
+	data := runJSON(t, "mail", "messages", "list", "--folder", "all", "--limit", "0")
 	msgs := data["messages"].([]interface{})
 	if total, ok := data["total"].(float64); !ok || int(total) != len(msgs) {
 		t.Errorf("total = %v with %d messages shown; the whole collection was asked for",
@@ -64,11 +64,11 @@ func TestMailMessagesListWholeCollection(t *testing.T) {
 }
 
 // A page wider than Proton serves at once is composed from as many of its pages
-// as it takes and cut to the number that was asked for, so --page-size is the
+// as it takes and cut to the number that was asked for, so --limit is the
 // reader's number rather than the endpoint's.
 func TestMailMessagesListWiderThanAPage(t *testing.T) {
 	const want = 160 // one row past Proton's own page
-	data := runJSON(t, "mail", "messages", "list", "--folder", "all", "--page-size", "160")
+	data := runJSON(t, "mail", "messages", "list", "--folder", "all", "--limit", "160")
 	msgs := data["messages"].([]interface{})
 	total, ok := data["total"].(float64)
 	if !ok {
@@ -83,7 +83,7 @@ func TestMailMessagesListWiderThanAPage(t *testing.T) {
 }
 
 func TestMailMessagesListFooterSinglePage(t *testing.T) {
-	_, stderr := runOKStderr(t, "mail", "messages", "list", "--page-size", "150")
+	_, stderr := runOKStderr(t, "mail", "messages", "list", "--limit", "150")
 	last := lastNonEmpty(stderr)
 	// One page holds everything, so the footer is a plain count: no "of", no
 	// next-page instruction, and never a page number the reader did not ask for.
@@ -96,7 +96,7 @@ func TestMailMessagesListFooterSinglePage(t *testing.T) {
 }
 
 func TestMailMessagesListFooterMidPagination(t *testing.T) {
-	_, stderr := runOKStderr(t, "mail", "messages", "list", "--page-size", "1")
+	_, stderr := runOKStderr(t, "mail", "messages", "list", "--limit", "1")
 	last := lastNonEmpty(stderr)
 	// Either mid-pagination ("Pass --page 1") or last/single-page if the
 	// account has ≤ 1 messages. Pin the substring that's present in the
@@ -107,7 +107,7 @@ func TestMailMessagesListFooterMidPagination(t *testing.T) {
 }
 
 func TestMailMessagesListJSONPaginationFields(t *testing.T) {
-	data := runJSON(t, "mail", "messages", "list", "--page-size", "1")
+	data := runJSON(t, "mail", "messages", "list", "--limit", "1")
 	for _, key := range []string{"total", "page", "page_size", "has_more", "messages"} {
 		if _, ok := data[key]; !ok {
 			t.Errorf("expected JSON field %q, got keys: %v", key, keysOf(data))
@@ -119,7 +119,7 @@ func TestMailMessagesListJSONPaginationFields(t *testing.T) {
 // reporting a total that was never asked for.
 func TestMailMessagesListFilteredFooterPages(t *testing.T) {
 	_, stderr := runOKStderr(t, "mail", "messages", "list",
-		"--folder", "all", "--keyword", "proton", "--page-size", "5")
+		"--folder", "all", "--keyword", "proton", "--limit", "5")
 	last := lastNonEmpty(stderr)
 	if strings.Contains(last, "page 0") {
 		t.Errorf("a footer should never name the page it is on: %q", last)
@@ -197,7 +197,7 @@ func TestMailListFromHitsNoHint(t *testing.T) {
 	var stderr string
 	for attempt := 0; attempt < 8; attempt++ {
 		_, s := runOKStderr(t, "mail", "messages", "list", "--folder", "all",
-			"--from", selfEmail(), "--page-size", "5")
+			"--from", selfEmail(), "--limit", "5")
 		stderr = s
 		if !strings.Contains(s, "matches the address only") {
 			return
@@ -263,7 +263,7 @@ func TestMailMessagesMarkReadUnread(t *testing.T) {
 	msgID := mutableMail(t)
 
 	runOK(t, "mail", "messages", "mark", "unread", "--", msgID)
-	data := runJSON(t, "mail", "messages", "list", "--unread", "--page-size", "50")
+	data := runJSON(t, "mail", "messages", "list", "--unread", "--limit", "50")
 	msgs := data["messages"].([]interface{})
 	found := false
 	for _, m := range msgs {
@@ -277,7 +277,7 @@ func TestMailMessagesMarkReadUnread(t *testing.T) {
 	}
 
 	runOK(t, "mail", "messages", "mark", "read", "--", msgID)
-	data = runJSON(t, "mail", "messages", "list", "--unread", "--page-size", "50")
+	data = runJSON(t, "mail", "messages", "list", "--unread", "--limit", "50")
 	msgs = data["messages"].([]interface{})
 	for _, m := range msgs {
 		if m.(map[string]interface{})["id"].(string) == msgID {
@@ -308,7 +308,7 @@ func TestMailMessagesStarUnstar(t *testing.T) {
 	msgID := mutableMail(t)
 
 	runOK(t, "mail", "messages", "star", "--", msgID)
-	data := runJSON(t, "mail", "messages", "list", "--folder", "starred", "--page-size", "50")
+	data := runJSON(t, "mail", "messages", "list", "--folder", "starred", "--limit", "50")
 	msgs := data["messages"].([]interface{})
 	found := false
 	for _, m := range msgs {
@@ -328,7 +328,7 @@ func TestMailMessagesMoveDest(t *testing.T) {
 	msgID := mutableMail(t)
 
 	runOK(t, "mail", "messages", "move", "--into", "archive", "--", msgID)
-	data := runJSON(t, "mail", "messages", "list", "--folder", "archive", "--page-size", "50")
+	data := runJSON(t, "mail", "messages", "list", "--folder", "archive", "--limit", "50")
 	msgs := data["messages"].([]interface{})
 	found := false
 	for _, m := range msgs {
@@ -348,7 +348,7 @@ func TestMailMessagesTrash(t *testing.T) {
 	msgID := mutableMail(t)
 
 	runOK(t, "mail", "messages", "trash", "--", msgID)
-	data := runJSON(t, "mail", "messages", "list", "--page-size", "50")
+	data := runJSON(t, "mail", "messages", "list", "--limit", "50")
 	msgs := data["messages"].([]interface{})
 	for _, m := range msgs {
 		if m.(map[string]interface{})["id"].(string) == msgID {

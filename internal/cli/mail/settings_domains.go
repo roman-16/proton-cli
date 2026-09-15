@@ -36,7 +36,8 @@ func domainsCmd() *cobra.Command {
 }
 
 func domainsListCmd() *cobra.Command {
-	return &cobra.Command{
+	var held kit.Held[mailsvc.Domain]
+	c := &cobra.Command{
 		Use:   "list",
 		Short: "List the custom domains on the account",
 		Long: "List the custom domains on the account.\n\n" +
@@ -47,13 +48,16 @@ func domainsListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return kit.List(c, ui.TableSpec[mailsvc.Domain]{
-				Noun:  "domains",
-				Total: ui.Unknown, Page: ui.Unpaged,
+			return held.Answer(c, ui.TableSpec[mailsvc.Domain]{
+				Noun:    "domains",
 				Columns: domainColumns(),
 			}, rows)
 		}),
 	}
+	held.Register(c, "domains",
+		kit.Key[mailsvc.Domain]{Name: "domain", Less: func(a, b mailsvc.Domain) int { return kit.Fold(a.Domain, b.Domain) }},
+	)
+	return c
 }
 
 func domainsGetCmd() *cobra.Command {
@@ -107,7 +111,7 @@ func domainsCreateCmd() *cobra.Command {
 			"no address can be added on it until Proton has seen that entry. `get` shows\n" +
 			"every entry the domain needs.\n\n" +
 			"Asks for your password even when you are signed in. With no terminal to ask,\n" +
-			"pass --password-file or --password-stdin.",
+			"pass --password-file, which takes - for stdin.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			if err := reauth.Supply(c); err != nil {
 				return err
@@ -141,7 +145,6 @@ func domainsCreateCmd() *cobra.Command {
 // choose: which address takes mail sent to a name the domain has not got.
 func domainsUpdateCmd() *cobra.Command {
 	var catchAll string
-	var clear bool
 	var reauth kit.Reauth
 	c := &cobra.Command{
 		Use:   "update REF",
@@ -150,19 +153,16 @@ func domainsUpdateCmd() *cobra.Command {
 			"Mail sent to a name that does not exist at the domain arrives at the\n" +
 			"catch-all address instead of being refused.\n\n" +
 			"--catch-all takes one of your addresses on that domain. One address catches\n" +
-			"at a time, so naming another moves it. --clear-catch-all turns it off.\n\n" +
+			"at a time, so naming another moves it, and `--catch-all none` turns it off.\n\n" +
 			"Asks for your password even when you are signed in. With no terminal to ask,\n" +
-			"pass --password-file or --password-stdin.",
+			"pass --password-file, which takes - for stdin.",
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			if err := reauth.Supply(c); err != nil {
 				return err
 			}
-			if clear && c.Changed("catch-all") {
-				return kit.Fail("--catch-all and --clear-catch-all contradict each other.")
-			}
-			if !clear && !c.Changed("catch-all") {
+			if !c.Changed("catch-all") {
 				return kit.Fail("Nothing to change.").
-					Hint("pass --catch-all or --clear-catch-all.")
+					Hint("--catch-all work@example.com, or --catch-all none to turn it off")
 			}
 			d, err := domainList(c).Find(c.Ctx, c.Args[0])
 			if err != nil {
@@ -170,7 +170,7 @@ func domainsUpdateCmd() *cobra.Command {
 			}
 			var addressID *string
 			detail := "to catch nothing"
-			if !clear {
+			if !strings.EqualFold(strings.TrimSpace(catchAll), kit.None) {
 				a, err := c.App.Mail.ResolveAddress(c.Ctx, catchAll)
 				if err != nil {
 					return err
@@ -192,8 +192,8 @@ func domainsUpdateCmd() *cobra.Command {
 			})
 		}),
 	}
-	c.Flags().StringVar(&catchAll, "catch-all", "", "Address that takes mail sent to a name the domain has not got")
-	c.Flags().BoolVar(&clear, "clear-catch-all", false, "Refuse mail sent to a name the domain has not got")
+	c.Flags().StringVar(&catchAll, "catch-all", "",
+		"Address that takes mail sent to a name the domain has not got, or none")
 	reauth.Declare(c)
 	return c
 }
@@ -208,7 +208,7 @@ func domainsDeleteCmd() *cobra.Command {
 			"hold stays. Adding the domain again needs its DNS entries verified from\n" +
 			"scratch.\n\n" +
 			"Asks for your password even when you are signed in. With no terminal to ask,\n" +
-			"pass --password-file or --password-stdin.",
+			"pass --password-file, which takes - for stdin.",
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			if err := reauth.Supply(c); err != nil {
 				return err

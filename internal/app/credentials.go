@@ -9,24 +9,33 @@ import (
 	"github.com/roman-16/proton-cli/internal/ui"
 )
 
+// Stdin is the path that means standard input, wherever a path is read.
+//
+// It is the spelling the rest of the CLI already uses - `--body -`, `--dest -`,
+// a `-` argument to upload - so a secret has no second one. A flag whose value
+// is a path and nothing else cannot leak the secret into argv, which is the
+// whole reason these are paths.
+const Stdin = "-"
+
 // passwordSource says where a secret may be read from. A file path is the
 // channel secret delivery already speaks - systemd's LoadCredential, Kubernetes
 // secrets and Docker secrets all hand one over.
 type passwordSource struct {
 	// file is read whole, with surrounding whitespace stripped.
 	file string
-	// stdin is standard input, claimed the moment --password-stdin is seen rather
-	// than when a password turns out to be wanted: a `-` argument would otherwise
-	// read the stream first and quietly send the password wherever it pointed.
+	// stdin is standard input, claimed the moment `--password-file -` is seen
+	// rather than when a password turns out to be wanted: a `-` argument would
+	// otherwise read the stream first and quietly send the password wherever it
+	// pointed.
 	stdin io.Reader
-	// declared says the running command offers the flags this secret arrives
+	// declared says the running command offers the flag this secret arrives
 	// through, which is what decides how a missing one is answered.
 	declared bool
 }
 
 // hint says how to supply this secret without a terminal.
 //
-// Few commands declare the flags a secret arrives through, and any command at all
+// Few commands declare the flag a secret arrives through, and any command at all
 // can find the session's key password missing - so pointing one of those at a
 // flag it would reject is worse than saying nothing. Signing in is what puts the
 // key password back, so that is what it says instead.
@@ -35,6 +44,23 @@ func (s passwordSource) hint(flag string) []string {
 		return []string{"pass " + flag + ", or run this in a terminal"}
 	}
 	return []string{"proton account login", "or run this in a terminal"}
+}
+
+// from records where a secret is to be read from, claiming standard input when
+// the path says so. One function for every secret, because the rule is one rule:
+// the value is a path, and `-` is the stream.
+func (c *Credentials) from(src *passwordSource, flag, file string) error {
+	src.declared = true
+	if file != Stdin {
+		src.file = file
+		return nil
+	}
+	r, err := c.stdinOwner(flag + " " + Stdin)
+	if err != nil {
+		return err
+	}
+	src.stdin = r
+	return nil
 }
 
 // Credentials resolves the values that identify and unlock an account.
@@ -46,12 +72,14 @@ func (s passwordSource) hint(flag string) []string {
 // Resolution, most specific first:
 //
 //	email     the account this profile is signed in as, else a prompt
-//	password  --password-file, else --password-stdin, else a prompt
-//	second    --second-password-file, else --second-password-stdin, else a prompt
-//	extra     --extra-password-file, else --extra-password-stdin, else a prompt
-//	previous  --previous-password-file, else --previous-password-stdin, else a prompt
-//	phrase    --recovery-phrase-file, else --recovery-phrase-stdin, else a prompt
+//	password  --password-file, else a prompt
+//	second    --second-password-file, else a prompt
+//	extra     --extra-password-file, else a prompt
+//	previous  --previous-password-file, else a prompt
+//	phrase    --recovery-phrase-file, else a prompt
 //	code      --totp, else a prompt
+//
+// Each file flag reads standard input when its value is `-`.
 //
 // Only `account login` names an account, and it does so with its own --user.
 //
@@ -159,17 +187,8 @@ func newCredentials(u *ui.UI, signedInAs string) *Credentials {
 // It is kept apart from the account password because it is a different secret
 // with a different life: one unlocks the account, the other unlocks one file,
 // and a person who exports a backup chooses it themselves.
-func (c *Credentials) SupplyPassphrase(file string, stdin bool) error {
-	c.passphrase.source.file = file
-	if !stdin {
-		return nil
-	}
-	r, err := c.stdinOwner("--passphrase-stdin")
-	if err != nil {
-		return err
-	}
-	c.passphrase.source.stdin = r
-	return nil
+func (c *Credentials) SupplyPassphrase(file string) error {
+	return c.from(&c.passphrase.source, "--passphrase-file", file)
 }
 
 // Passphrase returns the passphrase for a file, asking for it if there is
@@ -191,53 +210,23 @@ func (c *Credentials) Passphrase(reason string) (string, error) {
 // Supply records the credentials a command was given. Only the commands that can
 // be asked to re-authenticate declare them, so this is the one place standard
 // input is claimed for a password.
-func (c *Credentials) Supply(passwordFile string, passwordStdin bool, totp string) error {
-	c.source.file = passwordFile
-	c.source.declared = true
+func (c *Credentials) Supply(passwordFile, totp string) error {
 	c.flagTOTP = totp
-	if !passwordStdin {
-		return nil
-	}
-	r, err := c.stdinOwner("--password-stdin")
-	if err != nil {
-		return err
-	}
-	c.source.stdin = r
-	return nil
+	return c.from(&c.source, "--password-file", passwordFile)
 }
 
 // SupplySecondPassword records where the account's second password may be read
 // from. Only signing in declares it: every other command proves who it is with
 // the password, which is a different secret.
-func (c *Credentials) SupplySecondPassword(file string, stdin bool) error {
-	c.second.source.file = file
-	c.second.source.declared = true
-	if !stdin {
-		return nil
-	}
-	r, err := c.stdinOwner("--second-password-stdin")
-	if err != nil {
-		return err
-	}
-	c.second.source.stdin = r
-	return nil
+func (c *Credentials) SupplySecondPassword(file string) error {
+	return c.from(&c.second.source, "--second-password-file", file)
 }
 
 // SupplyExtraPassword records where the password protecting Pass may be read
 // from. Signing in declares it for the scope it buys, and turning it on or off
 // declares it because it is the subject.
-func (c *Credentials) SupplyExtraPassword(file string, stdin bool) error {
-	c.extra.source.file = file
-	c.extra.source.declared = true
-	if !stdin {
-		return nil
-	}
-	r, err := c.stdinOwner("--extra-password-stdin")
-	if err != nil {
-		return err
-	}
-	c.extra.source.stdin = r
-	return nil
+func (c *Credentials) SupplyExtraPassword(file string) error {
+	return c.from(&c.extra.source, "--extra-password-file", file)
 }
 
 // ExtraPasswordOffered reports whether one was named at all, which is what
@@ -360,18 +349,8 @@ func (c *Credentials) readPassword(reason string) (string, error) {
 // SupplyPreviousPassword records where the password from before a reset may be
 // read from. Only reactivating keys declares it: nothing else the account does
 // wants a password that opens nothing it has now.
-func (c *Credentials) SupplyPreviousPassword(file string, stdin bool) error {
-	c.previous.source.file = file
-	c.previous.source.declared = true
-	if !stdin {
-		return nil
-	}
-	r, err := c.stdinOwner("--previous-password-stdin")
-	if err != nil {
-		return err
-	}
-	c.previous.source.stdin = r
-	return nil
+func (c *Credentials) SupplyPreviousPassword(file string) error {
+	return c.from(&c.previous.source, "--previous-password-file", file)
 }
 
 // PreviousPassword returns the password from before the reset, asking for it if
@@ -391,18 +370,8 @@ func (c *Credentials) PreviousPassword() (string, error) {
 }
 
 // SupplyRecoveryPhrase records where the recovery phrase may be read from.
-func (c *Credentials) SupplyRecoveryPhrase(file string, stdin bool) error {
-	c.phrase.source.file = file
-	c.phrase.source.declared = true
-	if !stdin {
-		return nil
-	}
-	r, err := c.stdinOwner("--recovery-phrase-stdin")
-	if err != nil {
-		return err
-	}
-	c.phrase.source.stdin = r
-	return nil
+func (c *Credentials) SupplyRecoveryPhrase(file string) error {
+	return c.from(&c.phrase.source, "--recovery-phrase-file", file)
 }
 
 // RecoveryPhrase returns the account's recovery phrase, asking for it if there

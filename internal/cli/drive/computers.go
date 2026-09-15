@@ -35,7 +35,8 @@ func computerList(c *kit.Invocation) *kit.Lookup[drivesvc.Computer] {
 }
 
 func computersListCmd() *cobra.Command {
-	return &cobra.Command{
+	var held kit.Held[drivesvc.Computer]
+	c := &cobra.Command{
 		Use:   "list",
 		Short: "List the computers syncing to Drive",
 		Long: "List the computers syncing to Drive.\n\n" +
@@ -49,12 +50,16 @@ func computersListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return kit.List(c, ui.TableSpec[drivesvc.Computer]{
+			return held.Answer(c, ui.TableSpec[drivesvc.Computer]{
 				Noun: "computers", Columns: computerColumns(),
-				Total: ui.Unknown, Page: ui.Unpaged,
 			}, computers)
 		}),
 	}
+	held.Register(c, "computers",
+		kit.Key[drivesvc.Computer]{Name: "name", Less: func(a, b drivesvc.Computer) int { return kit.Fold(a.Name, b.Name) }},
+		kit.Key[drivesvc.Computer]{Name: "synced", Less: func(a, b drivesvc.Computer) int { return kit.Ints(a.LastSync, b.LastSync) }},
+	)
+	return c
 }
 
 func computersUpdateCmd() *cobra.Command {

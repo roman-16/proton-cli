@@ -17,7 +17,7 @@ func messagesCmd() *cobra.Command {
 	c := &cobra.Command{Use: "messages", Short: "Individual messages"}
 	c.AddCommand(
 		listCmd(), watchCmd(), getCmd(), sendCmd(), replyCmd(), forwardCmd(), exportCmd(),
-		emptyCmd(), expireCmd(), unsubscribeCmd(),
+		emptyCmd(), updateCmd(), unsubscribeCmd(),
 		moveCmd(), labelCmd(), unlabelCmd(), starCmd(), unstarCmd(), markCmd(),
 		trashCmd(), deleteCmd(), unscheduleCmd(), attachmentsCmd(),
 	)
@@ -632,46 +632,42 @@ func emptyCmd() *cobra.Command {
 
 // ── self-destructing messages ──
 
-// Expire makes messages delete themselves, or stops them.
+// Update changes a field of messages that already exist, which for a message is
+// when it deletes itself and nothing else: the rest of what a message is was
+// settled by whoever sent it.
 //
 // Proton stores the moment rather than the duration, so this takes a duration
 // and works out the moment - which is what a person means by "in a week".
-func expireCmd() *cobra.Command {
+func updateCmd() *cobra.Command {
 	var f filters
-	var in string
-	var never bool
+	var expires string
 	var reauth kit.Reauth
 	c := &cobra.Command{
-		Use:   "expire [REF...]",
-		Short: "Make messages delete themselves after a while",
-		Long: "Make messages delete themselves after a while, or stop them.\n\n" +
-			"--in takes a duration. A message already counting down reports the moment\n" +
-			"it expires rather than how long is left.",
+		Use:   "update [REF...]",
+		Short: "Change when messages delete themselves",
+		Long: "Change when messages delete themselves.\n\n" +
+			"--expires takes a duration, or never to stop them expiring. A message already\n" +
+			"counting down reports the moment it expires rather than how long is left.",
 		RunE: kit.Run([]kit.Step{
 			kit.StepSelection(f.set, filterHint, "a whole folder"), kit.StepExpand,
 			reauth.Supply,
 		}, func(c *kit.Invocation) error {
+			if expires == "" {
+				return kit.Fail("Nothing to change.").
+					Hint("--expires 7d, or --expires never to stop them expiring")
+			}
+			d, err := kit.Expires(expires)
+			if err != nil {
+				return err
+			}
 			var at int64
-			switch {
-			case never && in != "":
-				return kit.Fail("--in and --never say opposite things.").
-					Hint("pass one of them.")
-			case !never && in == "":
-				return kit.Fail("How long?").Hint("--in 7d, or --never to stop it")
-			case in != "":
-				d, err := units.ParseDuration(in)
-				if err != nil {
-					return kit.Fail("--in: %v", err)
-				}
-				at = time.Now().Add(d).Unix()
+			detail := "- they will not expire"
+			if d > 0 {
+				at, detail = time.Now().Add(d).Unix(), "in "+expires
 			}
 			sel, err := selectMessages(c, &f)
 			if err != nil {
 				return err
-			}
-			detail := "in " + in
-			if never {
-				detail = "- they will not expire"
 			}
 			return kit.Mutate(c, ui.ResultSpec{
 				Action: ui.Updated, Kind: "messages", Count: sel.Len(), IDs: sel.IDs,
@@ -681,8 +677,8 @@ func expireCmd() *cobra.Command {
 			})
 		}),
 	}
-	c.Flags().StringVar(&in, "in", "", "Delete them after DURATION (e.g. 7d, 24h)")
-	c.Flags().BoolVar(&never, "never", false, "Stop them expiring")
+	c.Flags().StringVar(&expires, "expires", "",
+		"Delete them after DURATION (e.g. 7d, 24h), or never")
 	f.register(c)
 	// Proton guards this endpoint behind an elevated session and grants that only
 	// for another SRP exchange, so the command carries what it can answer with.

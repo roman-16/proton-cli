@@ -20,7 +20,6 @@ type composeFlags struct {
 	subject      string
 	body         string
 	html         bool
-	plain        bool
 	attach       []string
 	attachInline []string
 	detach       []string
@@ -166,11 +165,8 @@ func (f *composeFlags) applyTo(c *kit.Invocation, draft *mailsvc.Draft) (mailsvc
 		}
 		out.Body = body
 	}
-	switch {
-	case c.Changed("html"):
+	if c.Changed("html") {
 		out.HTML = f.html
-	case c.Changed("plain"):
-		out.HTML = !f.plain
 	}
 	if c.Changed("from") {
 		sender, err := c.App.Mail.ResolveSender(c.Ctx, mailsvc.SenderRequest{Explicit: f.from})

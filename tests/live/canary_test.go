@@ -52,7 +52,7 @@ var collections = []struct {
 	// something makes Proton write to you when the other side answers. Only the
 	// newest are photographed - the rest is somebody's real mail and none of the
 	// suite's business.
-	{"inbox", []string{"mail", "messages", "list", "--folder", "inbox", "--page-size", "25"}, "id", []string{"subject"}},
+	{"inbox", []string{"mail", "messages", "list", "--folder", "inbox", "--limit", "25"}, "id", []string{"subject"}},
 	{"calendars", []string{"calendar", "settings", "calendars", "list"}, "id", []string{"name"}},
 	{"vaults", []string{"pass", "vaults", "list"}, "share_id", []string{"name"}},
 	{"pass items", []string{"pass", "items", "list"}, "item_id", []string{"name"}},
@@ -218,7 +218,7 @@ func sweepOnce() int {
 func sweepFrom(sender string) int {
 	body, _, code, err := runAs(account.Paid, nil, asJSON([]string{
 		"mail", "messages", "list", "--folder", "all",
-		"--from", sender, "--page-size", "50",
+		"--from", sender, "--limit", "50",
 	})...)
 	if err != nil || code != 0 {
 		return 0

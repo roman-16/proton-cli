@@ -17,42 +17,37 @@ import (
 // terminal. A phrase is asked for only when the command line says so, because
 // the prompt for one secret must never be what somebody types the other into.
 //
-// Like every secret here, the password and the phrase are read from a pipe, a
-// file or a prompt and never from a flag value: argv is readable by every user
-// on the machine through ps, and it survives in shell history and in unit files.
-// The recovery file is a path to something encrypted, which argv may carry.
+// Like every secret here, the password and the phrase arrive as a path, with `-`
+// for standard input, or from a prompt. Neither is ever a flag value: argv is
+// readable by every user on the machine through ps, and it survives in shell
+// history and in unit files. The recovery file is a path to something encrypted,
+// which argv may carry.
 type Recovery struct {
-	previousFile  string
-	previousStdin bool
-	phrase        bool
-	phraseFile    string
-	phraseStdin   bool
-	file          string
+	previousFile string
+	phrase       bool
+	phraseFile   string
+	file         string
 }
 
 // The one thing each of these says, wherever it appears.
 const (
-	PreviousPasswordFileUsage  = "Read the password from before the reset from a file"
-	PreviousPasswordStdinUsage = "Read the password from before the reset from stdin"
-	RecoveryPhraseUsage        = "Recover with the recovery phrase, asked for at the prompt"
-	RecoveryPhraseFileUsage    = "Read the recovery phrase from a file"
-	RecoveryPhraseStdinUsage   = "Read the recovery phrase from stdin"
-	RecoveryFileUsage          = "Recover with a recovery file downloaded from Proton"
+	PreviousPasswordFileUsage = "Read the password from before the reset from a file, or - for stdin"
+	RecoveryPhraseUsage       = "Recover with the recovery phrase, asked for at the prompt"
+	RecoveryPhraseFileUsage   = "Read the recovery phrase from a file, or - for stdin"
+	RecoveryFileUsage         = "Recover with a recovery file downloaded from Proton"
 )
 
 // Declare adds the flags to a command. Call Supply from its body.
 func (r *Recovery) Declare(c *cobra.Command) {
 	f := c.Flags()
 	f.StringVar(&r.previousFile, "previous-password-file", "", PreviousPasswordFileUsage)
-	f.BoolVar(&r.previousStdin, "previous-password-stdin", false, PreviousPasswordStdinUsage)
 	f.BoolVar(&r.phrase, "recovery-phrase", false, RecoveryPhraseUsage)
 	f.StringVar(&r.phraseFile, "recovery-phrase-file", "", RecoveryPhraseFileUsage)
-	f.BoolVar(&r.phraseStdin, "recovery-phrase-stdin", false, RecoveryPhraseStdinUsage)
 	f.StringVar(&r.file, "recovery-file", "", RecoveryFileUsage)
-	// One method per run, and one source per secret.
+	// One method per run.
 	methods := [][]string{
-		{"previous-password-file", "previous-password-stdin"},
-		{"recovery-phrase", "recovery-phrase-file", "recovery-phrase-stdin"},
+		{"previous-password-file"},
+		{"recovery-phrase", "recovery-phrase-file"},
 		{"recovery-file"},
 	}
 	for i, chosen := range methods {
@@ -64,28 +59,26 @@ func (r *Recovery) Declare(c *cobra.Command) {
 			}
 		}
 	}
-	c.MarkFlagsMutuallyExclusive("previous-password-file", "previous-password-stdin")
-	c.MarkFlagsMutuallyExclusive("recovery-phrase-file", "recovery-phrase-stdin")
 }
 
 // Supply hands what was given to the invocation, before anything that might ask
 // for it runs.
 func (r *Recovery) Supply(c *Invocation) error {
-	if err := c.App.Creds.SupplyPreviousPassword(r.previousFile, r.previousStdin); err != nil {
+	if err := c.App.Creds.SupplyPreviousPassword(r.previousFile); err != nil {
 		return err
 	}
-	return c.App.Creds.SupplyRecoveryPhrase(r.phraseFile, r.phraseStdin)
+	return c.App.Creds.SupplyRecoveryPhrase(r.phraseFile)
 }
 
 // Offered reports whether the secret arrived on the command line, so a command
 // can judge it before it asks Proton anything - and never prompts for one it is
 // about to refuse.
 func (r *Recovery) Offered() bool {
-	return r.previousFile != "" || r.previousStdin || r.phraseFile != "" || r.phraseStdin || r.file != ""
+	return r.previousFile != "" || r.phraseFile != "" || r.file != ""
 }
 
 // UsesPhrase reports whether the recovery phrase is the method chosen.
-func (r *Recovery) UsesPhrase() bool { return r.phrase || r.phraseFile != "" || r.phraseStdin }
+func (r *Recovery) UsesPhrase() bool { return r.phrase || r.phraseFile != "" }
 
 // UsesFile reports whether a recovery file is the method chosen.
 func (r *Recovery) UsesFile() bool { return r.file != "" }

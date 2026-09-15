@@ -109,7 +109,7 @@ func (s *Service) AliasSetEnabled(ctx context.Context, shareID, itemID string, e
 // AliasPatch is what an alias edit changes about the route.
 type AliasPatch struct {
 	// Mailboxes are the addresses mail to the alias should arrive in, named as
-	// `aliases options` lists them.
+	// `settings domains list` lists them.
 	Mailboxes []string
 	// DisplayName is the name recipients see on mail sent from the alias.
 	DisplayName string
@@ -179,9 +179,9 @@ func (s *Service) AliasOptions(ctx context.Context, shareID string) ([]AliasSuff
 
 // AliasPlan is the address an alias will have, worked out before it is made.
 //
-// Proton decides the tail: `aliases options` offers suffixes it invents on the
-// spot, each signed, and whichever gets used must be sent back with the
-// signature it came with. So the address is knowable in advance, but only by
+// Proton decides the tail: the suffixes it offers are invented on the spot,
+// each signed, and whichever gets used must be sent back with the signature it
+// came with. So the address is knowable in advance, but only by
 // asking - which is also what makes a suffix nobody offered a refusal that
 // arrives before anything exists.
 type AliasPlan struct {

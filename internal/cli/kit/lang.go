@@ -27,7 +27,9 @@ const Docs = "https://" + Alias + ".lerchster.dev"
 
 // Verbs is every word that may end a command path.
 //
-// Each entry is the one word for its idea. Where two words competed, the winner
+// Each entry is the one word for its idea, and each is spoken: a word kept here
+// after the command that said it is gone describes a CLI that no longer exists,
+// and the next reader trusts it anyway. Where two words competed, the winner
 // is the one Proton's own interface uses; where Proton has no word, the winner is
 // the one that reads as ordinary English.
 var Verbs = map[string]string{
@@ -78,8 +80,6 @@ var Verbs = map[string]string{
 
 	// Sharing
 	"transfer":    "hand ownership to somebody else",
-	"link":        "create a public link",
-	"unlink":      "remove a public link",
 	"add":         "put a member into a container",
 	"remove":      "take a member out of a container",
 	"confirm":     "hand the key to somebody invited before they had a Proton account",
@@ -90,8 +90,6 @@ var Verbs = map[string]string{
 	"block":       "send a sender's mail straight to blocked",
 	"allow":       "always let a sender reach the inbox",
 	"spam":        "send a sender's mail straight to spam",
-	"forget":      "drop a standing decision",
-	"expire":      "make something delete itself later",
 	"unsubscribe": "ask a mailing list to stop",
 	"apply":       "run existing rules over what is already here",
 	"reorder":     "set the order things are kept in",
@@ -119,9 +117,6 @@ var Verbs = map[string]string{
 	"login":  "authenticate and save a session",
 	"logout": "discard a saved session",
 	"revoke": "invalidate a session server-side",
-
-	// Reference data
-	"options": "list the values a choice offers",
 
 	// The tool itself
 	"changelog":  "print what each release changed",
@@ -193,11 +188,11 @@ var Mutating = map[string]bool{
 	"send": true, "reply": true, "forward": true, "unschedule": true,
 	"legitimate": true, "phishing": true,
 	"read": true, "unread": true, "label": true, "unlabel": true, "star": true,
-	"unstar": true, "enable": true, "disable": true, "link": true,
-	"unlink": true, "add": true, "remove": true, "confirm": true,
+	"unstar": true, "enable": true, "disable": true,
+	"add": true, "remove": true, "confirm": true,
 	"leave": true, "accept": true,
 	"decline": true, "resend": true, "block": true, "allow": true,
-	"spam": true, "forget": true, "expire": true, "unsubscribe": true,
+	"spam": true, "unsubscribe": true,
 	"snooze": true, "unsnooze": true, "apply": true, "reorder": true, "favorite": true, "unfavorite": true, "pin": true,
 	"unpin": true, "reactivate": true, "respond": true, "login": true, "logout": true,
 	"revoke": true, "uninstall": true, "transfer": true,

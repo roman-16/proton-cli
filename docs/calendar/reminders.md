@@ -20,15 +20,17 @@ proton calendar reminders list
 
 ```bash
 proton calendar reminders list
-proton calendar reminders list --start 2026-04-20 --end 2026-04-21
+proton calendar reminders list --after 2026-04-20 --before 2026-04-21
 proton calendar reminders list --calendar Work --output json
 ```
 
 | Flag | Description |
 | --- | --- |
+| `--after string` | First day to include (YYYY-MM-DD) |
+| `--before string` | Last day to include (YYYY-MM-DD) |
 | `--calendar string` | Which calendar, by name or ID (default: all of them) |
-| `--end string` | Last day to include (YYYY-MM-DD) |
-| `--start string` | First day to include (YYYY-MM-DD) |
+| `--limit int` | How many reminders per page; 0 for all of them |
+| `--page int` | Which page of results, counting from zero |
 
 ## `watch`
 

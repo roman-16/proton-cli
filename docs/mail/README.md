@@ -61,6 +61,8 @@ proton mail messages list --subject "Q1 report" --folder archive
 
 `--from` and `--to` match addresses. `--keyword` also matches display names and body text.
 
+`--after` and `--before` are the first and last whole days to include, read in your own zone, and both are included.
+
 A change reaches `list` a few seconds late. To confirm one right away, `get` the ID the command printed.
 
 ## Send
@@ -91,12 +93,12 @@ proton mail messages send --from work@example.com --to alice@proton.me --subject
 proton mail messages send … --send-at 2026-05-01T09:00     # local time; confirms the resolved time
 proton mail messages send … --expires 7d
 proton mail messages send … --eo-password-file /run/secrets/jane --eo-password-hint "our usual"
-pass show mail/jane | proton mail messages send … --eo-password-stdin
+pass show mail/jane | proton mail messages send … --eo-password-file -
 ```
 
 The password a recipient outside Proton types comes from a file or from standard input, never from a flag value. It needs at least eight characters.
 
-Such a message expires after 28 days whatever `--expires` says. `--eo-password-stdin` takes the stream for itself, so it cannot be combined with `--body -`.
+Such a message expires after 28 days whatever `--expires` says. `--eo-password-file -` takes the stream for itself, so it cannot be combined with `--body -`.
 
 A scheduled send sits in the `scheduled` folder until it goes. To pull it back to Drafts, run `proton mail messages unschedule REF`.
 
@@ -153,13 +155,14 @@ proton mail messages move --into archive --from newsletter@example.com --older-t
 proton mail messages delete --folder spam --all
 ```
 
-Add `--dry-run` to see the list first. `--limit` defaults to 150, which is Proton's per-page cap. See [Filters and bulk changes](../using/filters.md).
+Add `--dry-run` to see the list first. `--limit` caps how many a verb touches and defaults to 150. See [Filters and bulk changes](../using/filters.md).
 
 **`empty` is not `delete --all`.** A filtered delete shows what it will touch. `empty` clears the folder whole, takes no filter, and always asks.
 
 ```bash
 proton mail messages empty --folder trash
-proton mail messages expire REF --in 7d        # delete itself later; --never stops it
+proton mail messages update REF --expires 7d   # delete itself later
+proton mail messages update REF --expires never
 proton mail messages unsubscribe REF           # ask a mailing list to stop
 ```
 
@@ -257,7 +260,7 @@ Server-side filters. Describe one with `--if`; it is stored as [Sieve](https://e
 
 ```bash
 proton mail settings filters create --name "Archive invoices" \
-  --if "subject contains invoice" --move-to Archive
+  --if "subject contains invoice" --into Archive
 
 proton mail settings filters create --name Receipts \
   --if "sender contains billing@" --if "subject not contains draft" \
@@ -278,7 +281,7 @@ A condition reads `FIELD [not] COMPARATOR VALUE`:
 
 Every condition has to hold unless you pass `--match any`.
 
-Actions are `--move-to` (one folder), `--label` (repeatable), `--mark-read` and `--star`. A filter needs at least one. Every filter skips mail Proton has already called spam.
+Actions are `--into` (one folder), `--label` (repeatable), `--mark-read` and `--star`. A filter needs at least one. Every filter skips mail Proton has already called spam.
 
 `update` rewrites the rule in place and replaces the whole thing rather than adding to it. The filter keeps its place in the order and stays enabled or disabled as it was, which is what makes this different from deleting it and making a new one.
 
@@ -288,17 +291,17 @@ A filter acts once, as mail arrives, so a rule written today does nothing about 
 
 ```bash
 proton mail settings filters apply                       # every enabled filter
-proton mail settings filters reorder Newsletters Receipts Archive
+proton mail settings filters reorder Receipts            # run this one first
 ```
 
-Order decides the outcome: the first rule to file a message wins. `reorder` replaces the **whole** order and refuses a partial one.
+Order decides the outcome: the first rule to file a message wins. `reorder` moves the filters you name to the front and leaves the rest in the order they are in.
 
 ## Auto-reply
 
 ```bash
 proton mail settings autoreply set --repeat fixed \
   --start 2026-07-01T09:00 --end 2026-07-14T18:00 \
-  --message "I'm away until the 14th."
+  --body "I'm away until the 14th."
 proton mail settings autoreply disable
 ```
 
@@ -327,10 +330,10 @@ proton mail settings senders list
 proton mail settings senders block spammer@example.com
 proton mail settings senders block @example.com          # a whole domain
 proton mail settings senders allow billing@example.com
-proton mail settings senders forget billing@example.com
+proton mail settings senders remove billing@example.com
 ```
 
-A decision applies before the spam filter forms an opinion. Deciding again about the same sender replaces the earlier decision. `forget` lets the filter decide again.
+A decision applies before the spam filter forms an opinion. Deciding again about the same sender replaces the earlier decision. `remove` lets the filter decide again.
 
 ## Forward one of your addresses
 
@@ -344,7 +347,7 @@ Setting one up needs a paid Mail plan. Nothing is forwarded until the other side
 
 Forwarding to an address outside Proton turns off end-to-end encryption for your address. It comes back on when the last such forwarding from that address is deleted. `proton mail settings addresses get me@proton.me` shows whether it is on.
 
-**Setting up that kind asks for your password**, and so does the `delete` that turns encryption back on. With no terminal, pass `--password-file` or `--password-stdin`. The other commands that do this are listed in [Account](../account/README.md#commands-that-ask-for-the-password-again).
+**Setting up that kind asks for your password**, and so does the `delete` that turns encryption back on. With no terminal, pass `--password-file`, which takes `-` for standard input. The other commands that do this are listed in [Account](../account/README.md#commands-that-ask-for-the-password-again).
 
 ## Change or stop a forwarding you set up
 
@@ -377,7 +380,7 @@ proton mail settings domains list
 
 Adding a domain needs a paid Mail plan, and how many you may have depends on it. Without one, every command here says so.
 
-**Changing a domain asks for your password**, even when you are signed in. That is `create`, `update` and `delete`. With no terminal, pass `--password-file` or `--password-stdin`. The other commands that do this are listed in [Account](../account/README.md#commands-that-ask-for-the-password-again).
+**Changing a domain asks for your password**, even when you are signed in. That is `create`, `update` and `delete`. With no terminal, pass `--password-file`, which takes `-` for standard input. The other commands that do this are listed in [Account](../account/README.md#commands-that-ask-for-the-password-again).
 
 `get` shows every DNS entry the domain needs and re-checks your DNS each time it runs. Add the entries at your registrar, then run it again. Each check reads `ok`, or what Proton found instead: `missing`, `wrong`, `duplicate`, `wrong-priority`, `backup`, `error`, `warning`, `delegated` or `relaxed`.
 
@@ -399,10 +402,10 @@ No address can be added on the domain until Proton has seen the verification ent
 
 ```bash
 proton mail settings domains update example.com --catch-all work@example.com
-proton mail settings domains update example.com --clear-catch-all
+proton mail settings domains update example.com --catch-all none
 ```
 
-Mail sent to a name your domain has not got arrives at the catch-all address instead of being refused. `--catch-all` takes one of your addresses on that domain. One address catches at a time, so naming another moves it.
+Mail sent to a name your domain has not got arrives at the catch-all address instead of being refused. `--catch-all` takes one of your addresses on that domain, or `none` to refuse such mail again. One address catches at a time, so naming another moves it.
 
 ## Remove a custom domain
 

@@ -34,9 +34,9 @@ type filters struct {
 	before         string
 	age            kit.Range
 	all            bool
-	// page is where in the result to read. A listing spells it --page and
-	// --page-size; a verb that acts on what a filter found spells the width
-	// --limit, because a cap on a bulk change is its first page.
+	// page is where in the result to read. A listing pairs --limit with --page; a
+	// verb that acts on what a filter found takes --limit alone, because a cap on
+	// a bulk change is its first page.
 	page kit.Page
 }
 
@@ -56,8 +56,8 @@ func (f *filters) registerNarrowing(c *cobra.Command, folder string) {
 	fl.StringVar(&f.to, "to", "", "Match a recipient's address")
 	fl.StringVar(&f.subject, "subject", "", "Match text in the subject")
 	fl.StringVar(&f.keyword, "keyword", "", "Match text anywhere, including display names and bodies")
-	fl.StringVar(&f.after, "after", "", "Match messages after this date (YYYY-MM-DD)")
-	fl.StringVar(&f.before, "before", "", "Match messages before this date (YYYY-MM-DD)")
+	fl.StringVar(&f.after, "after", "", "First day to include (YYYY-MM-DD)")
+	fl.StringVar(&f.before, "before", "", "Last day to include (YYYY-MM-DD)")
 	f.age.Register(fl, "messages")
 	registerFolder(c, &f.folder, "", folder)
 }

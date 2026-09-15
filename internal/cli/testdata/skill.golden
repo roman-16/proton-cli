@@ -33,27 +33,56 @@ The last word is the verb and a group never acts, so `proton mail messages list`
 
 ## Reading
 
-A listing is one JSON object keyed by its plural name, always with `count`; a paged one also carries `total`, `page`, `page_size` and `has_more`. `total` counts the whole collection whatever the page holds, so counting never needs a second page. `--page-size 0` returns every row in one answer, for when they are all needed; otherwise narrowing the listing costs less than walking it.
+A listing is one JSON object keyed by its plural name, always with `count`; a paged one also carries `total`, `page`, `page_size` and `has_more`. `total` counts the whole collection whatever the page holds, so counting never needs a second page. `--limit 0` returns every row in one answer, for when they are all needed; otherwise narrowing the listing costs less than walking it.
 
-An all-day event's `end` is the midnight after its last day (`all_day` marks one). The last day it occupies is the day before `end`, and `--end` takes that day, not that timestamp.
+An all-day event's `end` is the midnight after its last day (`all_day` marks one). The last day it occupies is the day before `end`, and `--before` takes that day, not that timestamp.
 
 These are the listings that can be narrowed, and what narrows them. The same flags choose what a bulk verb in that collection acts on, so a selection can be worked out on `list` and then handed to `trash`, `move`, `label` or `export`. Everything else a command takes is in its `--help`.
 
-- `proton calendar events list --calendar string --end string --start string`
-- `proton calendar reminders list --calendar string --end string --start string`
-- `proton contacts list --desc --keyword string --page int --page-size int --sort string`
-- `proton drive items list [PATH] --computer string --desc --larger-than string --link string --link-password-file string --link-password-stdin --newer-than string --older-than string --page int --page-size int --pattern string --recursive --shared string --smaller-than string --sort string`
+- `proton calendar events list --after string --before string --calendar string --limit int --page int`
+- `proton calendar invitations list --desc --limit int --page int --sort string`
+- `proton calendar reminders list --after string --before string --calendar string --limit int --page int`
+- `proton calendar settings calendars list --desc --limit int --page int --sort string`
+- `proton contacts groups list --desc --limit int --page int --sort string`
+- `proton contacts list --desc --keyword string --limit int --page int --sort string`
+- `proton drive computers list --desc --limit int --page int --sort string`
+- `proton drive invitations list --desc --limit int --page int --sort string`
+- `proton drive items list [PATH] --computer string --desc --larger-than string --limit int --link string --link-password-file string --newer-than string --older-than string --page int --pattern string --recursive --shared string --smaller-than string --sort string`
 - `proton drive items revisions list PATH --computer string --shared string`
-- `proton drive photos list --album string --tag string`
-- `proton drive trash list --desc --page int --page-size int --sort string`
+- `proton drive links list --desc --limit int --page int --sort string`
+- `proton drive photos albums list --desc --limit int --page int --sort string`
+- `proton drive photos list --album string --desc --limit int --page int --sort string --tag string`
+- `proton drive shared list --desc --limit int --page int --sort string`
+- `proton drive sharing list --desc --limit int --page int --sort string`
+- `proton drive trash list --desc --limit int --page int --sort string`
+- `proton drive volumes list --desc --limit int --page int --sort string`
 - `proton mail conversations attachments list REF --include-inline`
-- `proton mail conversations list --after string --before string --folder string --from string --keyword string --newer-than string --older-than string --page int --page-size int --starred --subject string --to string --unread`
-- `proton mail drafts list --page int --page-size int`
+- `proton mail conversations list --after string --before string --folder string --from string --keyword string --limit int --newer-than string --older-than string --page int --starred --subject string --to string --unread`
+- `proton mail drafts list --limit int --page int`
 - `proton mail messages attachments list REF --include-inline`
-- `proton mail messages list --after string --before string --folder string --from string --keyword string --newer-than string --older-than string --page int --page-size int --starred --subject string --to string --unread`
-- `proton pass aliases list --vault string`
+- `proton mail messages list --after string --before string --folder string --from string --keyword string --limit int --newer-than string --older-than string --page int --starred --subject string --to string --unread`
+- `proton mail settings addresses list --limit int --page int`
+- `proton mail settings domains list --desc --limit int --page int --sort string`
+- `proton mail settings filters list --limit int --page int`
+- `proton mail settings folders list --limit int --page int`
+- `proton mail settings forwarding list --desc --limit int --page int --sort string`
+- `proton mail settings labels list --limit int --page int`
+- `proton mail settings senders list --desc --limit int --page int --sort string`
+- `proton pass aliases contacts list REF --desc --limit int --page int --sort string`
+- `proton pass aliases list --desc --limit int --page int --sort string --vault string`
+- `proton pass breaches list --desc --limit int --page int --sort string`
+- `proton pass invitations list --desc --limit int --page int --sort string`
 - `proton pass items attachments list REF --removed`
-- `proton pass items list --desc --newer-than string --older-than string --page int --page-size int --risk string --sort string --type string --vault string`
+- `proton pass items list --desc --limit int --newer-than string --older-than string --page int --risk string --sort string --type string --vault string`
+- `proton pass links list --desc --limit int --page int --sort string`
+- `proton pass settings domains list --desc --limit int --page int --sort string`
+- `proton pass settings mailboxes list --desc --limit int --page int --sort string`
+- `proton pass shared list --desc --limit int --page int --sort string`
+- `proton pass sharing list --desc --limit int --page int --sort string`
+- `proton pass trash list --desc --limit int --page int --sort string`
+- `proton pass vaults list --desc --limit int --page int --sort string`
+- `proton account profiles list --desc --limit int --page int --sort string`
+- `proton account sessions list --desc --limit int --page int --sort string`
 
 Mail looks in the inbox unless told otherwise, and `--folder all` is what a question about "my mail" usually means.
 
@@ -67,7 +96,7 @@ proton mail messages list --keyword invoice --folder all --output json
 proton mail messages list --from billing@example.com --after 2026-01-01 --folder all --output json
 proton mail messages get 5bH2mQxK --output json
 proton drive items list /Documents --output json
-proton calendar events list --start 2026-04-16 --end 2026-04-23 --output json
+proton calendar events list --after 2026-04-16 --before 2026-04-23 --output json
 proton contacts get jane@example.com --output json
 proton pass items totp github.com
 ```
@@ -93,7 +122,7 @@ A bulk verb acts on at most `--limit` things, 150 by default; `--limit 0` lifts 
 
 `proton pass items get` and `proton pass items totp` print secrets in full.
 
-Secrets go in the same way they come out. `pass items create` and `pass items update` read them from `--secret-stdin NAME` or `--secret-file NAME=FILE`, never from a flag value, because a flag value is in the shell history.
+Secrets go in the same way they come out. `pass items create` and `pass items update` read them from `--secret-file NAME=FILE`, never from a flag value, because a flag value is in the shell history; `-` as the file reads standard input.
 
 ## Exit codes
 
@@ -122,7 +151,7 @@ One line per group, with the verbs under it. Arguments, flags and examples are i
 - `proton calendar reminders` - The notifications your events will raise: list, watch
 - `proton calendar settings` - How Calendar behaves: get, list, set
 - `proton calendar settings calendars` - The calendars you keep events in: create, delete, get, list, update
-- `proton calendar settings calendars share` - Who else can see a calendar: add, list, remove
+- `proton calendar settings calendars share` - Who else can see a calendar: add, get, remove, update
 
 ### contacts - Contacts, their groups and their pinned keys
 
@@ -136,7 +165,8 @@ One line per group, with the verbs under it. Arguments, flags and examples are i
 - `proton drive invitations` - Shares other people have offered you: accept, decline, list
 - `proton drive items` - Files and folders: copy, create, delete, download, get, list, move, trash, update, upload
 - `proton drive items revisions` - Earlier versions of a file: delete, download, list, restore
-- `proton drive items share` - Public links and the people you share with: add, confirm, get, link, remove, resend, unlink, update
+- `proton drive items share` - The people you share a file or folder with: add, confirm, get, remove, resend, update
+- `proton drive links` - Links that open a file or folder for anyone: create, get, list, revoke
 - `proton drive photos` - Your photo library: delete, download, favorite, list, trash, unfavorite, upload
 - `proton drive photos albums` - Photo albums: add, create, delete, list, remove, update
 - `proton drive settings` - How Drive behaves: get, list, set
@@ -151,7 +181,7 @@ One line per group, with the verbs under it. Arguments, flags and examples are i
 - `proton mail conversations attachments` - Files attached anywhere in a thread: download, list
 - `proton mail conversations mark` - Set whether threads count as read: read, unread
 - `proton mail drafts` - Messages not yet sent: create, delete, list, send, update
-- `proton mail messages` - Individual messages: delete, empty, expire, export, forward, get, label, list, move, reply, send, star, trash, unlabel, unschedule, unstar, unsubscribe, watch
+- `proton mail messages` - Individual messages: delete, empty, export, forward, get, label, list, move, reply, send, star, trash, unlabel, unschedule, unstar, unsubscribe, update, watch
 - `proton mail messages attachments` - Files attached to a message: download, list
 - `proton mail messages mark` - Set what messages count as: legitimate, phishing, read, unread
 - `proton mail settings` - How Mail behaves: get, list, set
@@ -162,12 +192,12 @@ One line per group, with the verbs under it. Arguments, flags and examples are i
 - `proton mail settings folders` - Folders, which a message lives in: create, delete, list, update
 - `proton mail settings forwarding` - Mail forwarded to and from your addresses: accept, create, decline, delete, disable, enable, get, list, resend
 - `proton mail settings labels` - Labels, which a message carries: create, delete, list, update
-- `proton mail settings senders` - Who always reaches the inbox, and who never does: allow, block, forget, list, spam
+- `proton mail settings senders` - Who always reaches the inbox, and who never does: allow, block, list, remove, spam
 
 ### pass - Vaults, logins and secrets
 
 - `proton pass` - export, generate, import
-- `proton pass aliases` - Hide-my-email addresses that forward to you: create, disable, enable, list, options
+- `proton pass aliases` - Hide-my-email addresses that forward to you: create, disable, enable, list
 - `proton pass aliases contacts` - Addresses an alias can write to: allow, block, create, delete, list
 - `proton pass breaches` - Addresses that have appeared in a data breach: create, delete, disable, enable, get, list, resend, verify
 - `proton pass invitations` - What other people have offered you: accept, decline, list

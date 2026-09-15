@@ -132,8 +132,8 @@ proton contacts list --output json
 | --- | --- |
 | `--desc` | Reverse the order |
 | `--keyword string` | Match text in the name or the address |
+| `--limit int` | How many contacts per page; 0 for all of them (default `50`) |
 | `--page int` | Which page of results, counting from zero |
-| `--page-size int` | How many contacts per page; 0 for all of them (default `50`) |
 | `--sort string` | Order by: name, email (default `name`) |
 
 ## `merge`

@@ -69,6 +69,13 @@ proton drive photos albums list
 proton drive photos albums list
 ```
 
+| Flag | Description |
+| --- | --- |
+| `--desc` | Reverse the order |
+| `--limit int` | How many albums per page; 0 for all of them |
+| `--page int` | Which page of results, counting from zero |
+| `--sort string` | Order by: name, photos (default `name`) |
+
 ### `albums remove`
 
 Take photos out of an album.
@@ -83,7 +90,9 @@ proton drive photos albums remove Holidays 5bH2mQxK
 
 ### `albums update`
 
-Change an album's cover.
+Rename an album, or change its cover.
+
+A cover has to be a photo the album holds. Anything you do not mention is left alone.
 
 ```
 proton drive photos albums update REF
@@ -96,6 +105,7 @@ proton drive photos albums update Holidays --cover 5bH2mQxK
 | Flag | Description |
 | --- | --- |
 | `--cover string` | Which of the album's photos represents it |
+| `--name string` | New name for the album |
 
 ## `delete`
 
@@ -155,7 +165,11 @@ proton drive photos list --tag favorites
 
 | Flag | Description |
 | --- | --- |
-| `--album string` | Show only what is in this album, by ID |
+| `--album string` | Show only what is in this album, by name or ID |
+| `--desc` | Reverse the order |
+| `--limit int` | How many photos per page; 0 for all of them |
+| `--page int` | Which page of results, counting from zero |
+| `--sort string` | Order by: captured (default `captured`) |
 | `--tag string` | Show only photos with this tag: favorites, screenshots, videos, live-photos, motion-photos, selfies, portraits, bursts, panoramas, raw |
 
 ## `trash`

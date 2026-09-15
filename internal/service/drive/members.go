@@ -311,7 +311,7 @@ func outsideRefused(err error) error {
 	var api *proton.APIError
 	if errors.As(err, &api) && api.Code == featureDisabled {
 		return errs.Problemf("Proton has turned off invitations to addresses outside Proton.").
-			Hint("`proton drive items share link PATH` shares it by public link instead",
+			Hint("`proton drive links create PATH` shares it by public link instead",
 				"this is temporary - try the invitation again later").
 			Exit(4)
 	}

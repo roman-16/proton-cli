@@ -14,7 +14,7 @@ func TestEveryCollectionCanBeReadAndReconciled(t *testing.T) {
 		if c.What == "" {
 			t.Errorf("%s: no noun to report it by", where)
 		}
-		if !slices.Contains(c.List, "list") && !slices.Contains(c.List, "options") {
+		if !slices.Contains(c.List, "list") {
 			t.Errorf("%s: List is not a listing", where)
 		}
 		if c.Key == "" {

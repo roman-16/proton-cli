@@ -24,7 +24,7 @@ Your short-domain address is your username at pm.me. It takes the signature of y
 
 The address sends and receives as soon as it exists. An account that creates post-quantum keys is refused: add the address in a Proton client.
 
-Asks for your password even when you are signed in. With no terminal to ask, pass --password-file or --password-stdin.
+Asks for your password even when you are signed in. With no terminal to ask, pass --password-file, which takes - for stdin.
 
 ```
 proton mail settings addresses create EMAIL
@@ -39,8 +39,7 @@ proton mail settings addresses create alice@pm.me
 | Flag | Description |
 | --- | --- |
 | `--display-name string` | Name recipients see next to the address |
-| `--password-file string` | Read the account password from a file |
-| `--password-stdin` | Read the account password from stdin |
+| `--password-file string` | Read the account password from a file, or - for stdin |
 | `--totp string` | Two-factor code |
 
 ### `addresses delete`
@@ -51,7 +50,7 @@ REF is an address of yours. Proton allows one address deletion a year unless the
 
 A deleted address cannot be used again, by you or by anybody else.
 
-Asks for your password even when you are signed in. With no terminal to ask, pass --password-file or --password-stdin.
+Asks for your password even when you are signed in. With no terminal to ask, pass --password-file, which takes - for stdin.
 
 ```
 proton mail settings addresses delete REF...
@@ -63,8 +62,7 @@ proton mail settings addresses delete work@example.com
 
 | Flag | Description |
 | --- | --- |
-| `--password-file string` | Read the account password from a file |
-| `--password-stdin` | Read the account password from stdin |
+| `--password-file string` | Read the account password from a file, or - for stdin |
 | `--totp string` | Two-factor code |
 
 ### `addresses disable`
@@ -73,7 +71,7 @@ Stop an address sending and receiving.
 
 REF is an address of yours that is enabled. Everything it already holds stays, and enabling it again needs nothing else.
 
-Asks for your password even when you are signed in. With no terminal to ask, pass --password-file or --password-stdin.
+Asks for your password even when you are signed in. With no terminal to ask, pass --password-file, which takes - for stdin.
 
 ```
 proton mail settings addresses disable REF...
@@ -85,8 +83,7 @@ proton mail settings addresses disable work@example.com
 
 | Flag | Description |
 | --- | --- |
-| `--password-file string` | Read the account password from a file |
-| `--password-stdin` | Read the account password from stdin |
+| `--password-file string` | Read the account password from a file, or - for stdin |
 | `--totp string` | Two-factor code |
 
 ### `addresses enable`
@@ -95,7 +92,7 @@ Let a disabled address send and receive again.
 
 REF is an address of yours that is disabled.
 
-Asks for your password even when you are signed in. With no terminal to ask, pass --password-file or --password-stdin.
+Asks for your password even when you are signed in. With no terminal to ask, pass --password-file, which takes - for stdin.
 
 ```
 proton mail settings addresses enable REF...
@@ -107,8 +104,7 @@ proton mail settings addresses enable work@example.com
 
 | Flag | Description |
 | --- | --- |
-| `--password-file string` | Read the account password from a file |
-| `--password-stdin` | Read the account password from stdin |
+| `--password-file string` | Read the account password from a file, or - for stdin |
 | `--totp string` | Two-factor code |
 
 ### `addresses get`
@@ -134,6 +130,11 @@ proton mail settings addresses list
 ```bash
 proton mail settings addresses list
 ```
+
+| Flag | Description |
+| --- | --- |
+| `--limit int` | How many addresses per page; 0 for all of them |
+| `--page int` | Which page of results, counting from zero |
 
 ### `addresses reorder`
 
@@ -195,8 +196,7 @@ proton mail settings autoreply disable
 
 | Flag | Description |
 | --- | --- |
-| `--password-file string` | Read the account password from a file |
-| `--password-stdin` | Read the account password from stdin |
+| `--password-file string` | Read the account password from a file, or - for stdin |
 | `--totp string` | Two-factor code |
 
 ### `autoreply enable`
@@ -213,8 +213,7 @@ proton mail settings autoreply enable
 
 | Flag | Description |
 | --- | --- |
-| `--password-file string` | Read the account password from a file |
-| `--password-stdin` | Read the account password from stdin |
+| `--password-file string` | Read the account password from a file, or - for stdin |
 | `--totp string` | Two-factor code |
 
 ### `autoreply get`
@@ -242,18 +241,17 @@ proton mail settings autoreply set
 ```
 
 ```bash
-proton mail settings autoreply set --repeat permanent --message 'Away until Monday.'
-proton mail settings autoreply set --message 'On holiday.' --start 2026-07-01T09:00 --end 2026-07-14T17:00
+proton mail settings autoreply set --repeat permanent --body 'Away until Monday.'
+proton mail settings autoreply set --body 'On holiday.' --start 2026-07-01T09:00 --end 2026-07-14T17:00
 ```
 
 | Flag | Description |
 | --- | --- |
+| `--body string` | The reply to send (- reads stdin) |
 | `--days stringSlice` | Days it is active, for a daily schedule, e.g. mon,tue,wed |
 | `--end string` | End of the window (grammar depends on --repeat) |
-| `--html` | Treat the message as HTML rather than escaping it |
-| `--message string` | Reply body (- reads stdin) |
-| `--password-file string` | Read the account password from a file |
-| `--password-stdin` | Read the account password from stdin |
+| `--html` | Treat the body as HTML rather than escaping it |
+| `--password-file string` | Read the account password from a file, or - for stdin |
 | `--repeat string` | How the schedule repeats: fixed, daily, weekly, monthly, permanent (default `fixed`) |
 | `--start string` | Start of the window (grammar depends on --repeat) |
 | `--totp string` | Two-factor code |
@@ -276,7 +274,7 @@ DOMAIN is a domain you own, written as example.com. Adding one needs a paid Mail
 
 The domain carries no mail until its verification entry is in your DNS, and no address can be added on it until Proton has seen that entry. `get` shows every entry the domain needs.
 
-Asks for your password even when you are signed in. With no terminal to ask, pass --password-file or --password-stdin.
+Asks for your password even when you are signed in. With no terminal to ask, pass --password-file, which takes - for stdin.
 
 ```
 proton mail settings domains create DOMAIN
@@ -288,8 +286,7 @@ proton mail settings domains create example.com
 
 | Flag | Description |
 | --- | --- |
-| `--password-file string` | Read the account password from a file |
-| `--password-stdin` | Read the account password from stdin |
+| `--password-file string` | Read the account password from a file, or - for stdin |
 | `--totp string` | Two-factor code |
 
 ### `domains delete`
@@ -298,7 +295,7 @@ Remove a custom domain.
 
 Every address on the domain stops sending and receiving, and the mail they hold stays. Adding the domain again needs its DNS entries verified from scratch.
 
-Asks for your password even when you are signed in. With no terminal to ask, pass --password-file or --password-stdin.
+Asks for your password even when you are signed in. With no terminal to ask, pass --password-file, which takes - for stdin.
 
 ```
 proton mail settings domains delete REF
@@ -310,8 +307,7 @@ proton mail settings domains delete example.com
 
 | Flag | Description |
 | --- | --- |
-| `--password-file string` | Read the account password from a file |
-| `--password-stdin` | Read the account password from stdin |
+| `--password-file string` | Read the account password from a file, or - for stdin |
 | `--totp string` | Two-factor code |
 
 ### `domains get`
@@ -344,15 +340,22 @@ proton mail settings domains list
 proton mail settings domains list
 ```
 
+| Flag | Description |
+| --- | --- |
+| `--desc` | Reverse the order |
+| `--limit int` | How many domains per page; 0 for all of them |
+| `--page int` | Which page of results, counting from zero |
+| `--sort string` | Order by: domain (default `domain`) |
+
 ### `domains update`
 
 Set the address that catches stray mail.
 
 Mail sent to a name that does not exist at the domain arrives at the catch-all address instead of being refused.
 
---catch-all takes one of your addresses on that domain. One address catches at a time, so naming another moves it. --clear-catch-all turns it off.
+--catch-all takes one of your addresses on that domain. One address catches at a time, so naming another moves it, and `--catch-all none` turns it off.
 
-Asks for your password even when you are signed in. With no terminal to ask, pass --password-file or --password-stdin.
+Asks for your password even when you are signed in. With no terminal to ask, pass --password-file, which takes - for stdin.
 
 ```
 proton mail settings domains update REF
@@ -360,15 +363,13 @@ proton mail settings domains update REF
 
 ```bash
 proton mail settings domains update example.com --catch-all work@example.com
-proton mail settings domains update example.com --clear-catch-all
+proton mail settings domains update example.com --catch-all none
 ```
 
 | Flag | Description |
 | --- | --- |
-| `--catch-all string` | Address that takes mail sent to a name the domain has not got |
-| `--clear-catch-all` | Refuse mail sent to a name the domain has not got |
-| `--password-file string` | Read the account password from a file |
-| `--password-stdin` | Read the account password from stdin |
+| `--catch-all string` | Address that takes mail sent to a name the domain has not got, or none |
+| `--password-file string` | Read the account password from a file, or - for stdin |
 | `--totp string` | Two-factor code |
 
 ## `filters`
@@ -420,10 +421,10 @@ proton mail settings filters create --name Big --sieve ./big.sieve
 | --- | --- |
 | `--disabled` | Create it without turning it on |
 | `--if stringArray` | A condition matching mail must meet, as FIELD [not] COMPARATOR VALUE (repeatable) |
+| `--into string` | Move matching mail into this folder (archive, inbox, spam, trash, or one of yours) |
 | `--label stringArray` | Apply this label to matching mail (repeatable) |
 | `--mark-read` | Mark matching mail as read |
 | `--match string` | Whether every condition must hold, or any one of them: all, any (default `all`) |
-| `--move-to string` | Move matching mail into this folder (archive, inbox, spam, trash, or one of yours) |
 | `--name string` | Name for the new filter |
 | `--sieve string` | Sieve script (- reads stdin) |
 | `--star` | Star matching mail |
@@ -488,18 +489,23 @@ proton mail settings filters list
 proton mail settings filters list
 ```
 
+| Flag | Description |
+| --- | --- |
+| `--limit int` | How many filters per page; 0 for all of them |
+| `--page int` | Which page of results, counting from zero |
+
 ### `filters reorder`
 
 Set the order filters run in.
 
-The first rule to file a message wins, so the order decides where mail lands. Name every filter, in the order you want them. This replaces the whole order; a partial one is refused.
+The first rule to file a message wins, so the order decides where mail lands. Name the filters that should run first, in order; the rest keep the order they are in.
 
 ```
-proton mail settings filters reorder REF REF...
+proton mail settings filters reorder REF...
 ```
 
 ```bash
-proton mail settings filters reorder Newsletters Receipts Archive
+proton mail settings filters reorder Receipts
 ```
 
 ### `filters update`
@@ -519,10 +525,10 @@ proton mail settings filters update Receipts --sieve ./receipts.sieve
 | Flag | Description |
 | --- | --- |
 | `--if stringArray` | A condition matching mail must meet, as FIELD [not] COMPARATOR VALUE (repeatable) |
+| `--into string` | Move matching mail into this folder (archive, inbox, spam, trash, or one of yours) |
 | `--label stringArray` | Apply this label to matching mail (repeatable) |
 | `--mark-read` | Mark matching mail as read |
 | `--match string` | Whether every condition must hold, or any one of them: all, any (default `all`) |
-| `--move-to string` | Move matching mail into this folder (archive, inbox, spam, trash, or one of yours) |
 | `--name string` | New name |
 | `--sieve string` | New Sieve script (- reads stdin) |
 | `--star` | Star matching mail |
@@ -578,6 +584,11 @@ proton mail settings folders list
 proton mail settings folders list
 ```
 
+| Flag | Description |
+| --- | --- |
+| `--limit int` | How many folders per page; 0 for all of them |
+| `--page int` | Which page of results, counting from zero |
+
 ### `folders update`
 
 Rename or recolor a folder.
@@ -612,7 +623,7 @@ Accept forwardings sent to you.
 
 REF is the forwarder's address, or the forwarding's ID. Only a pending forwarding to one of your addresses can be accepted.
 
-Asks for your password even when you are signed in. With no terminal to ask, pass --password-file or --password-stdin.
+Asks for your password even when you are signed in. With no terminal to ask, pass --password-file, which takes - for stdin.
 
 ```
 proton mail settings forwarding accept REF...
@@ -624,8 +635,7 @@ proton mail settings forwarding accept jane@proton.me
 
 | Flag | Description |
 | --- | --- |
-| `--password-file string` | Read the account password from a file |
-| `--password-stdin` | Read the account password from stdin |
+| `--password-file string` | Read the account password from a file, or - for stdin |
 | `--totp string` | Two-factor code |
 
 ### `forwarding create`
@@ -634,7 +644,7 @@ Forward one of your addresses to another address.
 
 REF is the address of yours mail arrives at, EMAIL is where it is handed to. Needs a paid Mail plan, and nothing is forwarded until they accept it: a Proton address in its Proton client or with `forwarding accept`, an address outside Proton by following the link Proton emails it.
 
-To a Proton address, mail stays end-to-end encrypted. To an address outside Proton, end-to-end encryption for REF is turned off until the last such forwarding from it is deleted, and your password is asked for to turn it off. With no terminal to ask, pass --password-file or --password-stdin.
+To a Proton address, mail stays end-to-end encrypted. To an address outside Proton, end-to-end encryption for REF is turned off until the last such forwarding from it is deleted, and your password is asked for to turn it off. With no terminal to ask, pass --password-file, which takes - for stdin.
 
 ```
 proton mail settings forwarding create REF EMAIL
@@ -647,8 +657,7 @@ proton mail settings forwarding create me@proton.me jane@example.com
 
 | Flag | Description |
 | --- | --- |
-| `--password-file string` | Read the account password from a file |
-| `--password-stdin` | Read the account password from stdin |
+| `--password-file string` | Read the account password from a file, or - for stdin |
 | `--totp string` | Two-factor code |
 
 ### `forwarding decline`
@@ -669,7 +678,7 @@ proton mail settings forwarding decline jane@proton.me
 
 Stop forwardings, in either direction.
 
-REF is a forwarding in either direction. Taking down the last forwarding from one of your addresses to an address outside Proton turns end-to-end encryption for it back on, and asks for your password to do it. With no terminal to ask, pass --password-file or --password-stdin.
+REF is a forwarding in either direction. Taking down the last forwarding from one of your addresses to an address outside Proton turns end-to-end encryption for it back on, and asks for your password to do it. With no terminal to ask, pass --password-file, which takes - for stdin.
 
 ```
 proton mail settings forwarding delete REF...
@@ -681,8 +690,7 @@ proton mail settings forwarding delete jane@proton.me
 
 | Flag | Description |
 | --- | --- |
-| `--password-file string` | Read the account password from a file |
-| `--password-stdin` | Read the account password from stdin |
+| `--password-file string` | Read the account password from a file, or - for stdin |
 | `--totp string` | Two-factor code |
 
 ### `forwarding disable`
@@ -738,6 +746,13 @@ proton mail settings forwarding list
 ```bash
 proton mail settings forwarding list
 ```
+
+| Flag | Description |
+| --- | --- |
+| `--desc` | Reverse the order |
+| `--limit int` | How many forwardings per page; 0 for all of them |
+| `--page int` | Which page of results, counting from zero |
+| `--sort string` | Order by: created, address (default `created`) |
 
 ### `forwarding resend`
 
@@ -813,6 +828,11 @@ proton mail settings labels list
 proton mail settings labels list
 ```
 
+| Flag | Description |
+| --- | --- |
+| `--limit int` | How many labels per page; 0 for all of them |
+| `--page int` | Which page of results, counting from zero |
+
 ### `labels update`
 
 Rename or recolor a label.
@@ -847,7 +867,7 @@ proton mail settings list
 
 Who always reaches the inbox, and who never does.
 
-Holds `allow`, `block`, `forget`, `list` and `spam`.
+Holds `allow`, `block`, `list`, `remove` and `spam`.
 
 ### `senders allow`
 
@@ -882,18 +902,6 @@ proton mail settings senders block spammer@example.com
 proton mail settings senders block @example.com
 ```
 
-### `senders forget`
-
-Drop a standing decision, letting the spam filter decide again.
-
-```
-proton mail settings senders forget EMAIL...
-```
-
-```bash
-proton mail settings senders forget billing@example.com
-```
-
 ### `senders list`
 
 List every standing decision about a sender.
@@ -904,6 +912,25 @@ proton mail settings senders list
 
 ```bash
 proton mail settings senders list
+```
+
+| Flag | Description |
+| --- | --- |
+| `--desc` | Reverse the order |
+| `--limit int` | How many rules per page; 0 for all of them |
+| `--page int` | Which page of results, counting from zero |
+| `--sort string` | Order by: sender, since (default `sender`) |
+
+### `senders remove`
+
+Drop a standing decision, letting the spam filter decide again.
+
+```
+proton mail settings senders remove EMAIL...
+```
+
+```bash
+proton mail settings senders remove billing@example.com
 ```
 
 ### `senders spam`

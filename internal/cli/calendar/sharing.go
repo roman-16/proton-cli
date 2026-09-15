@@ -20,35 +20,24 @@ import (
 
 func calendarsShareCmd() *cobra.Command {
 	c := &cobra.Command{Use: "share", Short: "Who else can see a calendar"}
-	c.AddCommand(shareAddCmd(), shareListCmd(), shareRemoveCmd())
+	c.AddCommand(shareAddCmd(), shareGetCmd(), shareUpdateCmd(), shareRemoveCmd())
 	return c
 }
 
-func memberColumns() []ui.Column[calsvc.CalendarMember] {
-	return []ui.Column[calsvc.CalendarMember]{
-		{Header: "ID", ID: true, Cell: func(m calsvc.CalendarMember) string { return m.ID }},
-		{Header: "EMAIL", Flex: true, Cell: func(m calsvc.CalendarMember) string { return m.Email }},
-		{Header: "ACCESS", Cell: func(m calsvc.CalendarMember) string { return m.Access }},
-		{Header: "STATUS", Cell: func(m calsvc.CalendarMember) string { return m.Status }},
-		{Header: "OWNER", Cell: func(m calsvc.CalendarMember) string {
-			if m.Owner {
-				return "yes"
-			}
-			return "no"
-		}},
-	}
-}
-
 func shareAddCmd() *cobra.Command {
-	var edit bool
+	access := kit.Viewing()
 	c := &cobra.Command{
 		Use:   "add REF EMAIL",
 		Short: "Give somebody a calendar",
 		Long: "Give somebody a calendar.\n\n" +
 			"Only another Proton account can be given one.\n\n" +
-			"They are sent an invitation and see nothing until they accept. They can then\n" +
-			"read the calendar; --edit lets them change it too.",
+			"They are sent an invitation and see nothing until they accept. A viewer reads\n" +
+			"the calendar; an editor changes it too.",
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
+			edit, err := kit.CanEdit(access)
+			if err != nil {
+				return err
+			}
 			cal, err := calendarList(c).Find(c.Ctx, c.Args[0])
 			if err != nil {
 				return err
@@ -61,15 +50,15 @@ func shareAddCmd() *cobra.Command {
 			})
 		}),
 	}
-	c.Flags().BoolVar(&edit, "edit", false, "Let them change the calendar, not just see it")
+	access.Register(c)
 	return c
 }
 
-func shareListCmd() *cobra.Command {
+func shareGetCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "list REF",
-		Short: "List who has a calendar",
-		Long: "List who has a calendar.\n\n" +
+		Use:   "get REF",
+		Short: "Show who has a calendar",
+		Long: "Show who has a calendar.\n\n" +
 			"Somebody who has not answered yet is listed as pending. They can see nothing\n" +
 			"until they accept.",
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
@@ -81,11 +70,56 @@ func shareListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return kit.List(c, ui.TableSpec[calsvc.CalendarMember]{
-				Noun: "members", Columns: memberColumns(), Total: len(rows), Page: ui.Unpaged,
-			}, rows)
+			fields := []ui.Field{{Label: "Name", Value: cal.Name}}
+			for _, m := range rows {
+				label, detail := "Member", m.Access
+				switch {
+				case m.Owner:
+					detail = "owner"
+				case m.Status != "active":
+					label, detail = "Invited", m.Access+", "+m.Status
+				}
+				fields = append(fields, ui.Field{Label: label, Value: m.Email + " (" + detail + ")"})
+			}
+			return kit.Show(c, ui.RecordSpec{
+				Object: calsvc.CalendarShare{Name: cal.Name, Members: rows},
+				Fields: fields,
+			})
 		}),
 	}
+}
+
+func shareUpdateCmd() *cobra.Command {
+	access := kit.Viewing()
+	c := &cobra.Command{
+		Use:   "update REF EMAIL",
+		Short: "Change what somebody may do with a calendar",
+		Long: "Change what somebody may do with a calendar.\n\n" +
+			"Name them by address. It works whether they have accepted the calendar or\n" +
+			"still have it pending.",
+		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
+			edit, err := kit.CanEdit(access)
+			if err != nil {
+				return err
+			}
+			cal, err := calendarList(c).Find(c.Ctx, c.Args[0])
+			if err != nil {
+				return err
+			}
+			member, err := memberList(c, cal.ID).Find(c.Ctx, c.Args[1])
+			if err != nil {
+				return err
+			}
+			return kit.Mutate(c, ui.ResultSpec{
+				Action: ui.Updated, Kind: "members", Count: 1, Name: member.Email,
+				Detail: "to " + kit.Access(edit) + " on " + cal.Name, IDs: []string{member.ID},
+			}, func() error {
+				return c.App.Calendar.CalendarSetAccess(c.Ctx, cal.ID, member, edit)
+			})
+		}),
+	}
+	access.Register(c)
+	return c
 }
 
 func shareRemoveCmd() *cobra.Command {

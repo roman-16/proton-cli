@@ -223,7 +223,7 @@ func (r *report) across(work string) {
 	from, to := os.Getenv(accounts[0].User), os.Getenv(accounts[1].User)
 	fmt.Println("between the two")
 
-	found, err := fixture.Rows(seedRunner, "secondary", "mail", "messages", "list", "--subject", "Trip photos", "--folder", "inbox", "--page-size", "1")
+	found, err := fixture.Rows(seedRunner, "secondary", "mail", "messages", "list", "--subject", "Trip photos", "--folder", "inbox", "--limit", "1")
 	switch {
 	case err != nil:
 		r.fail("mail: primary -> secondary", err)
@@ -235,10 +235,10 @@ func (r *report) across(work string) {
 
 	if _, err := run("primary", "drive", "items", "share", "get", "/Documents"); err != nil {
 		r.make("primary", "drive: /Documents shared with the secondary",
-			[]string{"drive", "items", "share", "add", "/Documents", to, "--edit", "--message", "Have a look"})
+			[]string{"drive", "items", "share", "add", "/Documents", to, "--access", "editor", "--message", "Have a look"})
 	}
 
-	events, err := fixture.Rows(seedRunner, "secondary", "calendar", "events", "list", "--start", fixture.Today(), "--end", fixture.InDays(30))
+	events, err := fixture.Rows(seedRunner, "secondary", "calendar", "events", "list", "--after", fixture.Today(), "--before", fixture.InDays(30))
 	switch {
 	case err != nil:
 		r.fail("calendar: invitation", err)

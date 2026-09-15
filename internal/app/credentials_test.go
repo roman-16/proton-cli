@@ -124,15 +124,15 @@ func TestChoosingAnExtraPasswordAsksTwice(t *testing.T) {
 	}
 }
 
-// A password from a file is not confirmed, and the remedy a run without one is
-// given names the flags the command actually offers.
+// A password handed over is not confirmed, and the remedy a run without one is
+// given names the flag the command actually offers.
 func TestAnExtraPasswordFromAFlagIsTakenAsItIs(t *testing.T) {
 	var out bytes.Buffer
 	creds := newCredentials(ui.New(ui.Options{
 		Format: ui.FormatText, Err: &out, Out: &out, In: strings.NewReader(""), NoInput: true,
 	}), "")
 	creds.stdinOwner = func(string) (io.Reader, error) { return strings.NewReader("correct horse\n"), nil }
-	if err := creds.SupplyExtraPassword("", true); err != nil {
+	if err := creds.SupplyExtraPassword(Stdin); err != nil {
 		t.Fatalf("SupplyExtraPassword: %v", err)
 	}
 
@@ -144,7 +144,7 @@ func TestAnExtraPasswordFromAFlagIsTakenAsItIs(t *testing.T) {
 	declared := newCredentials(ui.New(ui.Options{
 		Format: ui.FormatText, Err: &out, Out: &out, NoInput: true,
 	}), "")
-	if err := declared.SupplyExtraPassword("", false); err != nil {
+	if err := declared.SupplyExtraPassword(""); err != nil {
 		t.Fatalf("SupplyExtraPassword: %v", err)
 	}
 	_, err = declared.ChooseExtraPassword()
@@ -204,10 +204,10 @@ func TestARecoverySecretWithNobodyToAskNamesItsFlag(t *testing.T) {
 	creds := newCredentials(ui.New(ui.Options{
 		Format: ui.FormatText, Err: &out, Out: &out, NoInput: true,
 	}), "alice@proton.me")
-	if err := creds.SupplyPreviousPassword("", false); err != nil {
+	if err := creds.SupplyPreviousPassword(""); err != nil {
 		t.Fatal(err)
 	}
-	if err := creds.SupplyRecoveryPhrase("", false); err != nil {
+	if err := creds.SupplyRecoveryPhrase(""); err != nil {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct {

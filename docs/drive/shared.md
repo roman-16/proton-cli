@@ -10,7 +10,7 @@ Holds `add`, `leave`, `list` and `remove`.
 
 Add a public link to what is shared with you.
 
-URL is the link as it was sent to you, including everything after the #. Once added it appears in `shared list` and opens with `--shared REF`, with nothing to pass again. A link with a password takes it from --link-password-file or --link-password-stdin and keeps it.
+URL is the link as it was sent to you, including everything after the #. Once added it appears in `shared list` and opens with `--shared REF`, with nothing to pass again. A link with a password takes it from --link-password-file, which takes - for stdin, and keeps it.
 
 ```
 proton drive shared add URL
@@ -23,8 +23,7 @@ proton drive shared add 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL' -
 
 | Flag | Description |
 | --- | --- |
-| `--link-password-file string` | Read the public link's password from a file |
-| `--link-password-stdin` | Read the public link's password from stdin |
+| `--link-password-file string` | Read the public link's password from a file, or - for stdin |
 
 ## `leave`
 
@@ -58,6 +57,13 @@ proton drive shared list
 ```bash
 proton drive shared list
 ```
+
+| Flag | Description |
+| --- | --- |
+| `--desc` | Reverse the order |
+| `--limit int` | How many items per page; 0 for all of them |
+| `--page int` | Which page of results, counting from zero |
+| `--sort string` | Order by: name, size, shared (default `name`) |
 
 ## `remove`
 

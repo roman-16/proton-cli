@@ -21,7 +21,7 @@ MSG=$(proton mail messages send --to me@proton.me --subject Deploy --body "Done.
 proton mail messages list --unread --output json | jq -r '.messages[].subject'
 
 # senders of everything older than a week, deduplicated
-proton mail messages list --before 2026-04-08 --folder all --page-size 0 --output json | jq -r '.messages[].from_address' | sort -u
+proton mail messages list --before 2026-04-08 --folder all --limit 0 --output json | jq -r '.messages[].from_address' | sort -u
 
 # total size of a Drive folder
 proton drive items list /Backup --output json | jq '[.items[].size] | add'
@@ -31,7 +31,7 @@ proton pass vaults list --output json | jq -r '.vaults[].name'
 
 # today's agenda, one line per event
 day=$(date +%F)
-proton calendar events list --start "$day" --end "$day" --output json |
+proton calendar events list --after "$day" --before "$day" --output json |
   jq -r '.events[] | if .all_day then "all day  \(.title)" else "\(.start[11:16])    \(.title)" end'
 ```
 
@@ -270,7 +270,7 @@ WantedBy=timers.target
 ### Out of office
 
 ```bash
-proton mail settings autoreply set --repeat fixed --start "$(date -d 'next monday 09:00' +%Y-%m-%dT%H:%M)" --end "$(date -d 'next friday 18:00' +%Y-%m-%dT%H:%M)" --message "Away this week. For anything urgent, contact team@example.com."
+proton mail settings autoreply set --repeat fixed --start "$(date -d 'next monday 09:00' +%Y-%m-%dT%H:%M)" --end "$(date -d 'next friday 18:00' +%Y-%m-%dT%H:%M)" --body "Away this week. For anything urgent, contact team@example.com."
 
 # and when you are back
 proton mail settings autoreply disable
@@ -289,8 +289,8 @@ alias newsletter-xyz
 
 - **Credentials.** Hand the password to `account login` with `--password-file`, from a path only your user can read; systemd's `LoadCredential=`, Kubernetes secrets and Docker secrets all give you one. A [two-password](../account/README.md#two-password-mode) account adds `--second-password-file`, a Pass [extra password](../pass/README.md#an-extra-password) adds `--extra-password-file`. See [Sign in without a terminal](../account/README.md#sign-in-without-a-terminal).
 - **Two-factor.** A code or a security key is only asked for at a fresh login. Sign in once at a terminal so the session file exists, then let the job reuse it.
-- **Commands that ask for the password again.** A few do, even with a session; they take `--password-file` and `--password-stdin` of their own. [The list](../account/README.md#commands-that-ask-for-the-password-again).
-- **Secrets you store.** `pass items create` and `pass items update` take them from `--secret-file NAME=FILE` or `--secret-stdin NAME`, never from a flag value. See [Secrets](../pass/README.md#secrets).
+- **Commands that ask for the password again.** A few do, even with a session; they take `--password-file` and `--password-file -` of their own. [The list](../account/README.md#commands-that-ask-for-the-password-again).
+- **Secrets you store.** `pass items create` and `pass items update` take them from `--secret-file NAME=FILE` or `--secret-file NAME=-`, never from a flag value. See [Secrets](../pass/README.md#secrets).
 - **CAPTCHAs.** A job that is asked for one exits `2` with the page and a token; solve the page, then run the command again with `--verified TOKEN`. See [Solving a CAPTCHA in a script](../help/troubleshooting.md#solving-a-captcha-in-a-script).
 - **Quiet output.** `--quiet` silences the `✓` lines and progress bars, which is what cron wants.
 - **Failures.** Exit `5` means come back later, `2` means fix the credential, and retrying never helps with `6` or `8`. See [Exit codes](output.md#exit-codes).

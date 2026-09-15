@@ -40,8 +40,8 @@ proton drive trash list --sort trashed --desc
 | Flag | Description |
 | --- | --- |
 | `--desc` | Reverse the order |
+| `--limit int` | How many items per page; 0 for all of them (default `50`) |
 | `--page int` | Which page of results, counting from zero |
-| `--page-size int` | How many items per page; 0 for all of them (default `50`) |
 | `--sort string` | Order by: name, size, trashed (default `name`) |
 
 ## `restore`

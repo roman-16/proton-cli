@@ -14,12 +14,12 @@ func asked(t *testing.T, first, last string) *DayRange {
 	cmd := &cobra.Command{Use: "list"}
 	d.Register(cmd)
 	if first != "" {
-		if err := cmd.Flags().Set("start", first); err != nil {
+		if err := cmd.Flags().Set("after", first); err != nil {
 			t.Fatal(err)
 		}
 	}
 	if last != "" {
-		if err := cmd.Flags().Set("end", last); err != nil {
+		if err := cmd.Flags().Set("before", last); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -30,10 +30,10 @@ func asked(t *testing.T, first, last string) *DayRange {
 // one must not first cost a sign-in to discover.
 func TestDayRangeRefusesWhatCannotBeARange(t *testing.T) {
 	for _, tc := range []struct{ name, first, last, want string }{
-		{"a date that is not one", "yesterday", "", "--start expects YYYY-MM-DD."},
-		{"a date with a time on it", "2026-08-14T09:00", "", "--start expects YYYY-MM-DD."},
-		{"an end that is not a date", "2026-08-14", "soon", "--end expects YYYY-MM-DD."},
-		{"a range that runs backwards", "2026-08-20", "2026-08-14", "--end is before --start."},
+		{"a date that is not one", "yesterday", "", "--after expects YYYY-MM-DD."},
+		{"a date with a time on it", "2026-08-14T09:00", "", "--after expects YYYY-MM-DD."},
+		{"an end that is not a date", "2026-08-14", "soon", "--before expects YYYY-MM-DD."},
+		{"a range that runs backwards", "2026-08-20", "2026-08-14", "--before is earlier than --after."},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			err := asked(t, tc.first, tc.last).validate()
@@ -56,7 +56,7 @@ func TestDayRangeAcceptsARangeAndASingleDay(t *testing.T) {
 		{"2026-08-14", "2026-08-20"},
 	} {
 		if err := asked(t, tc[0], tc[1]).validate(); err != nil {
-			t.Errorf("--start %q --end %q was refused: %v", tc[0], tc[1], err)
+			t.Errorf("--after %q --before %q was refused: %v", tc[0], tc[1], err)
 		}
 	}
 }
@@ -74,12 +74,12 @@ func TestDayRangeFallsBackForTheEndLeftOut(t *testing.T) {
 
 	first, last = asked(t, "2026-08-14", "").Or(fallbackFirst, fallbackLast)
 	if !first.Equal(time.Date(2026, 8, 14, 0, 0, 0, 0, time.Local)) || !last.Equal(fallbackLast) {
-		t.Errorf("with only --start = (%s, %s)", first, last)
+		t.Errorf("with only --after = (%s, %s)", first, last)
 	}
 
 	first, last = asked(t, "", "2026-08-20").Or(fallbackFirst, fallbackLast)
 	if !first.Equal(fallbackFirst) || !last.Equal(time.Date(2026, 8, 20, 0, 0, 0, 0, time.Local)) {
-		t.Errorf("with only --end = (%s, %s)", first, last)
+		t.Errorf("with only --before = (%s, %s)", first, last)
 	}
 }
 
@@ -97,6 +97,6 @@ func TestDayRangeReadsTheDaysInTheReadersZone(t *testing.T) {
 	first, _ := asked(t, "2026-08-14", "2026-08-14").Or(time.Time{}, time.Time{})
 	want := time.Date(2026, 8, 14, 0, 0, 0, 0, loc)
 	if !first.Equal(want) {
-		t.Errorf("--start 2026-08-14 = %s, want %s", first, want)
+		t.Errorf("--after 2026-08-14 = %s, want %s", first, want)
 	}
 }

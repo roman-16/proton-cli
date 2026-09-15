@@ -41,6 +41,7 @@ func reminderColumns() []ui.Column[calsvc.Reminder] {
 func remindersListCmd() *cobra.Command {
 	var calendar string
 	var days kit.DayRange
+	var held kit.Held[calsvc.Reminder]
 	c := &cobra.Command{
 		Use:   "list",
 		Short: "List the reminders due in a date range",
@@ -59,14 +60,14 @@ func remindersListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return kit.List(c, ui.TableSpec[calsvc.Reminder]{
+			return held.Answer(c, ui.TableSpec[calsvc.Reminder]{
 				Noun: "reminders", Columns: reminderColumns(),
-				Total: ui.Unknown, Page: ui.Unpaged,
 			}, reminders)
 		}),
 	}
 	c.Flags().StringVar(&calendar, "calendar", "", "Which calendar, by name or ID (default: all of them)")
 	days.Register(c)
+	held.Register(c, "reminders")
 	return c
 }
 

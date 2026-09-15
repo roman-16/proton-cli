@@ -29,7 +29,7 @@ func TestMailDraftsLifecycle(t *testing.T) {
 		"mail", "messages", "delete", "--", id)
 
 	// It shows up as a draft, listed by the dedicated command.
-	list := runJSON(t, "mail", "drafts", "list", "--page-size", "50")
+	list := runJSON(t, "mail", "drafts", "list", "--limit", "50")
 	drafts, _ := list["drafts"].([]interface{})
 	found := false
 	for _, d := range drafts {

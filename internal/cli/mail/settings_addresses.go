@@ -30,7 +30,8 @@ func addressesCmd() *cobra.Command {
 }
 
 func addressesListCmd() *cobra.Command {
-	return &cobra.Command{
+	var held kit.Held[mailsvc.Address]
+	c := &cobra.Command{
 		Use:   "list",
 		Short: "List the addresses on the account",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
@@ -38,13 +39,14 @@ func addressesListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return kit.List(c, ui.TableSpec[mailsvc.Address]{
-				Noun:  "addresses",
-				Total: ui.Unknown, Page: ui.Unpaged,
+			return held.Answer(c, ui.TableSpec[mailsvc.Address]{
+				Noun:    "addresses",
 				Columns: addressColumns(),
 			}, addrs)
 		}),
 	}
+	held.Register(c, "addresses")
+	return c
 }
 
 func addressesGetCmd() *cobra.Command {
@@ -152,7 +154,7 @@ func addressesCreateCmd() *cobra.Command {
 			"The address sends and receives as soon as it exists. An account that creates\n" +
 			"post-quantum keys is refused: add the address in a Proton client.\n\n" +
 			"Asks for your password even when you are signed in. With no terminal to ask,\n" +
-			"pass --password-file or --password-stdin.",
+			"pass --password-file, which takes - for stdin.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			if err := reauth.Supply(c); err != nil {
 				return err
@@ -196,7 +198,7 @@ func addressesEnableCmd() *cobra.Command {
 		short: "Let a disabled address send and receive again",
 		long: "REF is an address of yours that is disabled.\n\n" +
 			"Asks for your password even when you are signed in. With no terminal to ask,\n" +
-			"pass --password-file or --password-stdin.",
+			"pass --password-file, which takes - for stdin.",
 		action: ui.Enabled,
 		reason: "enable an address",
 		takes:  enableTakes,
@@ -213,7 +215,7 @@ func addressesDisableCmd() *cobra.Command {
 		long: "REF is an address of yours that is enabled. Everything it already holds\n" +
 			"stays, and enabling it again needs nothing else.\n\n" +
 			"Asks for your password even when you are signed in. With no terminal to ask,\n" +
-			"pass --password-file or --password-stdin.",
+			"pass --password-file, which takes - for stdin.",
 		action: ui.Disabled,
 		reason: "disable an address",
 		takes:  disableTakes,
@@ -232,7 +234,7 @@ func addressesDeleteCmd() *cobra.Command {
 			"short-domain address and the account's default address cannot be deleted.\n\n" +
 			"A deleted address cannot be used again, by you or by anybody else.\n\n" +
 			"Asks for your password even when you are signed in. With no terminal to ask,\n" +
-			"pass --password-file or --password-stdin.",
+			"pass --password-file, which takes - for stdin.",
 		reason: "delete an address",
 		action: ui.Deleted,
 		takes:  deleteTakes,

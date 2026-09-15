@@ -26,6 +26,13 @@ proton pass settings domains list
 proton pass settings domains list
 ```
 
+| Flag | Description |
+| --- | --- |
+| `--desc` | Reverse the order |
+| `--limit int` | How many domains per page; 0 for all of them |
+| `--page int` | Which page of results, counting from zero |
+| `--sort string` | Order by: domain (default `domain`) |
+
 ## `extra-password`
 
 The extra password Pass can be protected with.
@@ -36,7 +43,7 @@ Holds `disable`, `enable` and `get`.
 
 Remove the extra password from Pass.
 
-The password is asked for first, or comes from --extra-password-file or --extra-password-stdin.
+The password is asked for first, or comes from --extra-password-file, which takes - for stdin.
 
 Pass then opens with your account password alone, on every device. This session goes on working.
 
@@ -51,14 +58,13 @@ proton pass settings extra-password disable --extra-password-file /run/secrets/p
 
 | Flag | Description |
 | --- | --- |
-| `--extra-password-file string` | Read the Pass extra password from a file |
-| `--extra-password-stdin` | Read the Pass extra password from stdin |
+| `--extra-password-file string` | Read the Pass extra password from a file, or - for stdin |
 
 ### `extra-password enable`
 
 Protect Pass with an extra password.
 
-The password comes from --extra-password-file, from --extra-password-stdin, or from a prompt that asks for it twice. It needs at least eight characters.
+The password comes from --extra-password-file, which takes - for stdin, or from a prompt that asks for it twice. It needs at least eight characters.
 
 Keep it safe: without it nothing opens Pass, on any device. Your other devices ask for it the next time they open Pass, and this session goes on working.
 
@@ -75,8 +81,7 @@ proton pass settings extra-password enable --extra-password-file /run/secrets/pr
 
 | Flag | Description |
 | --- | --- |
-| `--extra-password-file string` | Read the Pass extra password from a file |
-| `--extra-password-stdin` | Read the Pass extra password from stdin |
+| `--extra-password-file string` | Read the Pass extra password from a file, or - for stdin |
 
 ### `extra-password get`
 
@@ -141,6 +146,13 @@ proton pass settings mailboxes list
 ```bash
 proton pass settings mailboxes list
 ```
+
+| Flag | Description |
+| --- | --- |
+| `--desc` | Reverse the order |
+| `--limit int` | How many mailboxes per page; 0 for all of them |
+| `--page int` | Which page of results, counting from zero |
+| `--sort string` | Order by: email (default `email`) |
 
 ### `mailboxes resend`
 

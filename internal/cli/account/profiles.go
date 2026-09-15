@@ -21,7 +21,8 @@ func profilesCmd() *cobra.Command {
 }
 
 func profilesListCmd() *cobra.Command {
-	return &cobra.Command{
+	var held kit.Held[session.Profile]
+	c := &cobra.Command{
 		Use:   "list",
 		Short: "List the profiles with a saved session",
 		// No authentication: this reads the filesystem, and being able to see
@@ -32,9 +33,8 @@ func profilesListCmd() *cobra.Command {
 				return err
 			}
 			active := c.App.Profile.String()
-			return kit.List(c, ui.TableSpec[session.Profile]{
-				Noun:  "profiles",
-				Total: ui.Unknown, Page: ui.Unpaged,
+			return held.Answer(c, ui.TableSpec[session.Profile]{
+				Noun: "profiles",
 				Columns: []ui.Column[session.Profile]{
 					{Header: "PROFILE", Cell: func(p session.Profile) string { return p.Name }},
 					{Header: "EMAIL", Flex: true, Cell: func(p session.Profile) string { return p.Email }},
@@ -54,6 +54,11 @@ func profilesListCmd() *cobra.Command {
 			}, profiles)
 		}),
 	}
+	held.Register(c, "profiles",
+		kit.Key[session.Profile]{Name: "name", Less: func(a, b session.Profile) int { return kit.Fold(a.Name, b.Name) }},
+		kit.Key[session.Profile]{Name: "saved", Less: func(a, b session.Profile) int { return kit.Ints(a.PersistedAt, b.PersistedAt) }},
+	)
+	return c
 }
 
 func profilesDeleteCmd() *cobra.Command {

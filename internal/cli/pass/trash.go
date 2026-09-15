@@ -36,7 +36,8 @@ func trashed(c *kit.Invocation) ([]passsvc.Item, error) {
 }
 
 func trashListCmd() *cobra.Command {
-	return &cobra.Command{
+	var held kit.Held[passsvc.Item]
+	c := &cobra.Command{
 		Use:   "list",
 		Short: "List what is in the trash",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
@@ -44,12 +45,17 @@ func trashListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return kit.List(c, ui.TableSpec[passsvc.Item]{
+			return held.Answer(c, ui.TableSpec[passsvc.Item]{
 				Noun: "items", Columns: itemColumns(),
-				Total: ui.Unknown, Page: ui.Unpaged,
 			}, items)
 		}),
 	}
+	held.Register(c, "items",
+		kit.Key[passsvc.Item]{Name: "name", Less: func(a, b passsvc.Item) int { return kit.Fold(a.Name, b.Name) }},
+		kit.Key[passsvc.Item]{Name: "type", Less: func(a, b passsvc.Item) int { return kit.Fold(a.Type, b.Type) }},
+		kit.Key[passsvc.Item]{Name: "modified", Less: func(a, b passsvc.Item) int { return kit.Ints(a.ModifyTime, b.ModifyTime) }},
+	)
+	return c
 }
 
 func trashRestoreCmd() *cobra.Command {

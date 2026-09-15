@@ -91,7 +91,8 @@ func reads(l passsvc.SecureLink) string {
 }
 
 func linksListCmd() *cobra.Command {
-	return &cobra.Command{
+	var held kit.Held[passsvc.SecureLink]
+	c := &cobra.Command{
 		Use:   "list",
 		Short: "List the links you have made",
 		Long: "List the links you have made.\n\n" +
@@ -103,11 +104,16 @@ func linksListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return kit.List(c, ui.TableSpec[passsvc.SecureLink]{
-				Noun: "links", Columns: linkColumns(), Total: len(rows), Page: ui.Unpaged,
+			return held.Answer(c, ui.TableSpec[passsvc.SecureLink]{
+				Noun: "links", Columns: linkColumns(),
 			}, rows)
 		}),
 	}
+	held.Register(c, "links",
+		kit.Key[passsvc.SecureLink]{Name: "expires", Less: func(a, b passsvc.SecureLink) int { return kit.Ints(a.Expires, b.Expires) }},
+		kit.Key[passsvc.SecureLink]{Name: "reads", Less: func(a, b passsvc.SecureLink) int { return kit.Ints(int64(a.Reads), int64(b.Reads)) }},
+	)
+	return c
 }
 
 func linksCreateCmd() *cobra.Command {
@@ -141,7 +147,7 @@ func linksCreateCmd() *cobra.Command {
 			}
 			var link *passsvc.SecureLink
 			if err := kit.Mutate(c, ui.ResultSpec{
-				Action: ui.Linked, Kind: "links", Count: 1,
+				Action: ui.Created, Kind: "links", Count: 1,
 				Detail: "lasting " + units.Duration(d), AnswerFollows: true,
 			}, func() error {
 				link, err = c.App.Pass.SecureLinkCreate(c.Ctx, shareID, itemID,

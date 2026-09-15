@@ -64,15 +64,17 @@ func filtersApplyCmd() *cobra.Command {
 	}
 }
 
-// Order decides the outcome, so it is set as a whole rather than nudged.
+// Order decides the outcome, so naming a filter moves it to the front and
+// everything else keeps the order it was in - which is what `reorder` means
+// wherever it appears, and what makes "run this one first" a two-word change.
 func filtersReorderCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "reorder REF REF...",
+		Use:   "reorder REF...",
 		Short: "Set the order filters run in",
 		Long: "Set the order filters run in.\n\n" +
 			"The first rule to file a message wins, so the order decides where mail\n" +
-			"lands. Name every filter, in the order you want them. This replaces the\n" +
-			"whole order; a partial one is refused.",
+			"lands. Name the filters that should run first, in order; the rest keep the\n" +
+			"order they are in.",
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			all, err := filterList(c).Rows(c.Ctx)
 			if err != nil {
@@ -82,21 +84,44 @@ func filtersReorderCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			// Naming some of them would leave the rest in an order nobody chose,
-			// so the command line has to account for all of them.
-			if len(sel.IDs) != len(all) {
-				return kit.Fail("You have %d filters but named %d.", len(all), len(sel.IDs)).
-					Hint("name every filter, in the order you want them.",
-						"`proton mail settings filters list` shows them.")
+			order := reorderedFilters(all, sel.IDs)
+			if sameFilterOrder(all, order) {
+				return kit.Fail("The filters are already in that order.")
 			}
 			return kit.Mutate(c, ui.ResultSpec{
 				Action: ui.Reordered, Kind: "filters", Count: len(sel.IDs), IDs: sel.IDs,
 				Preview: sel.Preview(),
 			}, func() error {
-				return c.App.Mail.FilterReorder(c.Ctx, sel.IDs)
+				return c.App.Mail.FilterReorder(c.Ctx, order)
 			})
 		}),
 	}
+}
+
+// reorderedFilters puts the named filters first, in the order they were named,
+// and leaves the rest where they are.
+func reorderedFilters(all []mailsvc.Filter, named []string) []string {
+	first := make(map[string]bool, len(named))
+	for _, id := range named {
+		first[id] = true
+	}
+	order := make([]string, 0, len(all))
+	order = append(order, named...)
+	for _, f := range all {
+		if !first[f.ID] {
+			order = append(order, f.ID)
+		}
+	}
+	return order
+}
+
+func sameFilterOrder(all []mailsvc.Filter, order []string) bool {
+	for i := range order {
+		if i >= len(all) || all[i].ID != order[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func filterColumns() []ui.Column[mailsvc.Filter] {
@@ -120,7 +145,8 @@ func filterList(c *kit.Invocation) *kit.Lookup[mailsvc.Filter] {
 }
 
 func filtersListCmd() *cobra.Command {
-	return &cobra.Command{
+	var held kit.Held[mailsvc.Filter]
+	c := &cobra.Command{
 		Use:   "list",
 		Short: "List your filters",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
@@ -128,12 +154,13 @@ func filtersListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return kit.List(c, ui.TableSpec[mailsvc.Filter]{
+			return held.Answer(c, ui.TableSpec[mailsvc.Filter]{
 				Noun: "filters", Columns: filterColumns(),
-				Total: ui.Unknown, Page: ui.Unpaged,
 			}, rows)
 		}),
 	}
+	held.Register(c, "filters")
+	return c
 }
 
 func filtersCreateCmd() *cobra.Command {
@@ -204,7 +231,7 @@ func filtersCreateCmd() *cobra.Command {
 	c.Flags().StringArrayVar(&conditions, "if", nil,
 		"A condition matching mail must meet, as FIELD [not] COMPARATOR VALUE (repeatable)")
 	match.Register(c)
-	c.Flags().StringVar(&moveTo, "move-to", "",
+	c.Flags().StringVar(&moveTo, "into", "",
 		"Move matching mail into this folder (archive, inbox, spam, trash, or one of yours)")
 	c.Flags().StringArrayVar(&labels, "label", nil, "Apply this label to matching mail (repeatable)")
 	c.Flags().BoolVar(&markRead, "mark-read", false, "Mark matching mail as read")
@@ -212,7 +239,7 @@ func filtersCreateCmd() *cobra.Command {
 	c.Flags().StringVar(&sieve, "sieve", "", "Sieve script (- reads stdin)")
 	c.Flags().BoolVar(&disabled, "disabled", false, "Create it without turning it on")
 	c.MarkFlagsMutuallyExclusive("if", "sieve")
-	c.MarkFlagsMutuallyExclusive("sieve", "move-to")
+	c.MarkFlagsMutuallyExclusive("sieve", "into")
 	c.MarkFlagsMutuallyExclusive("sieve", "label")
 	return c
 }
@@ -236,7 +263,7 @@ func checkRule(sieve string, conditions []string, moveTo string, labels []string
 	// nobody will ever notice not working.
 	if moveTo == "" && len(labels) == 0 && !markRead && !star {
 		return kit.Fail("That filter matches mail but does nothing with it.").
-			Hint("--move-to Archive", "--label Receipts", "--mark-read", "--star")
+			Hint("--into Archive", "--label Receipts", "--mark-read", "--star")
 	}
 	return nil
 }
@@ -365,14 +392,14 @@ func filtersUpdateCmd() *cobra.Command {
 	c.Flags().StringArrayVar(&conditions, "if", nil,
 		"A condition matching mail must meet, as FIELD [not] COMPARATOR VALUE (repeatable)")
 	match.Register(c)
-	c.Flags().StringVar(&moveTo, "move-to", "",
+	c.Flags().StringVar(&moveTo, "into", "",
 		"Move matching mail into this folder (archive, inbox, spam, trash, or one of yours)")
 	c.Flags().StringArrayVar(&labels, "label", nil, "Apply this label to matching mail (repeatable)")
 	c.Flags().BoolVar(&markRead, "mark-read", false, "Mark matching mail as read")
 	c.Flags().BoolVar(&star, "star", false, "Star matching mail")
 	c.Flags().StringVar(&sieve, "sieve", "", "New Sieve script (- reads stdin)")
 	c.MarkFlagsMutuallyExclusive("if", "sieve")
-	c.MarkFlagsMutuallyExclusive("sieve", "move-to")
+	c.MarkFlagsMutuallyExclusive("sieve", "into")
 	c.MarkFlagsMutuallyExclusive("sieve", "label")
 	return c
 }

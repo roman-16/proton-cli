@@ -187,7 +187,7 @@ func Free(work string) []Collection {
 		}},
 	}, {
 		What:   "event",
-		List:   []string{"calendar", "events", "list", "--start", Today(), "--end", InDays(30)},
+		List:   []string{"calendar", "events", "list", "--after", Today(), "--before", InDays(30)},
 		Key:    "title",
 		IDKeys: []string{"calendar_id", "id"},
 		Remove: []string{"calendar", "events", "delete"},
@@ -232,6 +232,7 @@ func Paid(home string) []Collection {
 		IDKeys: []string{"share_id", "item_id"},
 		Pins: []Pin{{
 			ID:     PaidAlias,
+			ByHand: true,
 			Fields: map[string]string{"type": "alias"},
 			Create: []string{"pass", "aliases", "create", "--prefix", PaidAliasPrefix, "--name", PaidAlias},
 		}},

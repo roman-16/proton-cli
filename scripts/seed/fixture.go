@@ -40,7 +40,7 @@ func (r *report) mail(profile, address, work string) {
 func (r *report) deliver(profile, address, work string, m fixture.Mail) {
 	what := "mail: " + m.Subject
 	found, err := fixture.Rows(seedRunner, profile, append([]string{"mail", "messages", "list",
-		"--subject", m.Subject, "--page-size", "1"}, inbox()...)...)
+		"--subject", m.Subject, "--limit", "1"}, inbox()...)...)
 	if err != nil {
 		r.fail(what, err)
 		return
@@ -199,7 +199,7 @@ func (r *report) await(profile string) {
 	for _, m := range fixture.Panel() {
 		for {
 			found, err := fixture.Rows(seedRunner, profile, append([]string{"mail", "messages", "list",
-				"--subject", m.Subject, "--page-size", "1"}, inbox()...)...)
+				"--subject", m.Subject, "--limit", "1"}, inbox()...)...)
 			if err == nil && len(found) > 0 {
 				break
 			}

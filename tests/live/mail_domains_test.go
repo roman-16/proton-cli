@@ -129,7 +129,7 @@ func TestMailSettingsDomainsCreateAndDelete(t *testing.T) {
 func TestMailSettingsDomainsCatchAll(t *testing.T) {
 	name := aDomainTheRunMade(t)
 
-	runOKPaid(t, "mail", "settings", "domains", "update", name, "--clear-catch-all")
+	runOKPaid(t, "mail", "settings", "domains", "update", name, "--catch-all", "none")
 	if d := runJSONPaid(t, "mail", "settings", "domains", "get", name); d["catch_all"] != nil {
 		t.Errorf("a domain with no addresses on it catches mail at %v", d["catch_all"])
 	}
@@ -144,14 +144,6 @@ func TestMailSettingsDomainsCatchAll(t *testing.T) {
 		t.Errorf("the refusal does not say the address is on another domain: %s", truncateOutput(stderr))
 	}
 
-	_, stderr, code = runPaid(t, "--yes", "mail", "settings", "domains", "update", name,
-		"--catch-all", elsewhere, "--clear-catch-all")
-	if code != 1 {
-		t.Errorf("asking to set and clear the catch-all at once exits %d, want 1", code)
-	}
-	if !strings.Contains(stderr, "contradict") {
-		t.Errorf("the refusal does not say the two flags contradict: %s", truncateOutput(stderr))
-	}
 }
 
 // An account with no plan cannot have a custom domain, and Proton answers the

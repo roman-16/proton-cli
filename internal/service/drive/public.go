@@ -116,7 +116,7 @@ func (s *Service) openLink(ctx context.Context, token, urlPassword, customPasswo
 func composeLinkPassword(info *proton.PublicLinkInfo, urlPassword, customPassword string) (string, error) {
 	if info.NeedsCustomPassword() && customPassword == "" {
 		return "", errs.Problemf("This link has a password.").
-			Hint("--link-password-file FILE, or --link-password-stdin")
+			Hint("--link-password-file FILE, or --link-password-file -")
 	}
 	if info.Legacy() {
 		return customPassword, nil

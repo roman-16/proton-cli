@@ -47,7 +47,8 @@ func invitationColumns() []ui.Column[calsvc.CalendarInvitation] {
 }
 
 func invitationsListCmd() *cobra.Command {
-	return &cobra.Command{
+	var held kit.Held[calsvc.CalendarInvitation]
+	c := &cobra.Command{
 		Use:   "list",
 		Short: "List calendars other people have offered you",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
@@ -55,12 +56,16 @@ func invitationsListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return kit.List(c, ui.TableSpec[calsvc.CalendarInvitation]{
+			return held.Answer(c, ui.TableSpec[calsvc.CalendarInvitation]{
 				Noun: "invitations", Columns: invitationColumns(),
-				Total: len(rows), Page: ui.Unpaged,
 			}, rows)
 		}),
 	}
+	held.Register(c, "invitations",
+		kit.Key[calsvc.CalendarInvitation]{Name: "name", Less: func(a, b calsvc.CalendarInvitation) int { return kit.Fold(a.Name, b.Name) }},
+		kit.Key[calsvc.CalendarInvitation]{Name: "sender", Less: func(a, b calsvc.CalendarInvitation) int { return kit.Fold(a.Sender, b.Sender) }},
+	)
+	return c
 }
 
 func invitationsAcceptCmd() *cobra.Command {

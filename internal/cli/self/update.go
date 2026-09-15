@@ -16,9 +16,10 @@ import (
 // It is a mutation like any other and reports through kit.Mutate, which is what
 // gives it --dry-run. That matters more here than almost anywhere else: this is
 // the one command that rewrites the program the user is running, so "show me
-// what you would do" has to be answerable without doing it.
+// what you would do" has to be answerable without doing it - and a preview is
+// the whole of what a check is, so there is no second flag for one.
 func UpdateCmd(version string) *cobra.Command {
-	var checkOnly, reinstall bool
+	var force bool
 	cmd := &cobra.Command{
 		Use:         "update [VERSION]",
 		Aliases:     []string{"upgrade", "self-update"},
@@ -28,6 +29,8 @@ func UpdateCmd(version string) *cobra.Command {
 (or a specific version), verifying the download against the published
 SHA-256 checksums.
 
+--dry-run reports what it would install without installing it.
+
 Only a curl-script install or a manually downloaded binary can update
 itself. If proton was installed with a package manager (apt, dnf,
 apk, Homebrew, winget, npm, Nix), update it with that package manager.`,
@@ -36,11 +39,10 @@ apk, Homebrew, winget, npm, Nix), update it with that package manager.`,
 			if len(c.Args) == 1 {
 				target = strings.TrimPrefix(c.Args[0], "v")
 			}
-			return runUpdate(c, version, target, checkOnly, reinstall)
+			return runUpdate(c, version, target, force)
 		}),
 	}
-	cmd.Flags().BoolVar(&checkOnly, "check", false, "Only report whether an update is available; don't install")
-	cmd.Flags().BoolVar(&reinstall, "reinstall", false, "Install again even if already up to date")
+	cmd.Flags().BoolVar(&force, "force", false, "Install again even if already up to date")
 	return cmd
 }
 
@@ -53,7 +55,7 @@ type updateStatus struct {
 // releaseNotes is where a reader goes to find out what they just installed.
 const releaseNotes = "https://github.com/roman-16/proton-cli/releases/tag/v"
 
-func runUpdate(c *kit.Invocation, version, target string, checkOnly, reinstall bool) error {
+func runUpdate(c *kit.Invocation, version, target string, force bool) error {
 	u := c.UI()
 	client := &http.Client{Timeout: 60 * time.Second}
 
@@ -69,25 +71,13 @@ func runUpdate(c *kit.Invocation, version, target string, checkOnly, reinstall b
 	}
 	newer := selfmanage.IsNewer(latest, version)
 
-	if checkOnly {
-		if u.Format.Machine() {
-			return kit.Object(c, updateStatus{Current: version, Latest: latest, UpdateAvailable: newer})
-		}
-		if newer {
-			Available(u, version, latest)
-		} else {
-			c.Note("proton is up to date (%s).", version)
-		}
-		return nil
-	}
-
-	if version == "dev" && target == "" && !reinstall {
+	if version == "dev" && target == "" && !force {
 		return kit.Fail("This is a development build, so there is no version to compare against.").
 			Hint("proton update 1.9.11",
 				"curl -fsSL https://raw.githubusercontent.com/roman-16/proton-cli/main/scripts/install.sh | sh")
 	}
 
-	if !newer && target == "" && !reinstall {
+	if !newer && target == "" && !force {
 		if u.Format.Machine() {
 			return kit.Object(c, updateStatus{Current: version, Latest: latest, UpdateAvailable: false})
 		}

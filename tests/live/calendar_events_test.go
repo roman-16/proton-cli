@@ -249,7 +249,7 @@ const seriesAnchor = "2027-03-01"
 func occurrencesOf(t *testing.T, title, from, to string) []map[string]interface{} {
 	t.Helper()
 	rows := runJSONArray(t, "calendar", "events", "list",
-		"--calendar", "Default", "--start", from, "--end", to)
+		"--calendar", "Default", "--after", from, "--before", to)
 	var out []map[string]interface{}
 	for _, r := range rows {
 		row, ok := r.(map[string]interface{})
@@ -347,7 +347,7 @@ func TestCalendarAllDayEventAppearsInAList(t *testing.T) {
 		t.Error("the row does not report itself as all-day")
 	}
 	assertContains(t, runOK(t, "calendar", "events", "list",
-		"--calendar", "Default", "--start", "2027-05-04", "--end", "2027-05-04"), "all day")
+		"--calendar", "Default", "--after", "2027-05-04", "--before", "2027-05-04"), "all day")
 }
 
 // A whole-day event runs for a day, whichever way the end was stored: Proton keeps
@@ -965,7 +965,7 @@ func TestCalendarEventsExportWritesAnICSFile(t *testing.T) {
 		"calendar", "events", "delete", "--", ref)
 
 	out := runOK(t, "calendar", "events", "export",
-		"--start", "2027-09-01", "--end", "2027-09-30", "--dest", "-")
+		"--after", "2027-09-01", "--before", "2027-09-30", "--dest", "-")
 
 	for _, want := range []string{"BEGIN:VCALENDAR", "END:VCALENDAR", "BEGIN:VEVENT", title} {
 		if !strings.Contains(out, want) {
@@ -1064,7 +1064,7 @@ func TestCalendarEventsImportRoundTripsAnExport(t *testing.T) {
 
 	file := filepath.Join(t.TempDir(), "export.ics")
 	runOK(t, "calendar", "events", "export",
-		"--start", "2027-10-01", "--end", "2027-10-31", "--dest", file)
+		"--after", "2027-10-01", "--before", "2027-10-31", "--dest", file)
 
 	// And back in. An event carries the UID of the event it is, so reading the
 	// file back changes that event rather than making a second one - which is the
@@ -1100,7 +1100,7 @@ func TestCalendarEventsImportRoundTripsAnExport(t *testing.T) {
 func eventsTitled(t *testing.T, day, title string) []string {
 	t.Helper()
 	var refs []string
-	for _, row := range runJSONArray(t, "calendar", "events", "list", "--start", day, "--end", day) {
+	for _, row := range runJSONArray(t, "calendar", "events", "list", "--after", day, "--before", day) {
 		m, _ := row.(map[string]interface{})
 		if s, _ := m["title"].(string); s != title {
 			continue

@@ -38,6 +38,7 @@ Each word means one thing, everywhere it appears.
 | `enable` · `disable` | Turn something on or off |
 | `add` · `remove` | Put a member into a container, or take one out |
 | `accept` · `decline` | Answer an invitation |
+| `revoke` | Stop something working |
 | `set` | Write one setting |
 | `login` · `logout` | Your session |
 
@@ -50,14 +51,21 @@ To rename anything, use `update --name`. There is no `rename` verb.
 | `--to` | An email recipient, or a filter matching one |
 | `--into` | A container on Proton's side: a folder, a vault, a calendar |
 | `--dest` | A path on your disk |
-| `--force` | Overwrite a local file that already exists |
+| `--force` | Overwrite what is already there |
 | `--all` | Everything in scope, rather than a subset |
+| `--limit` | How many an answer holds, or a verb acts on |
+| `--after` · `--before` | The first and last day a selection includes |
+| `--access` | What somebody may do with a shared thing |
+| `--expires` | How long before it stops working, or `never` |
+| `--x-file` | Where to read a secret from; `-` is standard input |
 
 ```bash
 proton mail messages send --to alice@proton.me       # a recipient
 proton mail messages list --to alice@proton.me       # matching a recipient
 proton mail messages move REF --into archive         # a container over there
 proton drive items download /report.pdf --dest .     # a path over here
+proton pass vaults share add Work jane@proton.me --access editor
+proton account login --user me@proton.me --password-file /run/secrets/proton
 ```
 
 Five flags have a single-letter form: `-p` profile, `-o` output, `-n` dry run, `-q` quiet, `-y` yes. They cluster, so `-qn` is a quiet dry run.
@@ -68,9 +76,9 @@ Removing an optional value takes one of three spellings, and each flag's help sa
 
 | Spelling | Used when | Example |
 | --- | --- | --- |
-| The value itself | The word is one the flag already prints | `--expires never` |
+| The value itself | The word cannot be mistaken for a real value | `--expires never`, `--catch-all none` |
 | `--no-x` | The flag names a state | `calendar events update REF --no-remind` |
-| `--clear-x` | The value cannot carry the word: text, or a password read from a file | `--clear-signature`, `--clear-link-password` |
+| `--clear-x` | The value cannot carry the word: text, or a secret read from a file | `--clear-signature`, `--clear-link-password` |
 
 ## Getting help
 

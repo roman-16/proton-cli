@@ -14,8 +14,8 @@ func TestMailSendersBlockAllowAndForget(t *testing.T) {
 	addr := testID() + "@example.com"
 
 	runOK(t, "mail", "settings", "senders", "block", addr)
-	cleanupRun(t, fmt.Sprintf("Forget sender: proton mail settings senders forget %s", addr),
-		"mail", "settings", "senders", "forget", addr)
+	cleanupRun(t, fmt.Sprintf("Forget sender: proton mail settings senders remove %s", addr),
+		"mail", "settings", "senders", "remove", addr)
 	assertSenderGoes(t, addr, "blocked")
 
 	// Deciding again replaces the earlier decision rather than colliding.
@@ -24,7 +24,7 @@ func TestMailSendersBlockAllowAndForget(t *testing.T) {
 	runOK(t, "mail", "settings", "senders", "allow", addr)
 	assertSenderGoes(t, addr, "inbox")
 
-	runOK(t, "mail", "settings", "senders", "forget", addr)
+	runOK(t, "mail", "settings", "senders", "remove", addr)
 	if senderRule(t, addr) != nil {
 		t.Error("after forgetting, the sender should carry no standing decision")
 	}
@@ -35,8 +35,8 @@ func TestMailSendersTakeAWholeDomain(t *testing.T) {
 	domain := "@" + testID() + ".example.com"
 
 	runOK(t, "mail", "settings", "senders", "block", domain)
-	cleanupRun(t, fmt.Sprintf("Forget domain: proton mail settings senders forget %s", domain),
-		"mail", "settings", "senders", "forget", domain)
+	cleanupRun(t, fmt.Sprintf("Forget domain: proton mail settings senders remove %s", domain),
+		"mail", "settings", "senders", "remove", domain)
 	assertSenderGoes(t, domain, "blocked")
 }
 

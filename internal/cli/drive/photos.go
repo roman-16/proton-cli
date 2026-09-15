@@ -40,6 +40,7 @@ func photoColumns() []ui.Column[drivesvc.Photo] {
 }
 
 func photosListCmd() *cobra.Command {
+	var held kit.Held[drivesvc.Photo]
 	var album string
 	tag := &kit.Enum{
 		Name: "tag", Usage: "Show only photos with this tag",
@@ -65,7 +66,7 @@ func photosListCmd() *cobra.Command {
 				if err != nil {
 					return err
 				}
-				return listPhotos(c, photos)
+				return listPhotos(c, &held, photos)
 			}
 			tagID, filter := 0, false
 			if tag.Set() {
@@ -83,18 +84,22 @@ func photosListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return listPhotos(c, photos)
+			return listPhotos(c, &held, photos)
 		}),
 	}
 	tag.Register(c)
-	c.Flags().StringVar(&album, "album", "", "Show only what is in this album, by ID")
+	c.Flags().StringVar(&album, "album", "", "Show only what is in this album, by name or ID")
+	held.Register(c, "photos",
+		kit.Key[drivesvc.Photo]{Name: "captured", Less: func(a, b drivesvc.Photo) int {
+			return kit.Ints(a.CaptureTime, b.CaptureTime)
+		}},
+	)
 	return c
 }
 
-func listPhotos(c *kit.Invocation, photos []drivesvc.Photo) error {
-	return kit.List(c, ui.TableSpec[drivesvc.Photo]{
+func listPhotos(c *kit.Invocation, held *kit.Held[drivesvc.Photo], photos []drivesvc.Photo) error {
+	return held.Answer(c, ui.TableSpec[drivesvc.Photo]{
 		Noun: "photos", Columns: photoColumns(),
-		Total: ui.Unknown, Page: ui.Unpaged,
 	}, photos)
 }
 
@@ -261,13 +266,16 @@ func albumColumns() []ui.Column[drivesvc.Album] {
 // An album's cover is which of its own photos represents it. Nothing is
 // re-encrypted and nothing moves: the album names one of its children.
 func albumsUpdateCmd() *cobra.Command {
-	var cover string
+	var cover, name string
 	c := &cobra.Command{
 		Use:   "update REF",
-		Short: "Change an album's cover",
+		Short: "Rename an album, or change its cover",
+		Long: "Rename an album, or change its cover.\n\n" +
+			"A cover has to be a photo the album holds. Anything you do not mention is\n" +
+			"left alone.",
 		RunE: kit.Run([]kit.Step{kit.StepExpand, func(*kit.Invocation) error {
-			if cover == "" {
-				return kit.Fail("Nothing to change.").Hint("--cover REF")
+			if cover == "" && name == "" {
+				return kit.Fail("Nothing to change.").Hint("pass --name or --cover.")
 			}
 			return nil
 		}}, func(c *kit.Invocation) error {
@@ -279,18 +287,33 @@ func albumsUpdateCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			photoID, err := kit.Expand(c.App, cover)
-			if err != nil {
-				return err
+			photoID := ""
+			if cover != "" {
+				if photoID, err = kit.Expand(c.App, cover); err != nil {
+					return err
+				}
+			}
+			shown := album.Name
+			if name != "" {
+				shown = name
 			}
 			return kit.Mutate(c, ui.ResultSpec{
-				Action: ui.Updated, Kind: "albums", Count: 1, Name: album.Name,
+				Action: ui.Updated, Kind: "albums", Count: 1, Name: shown,
 				IDs: []string{album.LinkID},
 			}, func() error {
+				if name != "" {
+					if err := c.App.Drive.AlbumRename(c.Ctx, dc, album.LinkID, album.Name, name); err != nil {
+						return err
+					}
+				}
+				if photoID == "" {
+					return nil
+				}
 				return c.App.Drive.AlbumSetCover(c.Ctx, dc, album.LinkID, photoID)
 			})
 		}),
 	}
+	c.Flags().StringVar(&name, "name", "", "New name for the album")
 	c.Flags().StringVar(&cover, "cover", "", "Which of the album's photos represents it")
 	return c
 }
@@ -307,7 +330,8 @@ func albumList(c *kit.Invocation, dc *drivesvc.Context) *kit.Lookup[drivesvc.Alb
 }
 
 func albumsListCmd() *cobra.Command {
-	return &cobra.Command{
+	var held kit.Held[drivesvc.Album]
+	c := &cobra.Command{
 		Use:   "list",
 		Short: "List albums",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
@@ -319,12 +343,16 @@ func albumsListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return kit.List(c, ui.TableSpec[drivesvc.Album]{
+			return held.Answer(c, ui.TableSpec[drivesvc.Album]{
 				Noun: "albums", Columns: albumColumns(),
-				Total: ui.Unknown, Page: ui.Unpaged,
 			}, albums)
 		}),
 	}
+	held.Register(c, "albums",
+		kit.Key[drivesvc.Album]{Name: "name", Less: func(a, b drivesvc.Album) int { return kit.Fold(a.Name, b.Name) }},
+		kit.Key[drivesvc.Album]{Name: "photos", Less: func(a, b drivesvc.Album) int { return kit.Ints(int64(a.PhotoCount), int64(b.PhotoCount)) }},
+	)
+	return c
 }
 
 func albumsCreateCmd() *cobra.Command {

@@ -175,6 +175,42 @@ func (s *Service) groupsNamed(ctx context.Context, names []string, color string)
 // promise. Proton has an endpoint that takes contact IDs, but it labels one
 // address per contact rather than all of them - so the addresses are resolved
 // here and grouped the only way Proton actually groups anything.
+// GroupTargets is the addresses a group command acts on.
+//
+// Proton groups addresses rather than people, so an address names itself: naming
+// jane@acme.com puts that one address in the group, and naming Jane puts in
+// every address she holds. A reference is read as one or the other, never both,
+// which is what lets one command line name two colleagues and one colleague's
+// work address.
+func (s *Service) GroupTargets(ctx context.Context, refs []string) ([]string, error) {
+	all, err := s.contactEmails(ctx, url.Values{})
+	if err != nil {
+		return nil, err
+	}
+	byAddress := make(map[string]string, len(all))
+	byContact := make(map[string][]string, len(all))
+	for _, e := range all {
+		byAddress[strings.ToLower(e.Email)] = e.ID
+		byContact[e.ContactID] = append(byContact[e.ContactID], e.ID)
+	}
+	var out []string
+	for _, ref := range refs {
+		if id, ok := byAddress[strings.ToLower(strings.TrimSpace(ref))]; ok {
+			out = append(out, id)
+			continue
+		}
+		contactID, err := s.Resolve(ctx, ref)
+		if err != nil {
+			return nil, err
+		}
+		if len(byContact[contactID]) == 0 {
+			return nil, errs.Problemf("%q has no addresses to put in a group.", ref)
+		}
+		out = append(out, byContact[contactID]...)
+	}
+	return out, nil
+}
+
 func (s *Service) AddressesOf(ctx context.Context, contactIDs []string) ([]string, error) {
 	wanted := make(map[string]bool, len(contactIDs))
 	for _, id := range contactIDs {

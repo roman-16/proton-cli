@@ -39,9 +39,9 @@ func TestCalendarRemindersListReportsDue(t *testing.T) {
 	// does, then assert it reads a reminder. The wording lives in the JSON `says`
 	// field, not in the text columns, so it is asserted there.
 	waitFor(60*time.Second, 2*time.Second, func() bool {
-		return strings.Contains(runOK(t, "calendar", "reminders", "list", "--start", today, "--end", today), title)
+		return strings.Contains(runOK(t, "calendar", "reminders", "list", "--after", today, "--before", today), title)
 	})
-	got := runJSON(t, "calendar", "reminders", "list", "--start", today, "--end", today)
+	got := runJSON(t, "calendar", "reminders", "list", "--after", today, "--before", today)
 	for _, raw := range got["reminders"].([]interface{}) {
 		row := raw.(map[string]interface{})
 		if row["title"] != title {
@@ -89,7 +89,7 @@ func TestCalendarRemindersWatchRaisesOnTime(t *testing.T) {
 	// running out of it is Proton being slow rather than this being early, and
 	// saying so beats letting the watch look for something that is not there yet.
 	if !waitFor(60*time.Second, 2*time.Second, func() bool {
-		return strings.Contains(runOK(t, "calendar", "reminders", "list", "--start", today, "--end", today), title)
+		return strings.Contains(runOK(t, "calendar", "reminders", "list", "--after", today, "--before", today), title)
 	}) {
 		t.Fatalf("the alarm for %q never materialised, so there was nothing to watch for", title)
 	}

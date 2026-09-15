@@ -46,10 +46,9 @@ func TestEveryCommandTakingALinkTakesItsPassword(t *testing.T) {
 		if c.Flags().Lookup("link") == nil {
 			return
 		}
-		for _, name := range []string{"link-password-file", "link-password-stdin"} {
-			if c.Flags().Lookup(name) == nil {
-				t.Errorf("%s takes --link but not --%s, so a link with a password cannot be opened", named(c), name)
-			}
+		if c.Flags().Lookup("link-password-file") == nil {
+			t.Errorf("%s takes --link but not --link-password-file, "+
+				"so a link with a password cannot be opened", named(c))
 		}
 	})
 }

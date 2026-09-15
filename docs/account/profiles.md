@@ -30,6 +30,13 @@ proton account profiles list
 proton account profiles list
 ```
 
+| Flag | Description |
+| --- | --- |
+| `--desc` | Reverse the order |
+| `--limit int` | How many profiles per page; 0 for all of them |
+| `--page int` | Which page of results, counting from zero |
+| `--sort string` | Order by: name, saved (default `name`) |
+
 ---
 
 Every command also takes the [flags that work everywhere](../about/commands.md#flags-that-work-on-every-command).

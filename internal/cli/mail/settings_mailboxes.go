@@ -92,7 +92,8 @@ func mailboxes(c *kit.Invocation, noun string, folder bool) *kit.Lookup[mailsvc.
 }
 
 func mailboxListCmd(noun string, folder bool) *cobra.Command {
-	return &cobra.Command{
+	var held kit.Held[mailsvc.Label]
+	c := &cobra.Command{
 		Use:   "list",
 		Short: "List your " + noun,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
@@ -100,12 +101,13 @@ func mailboxListCmd(noun string, folder bool) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return kit.List(c, ui.TableSpec[mailsvc.Label]{
+			return held.Answer(c, ui.TableSpec[mailsvc.Label]{
 				Noun: noun, Columns: mailboxColumns(folder),
-				Total: ui.Unknown, Page: ui.Unpaged,
 			}, rows)
 		}),
 	}
+	held.Register(c, noun)
+	return c
 }
 
 func mailboxCreateCmd(noun string, folder bool) *cobra.Command {

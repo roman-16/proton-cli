@@ -3,6 +3,7 @@ package contacts
 import (
 	"io"
 	"os"
+	"strings"
 
 	"github.com/roman-16/proton-cli/internal/cli/kit"
 	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
@@ -83,7 +84,7 @@ func keysListCmd() *cobra.Command {
 }
 
 func keysPinCmd() *cobra.Command {
-	var keyPath, email string
+	var keyPath string
 	var noEncrypt bool
 	scheme := &kit.Enum{
 		Name: "scheme", Usage: "PGP scheme for recipients outside Proton",
@@ -92,6 +93,9 @@ func keysPinCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "pin REF",
 		Short: "Pin a public key so mail to a contact is encrypted to it",
+		Long: "Pin a public key so mail to a contact is encrypted to it.\n\n" +
+			"A key is pinned to one address. Name that address as REF when the contact\n" +
+			"holds more than one; naming the contact is enough when they hold one.",
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			if keyPath == "" {
 				return kit.Fail("A key is required.").
@@ -109,7 +113,7 @@ func keysPinCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			target, err := pickEmail(c, id, email)
+			target, err := pickEmail(c, id, c.Args[0])
 			if err != nil {
 				return err
 			}
@@ -134,23 +138,24 @@ func keysPinCmd() *cobra.Command {
 		}),
 	}
 	c.Flags().StringVar(&keyPath, "key", "", "Armoured public key file (- for stdin)")
-	c.Flags().StringVar(&email, "email", "", "Which of the contact's addresses the key applies to")
 	c.Flags().BoolVar(&noEncrypt, "no-encrypt", false, "Store the key for verification only, leaving encryption off")
 	scheme.Register(c)
 	return c
 }
 
 func keysUnpinCmd() *cobra.Command {
-	var email string
-	c := &cobra.Command{
+	return &cobra.Command{
 		Use:   "unpin REF",
 		Short: "Remove the keys pinned to a contact",
+		Long: "Remove the keys pinned to a contact.\n\n" +
+			"A key is pinned to one address. Name that address as REF when the contact\n" +
+			"holds more than one; naming the contact is enough when they hold one.",
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			id, err := c.App.Contacts.Resolve(c.Ctx, c.Args[0])
 			if err != nil {
 				return err
 			}
-			target, err := pickEmail(c, id, email)
+			target, err := pickEmail(c, id, c.Args[0])
 			if err != nil {
 				return err
 			}
@@ -169,30 +174,33 @@ func keysUnpinCmd() *cobra.Command {
 			return nil
 		}),
 	}
-	c.Flags().StringVar(&email, "email", "", "Which of the contact's addresses to unpin")
-	return c
 }
 
-// pickEmail decides which of a contact's addresses a key operation targets: the
-// one asked for, the only one there is, or an error listing the choice. Guessing
-// would silently encrypt to the wrong address.
-func pickEmail(c *kit.Invocation, id, flag string) (string, error) {
-	if flag != "" {
-		return flag, nil
-	}
+// pickEmail decides which of a contact's addresses a key operation targets.
+//
+// A key is pinned to an address, and a reference already names one: `pin jane`
+// and `pin jane@example.com` both find the contact, and only the second says
+// which of her addresses. So the reference answers when it can, the sole address
+// answers when there is one, and anything else is a refusal that lists the
+// choice - guessing would silently encrypt to the wrong address.
+func pickEmail(c *kit.Invocation, id, ref string) (string, error) {
 	ct, err := c.App.Contacts.Get(c.Ctx, id)
 	if err != nil {
 		return "", err
 	}
 	addresses := ct.EmailAddresses()
+	for _, e := range addresses {
+		if strings.EqualFold(e, strings.TrimSpace(ref)) {
+			return e, nil
+		}
+	}
 	switch len(addresses) {
 	case 0:
-		return "", kit.Fail("That contact has no email address.").
-			Hint("--email jane@example.com")
+		return "", kit.Fail("That contact has no email address.")
 	case 1:
 		return addresses[0], nil
 	}
-	lines := []string{"choose one with --email:"}
+	lines := []string{"name one of them instead of the contact:"}
 	for _, e := range addresses {
 		lines = append(lines, "  "+e)
 	}

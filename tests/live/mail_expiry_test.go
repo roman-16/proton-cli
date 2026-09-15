@@ -23,16 +23,16 @@ func TestMailMessagesExpireAndStop(t *testing.T) {
 	subject := testID() + "-expire"
 	msgID := sentToSelfPaid(t, subject)
 
-	runOKPaid(t, "mail", "messages", "expire", "--in", "30d", "--", msgID)
-	cleanupRunPaid(t, fmt.Sprintf("Stop expiry: proton mail messages expire --never -- %s", msgID),
-		"mail", "messages", "expire", "--never", "--", msgID)
+	runOKPaid(t, "mail", "messages", "update", "--expires", "30d", "--", msgID)
+	cleanupRunPaid(t, fmt.Sprintf("Stop expiry: proton mail messages update --expires never -- %s", msgID),
+		"mail", "messages", "update", "--expires", "never", "--", msgID)
 
 	at, _ := expirationOf(t, msgID)
 	if at <= 0 {
 		t.Fatalf("ExpirationTime = %v, want a moment in the future", at)
 	}
 
-	runOKPaid(t, "mail", "messages", "expire", "--never", "--", msgID)
+	runOKPaid(t, "mail", "messages", "update", "--expires", "never", "--", msgID)
 	if at, _ := expirationOf(t, msgID); at != 0 {
 		t.Errorf("after --never, ExpirationTime = %v, want 0", at)
 	}

@@ -314,9 +314,9 @@ func exists(path string) bool {
 }
 
 // ReadTextArg resolves a text flag that may be "-", meaning stdin. Centralising
-// the convention is what makes `--body -`, `--sieve -`, `--message -` and
-// `--signature -` all behave the same - and what lets stdin have one owner, so
-// this and --password-stdin cannot quietly drain the same stream.
+// the convention is what makes `--body -`, `--sieve -`, `--dest -` and
+// `--password-file -` all behave the same - and what lets stdin have one owner,
+// so no two of them can quietly drain the same stream.
 func ReadTextArg(c *Invocation, value, flag string) (string, error) {
 	if value != "-" {
 		return value, nil

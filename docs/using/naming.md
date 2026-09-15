@@ -31,7 +31,17 @@ Short IDs carry no ellipsis and never start with a dash, so they copy cleanly ou
 
 ## Tab completion
 
-With [completion installed](../install.md#shell-completions), Tab completes every command, every flag, and the values a flag accepts: folder names, item types, output formats, setting keys. A `REF` completes from what your listings showed you - the short ID, and the subject, name or address beside it.
+With [completion installed](../install.md#shell-completions), Tab completes every command, every flag, and the values a flag accepts: item types, output formats, setting keys, colours, icons.
+
+A `REF` completes from what your listings showed you - the short ID, and the subject, name or address beside it. So does a flag whose value names one of your things:
+
+```console
+$ proton pass items list --vault ⇥
+Work      -- 5bH2mQxK
+Personal  -- 9xL4pQrT
+```
+
+`--folder`, `--label`, `--into`, `--parent`, `--vault`, `--calendar`, `--album`, `--computer`, `--shared`, `--mailbox` and `--suffix` all complete this way.
 
 ```console
 $ proton mail conversations list

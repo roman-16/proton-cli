@@ -104,7 +104,7 @@ If you installed with a package manager, update with it. Otherwise proton update
 
 ```bash
 proton update             # install the latest release
-proton update --check     # only report whether an update exists
+proton update --dry-run     # only report whether an update exists
 proton update 2.5.0       # install a specific version
 ```
 

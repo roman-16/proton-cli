@@ -23,8 +23,7 @@ func TestOneWayOfRecoveringAtATime(t *testing.T) {
 		{"--recovery-phrase", "--recovery-file", file},
 		{"--recovery-phrase", "--previous-password-file", file},
 		{"--recovery-file", file, "--previous-password-file", file},
-		{"--recovery-phrase-file", file, "--recovery-phrase-stdin"},
-		{"--previous-password-file", file, "--previous-password-stdin"},
+		{"--previous-password-file", file, "--recovery-file", "x"},
 	} {
 		refuses(t, 1, append([]string{"account", "keys", "reactivate"}, args...),
 			"are set none of the others can be")

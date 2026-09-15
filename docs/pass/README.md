@@ -41,7 +41,7 @@ proton pass items create --type ssh-key --name laptop --public-key "$(cat ~/.ssh
 proton pass items create --type identity --name Me --full-name "Jane Roe" --email jane@example.com --city Vienna
 
 proton pass items update github.com --secret-file password=/run/secrets/github
-pass-store show github | proton pass items update github.com --secret-stdin password
+pass-store show github | proton pass items update github.com --secret-file password=-
 ```
 
 Types are `login` (the default), `note`, `credit-card`, `wifi`, `ssh-key`, `identity`, `alias` and `custom`. Identity stores thirty-one fields, which the [reference](items.md) lists.
@@ -53,7 +53,7 @@ Types are `login` (the default), `note`, `credit-card`, `wifi`, `ssh-key`, `iden
 **A secret is never a flag value.** The secret parts of an item come from a file or from stdin, the way the account password does.
 
 - `--secret-file NAME=FILE` can be given as often as you like.
-- `--secret-stdin NAME` reads one of them from the stream. Only one thing per run may read stdin.
+- `--secret-file NAME=-` reads that one from standard input. Only one thing per run may read it.
 
 `NAME` is one of the item's own secret fields - `password`, `totp-uri`, `number`, `cvv`, `pin`, `private-key` - or any other name, which makes a hidden custom field of it.
 
@@ -142,11 +142,11 @@ proton pass items trash --older-than 1y --type login --dry-run
 
 ```bash
 proton pass vaults create --name Work
-proton pass vaults update Work --description "Shared team logins" --icon 7 --color 3
+proton pass vaults update Work --description "Shared team logins" --icon star --color teal
 proton pass vaults delete Work               # by name, or by share ID
 ```
 
-Icons and colours are numbers.
+Icons and colours are named, and Tab offers them: ten colours from `violet` to `teal`, and thirty icons from `home` to `cheque`.
 
 Deleting a vault takes everything in it, so it names the vault and asks first.
 
@@ -157,7 +157,8 @@ To keep an item at the top of the list, run `proton pass items pin github.com`.
 Hide-my-email addresses that forward to your own mailboxes.
 
 ```bash
-proton pass aliases options                   # available suffixes and mailboxes
+proton pass settings domains list             # the suffixes an alias can take
+proton pass settings mailboxes list           # where it can forward to
 proton pass aliases create --prefix shop --mailbox me@proton.me
 ```
 
@@ -304,7 +305,7 @@ It holds **the vaults you own**, and the attachments on their items. A vault som
 
 **Without a passphrase the archive holds every password in plain text**, and the command says so as it writes. With one, the document is encrypted to it and stored as `data.pgp`, which Proton Pass can import. **The attachments are never encrypted**, with a passphrase or without.
 
-The passphrase comes from a file, from stdin with `--passphrase-stdin`, or from a prompt. Never from a flag value.
+The passphrase comes from a file, from stdin with `--passphrase-file -`, or from a prompt. Never from a flag value.
 
 Reading a backup back keeps what it says about each item: the dates it was made and last changed on, and the trash, so an item that was in the trash goes back to the trash.
 
@@ -380,7 +381,7 @@ proton account login --user me@proton.me \
   --extra-password-file /run/secrets/proton-pass
 ```
 
-A `pass` command that needs it and finds nobody to ask says so and names that flag. Like every other secret it is read from a file, from stdin with `--extra-password-stdin`, or from a prompt.
+A `pass` command that needs it and finds nobody to ask says so and names that flag. Like every other secret it is read from a file, from stdin with `--extra-password-file -`, or from a prompt.
 
 A few wrong answers end the session, so read a refusal rather than retrying blindly.
 
@@ -392,7 +393,7 @@ proton pass settings extra-password enable
 proton pass settings extra-password disable
 ```
 
-`enable` asks for the password twice, or reads it once from `--extra-password-file` or `--extra-password-stdin`. It needs at least eight characters. Keep it safe: without it nothing opens Pass, on any device. Your other devices ask for it the next time they open Pass, and this session goes on working.
+`enable` asks for the password twice, or reads it once from `--extra-password-file` or `--extra-password-file -`. It needs at least eight characters. Keep it safe: without it nothing opens Pass, on any device. Your other devices ask for it the next time they open Pass, and this session goes on working.
 
 `disable` asks for the password first. Pass then opens with your account password alone, on every device, and this session goes on working.
 

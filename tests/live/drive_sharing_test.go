@@ -36,7 +36,7 @@ func TestDriveShareLinkLifecycle(t *testing.T) {
 	cleanupRun(t, fmt.Sprintf("Delete folder: proton drive items delete --permanent %s", folder),
 		"drive", "items", "delete", folder)
 
-	url := strings.TrimSpace(runOK(t, "drive", "items", "share", "link", folder))
+	url := strings.TrimSpace(runOK(t, "drive", "links", "create", folder))
 	if !strings.Contains(url, "/urls/") {
 		t.Fatalf("link stdout has no public URL: %q", url)
 	}
@@ -48,7 +48,7 @@ func TestDriveShareLinkLifecycle(t *testing.T) {
 	assertContains(t, status, "Public Link:")
 	assertContains(t, status, tokenOf(t, url))
 
-	runOK(t, "drive", "items", "share", "unlink", folder)
+	runOK(t, "drive", "links", "revoke", folder)
 	after := runOKBothStreams(t, "drive", "items", "share", "get", folder)
 	assertField(t, after, "Shared:", "no")
 }
@@ -63,7 +63,7 @@ func TestDriveShareLinkPublicHandshake(t *testing.T) {
 	cleanupRun(t, fmt.Sprintf("Delete folder: proton drive items delete --permanent %s", folder),
 		"drive", "items", "delete", folder)
 
-	url := strings.TrimSpace(runOK(t, "drive", "items", "share", "link", folder))
+	url := strings.TrimSpace(runOK(t, "drive", "links", "create", folder))
 	token := tokenOf(t, url)
 	linkID := strings.TrimSpace(runJSON(t, "drive", "items", "get", folder)["link_id"].(string))
 
@@ -91,8 +91,8 @@ func TestDriveShareLinkIdempotent(t *testing.T) {
 	cleanupRun(t, fmt.Sprintf("Delete folder: proton drive items delete --permanent %s", folder),
 		"drive", "items", "delete", folder)
 
-	first := strings.TrimSpace(runOK(t, "drive", "items", "share", "link", folder))
-	second := strings.TrimSpace(runOK(t, "drive", "items", "share", "link", folder))
+	first := strings.TrimSpace(runOK(t, "drive", "links", "create", folder))
+	second := strings.TrimSpace(runOK(t, "drive", "links", "create", folder))
 	if tokenOf(t, first) != tokenOf(t, second) {
 		t.Errorf("link is not idempotent: %q vs %q", first, second)
 	}
@@ -104,12 +104,12 @@ func TestDriveShareLinkExpires(t *testing.T) {
 	cleanupRun(t, fmt.Sprintf("Delete folder: proton drive items delete --permanent %s", folder),
 		"drive", "items", "delete", folder)
 
-	link := runJSON(t, "drive", "items", "share", "link", folder, "--expires", "7d")
+	link := runJSON(t, "drive", "links", "create", folder, "--expires", "7d")
 	if link["expire_time"] == nil {
 		t.Errorf("expected expire_time to be set, got %v", link["expire_time"])
 	}
 
-	permanent := runJSON(t, "drive", "items", "share", "link", folder, "--expires", "never")
+	permanent := runJSON(t, "drive", "links", "create", folder, "--expires", "never")
 	if permanent["expire_time"] != nil {
 		t.Errorf("--expires never left expire_time %v", permanent["expire_time"])
 	}
@@ -123,7 +123,7 @@ func TestDriveShareLinkPassword(t *testing.T) {
 
 	// The record is the answer, so the custom password is reported there rather
 	// than in the confirmation on stderr.
-	stdout := runOK(t, "drive", "items", "share", "link", folder,
+	stdout := runOK(t, "drive", "links", "create", folder,
 		"--link-password-file", passwordFile(t, "hunter2"))
 	if !strings.Contains(stdout, "#") {
 		t.Errorf("link should still carry a generated fragment: %q", stdout)
@@ -133,7 +133,7 @@ func TestDriveShareLinkPassword(t *testing.T) {
 
 	// A password read from a file has no way of saying "none", so taking one off
 	// is its own word.
-	runOK(t, "drive", "items", "share", "link", folder, "--clear-link-password")
+	runOK(t, "drive", "links", "create", folder, "--clear-link-password")
 	assertNotContains(t, runOK(t, "drive", "items", "share", "get", folder), "Link Password:")
 }
 
@@ -154,7 +154,7 @@ func TestDriveShareLinkDryRun(t *testing.T) {
 	cleanupRun(t, fmt.Sprintf("Delete folder: proton drive items delete --permanent %s", folder),
 		"drive", "items", "delete", folder)
 
-	_, stderr := runOKStderr(t, "--dry-run", "drive", "items", "share", "link", folder)
+	_, stderr := runOKStderr(t, "--dry-run", "drive", "links", "create", folder)
 	assertContains(t, stderr, "Dry run")
 
 	status := runOKBothStreams(t, "drive", "items", "share", "get", folder)
@@ -169,8 +169,8 @@ func TestDriveShareLinkUpdatesTheLinkItAlreadyHas(t *testing.T) {
 	cleanupRun(t, fmt.Sprintf("Delete folder: proton drive items delete --permanent %s", folder),
 		"drive", "items", "delete", folder)
 
-	first := strings.TrimSpace(runOK(t, "drive", "items", "share", "link", folder))
-	updated := runOK(t, "drive", "items", "share", "link", folder,
+	first := strings.TrimSpace(runOK(t, "drive", "links", "create", folder))
+	updated := runOK(t, "drive", "links", "create", folder,
 		"--link-password-file", passwordFile(t, "hunter2"))
 
 	assertField(t, updated, "Password:", "hunter2")
@@ -207,7 +207,7 @@ func TestDriveShareWithSomebodyOutsideProton(t *testing.T) {
 	}
 	assertContains(t, refusal, "has not created a Proton account yet")
 
-	runOK(t, "drive", "items", "share", "update", folder, outsider, "--edit")
+	runOK(t, "drive", "items", "share", "update", folder, outsider, "--access", "editor")
 	assertContains(t, runOK(t, "drive", "items", "share", "get", folder), "editor")
 	runOK(t, "drive", "items", "share", "resend", folder, outsider)
 
@@ -407,7 +407,7 @@ func TestDriveShareUpdateChangesWhatAnInviteeMayDo(t *testing.T) {
 
 	// While the invitation is still unanswered, the role lives on the invitation.
 	assertContains(t, runOK(t, "drive", "items", "share", "get", folder), "viewer")
-	runOK(t, "drive", "items", "share", "update", folder, secondaryEmail(), "--edit")
+	runOK(t, "drive", "items", "share", "update", folder, secondaryEmail(), "--access", "editor")
 	assertContains(t, runOK(t, "drive", "items", "share", "get", folder), "editor")
 
 	// Once it is accepted the role lives on the member instead, which is a
@@ -439,7 +439,7 @@ func TestDriveShareUpdateChangesWhatAnInviteeMayDo(t *testing.T) {
 	}
 	runOKSecondary(t, "drive", "items", "upload", src, "/", "--shared", name)
 
-	runOK(t, "drive", "items", "share", "update", folder, secondaryEmail(), "--edit=false")
+	runOK(t, "drive", "items", "share", "update", folder, secondaryEmail(), "--access", "viewer")
 	assertContains(t, runOK(t, "drive", "items", "share", "get", folder), "viewer")
 
 	if role := sharedRoleSecondary(t, name); role != "viewer" {

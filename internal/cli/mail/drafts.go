@@ -120,8 +120,7 @@ func draftsUpdateCmd() *cobra.Command {
 	}
 	f.registerRecipients(c)
 	f.registerBody(c)
-	c.Flags().Lookup("html").Usage = "Switch the draft to text/html"
-	c.Flags().BoolVar(&f.plain, "plain", false, "Switch the draft to text/plain")
+	c.Flags().Lookup("html").Usage = "Switch the draft to HTML; --html=false switches it to plain text"
 	f.registerAttachments(c)
 	c.Flags().StringArrayVar(&f.detach, "detach", nil, "Remove an attachment by name or ID (repeatable)")
 	f.registerIdentity(c)

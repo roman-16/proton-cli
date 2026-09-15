@@ -31,8 +31,8 @@ printf 'The north trail is open again.\n' >"$work/trail-map.txt"
 # does, so the panel's theme decides its shade along with everything else.
 prompt() { printf '\033[35m$\033[39m %s\n' "$*"; }
 
-prompt "proton mail messages list --unread --page-size 3"
-"$bin" mail messages list --unread --page-size 3 || true
+prompt "proton mail messages list --unread --limit 3"
+"$bin" mail messages list --unread --limit 3 || true
 printf '\n'
 
 prompt "proton drive items upload trail-map.txt /Documents"

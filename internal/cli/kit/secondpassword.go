@@ -12,29 +12,23 @@ import (
 // everything else either holds the key password already, sealed into the
 // session, or is being asked to prove itself, which the password answers.
 //
-// Like a password, it is read from a pipe, a file or a prompt and never from a
-// flag value: argv is readable by every user on the machine through ps, and it
-// survives in shell history and in unit files.
+// Like a password, it arrives as a path, with `-` for standard input, or from a
+// prompt. It is never a flag value: argv is readable by every user on the
+// machine through ps, and it survives in shell history and in unit files.
 type SecondPassword struct {
-	file  string
-	stdin bool
+	file string
 }
 
-// The one thing each of these says, wherever it appears.
-const (
-	SecondPasswordFileUsage  = "Read the second password (two-password mode) from a file"
-	SecondPasswordStdinUsage = "Read the second password (two-password mode) from stdin"
-)
+// The one thing this says, wherever it appears.
+const SecondPasswordFileUsage = "Read the second password (two-password mode) from a file, or - for stdin"
 
-// Declare adds the flags to a command. Call Supply from its body.
+// Declare adds the flag to a command. Call Supply from its body.
 func (p *SecondPassword) Declare(c *cobra.Command) {
-	f := c.Flags()
-	f.StringVar(&p.file, "second-password-file", "", SecondPasswordFileUsage)
-	f.BoolVar(&p.stdin, "second-password-stdin", false, SecondPasswordStdinUsage)
+	c.Flags().StringVar(&p.file, "second-password-file", "", SecondPasswordFileUsage)
 }
 
 // Supply hands what was given to the invocation, before anything that might ask
 // for it runs.
 func (p *SecondPassword) Supply(c *Invocation) error {
-	return c.App.Creds.SupplySecondPassword(p.file, p.stdin)
+	return c.App.Creds.SupplySecondPassword(p.file)
 }

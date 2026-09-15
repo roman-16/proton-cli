@@ -269,195 +269,12 @@ func argTokens(use string) []string {
 
 // ── rule 8: a flag name means one thing ──
 
-// flagMeanings is the registry of every flag used by more than one command. Two
-// commands may share a name only if they share the meaning.
+// The flag vocabulary lives in kit.Flags, beside the verbs and the argument
+// names, because it is the same kind of declaration: a word this CLI may use and
+// what it means. It is checked in both directions.
 //
 // This is the rule that would have caught --all meaning four different things
 // and --html meaning three.
-var flagMeanings = map[string]string{
-	"address":                "a postal or street address",
-	"after":                  "only things after a date",
-	"access":                 "what somebody may do with a shared thing",
-	"album":                  "the photo album to act in",
-	"all":                    "act on everything in the command's scope, rather than a subset",
-	"all-day":                "an event with no time of day",
-	"anniversary":            "a date being commemorated",
-	"answer":                 "a reply to an invitation",
-	"attach":                 "a file to attach",
-	"attach-inline":          "an image to embed in an HTML body by Content-ID",
-	"attendee":               "someone invited",
-	"bcc":                    "a blind-carbon-copy recipient",
-	"before":                 "only things before a date",
-	"birthdate":              "a date of birth",
-	"birthday":               "a date of birth",
-	"body":                   "the message body",
-	"body-only":              "emit only the body",
-	"calendar":               "the calendar to act in",
-	"cc":                     "a carbon-copy recipient",
-	"check":                  "report without changing anything",
-	"city":                   "a city",
-	"clear-signature":        "remove the signature",
-	"code":                   "the code Proton emailed an address",
-	"color":                  "the accent colour to set",
-	"company":                "the company somebody works for",
-	"computer":               "the computer whose files to act in",
-	"country":                "a country",
-	"county":                 "an administrative county",
-	"cvv":                    "a payment card verification number",
-	"days":                   "the days a schedule is active",
-	"delete-photos":          "also remove the photos an album held",
-	"desc":                   "reverse the order a listing is in",
-	"description":            "free-text description",
-	"dest":                   "the local path to write the payload to; - is stdout",
-	"dest-dir":               "a local directory to fill, keeping each item's own name",
-	"detach":                 "an attachment to remove",
-	"disabled":               "create without turning it on",
-	"display-name":           "the name recipients see",
-	"draft":                  "save instead of sending",
-	"duration":               "how long something lasts",
-	"edit":                   "grant edit rather than view access",
-	"email":                  "an email address",
-	"eml":                    "an RFC 822 file to build the message from",
-	"end":                    "the end of a range or event",
-	"eo-password-file":       "where to read the password for recipients outside Proton from",
-	"eo-password-stdin":      "read the password for recipients outside Proton from stdin",
-	"eo-password-hint":       "hint shown to password-protected recipients",
-	"everyone":               "answer every address that was on the message, not only the sender",
-	"expires":                "how long before it stops working",
-	"expiry":                 "a payment card expiry date",
-	"extra-password-file":    "where to read the Pass extra password from",
-	"extra-password-stdin":   "read the Pass extra password from stdin",
-	"facebook":               "a Facebook handle",
-	"field":                  "a custom field, as NAME=VALUE",
-	"first-name":             "a given name",
-	"floor":                  "a floor within a building",
-	"folder":                 "the mail location to look in",
-	"force":                  "overwrite a local file that already exists",
-	"format":                 "the file layout to write",
-	"from":                   "the sender: compose sets it, a filter matches it",
-	"full-name":              "a full name",
-	"generate-password":      "make the password rather than being given one",
-	"gender":                 "a gender",
-	"hidden":                 "a hidden custom field, as NAME=VALUE",
-	"holder":                 "the name on a payment card",
-	"html":                   "treat the text as HTML rather than escaping it",
-	"include-inline":         "include inline attachments",
-	"instagram":              "an Instagram handle",
-	"into":                   "the remote container a move or copy puts something in",
-	"job-title":              "a job title",
-	"key":                    "an armoured PGP key",
-	"keyword":                "full-text search term",
-	"if":                     "a condition matching mail must meet",
-	"label":                  "the label to attach or detach",
-	"mark-read":              "mark matching mail as read",
-	"match":                  "whether every condition must hold or any one of them",
-	"language":               "a preferred language",
-	"larger-than":            "select files above a size",
-	"last-name":              "a family name",
-	"length":                 "how many characters a generated password has",
-	"license-number":         "a driving licence number",
-	"limit":                  "cap how many things are selected; 0 for no cap",
-	"link":                   "the public link somebody sent you to act in",
-	"link-password-file":     "where to read a public link's password from",
-	"link-password-stdin":    "read a public link's password from stdin",
-	"linkedin":               "a LinkedIn handle",
-	"location":               "where something is",
-	"mailbox":                "where mail to an alias should arrive",
-	"manager":                "the password manager that wrote a file being read in",
-	"message":                "an accompanying note",
-	"middle-name":            "a middle name",
-	"move-to":                "the folder to move matching mail into",
-	"name":                   "the name to set",
-	"newer-than":             "select things newer than a duration",
-	"nickname":               "a familiar name",
-	"no-attachments":         "leave attachments out",
-	"no-quote":               "do not quote the message being answered",
-	"no-remind":              "leave an event with no reminder",
-	"no-signature":           "leave the signature out",
-	"notify":                 "tell you when mail arrives in a folder",
-	"no-digits":              "leave the digits out of a generated password",
-	"no-symbols":             "leave the symbols out of a generated password",
-	"no-uppercase":           "leave the capitals out of a generated password",
-	"note":                   "free-text note",
-	"number":                 "a payment card number",
-	"older-than":             "select things older than a duration",
-	"onwards":                "extend the change to every later occurrence of a series",
-	"organization":           "an organization name",
-	"others":                 "act on every session but this one",
-	"page":                   "which page of results",
-	"page-size":              "how many results per page; 0 for all of them",
-	"parent":                 "the containing folder",
-	"passport-number":        "a passport number",
-	"passphrase-file":        "where to read the passphrase that locks a file",
-	"passphrase-stdin":       "read the passphrase that locks a file from stdin",
-	"password-file":          "where to read the account password from",
-	"password-stdin":         "read the account password from stdin",
-	"pattern":                "select by glob against the name",
-	"personal-website":       "a personal website, as opposed to a work one",
-	"phone":                  "a phone number",
-	"pin":                    "a payment card PIN",
-	"postal-code":            "a postal code",
-	"prefix":                 "the local part of an alias",
-	"private-key":            "a private key",
-	"public-key":             "a public key",
-	"purge":                  "also remove local data",
-	"query":                  "a URL query parameter",
-	"recursive":              "descend into subdirectories",
-	"reddit":                 "a Reddit handle",
-	"reinstall":              "install again even if already current",
-	"remind":                 "a reminder before the start",
-	"removed":                "list what was taken away rather than what is there",
-	"render":                 "which representation of a message body to print",
-	"repeat":                 "how a schedule repeats",
-	"revoke":                 "also invalidate the session at Proton",
-	"risk":                   "which password-health check a login fails",
-	"role":                   "the part somebody plays in an organization",
-	"rrule":                  "an iCalendar recurrence rule",
-	"scope":                  "the Drive subtree to look in",
-	"second-phone":           "a second phone number",
-	"secret-file":            "where to read a secret field from, as NAME=FILE",
-	"secret-stdin":           "read the named secret field from stdin",
-	"separator":              "what stands between the words of a passphrase",
-	"shared":                 "the item somebody shared with you to act in",
-	"security":               "a Wi-Fi security protocol",
-	"send-at":                "when to deliver",
-	"sieve":                  "a Sieve script",
-	"star":                   "star matching mail",
-	"smaller-than":           "select files below a size",
-	"social-security-number": "a social security number",
-	"sort":                   "which key a listing is ordered by",
-	"ssid":                   "a Wi-Fi network name",
-	"starred":                "select starred things",
-	"start":                  "the beginning of a range or event",
-	"state":                  "a state or province",
-	"status":                 "whether an event is going ahead: confirmed, tentative or cancelled",
-	"strip-quotes":           "drop quoted reply blocks",
-	"subject":                "the subject line: compose sets it, a filter matches it",
-	"suffix":                 "the domain part of an alias",
-	"summary":                "one line per item instead of the whole thing",
-	"tag":                    "the photo tag to select",
-	"timezone":               "an IANA time zone",
-	"title":                  "a title: an event's, or a person's job title",
-	"to":                     "an email recipient: compose sets one, a filter matches one",
-	"totp-field":             "a custom field holding a two-factor secret",
-	"totp":                   "a two-factor code",
-	"totp-uri":               "a TOTP URI or secret, stored on a Pass login",
-	"type":                   "the kind of thing to create or select",
-	"unread":                 "select unread things",
-	"until":                  "where a range stops",
-	"url":                    "a URL",
-	"username":               "a login username",
-	"vault":                  "the Pass vault to act in",
-	"website":                "a website address",
-	"words":                  "how many words a passphrase has, instead of a password",
-	"work-email":             "a work email address",
-	"work-phone":             "a work phone number",
-	"x-handle":               "an X handle",
-	"yahoo":                  "a Yahoo handle",
-	"yes":                    "proceed without asking",
-	"zone":                   "an IANA time zone",
-}
-
 func TestSharedFlagNamesShareOneMeaning(t *testing.T) {
 	leaves, _ := partition(t)
 	users := map[string][]string{}
@@ -470,9 +287,20 @@ func TestSharedFlagNamesShareOneMeaning(t *testing.T) {
 		if len(cmds) < 2 {
 			continue
 		}
-		if _, declared := flagMeanings[name]; !declared {
+		if _, declared := kit.Flags[name]; !declared {
 			t.Errorf("--%s is used by %d commands but has no declared meaning:\n  %s",
 				name, len(cmds), strings.Join(cmds, "\n  "))
+		}
+	}
+	// The other direction. A vocabulary that keeps a word after nothing says it
+	// stops describing the CLI, and the next reader trusts it anyway: --totp-uri,
+	// --cvv and five more outlived the flags they described by a whole release.
+	// Global flags are declared too, and no leaf owns one, so they are exempt.
+	global := map[string]bool{}
+	newRoot().PersistentFlags().VisitAll(func(f *pflag.Flag) { global[f.Name] = true })
+	for name := range kit.Flags {
+		if len(users[name]) == 0 && !global[name] {
+			t.Errorf("kit.Flags declares --%s and no command takes it", name)
 		}
 	}
 }
@@ -497,53 +325,37 @@ func TestSharedFlagNamesShareOneMeaning(t *testing.T) {
 // different meaning has to pick a different name, because this fails on any
 // command that declares one of them itself.
 var kitOwnedFlags = map[string]string{
-	"all":                     "kit.All",
-	"clear-link-password":     "kit.LinkPassword",
-	"eo-password-file":        "kit.EOPassword",
-	"eo-password-stdin":       "kit.EOPassword",
-	"extra-password-file":     "kit.ExtraPassword",
-	"extra-password-stdin":    "kit.ExtraPassword",
-	"link-password-file":      "kit.LinkPassword",
-	"link-password-stdin":     "kit.LinkPassword",
-	"passphrase-file":         "kit.Passphrase",
-	"passphrase-stdin":        "kit.Passphrase",
-	"password-file":           "kit.Reauth",
-	"password-stdin":          "kit.Reauth",
-	"previous-password-file":  "kit.Recovery",
-	"previous-password-stdin": "kit.Recovery",
-	"recovery-file":           "kit.Recovery",
-	"recovery-phrase":         "kit.Recovery",
-	"recovery-phrase-file":    "kit.Recovery",
-	"recovery-phrase-stdin":   "kit.Recovery",
-	"second-password-file":    "kit.SecondPassword",
-	"second-password-stdin":   "kit.SecondPassword",
-	"totp":                    "kit.Reauth",
+	"all":                    "kit.All",
+	"clear-link-password":    "kit.LinkPassword",
+	"eo-password-file":       "kit.EOPassword",
+	"extra-password-file":    "kit.ExtraPassword",
+	"link-password-file":     "kit.LinkPassword",
+	"passphrase-file":        "kit.Passphrase",
+	"password-file":          "kit.Reauth",
+	"previous-password-file": "kit.Recovery",
+	"recovery-file":          "kit.Recovery",
+	"recovery-phrase":        "kit.Recovery",
+	"recovery-phrase-file":   "kit.Recovery",
+	"second-password-file":   "kit.SecondPassword",
+	"totp":                   "kit.Reauth",
 }
 
 // kitFlagUsage is what kit itself registers each of those with, so the guard
 // below can tell kit's own registration from a command redeclaring the name.
 var kitFlagUsage = map[string]string{
-	"all":                     kit.AllUsage,
-	"clear-link-password":     kit.ClearLinkPasswordUsage,
-	"eo-password-file":        kit.EOPasswordFileUsage,
-	"eo-password-stdin":       kit.EOPasswordStdinUsage,
-	"extra-password-file":     kit.ExtraPasswordFileUsage,
-	"extra-password-stdin":    kit.ExtraPasswordStdinUsage,
-	"link-password-file":      kit.LinkPasswordFileUsage,
-	"link-password-stdin":     kit.LinkPasswordStdinUsage,
-	"passphrase-file":         kit.PassphraseFileUsage,
-	"passphrase-stdin":        kit.PassphraseStdinUsage,
-	"password-file":           kit.PasswordFileUsage,
-	"password-stdin":          kit.PasswordStdinUsage,
-	"previous-password-file":  kit.PreviousPasswordFileUsage,
-	"previous-password-stdin": kit.PreviousPasswordStdinUsage,
-	"recovery-file":           kit.RecoveryFileUsage,
-	"recovery-phrase":         kit.RecoveryPhraseUsage,
-	"recovery-phrase-file":    kit.RecoveryPhraseFileUsage,
-	"recovery-phrase-stdin":   kit.RecoveryPhraseStdinUsage,
-	"second-password-file":    kit.SecondPasswordFileUsage,
-	"second-password-stdin":   kit.SecondPasswordStdinUsage,
-	"totp":                    kit.TOTPUsage,
+	"all":                    kit.AllUsage,
+	"clear-link-password":    kit.ClearLinkPasswordUsage,
+	"eo-password-file":       kit.EOPasswordFileUsage,
+	"extra-password-file":    kit.ExtraPasswordFileUsage,
+	"link-password-file":     kit.LinkPasswordFileUsage,
+	"passphrase-file":        kit.PassphraseFileUsage,
+	"password-file":          kit.PasswordFileUsage,
+	"previous-password-file": kit.PreviousPasswordFileUsage,
+	"recovery-file":          kit.RecoveryFileUsage,
+	"recovery-phrase":        kit.RecoveryPhraseUsage,
+	"recovery-phrase-file":   kit.RecoveryPhraseFileUsage,
+	"second-password-file":   kit.SecondPasswordFileUsage,
+	"totp":                   kit.TOTPUsage,
 }
 
 // A flag name that names a fixed set of values names the same set everywhere.
@@ -562,12 +374,14 @@ var kitFlagUsage = map[string]string{
 // the flag actually means: two commands offering different values are asking
 // different questions whatever their usage strings say.
 //
-// domainsByCollection are the two that ask one question whose answers belong to
-// whatever is being acted on: which column to order by, and which layout to
-// write. A message can be laid down as eml or mbox and a vault cannot; a card
-// sorts by name and a file by size. The question is the same word in every one
-// of them, and anything not named here that offers a second set is not.
-var domainsByCollection = map[string]bool{"format": true, "sort": true}
+// domainsByCollection are the three that ask one question whose answers belong
+// to whatever is being acted on: which column to order by, which layout to
+// write, and what somebody may do with a shared thing. A message can be laid
+// down as eml or mbox and a vault cannot; a card sorts by name and a file by
+// size; a Pass vault has a manager and a Drive folder has nothing above editor.
+// The question is the same word in every one of them, and anything not named
+// here that offers a second set is not.
+var domainsByCollection = map[string]bool{"access": true, "format": true, "sort": true}
 
 func TestAFlagNameNamesOneSetOfValues(t *testing.T) {
 	// Building the tree is what populates the registry.
@@ -720,10 +534,10 @@ var filterParityExceptions = map[string]string{}
 // things: how many, whether everything was meant, where to look when there is no
 // argument to say it with, and what to do with what it found.
 var notNarrowing = map[string]bool{
-	"limit": true, "scope": true, "help": true,
+	"limit": true, "page": true, "scope": true, "help": true,
 	"into": true, "dest": true, "dest-dir": true, "force": true,
 	"format": true, "no-attachments": true, "label": true,
-	"in": true, "never": true, "until": true,
+	"expires": true, "until": true,
 }
 
 // narrows reports whether a flag on a bulk verb says which things it acts on.
@@ -959,10 +773,10 @@ func TestNoLeafShadowsAGlobalFlag(t *testing.T) {
 
 // ── rule 14: standard input has one owner ──
 
-// Several things want stdin: --password-stdin for the account password,
-// --second-password-stdin for the secret that opens the keys, and `-` for a
-// body, a key, or a file to upload. Whichever read it second would find an empty
-// stream and fail somewhere further along with a puzzle.
+// Everything that wants stdin asks with the same word: `--password-file -` for
+// the account password, `--secret-file password=-` for a stored one, and a bare
+// `-` for a body, a key, or a file to upload. Whichever read it second would find
+// an empty stream and fail somewhere further along with a puzzle.
 //
 // So every reader goes through App.Stdin, which hands it out once and names both
 // claimants when they collide - which is the only reason a command may declare
@@ -992,7 +806,7 @@ func TestReauthCommandsAreDeclared(t *testing.T) {
 		"proton account keys reactivate",
 		"proton account login",
 		"proton calendar settings calendars delete",
-		"proton mail messages expire",
+		"proton mail messages update",
 		"proton mail settings addresses create",
 		"proton mail settings addresses delete",
 		"proton mail settings addresses disable",
@@ -1110,12 +924,26 @@ func TestCommandsThatActOnThisMachineAreDeclared(t *testing.T) {
 
 func TestEveryVerbIsInTheVocabulary(t *testing.T) {
 	leaves, _ := partition(t)
+	spoken := map[string]bool{}
 	for _, c := range leaves {
 		if c.Name() == kit.Program {
 			continue
 		}
+		spoken[c.Name()] = true
 		if _, ok := kit.Verbs[c.Name()]; !ok {
 			t.Errorf("%s: %q is not in the declared verb vocabulary", cmdPath(c), c.Name())
+		}
+	}
+	// `completion` is a command and is not one of the leaves: partition drops it,
+	// because cobra writes it and it answers to none of the rules the rest are
+	// held to. It is still a word this CLI says.
+	spoken["completion"] = true
+	// The other direction. `expire`, `forget`, `link`, `unlink` and `options`
+	// outlived the commands that said them by a whole release, and a vocabulary
+	// holding words nothing speaks describes a CLI that is not there.
+	for verb := range kit.Verbs {
+		if !spoken[verb] {
+			t.Errorf("kit.Verbs declares %q and no command ends in it", verb)
 		}
 	}
 }
@@ -1736,6 +1564,11 @@ func TestShorthandsAreDeclared(t *testing.T) {
 //
 // So the action names the seam. Anything reporting ui.Created goes through
 // kit.Create, and this reads the source rather than trusting it.
+//
+// AnswerFollows is the one exception, and it is the same contract by another
+// route: the command writes its own record to stdout straight after, so what a
+// script captures is that - the URL of a link it just made, which is the thing
+// worth capturing and is not the ID.
 func TestACreationIsReportedByTheSeamThatKnowsItsID(t *testing.T) {
 	for _, dir := range []string{"."} {
 		err := filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
@@ -1757,7 +1590,7 @@ func TestACreationIsReportedByTheSeamThatKnowsItsID(t *testing.T) {
 					return true
 				}
 				for _, arg := range call.Args {
-					if !reportsCreated(arg) {
+					if !reportsCreated(arg) || writesItsOwnAnswer(arg) {
 						continue
 					}
 					if seam != "kit.Create" {
@@ -1774,6 +1607,25 @@ func TestACreationIsReportedByTheSeamThatKnowsItsID(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+}
+
+// writesItsOwnAnswer reports whether a result spec says a record follows it on
+// stdout.
+func writesItsOwnAnswer(arg ast.Expr) bool {
+	lit, ok := arg.(*ast.CompositeLit)
+	if !ok {
+		return false
+	}
+	for _, elt := range lit.Elts {
+		kv, ok := elt.(*ast.KeyValueExpr)
+		if !ok {
+			continue
+		}
+		if key, ok := kv.Key.(*ast.Ident); ok && key.Name == "AnswerFollows" {
+			return true
+		}
+	}
+	return false
 }
 
 // reportsCreated reports whether an argument is a result spec whose action is

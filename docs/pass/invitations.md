@@ -50,6 +50,13 @@ proton pass invitations list
 proton pass invitations list
 ```
 
+| Flag | Description |
+| --- | --- |
+| `--desc` | Reverse the order |
+| `--limit int` | How many invitations per page; 0 for all of them |
+| `--page int` | Which page of results, counting from zero |
+| `--sort string` | Order by: vault, sender (default `vault`) |
+
 ---
 
 Every command also takes the [flags that work everywhere](../about/commands.md#flags-that-work-on-every-command).

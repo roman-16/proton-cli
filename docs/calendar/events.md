@@ -77,18 +77,18 @@ proton calendar events export
 ```
 
 ```bash
-proton calendar events export --start 2026-01-01 --end 2026-12-31 --dest year.ics
+proton calendar events export --after 2026-01-01 --before 2026-12-31 --dest year.ics
 proton calendar events export --calendar Work --dest - > work.ics
 ```
 
 | Flag | Description |
 | --- | --- |
+| `--after string` | First day to include (YYYY-MM-DD) |
+| `--before string` | Last day to include (YYYY-MM-DD) |
 | `--calendar string` | Which calendar, by name or ID (default: all of them) |
 | `--dest string` | Write to this path, or - for stdout |
 | `--dest-dir string` | Write into this directory, keeping each item's own name |
-| `--end string` | Last day to include (YYYY-MM-DD) |
 | `--force` | Overwrite a file that already exists |
-| `--start string` | First day to include (YYYY-MM-DD) |
 
 ## `get`
 
@@ -143,15 +143,17 @@ proton calendar events list
 
 ```bash
 proton calendar events list
-proton calendar events list --start 2026-04-15 --end 2026-04-30
+proton calendar events list --after 2026-04-15 --before 2026-04-30
 proton calendar events list --calendar Work
 ```
 
 | Flag | Description |
 | --- | --- |
+| `--after string` | First day to include (YYYY-MM-DD) |
+| `--before string` | Last day to include (YYYY-MM-DD) |
 | `--calendar string` | Which calendar, by name or ID (default: all of them) |
-| `--end string` | Last day to include (YYYY-MM-DD) |
-| `--start string` | First day to include (YYYY-MM-DD) |
+| `--limit int` | How many events per page; 0 for all of them |
+| `--page int` | Which page of results, counting from zero |
 
 ## `respond`
 

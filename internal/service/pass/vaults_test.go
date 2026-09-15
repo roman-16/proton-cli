@@ -93,7 +93,7 @@ func TestPatchedVaultChangesOnlyWhatItNames(t *testing.T) {
 		Display: &pb.VaultDisplayPreferences{Icon: 3, Color: 5},
 	})
 
-	icon := 7
+	icon := "wallet"
 	out, err := patchedVault(content, key, VaultPatch{Icon: &icon})
 	if err != nil {
 		t.Fatal(err)
@@ -105,29 +105,33 @@ func TestPatchedVaultChangesOnlyWhatItNames(t *testing.T) {
 	if got.Name != "Personal" || got.Description != "cards and logins" {
 		t.Errorf("setting an icon changed something else: %+v", &got)
 	}
-	if got.Display.Icon != pb.VaultIcon(DisplayValue(7)) {
-		t.Errorf("icon = %v, want the enum for 7", got.Display.Icon)
+	if got.Display.Icon != pb.VaultIcon(IconValue("wallet")) {
+		t.Errorf("icon = %v, want the enum for wallet", got.Display.Icon)
 	}
 	if got.Display.Color != 5 {
 		t.Errorf("setting an icon dropped the colour: %v", got.Display.Color)
 	}
 }
 
-// The numbers a person writes and the enum Pass stores are offset, and the two
-// have to agree in both directions or a vault reads back as a different colour
-// than it was set to.
-func TestDisplayNumbersRoundTrip(t *testing.T) {
-	for n := 1; n <= 30; n++ {
-		if got := DisplayNumber(DisplayValue(n)); got != n {
-			t.Errorf("%d round-tripped as %d", n, got)
+// The names a person writes and the enum Pass stores have to agree in both
+// directions, or a vault reads back as a different colour than it was set to.
+func TestDisplayNamesRoundTrip(t *testing.T) {
+	for _, name := range VaultIcons() {
+		if got := IconName(IconValue(name)); got != name {
+			t.Errorf("icon %q round-tripped as %q", name, got)
 		}
 	}
-	// A vault that never chose reads as nothing chosen, not as number one.
-	if got := DisplayNumber(0); got != 0 {
-		t.Errorf("an unset display read as %d, want 0", got)
+	for _, name := range VaultColors() {
+		if got := ColorName(ColorValue(name)); got != name {
+			t.Errorf("colour %q round-tripped as %q", name, got)
+		}
 	}
-	if got := DisplayNumber(1); got != 0 {
-		t.Errorf("a custom display read as %d, want 0", got)
+	// A vault that never chose reads as nothing chosen, not as the first swatch.
+	if got := IconName(0); got != "" {
+		t.Errorf("an unset icon read as %q, want nothing", got)
+	}
+	if got := ColorName(1); got != "" {
+		t.Errorf("a custom colour read as %q, want nothing", got)
 	}
 }
 

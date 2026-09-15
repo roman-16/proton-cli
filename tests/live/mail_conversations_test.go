@@ -26,12 +26,12 @@ func TestMailConversationsListFromZeroResultsHint(t *testing.T) {
 }
 
 func TestMailConversationsList(t *testing.T) {
-	stdout := runOK(t, "mail", "conversations", "list", "--page-size", "5")
+	stdout := runOK(t, "mail", "conversations", "list", "--limit", "5")
 	assertContains(t, stdout, "SUBJECT")
 }
 
 func TestMailConversationsListJSONShape(t *testing.T) {
-	data := runJSON(t, "mail", "conversations", "list", "--page-size", "3")
+	data := runJSON(t, "mail", "conversations", "list", "--limit", "3")
 	if _, ok := data["total"]; !ok {
 		t.Error("expected 'total' key")
 	}
@@ -94,7 +94,7 @@ func TestMailConversationsTrashRoundTrip(t *testing.T) {
 	convID := findConversationFor(t, mutableMail(t))
 
 	runOK(t, "mail", "conversations", "trash", "--", convID)
-	data := runJSON(t, "mail", "conversations", "list", "--page-size", "50")
+	data := runJSON(t, "mail", "conversations", "list", "--limit", "50")
 	convs := data["conversations"].([]interface{})
 	for _, c := range convs {
 		if c.(map[string]interface{})["id"].(string) == convID {
@@ -132,7 +132,7 @@ func TestMailConversationsMarkAndStar(t *testing.T) {
 // conversationListed reports whether a thread is in the listing the filters name.
 func conversationListed(t *testing.T, convID string, filters ...string) bool {
 	t.Helper()
-	args := append([]string{"mail", "conversations", "list", "--page-size", "50"}, filters...)
+	args := append([]string{"mail", "conversations", "list", "--limit", "50"}, filters...)
 	for _, row := range runJSONArray(t, args...) {
 		if row.(map[string]interface{})["id"] == convID {
 			return true

@@ -8,9 +8,9 @@ Holds `list`.
 
 ## `list`
 
-List everything you have shared, by public link or with named people.
+List the files and folders you have handed to named people.
 
-To check a single item instead, run `items share get PATH`.
+A public link is the other way to share, and `links list` has those. To check a single item instead, run `items share get PATH`.
 
 ```
 proton drive sharing list
@@ -19,6 +19,13 @@ proton drive sharing list
 ```bash
 proton drive sharing list
 ```
+
+| Flag | Description |
+| --- | --- |
+| `--desc` | Reverse the order |
+| `--limit int` | How many items per page; 0 for all of them |
+| `--page int` | Which page of results, counting from zero |
+| `--sort string` | Order by: name, size, shared (default `name`) |
 
 ---
 

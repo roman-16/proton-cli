@@ -24,18 +24,19 @@ proton contacts keys list jane
 
 Pin a public key so mail to a contact is encrypted to it.
 
+A key is pinned to one address. Name that address as REF when the contact holds more than one; naming the contact is enough when they hold one.
+
 ```
 proton contacts keys pin REF
 ```
 
 ```bash
 proton contacts keys pin jane --key jane-pubkey.asc
-proton contacts keys pin jane --email jane@example.com --key - --no-encrypt
+proton contacts keys pin jane@example.com --key - --no-encrypt
 ```
 
 | Flag | Description |
 | --- | --- |
-| `--email string` | Which of the contact's addresses the key applies to |
 | `--key string` | Armoured public key file (- for stdin) |
 | `--no-encrypt` | Store the key for verification only, leaving encryption off |
 | `--scheme string` | PGP scheme for recipients outside Proton: pgp-mime, pgp-inline |
@@ -44,18 +45,16 @@ proton contacts keys pin jane --email jane@example.com --key - --no-encrypt
 
 Remove the keys pinned to a contact.
 
+A key is pinned to one address. Name that address as REF when the contact holds more than one; naming the contact is enough when they hold one.
+
 ```
 proton contacts keys unpin REF
 ```
 
 ```bash
 proton contacts keys unpin jane
-proton contacts keys unpin jane --email jane@example.com
+proton contacts keys unpin jane@example.com
 ```
-
-| Flag | Description |
-| --- | --- |
-| `--email string` | Which of the contact's addresses to unpin |
 
 ---
 

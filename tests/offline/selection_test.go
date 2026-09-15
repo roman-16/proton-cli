@@ -62,19 +62,11 @@ func TestADomainToAddHasToBeADomain(t *testing.T) {
 	}
 }
 
-// Setting a catch-all and turning one off are opposite requests, and a command
-// line asking for both settles nothing.
-func TestSettingAndClearingACatchAllAtOnceIsRefused(t *testing.T) {
-	refuses(t, 1, []string{"mail", "settings", "domains", "update", "example.com",
-		"--catch-all", "work@example.com", "--clear-catch-all"},
-		"--catch-all and --clear-catch-all contradict each other")
-}
-
 // The one field a domain has is the one the command exists to write, so naming
 // neither is a command line with nothing in it.
 func TestUpdatingADomainWithNothingToChangeIsRefused(t *testing.T) {
 	refuses(t, 1, []string{"mail", "settings", "domains", "update", "example.com"},
-		"Nothing to change", "--clear-catch-all")
+		"Nothing to change", "--catch-all none")
 }
 
 func TestSendingNeedsSomethingToSend(t *testing.T) {
@@ -112,11 +104,11 @@ func TestAPageThatCannotExistIsRefused(t *testing.T) {
 		{"pass", "items", "list"},
 	} {
 		refuses(t, 1, append(listing, "--page", "-1"), "--page counts from zero")
-		refuses(t, 1, append(listing, "--page-size", "-5"), "--page-size is a count")
+		refuses(t, 1, append(listing, "--limit", "-5"), "--limit is a count")
 		// Zero is the whole collection, so there is no second page of it, and an
 		// empty answer would read as the end rather than as a wrong question.
-		refuses(t, 1, append(listing, "--page", "2", "--page-size", "0"),
-			"--page 2 asks for a page of a listing --page-size 0 does not cut into")
+		refuses(t, 1, append(listing, "--page", "2", "--limit", "0"),
+			"--page 2 asks for a page of a listing --limit 0 does not cut into")
 	}
 }
 
@@ -142,11 +134,11 @@ func TestAnAutoReplyScheduleThatContradictsItselfIsRefused(t *testing.T) {
 		args    []string
 		phrases []string
 	}{
-		{[]string{"--repeat", "permanent", "--start", "09:00", "--message", "x"}, []string{"takes no --start"}},
-		{[]string{"--repeat", "daily", "--start", "09:00", "--end", "17:00", "--message", "x"}, []string{"needs --days"}},
-		{[]string{"--repeat", "weekly", "--start", "mon:09:00", "--end", "fri:17:00", "--days", "mon", "--message", "x"},
+		{[]string{"--repeat", "permanent", "--start", "09:00", "--body", "x"}, []string{"takes no --start"}},
+		{[]string{"--repeat", "daily", "--start", "09:00", "--end", "17:00", "--body", "x"}, []string{"needs --days"}},
+		{[]string{"--repeat", "weekly", "--start", "mon:09:00", "--end", "fri:17:00", "--days", "mon", "--body", "x"},
 			[]string{"--days applies to --repeat daily"}},
-		{[]string{"--repeat", "hourly", "--message", "x"},
+		{[]string{"--repeat", "hourly", "--body", "x"},
 			[]string{"--repeat accepts: fixed, daily, weekly, monthly, permanent"}},
 		{[]string{"--repeat", "permanent"}, []string{"A message is required"}},
 	} {
@@ -160,12 +152,11 @@ func TestEmptyingAFolderNeedsToKnowWhichOne(t *testing.T) {
 	refuses(t, 1, []string{"mail", "messages", "empty"}, "Which folder", "--folder trash")
 }
 
-// A duration and a stop are opposite instructions, and which was meant is not a
-// question any account can answer.
-func TestExpiringNeedsOneInstruction(t *testing.T) {
-	refuses(t, 1, []string{"mail", "messages", "expire", "--in", "7d", "--never", "any-ref"},
-		"opposite things")
-	refuses(t, 1, []string{"mail", "messages", "expire", "any-ref"}, "How long?", "--in 7d")
+// The one field a message has to change is the one this command exists to write,
+// so naming none is a command line with nothing in it.
+func TestUpdatingAMessageNeedsAnInstruction(t *testing.T) {
+	refuses(t, 1, []string{"mail", "messages", "update", "any-ref"},
+		"Nothing to change", "--expires 7d")
 }
 
 // Only the types whose Pass editor offers headings can carry a section, and

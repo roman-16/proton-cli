@@ -472,7 +472,7 @@ func messageIDInFolder(folder, subject string) string {
 // holds.
 func messageIDInFolderAs(profile, folder, subject string) string {
 	stdout, _, code, err := runAs(profile, nil, "--output", "json", "mail", "messages", "list",
-		"--folder", folder, "--page-size", "150")
+		"--folder", folder, "--limit", "150")
 	if err != nil || code != 0 {
 		return ""
 	}
@@ -583,7 +583,7 @@ func sendTestMailSecondary(t *testing.T, subject string) string {
 // `from` whose decrypted body contains `needle`, returning its ID or "".
 func secondaryMailContaining(t *testing.T, from, needle string) string {
 	t.Helper()
-	list := runJSONSecondary(t, "mail", "messages", "list", "--folder", "inbox", "--page-size", "20")
+	list := runJSONSecondary(t, "mail", "messages", "list", "--folder", "inbox", "--limit", "20")
 	msgs, _ := list["messages"].([]interface{})
 	for _, m := range msgs {
 		mm := m.(map[string]interface{})

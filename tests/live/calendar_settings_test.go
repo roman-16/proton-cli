@@ -198,7 +198,7 @@ func TestCalendarSharingRoundTrip(t *testing.T) {
 	// Until it is answered the invitation is pending, and the other account sees
 	// nothing.
 	var invited bool
-	for _, row := range runJSONArrayPaid(t, "calendar", "settings", "calendars", "share", "list", ref) {
+	for _, row := range shareMembers(t, ref) {
 		m, _ := row.(map[string]interface{})
 		if email, _ := m["email"].(string); !strings.EqualFold(email, secondaryEmail()) {
 			continue
@@ -214,6 +214,12 @@ func TestCalendarSharingRoundTrip(t *testing.T) {
 	if !invited {
 		t.Fatal("the second account is not listed on the calendar it was given")
 	}
+
+	// Changing what a pending invitation grants goes through the invitation's own
+	// endpoint, because there is no membership to change yet.
+	runOKPaid(t, "calendar", "settings", "calendars", "share", "update", ref,
+		secondaryEmail(), "--access", "editor")
+	assertAccess(t, ref, secondaryEmail(), "editor")
 
 	// The other side takes it, which is the half that proves the key it was
 	// handed actually opens the calendar.
@@ -254,7 +260,7 @@ func TestCalendarSharingRoundTrip(t *testing.T) {
 	// And it is listed as a member rather than an invitation now, so ending it
 	// goes through the other endpoint.
 	var active bool
-	for _, row := range runJSONArrayPaid(t, "calendar", "settings", "calendars", "share", "list", ref) {
+	for _, row := range shareMembers(t, ref) {
 		m, _ := row.(map[string]interface{})
 		if email, _ := m["email"].(string); !strings.EqualFold(email, secondaryEmail()) {
 			continue
@@ -267,8 +273,13 @@ func TestCalendarSharingRoundTrip(t *testing.T) {
 		t.Error("after accepting, the second account is not an active member")
 	}
 
+	// And once it is a membership, the same command reaches the other endpoint.
+	runOKPaid(t, "calendar", "settings", "calendars", "share", "update", ref,
+		secondaryEmail(), "--access", "viewer")
+	assertAccess(t, ref, secondaryEmail(), "viewer")
+
 	runOKPaid(t, "calendar", "settings", "calendars", "share", "remove", ref, secondaryEmail())
-	for _, row := range runJSONArrayPaid(t, "calendar", "settings", "calendars", "share", "list", ref) {
+	for _, row := range shareMembers(t, ref) {
 		m, _ := row.(map[string]interface{})
 		if email, _ := m["email"].(string); strings.EqualFold(email, secondaryEmail()) {
 			t.Error("the second account still has the calendar after being removed")
@@ -293,7 +304,7 @@ func TestCalendarSharingWithdrawnBeforeAnswer(t *testing.T) {
 	// Nobody has answered, so this withdraws the invitation rather than ending a
 	// membership.
 	runOKPaid(t, "calendar", "settings", "calendars", "share", "remove", ref, secondaryEmail())
-	for _, row := range runJSONArrayPaid(t, "calendar", "settings", "calendars", "share", "list", ref) {
+	for _, row := range shareMembers(t, ref) {
 		m, _ := row.(map[string]interface{})
 		if email, _ := m["email"].(string); strings.EqualFold(email, secondaryEmail()) {
 			t.Error("the invitation is still listed after being withdrawn")
@@ -337,4 +348,32 @@ func TestCalendarSettingsSetListsKeys(t *testing.T) {
 	stdout := runOK(t, "calendar", "settings", "list")
 	assertContains(t, stdout, "primary-timezone")
 	assertContains(t, stdout, "week-numbers")
+}
+
+// shareMembers reads everybody with a claim on a calendar.
+//
+// `share get` answers about the calendar rather than about its members, so the
+// answer is a record with the members inside it - the shape `items share get`
+// has in Drive and Pass.
+func shareMembers(t *testing.T, ref string) []interface{} {
+	t.Helper()
+	record := runJSONPaid(t, "calendar", "settings", "calendars", "share", "get", ref)
+	members, _ := record["members"].([]interface{})
+	return members
+}
+
+// assertAccess reads back what a calendar grants one address.
+func assertAccess(t *testing.T, ref, email, want string) {
+	t.Helper()
+	for _, row := range shareMembers(t, ref) {
+		m, _ := row.(map[string]interface{})
+		if got, _ := m["email"].(string); !strings.EqualFold(got, email) {
+			continue
+		}
+		if access, _ := m["access"].(string); access != want {
+			t.Errorf("access is %q, want %q", access, want)
+		}
+		return
+	}
+	t.Errorf("%s is not listed on the calendar", email)
 }

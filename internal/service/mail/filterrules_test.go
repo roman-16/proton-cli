@@ -152,7 +152,7 @@ func TestEveryPartOfARuleReachesTheTree(t *testing.T) {
 		{`"Type":"Not"`, "a negated condition"},
 		{`"Type":"Address"`, "a sender condition"},
 		{`"*@acme.com"`, "ends becoming a wildcard match"},
-		{`"Name":"Archive"`, "--move-to"},
+		{`"Name":"Archive"`, "--into"},
 		{`"Name":"Receipts"`, "--label"},
 		{`\\Seen`, "--mark-read"},
 		{`\\Flagged`, "--star"},

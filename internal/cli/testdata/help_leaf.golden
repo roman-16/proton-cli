@@ -17,9 +17,8 @@ Flags:
       --body string                 Message body (- reads stdin)
       --cc stringArray              Carbon-copy recipient (repeatable)
       --eml string                  Build the message from an RFC 822 file; other flags override what it says
-      --eo-password-file string     Read the password for recipients outside Proton from a file
+      --eo-password-file string     Read the password for recipients outside Proton from a file, or - for stdin
       --eo-password-hint string     Hint shown to password-protected recipients
-      --eo-password-stdin           Read the password for recipients outside Proton from stdin
       --expires string              Self-destruct after DURATION (e.g. 7d, 24h), or never
       --from string                 Address to send from, by email or ID (default: your primary)
   -h, --help                        help for send

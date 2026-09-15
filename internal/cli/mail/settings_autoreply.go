@@ -77,13 +77,13 @@ func autoreplySetCmd() *cobra.Command {
 			if ar.Zone, err = c.App.Zone(c.Ctx); err != nil {
 				return err
 			}
-			msg, err := kit.ReadTextArg(c, ar.Message, "--message")
+			msg, err := kit.ReadTextArg(c, ar.Message, "--body")
 			if err != nil {
 				return err
 			}
 			if strings.TrimSpace(msg) == "" {
 				return kit.Fail("A message is required.").
-					Hint(`--message "I'm away until the 14th.", or --message - to read stdin.`)
+					Hint(`--body "I'm away until the 14th.", or --body - to read stdin.`)
 			}
 			if !html {
 				msg = mailtext.TextToHTML(msg)
@@ -107,8 +107,8 @@ func autoreplySetCmd() *cobra.Command {
 	c.Flags().StringVar(&ar.Start, "start", "", "Start of the window (grammar depends on --repeat)")
 	c.Flags().StringVar(&ar.End, "end", "", "End of the window (grammar depends on --repeat)")
 	c.Flags().StringSliceVar(&ar.Days, "days", nil, "Days it is active, for a daily schedule, e.g. mon,tue,wed")
-	c.Flags().StringVar(&ar.Message, "message", "", "Reply body (- reads stdin)")
-	c.Flags().BoolVar(&html, "html", false, "Treat the message as HTML rather than escaping it")
+	c.Flags().StringVar(&ar.Message, "body", "", "The reply to send (- reads stdin)")
+	c.Flags().BoolVar(&html, "html", false, "Treat the body as HTML rather than escaping it")
 	reauth.Declare(c)
 	return c
 }

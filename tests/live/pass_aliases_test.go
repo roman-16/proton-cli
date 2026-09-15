@@ -182,7 +182,7 @@ func trashConfirmationMail() error {
 // subject contains what is being waited for.
 func secondaryMessageAbout(subject string) string {
 	stdout, _, code, err := runAs(account.Secondary, nil, "--output", "json",
-		"mail", "messages", "list", "--folder", "inbox", "--page-size", "20")
+		"mail", "messages", "list", "--folder", "inbox", "--limit", "20")
 	if err != nil || code != 0 {
 		return ""
 	}
@@ -230,15 +230,6 @@ func defaultMailbox(t *testing.T) string {
 	return ""
 }
 
-func TestPassAliasOptions(t *testing.T) {
-	// Both kinds come back in one table, told apart by KIND rather than by two
-	// headed sections.
-	stdout := runOK(t, "pass", "aliases", "options")
-	assertContains(t, stdout, "KIND")
-	assertContains(t, stdout, "suffix")
-	assertContains(t, stdout, "mailbox")
-}
-
 // What the listing offers has to be something --suffix will take.
 //
 // Proton mints the word in front of a suffix afresh on every request, so a
@@ -246,15 +237,12 @@ func TestPassAliasOptions(t *testing.T) {
 // stopped working. Making an alias here would prove it end to end and would also
 // spend one of the handful Proton allows in an hour, so what is checked is the
 // shape: --suffix takes the domain.
-func TestPassAliasOptionsOfferDomains(t *testing.T) {
+func TestPassAliasSuffixesAreDomains(t *testing.T) {
 	suffixes := 0
-	for _, row := range runJSONArray(t, "pass", "aliases", "options") {
+	for _, row := range runJSONArray(t, "pass", "settings", "domains", "list") {
 		o, _ := row.(map[string]interface{})
-		if kind, _ := o["kind"].(string); kind != "suffix" {
-			continue
-		}
 		suffixes++
-		value, _ := o["value"].(string)
+		value, _ := o["domain"].(string)
 		if strings.Contains(value, "@") || strings.HasPrefix(value, ".") {
 			t.Errorf("the suffix %q is a whole address ending, which Proton regenerates "+
 				"on every request and refuses when it is passed back; --suffix takes the domain", value)

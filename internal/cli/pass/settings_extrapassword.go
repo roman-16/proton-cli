@@ -53,8 +53,8 @@ func extraPasswordEnableCmd() *cobra.Command {
 		Use:   "enable",
 		Short: "Protect Pass with an extra password",
 		Long: "Protect Pass with an extra password.\n\n" +
-			"The password comes from --extra-password-file, from --extra-password-stdin, or\n" +
-			"from a prompt that asks for it twice. It needs at least eight characters.\n\n" +
+			"The password comes from --extra-password-file, which takes - for stdin, or from\n" +
+			"a prompt that asks for it twice. It needs at least eight characters.\n\n" +
 			"Keep it safe: without it nothing opens Pass, on any device. Your other devices\n" +
 			"ask for it the next time they open Pass, and this session goes on working.\n\n" +
 			"A Pass that already has one is refused. Turn it off and on again to change it.",
@@ -108,8 +108,8 @@ func extraPasswordDisableCmd() *cobra.Command {
 		Use:   "disable",
 		Short: "Remove the extra password from Pass",
 		Long: "Remove the extra password from Pass.\n\n" +
-			"The password is asked for first, or comes from --extra-password-file or\n" +
-			"--extra-password-stdin.\n\n" +
+			"The password is asked for first, or comes from --extra-password-file, which\n" +
+			"takes - for stdin.\n\n" +
 			"Pass then opens with your account password alone, on every device. This\n" +
 			"session goes on working.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {

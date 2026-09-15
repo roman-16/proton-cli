@@ -138,8 +138,8 @@ func TestAnItemReachedThroughALinkSaysWhatTheLinkPermits(t *testing.T) {
 		permissions int
 		want        string
 	}{
-		{"a link that allows editing", permEdit, "edit"},
-		{"a link that allows viewing only", permView, "view"},
+		{"a link that allows editing", permEdit, "editor"},
+		{"a link that allows viewing only", permView, "viewer"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			tree := newPublicTree(t, testURLPassword, "Q3-report.pdf", 2)

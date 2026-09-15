@@ -52,7 +52,7 @@ func TestASecretIsNotAFlagValue(t *testing.T) {
 			t.Errorf("%s: stderr says %q", flag, truncate(stderr))
 		}
 	}
-	refuses(t, 1, []string{"drive", "items", "share", "link", "/Documents", "--password", "hunter2"},
+	refuses(t, 1, []string{"drive", "links", "create", "/Documents", "--password", "hunter2"},
 		"Unknown flag: --password")
 	refuses(t, 1, []string{"mail", "messages", "send", "--to", "jane@example.com",
 		"--subject", "Hi", "--body", "text", "--eo-password", "hunter2"},
@@ -74,7 +74,7 @@ func TestAPasswordSetOnSomethingIsJudgedBeforeTheNetwork(t *testing.T) {
 	tooLong := write("long", strings.Repeat("x", 51))
 	tooShort := write("short", "secret7")
 
-	link := []string{"drive", "items", "share", "link", "/Documents"}
+	link := []string{"drive", "links", "create", "/Documents"}
 	refuses(t, 1, append(link, "--link-password-file", filepath.Join(dir, "nope")), "Could not read")
 	refuses(t, 1, append(link, "--link-password-file", empty), "is empty")
 	refuses(t, 1, append(link, "--link-password-file", tooLong), "at most 50 characters")
@@ -104,11 +104,11 @@ func TestAPasswordSetOnSomethingIsJudgedBeforeTheNetwork(t *testing.T) {
 func TestAStdinCollisionNamesTheFlagThatMovesOffTheStream(t *testing.T) {
 	_, stderr, code := runWithStdin(t, "long enough to be a password",
 		"mail", "messages", "send", "--to", "jane@example.com",
-		"--subject", "Hi", "--body", "-", "--eo-password-stdin")
+		"--subject", "Hi", "--body", "-", "--eo-password-file", "-")
 	if code != 1 {
 		t.Errorf("exit %d, want 1\nstderr: %s", code, truncate(stderr))
 	}
-	for _, phrase := range []string{"both read standard input", "--eo-password-file"} {
+	for _, phrase := range []string{"both read standard input", "--eo-password-file FILE"} {
 		if !strings.Contains(stderr, phrase) {
 			t.Errorf("stderr does not say %q: %s", phrase, truncate(stderr))
 		}

@@ -37,8 +37,7 @@ proton pass export --format json --dest -
 | `--force` | Overwrite a file that already exists |
 | `--format string` | How to lay the items down: zip, csv, json (default `zip`) |
 | `--no-attachments` | Leave attachments out, which is much faster |
-| `--passphrase-file string` | Read the passphrase that locks the file from a file |
-| `--passphrase-stdin` | Read the passphrase that locks the file from stdin |
+| `--passphrase-file string` | Read the passphrase that locks the file from a file, or - for stdin |
 
 ## `generate`
 
@@ -99,8 +98,7 @@ proton pass import chrome-passwords.csv --manager chrome --vault Personal
 | Flag | Description |
 | --- | --- |
 | `--manager string` | The password manager that wrote PATH: 1password, apple-passwords, bitwarden, brave, chrome, dashlane, edge, enpass, firefox, kaspersky, keepass, keeper, lastpass, nordpass, proton-pass, roboform, safari (default `proton-pass`) |
-| `--passphrase-file string` | Read the passphrase that locks the file from a file |
-| `--passphrase-stdin` | Read the passphrase that locks the file from stdin |
+| `--passphrase-file string` | Read the passphrase that locks the file from a file, or - for stdin |
 | `--vault string` | Put everything into this vault |
 
 ---

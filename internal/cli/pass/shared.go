@@ -19,7 +19,8 @@ import (
 
 func sharedCmd() *cobra.Command {
 	c := &cobra.Command{Use: "shared", Short: "Items other people have shared with you"}
-	c.AddCommand(&cobra.Command{
+	var held kit.Held[passsvc.Item]
+	sub := &cobra.Command{
 		Use:   "list",
 		Short: "List the items other people have shared with you",
 		Long: "List the items other people have shared with you.\n\n" +
@@ -32,8 +33,8 @@ func sharedCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return kit.List(c, ui.TableSpec[passsvc.Item]{
-				Noun: "items", Total: len(rows), Page: ui.Unpaged,
+			return held.Answer(c, ui.TableSpec[passsvc.Item]{
+				Noun: "items",
 				Columns: []ui.Column[passsvc.Item]{
 					{Header: "ID", ID: true, Cell: itemRef},
 					{Header: "TYPE", Cell: func(it passsvc.Item) string { return it.Type }},
@@ -47,13 +48,19 @@ func sharedCmd() *cobra.Command {
 				},
 			}, rows)
 		}),
-	})
+	}
+	held.Register(sub, "items",
+		kit.Key[passsvc.Item]{Name: "name", Less: func(a, b passsvc.Item) int { return kit.Fold(a.Name, b.Name) }},
+		kit.Key[passsvc.Item]{Name: "type", Less: func(a, b passsvc.Item) int { return kit.Fold(a.Type, b.Type) }},
+	)
+	c.AddCommand(sub)
 	return c
 }
 
 func sharingCmd() *cobra.Command {
 	c := &cobra.Command{Use: "sharing", Short: "Items you have shared with other people"}
-	c.AddCommand(&cobra.Command{
+	var held kit.Held[passsvc.Item]
+	sub := &cobra.Command{
 		Use:   "list",
 		Short: "List the items you have shared",
 		Long: "List the items you have shared with somebody on their own.\n\n" +
@@ -65,8 +72,8 @@ func sharingCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return kit.List(c, ui.TableSpec[passsvc.Item]{
-				Noun: "items", Total: len(rows), Page: ui.Unpaged,
+			return held.Answer(c, ui.TableSpec[passsvc.Item]{
+				Noun: "items",
 				Columns: []ui.Column[passsvc.Item]{
 					{Header: "ID", ID: true, Cell: itemRef},
 					{Header: "TYPE", Cell: func(it passsvc.Item) string { return it.Type }},
@@ -77,6 +84,11 @@ func sharingCmd() *cobra.Command {
 				},
 			}, rows)
 		}),
-	})
+	}
+	held.Register(sub, "items",
+		kit.Key[passsvc.Item]{Name: "name", Less: func(a, b passsvc.Item) int { return kit.Fold(a.Name, b.Name) }},
+		kit.Key[passsvc.Item]{Name: "type", Less: func(a, b passsvc.Item) int { return kit.Fold(a.Type, b.Type) }},
+	)
+	c.AddCommand(sub)
 	return c
 }

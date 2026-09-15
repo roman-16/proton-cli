@@ -130,6 +130,27 @@ func TestEnsureWillNotDeleteWhatItCannotRemake(t *testing.T) {
 	}
 }
 
+// A fixture a person mints once is found, never made. An alias address cannot be
+// un-minted, and a listing that comes back short for any reason at all looks
+// exactly like an account that has not got one - so the miss is reported with
+// the command to run rather than answered by spending an address.
+func TestEnsureNeverMintsWhatAPersonMintsOnce(t *testing.T) {
+	c := Paid("owner@example.com")[0]
+	r := &recorder{}
+	_, err := Ensure(r.run, "paid", c, c.Pins[0], nil)
+	if err == nil {
+		t.Fatal("a missing alias was minted rather than reported")
+	}
+	for _, want := range []string{"paid", PaidAlias, "never makes one", PaidAliasPrefix} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("the report does not mention %q: %v", want, err)
+		}
+	}
+	if len(r.ran) != 0 {
+		t.Errorf("the paid account was written to: %v", r.ran)
+	}
+}
+
 func TestEnsureCarriesTheRunnersFailureUp(t *testing.T) {
 	boom := errors.New("exit 2: not signed in")
 	if _, err := Ensure((&recorder{fail: boom}).run, "primary", vaults(), vaults().Pins[0], nil); !errors.Is(err, boom) {
@@ -230,5 +251,62 @@ func TestAgreesOnEveryFieldNamed(t *testing.T) {
 	}
 	if !agrees(row, nil) {
 		t.Error("a pin naming no fields is judged on its name alone")
+	}
+}
+
+// A fixture is addressed by its name, so two rows carrying it address neither.
+// Nothing else in the harness notices - Sweep only removes what carries the test
+// prefix - so the extras are removed here or the run is told.
+func TestEnsureLeavesOneRowAnsweringToAName(t *testing.T) {
+	c := vaults()
+	c.Pins[0].Fields = map[string]string{"colour": "green"}
+	r := &recorder{rows: []map[string]any{
+		{"name": "Personal", "share_id": "wrong", "colour": "red"},
+		{"name": "Personal", "share_id": "right", "colour": "green"},
+	}}
+	row, err := Ensure(r.run, "primary", c, c.Pins[0], r.rows)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The one that agrees is the one kept, so nothing is made again either.
+	if Str(row["share_id"]) != "right" {
+		t.Errorf("kept %v, want the row that agrees", row)
+	}
+	var removed, created []string
+	for _, args := range r.ran {
+		if slices.Contains(args, "delete") {
+			removed = append(removed, args[len(args)-1])
+		}
+		if slices.Contains(args, "create") {
+			created = append(created, args[len(args)-1])
+		}
+	}
+	if len(removed) != 1 || removed[0] != "wrong" {
+		t.Errorf("removed %v, want the one duplicate", removed)
+	}
+	if len(created) != 0 {
+		t.Errorf("a row that was already there was made again: %v", created)
+	}
+}
+
+// A collection with nothing to remove a row with says so, for the same reason it
+// refuses to replace one that disagrees.
+func TestEnsureReportsADuplicateItCannotRemove(t *testing.T) {
+	c := Paid("owner@example.com")[0]
+	r := &recorder{rows: []map[string]any{
+		{"name": PaidAlias, "type": "alias", "share_id": "a", "item_id": "1"},
+		{"name": PaidAlias, "type": "alias", "share_id": "a", "item_id": "2"},
+	}}
+	_, err := Ensure(r.run, "paid", c, c.Pins[0], r.rows)
+	if err == nil {
+		t.Fatal("two rows under one name were accepted")
+	}
+	for _, want := range []string{"paid", PaidAlias, "addresses none of them"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("the report does not mention %q: %v", want, err)
+		}
+	}
+	if len(r.ran) != 0 {
+		t.Errorf("the paid account was written to: %v", r.ran)
 	}
 }

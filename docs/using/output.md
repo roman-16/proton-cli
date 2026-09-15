@@ -7,7 +7,7 @@ Data goes to stdout. Progress bars, confirmations, footers, warnings, prompts an
 ### Collections
 
 ```console
-$ proton mail messages list --unread --page-size 3
+$ proton mail messages list --unread --limit 3
 ID        FROM              SUBJECT                DATE              FLAGS
 ────────  ────────────────  ─────────────────────  ────────────────  ─────
 5bH2mQxK  Fastmail Billing  Invoice #2291 ready    2026-04-15 14:32  ●★2
@@ -21,7 +21,7 @@ ID        FROM              SUBJECT                DATE              FLAGS
 
 An empty collection prints nothing on stdout, so a redirect yields an empty file rather than a stray header. On stderr it says `No messages.`, or `No messages match.` when a filter was applied.
 
-Every `list` takes `--page` and `--page-size`; `--page-size 0` returns the whole collection. Everything except mail also takes `--sort` and `--desc`, and each listing names the sort keys it accepts. Mail comes back newest first.
+Every `list` takes `--page` and `--limit`; `--limit 0` returns the whole collection. Most also take `--sort` and `--desc`, and each names the sort keys it accepts. A listing whose order is the answer takes neither: mail comes back newest first, your addresses in the order the first one is the default, and your filters in the order they run.
 
 ### Records
 

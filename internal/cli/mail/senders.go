@@ -28,7 +28,7 @@ func sendersCmd() *cobra.Command {
 		senderVerb("block", "Send someone's mail straight to blocked", "blocked", ui.Blocked),
 		senderVerb("spam", "Send someone's mail straight to spam", "spam", ui.Filed),
 		senderVerb("allow", "Always let someone reach the inbox", "inbox", ui.Allowed),
-		sendersForgetCmd(),
+		sendersRemoveCmd(),
 	)
 	return c
 }
@@ -53,7 +53,8 @@ func senderColumns() []ui.Column[mailsvc.SenderRule] {
 }
 
 func sendersListCmd() *cobra.Command {
-	return &cobra.Command{
+	var held kit.Held[mailsvc.SenderRule]
+	c := &cobra.Command{
 		Use:   "list",
 		Short: "List every standing decision about a sender",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
@@ -61,16 +62,17 @@ func sendersListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return kit.List(c, ui.TableSpec[mailsvc.SenderRule]{
+			return held.Answer(c, ui.TableSpec[mailsvc.SenderRule]{
 				Noun: "rules", Columns: senderColumns(),
-				Total: ui.Unknown, Page: ui.Unpaged,
 			}, rules)
 		}),
 	}
+	held.Register(c, "rules",
+		kit.Key[mailsvc.SenderRule]{Name: "sender", Less: func(a, b mailsvc.SenderRule) int { return kit.Fold(a.Email+a.Domain, b.Email+b.Domain) }},
+		kit.Key[mailsvc.SenderRule]{Name: "since", Less: func(a, b mailsvc.SenderRule) int { return kit.Ints(a.Time, b.Time) }},
+	)
+	return c
 }
-
-// senderVerb builds block, spam and allow, which differ only in where the mail
-// ends up.
 func senderVerb(use, short, destination string, action ui.Action) *cobra.Command {
 	return &cobra.Command{
 		Use:   use + " EMAIL...",
@@ -97,14 +99,14 @@ func senderVerb(use, short, destination string, action ui.Action) *cobra.Command
 	}
 }
 
-func sendersForgetCmd() *cobra.Command {
+func sendersRemoveCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "forget EMAIL...",
+		Use:   "remove EMAIL...",
 		Short: "Drop a standing decision, letting the spam filter decide again",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			targets := kit.Dedupe(c.Args)
 			return kit.Mutate(c, ui.ResultSpec{
-				Action: ui.Forgot, Kind: "senders", Count: len(targets),
+				Action: ui.Removed, Kind: "senders", Count: len(targets),
 				Name: kit.Sole(targets, func(s string) string { return s }),
 			}, func() error {
 				return c.App.Mail.SenderForget(c.Ctx, targets)

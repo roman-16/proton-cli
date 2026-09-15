@@ -388,7 +388,7 @@ func TestResultMachineIsAlwaysStructured(t *testing.T) {
 // for a parser to choke on.
 func TestResultMachineIsSilentWhenTheAnswerFollows(t *testing.T) {
 	spec := ResultSpec{
-		Action: Linked, Kind: "links", Count: 1,
+		Action: Created, Kind: "links", Count: 1,
 		Detail: "for /Documents", AnswerFollows: true,
 	}
 

@@ -18,7 +18,7 @@ proton mail messages trash 5bH2mQxK --unread --folder spam                  # bo
 | `--pattern` | The name, against a glob |
 | `--unread` · `--starred` · `--type` | By state or kind |
 | `--all` | Everything in scope, rather than a subset |
-| `--limit` | How many a bulk verb may affect |
+| `--limit` | How many a bulk verb may affect, or a listing holds |
 
 Each command's own page lists the filters it takes. Mail adds `--from`, `--to`, `--subject`, `--keyword`, `--after` and `--before`.
 
@@ -48,7 +48,7 @@ Try:   pass a REF, or a filter such as --unread, --starred, --from or --older-th
 
 ## Limits
 
-`--limit` defaults to 150 in Mail: a guard against a mistyped filter, not a technical bound. A selection that fills it says so, `--limit N` reads as far as it takes to find N, and `--limit 0` lifts the cap altogether.
+`--limit` defaults to 150 on a bulk verb: a guard against a mistyped filter, not a technical bound. A selection that fills it says so, `--limit N` reads as far as it takes to find N, and `--limit 0` lifts the cap altogether.
 
 Bulk verbs act on the IDs the selection resolved to, in batches of fifty, and report Proton's answer per item. Whatever was refused is named, and the count reports what actually landed.
 

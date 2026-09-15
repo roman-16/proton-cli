@@ -101,14 +101,14 @@ On an account with no extra password, the flag is reported as unnecessary and th
 
 ### Sign in without a terminal
 
-A password is read from a pipe or a file, never from a flag value.
+A password is read from a file, never from a flag value. A path of `-` reads standard input.
 
 ```bash
-# from a pipe
-printf '%s' "$PW" | proton account login --user alice@proton.me --password-stdin
-
 # from a file
 proton account login --user alice@proton.me --password-file /run/secrets/proton
+
+# from a pipe
+printf '%s' "$PW" | proton account login --user alice@proton.me --password-file -
 ```
 
 The second and extra passwords are read the same way, through flags of their own.
@@ -127,7 +127,7 @@ These commands ask for your password again even when you are signed in:
 
 - `account keys reactivate`
 - `calendar settings calendars delete`
-- `mail messages expire`
+- `mail messages update`
 - `mail settings addresses create`
 - `mail settings addresses delete`
 - `mail settings addresses disable`
@@ -143,15 +143,15 @@ These commands ask for your password again even when you are signed in:
 - `mail settings autoreply set`
 
 ```bash
-printf '%s' "$PW" | proton calendar settings calendars delete Work --password-stdin
+printf '%s' "$PW" | proton calendar settings calendars delete Work --password-file -
 ```
 
-`--password-stdin` takes standard input for the password and nothing else, so it cannot be combined with a `-` argument that wants the same stream:
+Only one thing per run may read standard input, so `--password-file -` cannot be combined with a `-` argument that wants the same stream:
 
 ```console
-$ printf '%s' "$PW" | proton --password-stdin mail messages send --body - ...
-Error: --password-stdin and --body - both read standard input, which can only be read once.
-Try:   pass it with --password-file instead
+$ printf '%s' "$PW" | proton --password-file - mail messages send --body - ...
+Error: --password-file - and --body - both read standard input, which can only be read once.
+Try:   pass it with --password-file FILE instead
 ```
 
 ## After a password reset

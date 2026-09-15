@@ -58,7 +58,7 @@ func TestPassItemsCRUDLogin(t *testing.T) {
 
 	// Edit password, this time over the stream rather than out of a file.
 	runWithStdin(t, strings.NewReader("new-pass-v2"),
-		"--yes", "pass", "items", "update", "--secret-stdin", "password", name)
+		"--yes", "pass", "items", "update", "--secret-file", "password=-", name)
 	got2 := runOK(t, "pass", "items", "get", name)
 	assertField(t, got2, "Password:", "new-pass-v2")
 }
@@ -663,7 +663,7 @@ func passItemRefs(t *testing.T) map[string]bool {
 	out := map[string]bool{}
 	for page := 0; ; page++ {
 		rows := runJSONArray(t, "pass", "items", "list",
-			"--page", strconv.Itoa(page), "--page-size", strconv.Itoa(pageSize))
+			"--page", strconv.Itoa(page), "--limit", strconv.Itoa(pageSize))
 		for _, row := range rows {
 			m, _ := row.(map[string]interface{})
 			share, _ := m["share_id"].(string)

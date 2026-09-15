@@ -42,6 +42,13 @@ proton drive invitations list
 proton drive invitations list
 ```
 
+| Flag | Description |
+| --- | --- |
+| `--desc` | Reverse the order |
+| `--limit int` | How many invitations per page; 0 for all of them |
+| `--page int` | Which page of results, counting from zero |
+| `--sort string` | Order by: created, sender (default `created`) |
+
 ---
 
 Every command also takes the [flags that work everywhere](../about/commands.md#flags-that-work-on-every-command).

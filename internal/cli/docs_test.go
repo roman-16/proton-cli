@@ -168,7 +168,7 @@ func TestTheDocsCheckerFindsAFlagThatIsNotThere(t *testing.T) {
 	}{
 		{src: "```bash\nproton mail messages list --unread\n```"},
 		{src: "```bash\nproton mail messages list --nope\n```", want: []string{"nope"}},
-		{src: "```bash\nproton mail messages list --page-size=3\n```"},
+		{src: "```bash\nproton mail messages list --limit=3\n```"},
 		{src: "```bash\nproton mail messages send --help\n```"},
 		{src: "```bash\nproton mail messages list --output json\n```"},
 		// Another program's flags, and a page-relative reference, are not this

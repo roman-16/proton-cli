@@ -29,10 +29,10 @@ func sharedLink(t *testing.T, name, content string, args ...string) (folder, url
 		"drive", "items", "delete", folder)
 	runOK(t, "drive", "items", "upload", src, folder)
 
-	// The link is read as the record it is: `share link` answers with the URL and
+	// The link is read as the record it is: `links create` answers with the URL and
 	// what else it set, so the URL is a field of the answer rather than the whole
 	// of it.
-	link := runJSON(t, append([]string{"drive", "items", "share", "link", folder}, args...)...)
+	link := runJSON(t, append([]string{"drive", "links", "create", folder}, args...)...)
 	url, _ = link["url"].(string)
 	if !strings.Contains(url, "#") {
 		t.Fatalf("public link carries no password: %q", url)
@@ -167,7 +167,7 @@ func TestDriveSharedLinkPasswordIsAskedForAndAccepted(t *testing.T) {
 // a sentence rather than a code, and exits as anything else that is not there.
 func TestDriveSharedLinkThatIsGoneIsRefused(t *testing.T) {
 	folder, url := sharedLink(t, "unlinked", "gone-payload")
-	runOK(t, "drive", "items", "share", "unlink", folder)
+	runOK(t, "drive", "links", "revoke", folder)
 
 	_, stderr, code := runSecondary(t, "drive", "items", "list", "/", "--link", url)
 	if code != 3 {
@@ -222,7 +222,7 @@ func TestDriveSharedAddListOpenAndRemove(t *testing.T) {
 // A link that allows editing takes new files and new folders, from whoever holds
 // the URL, and what lands there is the owner's to read back.
 func TestDriveSharedLinkTakesUploadsWhenItAllowsEditing(t *testing.T) {
-	folder, url := sharedLink(t, "linkedit", "edit-payload", "--edit")
+	folder, url := sharedLink(t, "linkedit", "edit-payload", "--access", "editor")
 
 	root := runJSONSecondary(t, "drive", "items", "get", "/", "--link", url)
 	if root["link_access"] != "edit" {
@@ -278,7 +278,7 @@ func TestDriveSharedLinkTakesUploadsWhenItAllowsEditing(t *testing.T) {
 // owner sees, and the same thing a browser upload from a signed-out visitor
 // leaves behind.
 func TestDriveSharedLinkTakesUploadsWithoutAnAccount(t *testing.T) {
-	folder, url := sharedLink(t, "linknobody", "nobody-edit", "--edit")
+	folder, url := sharedLink(t, "linknobody", "nobody-edit", "--access", "editor")
 	nobody := map[string]string{"PROTON_PROFILE": "no-such-" + testID()}
 
 	src := filepath.Join(t.TempDir(), "anonymous.txt")
@@ -356,7 +356,7 @@ func TestDriveSharedLinkThatAllowsViewingRefusesUploads(t *testing.T) {
 // it is: a link serves one version of a file, has no trash, and what its owner
 // put there is theirs.
 func TestDriveSavedLinkGivesBackWhatYouUploadedAndNothingElse(t *testing.T) {
-	folder, url := sharedLink(t, "savedlink", "owner-payload", "--edit")
+	folder, url := sharedLink(t, "savedlink", "owner-payload", "--access", "editor")
 	token := tokenOf(t, url)
 
 	runOKSecondary(t, "drive", "shared", "add", url)
@@ -409,7 +409,7 @@ func TestDriveSavedLinkGivesBackWhatYouUploadedAndNothingElse(t *testing.T) {
 // the rename and the deletion land where the owner can see them, and a folder
 // goes with everything in it.
 func TestDriveSharedLinkGivesBackYourOwnUploads(t *testing.T) {
-	folder, url := sharedLink(t, "linkmine", "mine-payload", "--edit")
+	folder, url := sharedLink(t, "linkmine", "mine-payload", "--access", "editor")
 
 	dir := t.TempDir()
 	src := filepath.Join(dir, "uploaded.txt")
@@ -458,7 +458,7 @@ func TestDriveSharedLinkGivesBackYourOwnUploads(t *testing.T) {
 // What is not yours is said before the question rather than after the answer: a
 // bulk delete names what it will not touch, deletes the rest, and exits 0.
 func TestDriveSharedLinkNamesWhatIsNotYoursToDelete(t *testing.T) {
-	folder, url := sharedLink(t, "linktheirs", "theirs-payload", "--edit")
+	folder, url := sharedLink(t, "linktheirs", "theirs-payload", "--access", "editor")
 
 	src := filepath.Join(t.TempDir(), "mine.txt")
 	writeLocal(t, src, "mine")
@@ -488,7 +488,7 @@ func TestDriveSharedLinkNamesWhatIsNotYoursToDelete(t *testing.T) {
 // it to the session that made it, and that session ends with the run. The
 // refusal says so before the link is even read for what is in it.
 func TestDriveSharedLinkRefusesToGiveBackWithoutAnAccount(t *testing.T) {
-	_, url := sharedLink(t, "linkanon", "anon-payload", "--edit")
+	_, url := sharedLink(t, "linkanon", "anon-payload", "--access", "editor")
 	nobody := map[string]string{"PROTON_PROFILE": "no-such-" + testID()}
 
 	src := filepath.Join(t.TempDir(), "anonymous.txt")

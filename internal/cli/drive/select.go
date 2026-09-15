@@ -26,7 +26,14 @@ type filters struct {
 	age         kit.Range
 	recursive   bool
 	all         bool
+	// page is the cap a bulk verb acts under. A pattern is a glob over a whole
+	// tree, so the difference between what was meant and what was typed can be
+	// the whole drive.
+	page kit.Page
 }
+
+// defaultLimit is how many items a bulk verb acts on when no cap was given.
+const defaultLimit = 150
 
 // registerNarrowing adds the flags that say which items, and nothing else.
 //
@@ -34,7 +41,7 @@ type filters struct {
 // be read with the command that only reads before it is handed to one that
 // removes. A dry run is a preview of a change; `list` is where a filter is
 // worked out in the first place.
-func (f *filters) registerNarrowing(fl kit.Flags) {
+func (f *filters) registerNarrowing(fl kit.FlagSet) {
 	fl.StringVar(&f.pattern, "pattern", "", "Match names against a shell glob, e.g. *.tmp")
 	fl.StringVar(&f.largerThan, "larger-than", "", "Match files above SIZE (e.g. 100MB, 2GB)")
 	fl.StringVar(&f.smallerThan, "smaller-than", "", "Match files below SIZE")
@@ -49,6 +56,8 @@ func (f *filters) register(c *cobra.Command) {
 	f.registerNarrowing(fl)
 	fl.StringVar(&f.scope, "scope", "", "Look only inside this folder (default: the whole drive)")
 	kit.All(fl, &f.all)
+	f.page.Default = defaultLimit
+	f.page.RegisterCap(c, "items")
 }
 
 // narrowed reports whether the user asked for a subset of what is there, which
@@ -88,6 +97,7 @@ func selectItems(c *kit.Invocation, dc *drivesvc.Context, f *filters) (kit.Selec
 		IDOf:       func(ch drivesvc.Child) string { return ch.LinkID },
 		FilterHint: filterHint,
 		Scope:      itemScope,
+		Limit:      f.page.Size,
 		ByRef: func(ctx stdctx.Context, ref string) (drivesvc.Child, error) {
 			res, err := c.App.Drive.ResolvePath(ctx, dc, ref)
 			if err != nil {

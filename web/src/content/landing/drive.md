@@ -10,5 +10,5 @@ title: Drive
 proton drive items list /Documents
 proton drive items upload --recursive ./project /Backup
 proton drive items download /Documents/report.pdf --dest-dir .
-proton drive items share link /Documents/report.pdf --expires 7d
+proton drive links create /Documents/report.pdf --expires 7d
 ```

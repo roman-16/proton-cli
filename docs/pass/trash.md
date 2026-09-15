@@ -30,6 +30,13 @@ proton pass trash list
 proton pass trash list
 ```
 
+| Flag | Description |
+| --- | --- |
+| `--desc` | Reverse the order |
+| `--limit int` | How many items per page; 0 for all of them |
+| `--page int` | Which page of results, counting from zero |
+| `--sort string` | Order by: name, type, modified (default `name`) |
+
 ## `restore`
 
 Put items back where they came from.

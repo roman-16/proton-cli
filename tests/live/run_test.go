@@ -77,7 +77,7 @@ func runAs(profile string, stdin io.Reader, args ...string) (stdout, stderr stri
 // which internal/cli/conformance_test.go pins.
 var reauthCommands = [][]string{
 	{"calendar", "settings", "calendars", "delete"},
-	{"mail", "messages", "expire"},
+	{"mail", "messages", "update"},
 	{"mail", "settings", "addresses", "create"},
 	{"mail", "settings", "addresses", "delete"},
 	{"mail", "settings", "addresses", "disable"},
@@ -268,9 +268,9 @@ func listAllSecondary(t *testing.T, args ...string) []interface{} {
 }
 
 // whole asks for every row rather than a page. It goes at the end, where a
-// listing's own flags go: --page-size belongs to the leaf command, not the root.
+// listing's own flags go: --limit belongs to the leaf command, not the root.
 func whole(args []string) []string {
-	return append(append([]string{}, args...), "--page-size", "0")
+	return append(append([]string{}, args...), "--limit", "0")
 }
 
 // runArgs executes the CLI as the primary account without a *testing.T, so the

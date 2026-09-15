@@ -21,7 +21,7 @@ import (
 // The keys are the json tags, so one consumer reads either format.
 
 func TestOutputYAMLSnakeCase(t *testing.T) {
-	stdout := runOK(t, "mail", "messages", "list", "--page-size", "1", "--output", "yaml")
+	stdout := runOK(t, "mail", "messages", "list", "--limit", "1", "--output", "yaml")
 	// Non-omitempty keys only; from_name drops out when the sender has no display name.
 	for _, want := range []string{"from_address", "num_attachments"} {
 		if !strings.Contains(stdout, want+":") {
@@ -55,7 +55,7 @@ func TestOutputYAMLRawAPIKeepsIntegers(t *testing.T) {
 // ── --output text, the default ──
 
 func TestOutputTextIsDefault(t *testing.T) {
-	stdout := runOK(t, "mail", "messages", "list", "--page-size", "1")
+	stdout := runOK(t, "mail", "messages", "list", "--limit", "1")
 	// Table output has a separator line with ─ chars
 	if !strings.Contains(stdout, "─") {
 		t.Error("expected table output by default")
@@ -70,7 +70,7 @@ func TestOutputTextIsDefault(t *testing.T) {
 
 func TestOutputJSONParsesEverywhere(t *testing.T) {
 	cases := [][]string{
-		{"mail", "messages", "list", "--page-size", "1"},
+		{"mail", "messages", "list", "--limit", "1"},
 		{"mail", "settings", "labels", "list"},
 		{"mail", "settings", "addresses", "list"},
 		{"contacts", "list"},

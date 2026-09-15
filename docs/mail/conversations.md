@@ -61,9 +61,9 @@ proton mail conversations delete 5bH2mQxK
 
 | Flag | Description |
 | --- | --- |
-| `--after string` | Match messages after this date (YYYY-MM-DD) |
+| `--after string` | First day to include (YYYY-MM-DD) |
 | `--all` | Act on everything in scope, rather than a subset |
-| `--before string` | Match messages before this date (YYYY-MM-DD) |
+| `--before string` | Last day to include (YYYY-MM-DD) |
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text anywhere, including display names and bodies |
@@ -115,9 +115,8 @@ proton mail conversations forward 'Quarterly numbers' --to jane@example.com
 | `--body string` | Your text, placed above the quoted original (- reads stdin) |
 | `--cc stringArray` | Carbon-copy recipient (repeatable) |
 | `--draft` | Save as a draft instead of sending |
-| `--eo-password-file string` | Read the password for recipients outside Proton from a file |
+| `--eo-password-file string` | Read the password for recipients outside Proton from a file, or - for stdin |
 | `--eo-password-hint string` | Hint shown to password-protected recipients |
-| `--eo-password-stdin` | Read the password for recipients outside Proton from stdin |
 | `--expires string` | Self-destruct after DURATION (e.g. 7d, 24h), or never |
 | `--from string` | Address to send from, by email or ID (default: your primary) |
 | `--html` | Compose in HTML (default: match the original) |
@@ -162,9 +161,9 @@ proton mail conversations label 'Quarterly numbers' --label Accounting
 
 | Flag | Description |
 | --- | --- |
-| `--after string` | Match messages after this date (YYYY-MM-DD) |
+| `--after string` | First day to include (YYYY-MM-DD) |
 | `--all` | Act on everything in scope, rather than a subset |
-| `--before string` | Match messages before this date (YYYY-MM-DD) |
+| `--before string` | Last day to include (YYYY-MM-DD) |
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text anywhere, including display names and bodies |
@@ -197,15 +196,15 @@ proton mail conversations list --from jane@example.com --folder all
 
 | Flag | Description |
 | --- | --- |
-| `--after string` | Match messages after this date (YYYY-MM-DD) |
-| `--before string` | Match messages before this date (YYYY-MM-DD) |
+| `--after string` | First day to include (YYYY-MM-DD) |
+| `--before string` | Last day to include (YYYY-MM-DD) |
 | `--folder string` | Folder or label to look in (default: inbox) |
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text anywhere, including display names and bodies |
+| `--limit int` | How many threads per page; 0 for all of them (default `25`) |
 | `--newer-than string` | Match messages newer than DURATION |
 | `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |
 | `--page int` | Which page of results, counting from zero |
-| `--page-size int` | How many threads per page; 0 for all of them (default `25`) |
 | `--starred` | Match starred messages |
 | `--subject string` | Match text in the subject |
 | `--to string` | Match a recipient's address |
@@ -232,9 +231,9 @@ proton mail conversations mark read --folder inbox --all
 
 | Flag | Description |
 | --- | --- |
-| `--after string` | Match messages after this date (YYYY-MM-DD) |
+| `--after string` | First day to include (YYYY-MM-DD) |
 | `--all` | Act on everything in scope, rather than a subset |
-| `--before string` | Match messages before this date (YYYY-MM-DD) |
+| `--before string` | Last day to include (YYYY-MM-DD) |
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text anywhere, including display names and bodies |
@@ -260,9 +259,9 @@ proton mail conversations mark unread 'Quarterly numbers'
 
 | Flag | Description |
 | --- | --- |
-| `--after string` | Match messages after this date (YYYY-MM-DD) |
+| `--after string` | First day to include (YYYY-MM-DD) |
 | `--all` | Act on everything in scope, rather than a subset |
-| `--before string` | Match messages before this date (YYYY-MM-DD) |
+| `--before string` | Last day to include (YYYY-MM-DD) |
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text anywhere, including display names and bodies |
@@ -289,9 +288,9 @@ proton mail conversations move --older-than 90d --folder inbox --into archive
 
 | Flag | Description |
 | --- | --- |
-| `--after string` | Match messages after this date (YYYY-MM-DD) |
+| `--after string` | First day to include (YYYY-MM-DD) |
 | `--all` | Act on everything in scope, rather than a subset |
-| `--before string` | Match messages before this date (YYYY-MM-DD) |
+| `--before string` | Last day to include (YYYY-MM-DD) |
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
 | `--into string` | Destination folder, by name or ID |
@@ -325,9 +324,8 @@ proton mail conversations reply 'Quarterly numbers' --everyone --body Agreed.
 | `--body string` | Your text, placed above the quoted original (- reads stdin) |
 | `--cc stringArray` | Carbon-copy recipient (repeatable) |
 | `--draft` | Save as a draft instead of sending |
-| `--eo-password-file string` | Read the password for recipients outside Proton from a file |
+| `--eo-password-file string` | Read the password for recipients outside Proton from a file, or - for stdin |
 | `--eo-password-hint string` | Hint shown to password-protected recipients |
-| `--eo-password-stdin` | Read the password for recipients outside Proton from stdin |
 | `--everyone` | Reply to everyone who was on the message, not just the sender |
 | `--expires string` | Self-destruct after DURATION (e.g. 7d, 24h), or never |
 | `--from string` | Address to send from, by email or ID (default: your primary) |
@@ -354,9 +352,9 @@ proton mail conversations snooze --unread --until 2026-04-17T09:00
 
 | Flag | Description |
 | --- | --- |
-| `--after string` | Match messages after this date (YYYY-MM-DD) |
+| `--after string` | First day to include (YYYY-MM-DD) |
 | `--all` | Act on everything in scope, rather than a subset |
-| `--before string` | Match messages before this date (YYYY-MM-DD) |
+| `--before string` | Last day to include (YYYY-MM-DD) |
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text anywhere, including display names and bodies |
@@ -383,9 +381,9 @@ proton mail conversations star 'Quarterly numbers'
 
 | Flag | Description |
 | --- | --- |
-| `--after string` | Match messages after this date (YYYY-MM-DD) |
+| `--after string` | First day to include (YYYY-MM-DD) |
 | `--all` | Act on everything in scope, rather than a subset |
-| `--before string` | Match messages before this date (YYYY-MM-DD) |
+| `--before string` | Last day to include (YYYY-MM-DD) |
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text anywhere, including display names and bodies |
@@ -412,9 +410,9 @@ proton mail conversations trash --from newsletter@example.com --older-than 90d
 
 | Flag | Description |
 | --- | --- |
-| `--after string` | Match messages after this date (YYYY-MM-DD) |
+| `--after string` | First day to include (YYYY-MM-DD) |
 | `--all` | Act on everything in scope, rather than a subset |
-| `--before string` | Match messages before this date (YYYY-MM-DD) |
+| `--before string` | Last day to include (YYYY-MM-DD) |
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text anywhere, including display names and bodies |
@@ -440,9 +438,9 @@ proton mail conversations unlabel 'Quarterly numbers' --label Accounting
 
 | Flag | Description |
 | --- | --- |
-| `--after string` | Match messages after this date (YYYY-MM-DD) |
+| `--after string` | First day to include (YYYY-MM-DD) |
 | `--all` | Act on everything in scope, rather than a subset |
-| `--before string` | Match messages before this date (YYYY-MM-DD) |
+| `--before string` | Last day to include (YYYY-MM-DD) |
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text anywhere, including display names and bodies |
@@ -469,9 +467,9 @@ proton mail conversations unsnooze 5bH2mQxK
 
 | Flag | Description |
 | --- | --- |
-| `--after string` | Match messages after this date (YYYY-MM-DD) |
+| `--after string` | First day to include (YYYY-MM-DD) |
 | `--all` | Act on everything in scope, rather than a subset |
-| `--before string` | Match messages before this date (YYYY-MM-DD) |
+| `--before string` | Last day to include (YYYY-MM-DD) |
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text anywhere, including display names and bodies |
@@ -497,9 +495,9 @@ proton mail conversations unstar 'Quarterly numbers'
 
 | Flag | Description |
 | --- | --- |
-| `--after string` | Match messages after this date (YYYY-MM-DD) |
+| `--after string` | First day to include (YYYY-MM-DD) |
 | `--all` | Act on everything in scope, rather than a subset |
-| `--before string` | Match messages before this date (YYYY-MM-DD) |
+| `--before string` | Last day to include (YYYY-MM-DD) |
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text anywhere, including display names and bodies |

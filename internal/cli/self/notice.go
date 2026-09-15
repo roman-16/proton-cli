@@ -17,7 +17,7 @@ const lookup = 2 * time.Second
 
 // Available says a release is there and what to do about it.
 //
-// There is one wording, because there is one thing being said. `update --check`
+// There is one wording, because there is one thing being said. `update --dry-run`
 // asks the question outright and the notice volunteers the answer, and a reader
 // who has seen either has learned the other.
 func Available(u *ui.UI, current, latest string) {

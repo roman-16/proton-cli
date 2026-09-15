@@ -46,13 +46,13 @@ Proton groups **addresses**, not people, so a colleague's work address can be in
 
 ```bash
 proton contacts groups create --name Team --color "#8080FF"
-proton contacts groups get Team                               # and who is in it
-proton contacts groups add Team jane                          # all of Jane's addresses
-proton contacts groups add Team jane --email jane@acme.com    # only that one
+proton contacts groups get Team                       # and who is in it
+proton contacts groups add Team jane                  # all of Jane's addresses
+proton contacts groups add Team jane@acme.com         # only that one
 proton contacts groups remove Team jane
 ```
 
-With `--email`, exactly one contact may be named.
+Naming a contact means every address they hold; naming one of their addresses means that one. Both forms can appear in the same command.
 
 A *listing* of groups does not show members. `get` does.
 
@@ -89,11 +89,11 @@ Pinning a public key to a contact means mail to that address is encrypted to the
 
 ```bash
 proton contacts keys pin jane --key jane-pubkey.asc
-proton contacts keys pin jane --email jane@example.com --key -    # armored key on stdin
-proton contacts keys pin jane --key jane.asc --no-encrypt         # pin for verification only
-proton contacts keys unpin jane
+proton contacts keys pin jane@example.com --key -           # armored key on stdin
+proton contacts keys pin jane --key jane.asc --no-encrypt   # pin for verification only
+proton contacts keys unpin jane@example.com
 ```
 
-`--email` picks which of the contact's addresses the key applies to when there are several.
+A key is pinned to one address. Name that address when the contact holds several; naming the contact is enough when they hold one.
 
 `--scheme` is `pgp-mime` by default, or `pgp-inline`.

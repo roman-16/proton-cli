@@ -116,6 +116,9 @@ func itemOrder() kit.Comparators[passsvc.Item] {
 	}
 }
 
+// screenful is how many items a listing holds when nothing asked for more.
+const screenful = 50
+
 func itemsListCmd() *cobra.Command {
 	var f filters
 	var page kit.Page
@@ -169,6 +172,7 @@ func itemsListCmd() *cobra.Command {
 	f.registerNarrowing(c)
 	risk.Register(c)
 	order.Register(c, "name", "type", "modified", "created")
+	page.Default = screenful
 	page.Register(c, "items")
 	return c
 }
@@ -397,7 +401,7 @@ func secretFieldNames() string {
 	return strings.Join(names, ", ")
 }
 
-// readSecrets folds what --secret-file and --secret-stdin carried into the item.
+// readSecrets folds what --secret-file carried into the item.
 //
 // A name the item type knows is that field; anything else is a custom field,
 // stored hidden - or, when the value is a TOTP URI, as the two-factor field that
@@ -506,8 +510,8 @@ func itemsCreateCmd() *cobra.Command {
 		Use:   "create",
 		Short: "Create an item",
 		Long: "Create an item.\n\n" +
-			"A secret is read from a file or from stdin, never from a flag value:\n" +
-			"--secret-file NAME=FILE, or --secret-stdin NAME for one of them.\n" +
+			"A secret is read from a file, never from a flag value: --secret-file NAME=FILE,\n" +
+			"and - as the file reads standard input.\n" +
 			"NAME is " + secretFieldNames() + ",\n" +
 			"or any name at all, which makes a hidden custom field of it.\n\n" +
 			"--generate-password makes one instead, so a new login needs no file: it is\n" +
@@ -588,8 +592,8 @@ func itemsUpdateCmd() *cobra.Command {
 		Use:   "update REF",
 		Short: "Change an item's fields",
 		Long: "Change an item's fields.\n\n" +
-			"A secret is read from a file or from stdin, never from a flag value:\n" +
-			"--secret-file NAME=FILE, or --secret-stdin NAME for one of them.\n" +
+			"A secret is read from a file, never from a flag value: --secret-file NAME=FILE,\n" +
+			"and - as the file reads standard input.\n" +
 			"NAME is " + secretFieldNames() + ",\n" +
 			"or any name at all, which makes a hidden custom field of it.\n\n" +
 			"--generate-password replaces the password with one it makes.\n\n" +
@@ -748,6 +752,9 @@ type filters struct {
 	itemType *kit.Enum
 	age      kit.Range
 	all      bool
+	// page is the cap a bulk verb acts under, for the same reason Mail's is: a
+	// filter that selected more than was meant should stop short of the vault.
+	page kit.Page
 }
 
 // registerNarrowing adds the flags that say which items, and nothing else. See
@@ -763,6 +770,8 @@ func (f *filters) registerNarrowing(c *cobra.Command) {
 func (f *filters) register(c *cobra.Command) {
 	f.registerNarrowing(c)
 	kit.All(c.Flags(), &f.all)
+	f.page.Default = defaultLimit
+	f.page.RegisterCap(c, "items")
 }
 
 // narrowed reports whether the user asked for a subset of what is there.
@@ -778,6 +787,9 @@ const (
 	itemScope = "a whole vault"
 )
 
+// defaultLimit is how many items a bulk verb acts on when no cap was given.
+const defaultLimit = 150
+
 func selectItems(c *kit.Invocation, f *filters) (kit.Selection[passsvc.Item], error) {
 	if f.all && f.vault == "" && !f.itemType.Set() && !f.age.Set() {
 		c.Warn("--all with no other filter covers every vault. Add --vault to narrow it.")
@@ -788,6 +800,7 @@ func selectItems(c *kit.Invocation, f *filters) (kit.Selection[passsvc.Item], er
 		IDOf:       itemRef,
 		FilterHint: itemFilterHint,
 		Scope:      itemScope,
+		Limit:      f.page.Size,
 		ByRef: func(ctx stdctx.Context, ref string) (passsvc.Item, error) {
 			shareID, itemID, err := resolveItem(c, ref)
 			if err != nil {

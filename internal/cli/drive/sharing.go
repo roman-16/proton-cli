@@ -10,14 +10,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Sharing has two mechanisms and therefore two verb pairs: link and unlink for a
-// public URL, add and remove for named people. `get` reports both at once, which
-// is the question a user actually has about a file.
+// Sharing has two mechanisms. This is the one that names people; a public link
+// is a thing rather than a property of the item, so it lives in `drive links`.
+// `get` reports both at once, which is the question a user actually has about a
+// file.
 
 func shareCmd() *cobra.Command {
-	c := &cobra.Command{Use: "share", Short: "Public links and the people you share with"}
-	c.AddCommand(shareGetCmd(), shareLinkCmd(), shareUnlinkCmd(), shareAddCmd(),
-		shareConfirmCmd(), shareUpdateCmd(), shareResendCmd(), shareRemoveCmd())
+	c := &cobra.Command{Use: "share", Short: "The people you share a file or folder with"}
+	c.AddCommand(shareGetCmd(), shareAddCmd(), shareConfirmCmd(), shareUpdateCmd(),
+		shareResendCmd(), shareRemoveCmd())
 	return c
 }
 
@@ -86,107 +87,8 @@ func expiry(at *int64) string {
 	return units.Time(*at)
 }
 
-func shareLinkCmd() *cobra.Command {
-	var edit bool
-	var expires string
-	var t tree
-	password := kit.LinkPassword()
-	c := &cobra.Command{
-		Use:   "link PATH",
-		Short: "Create or update the public link for a file or folder",
-		Long: "Create or update the public link for a file or folder.\n\n" +
-			"Running it again changes the existing link rather than making a second one,\n" +
-			"so a URL you have already shared keeps working.\n\n" +
-			"The password is read from a file or from stdin, never from a flag value, and\n" +
-			"may be at most 50 characters. --clear-link-password takes it off again, and\n" +
-			"--expires never makes an expiring link permanent.",
-		RunE: kit.Run([]kit.Step{password.Supply}, func(c *kit.Invocation) error {
-			opts := drivesvc.LinkOptions{}
-			if c.Changed("edit") {
-				opts.SetEdit, opts.CanEdit = true, edit
-			}
-			if c.Changed("expires") {
-				d, err := kit.Expires(expires)
-				if err != nil {
-					return err
-				}
-				opts.SetExpiry, opts.ExpireSeconds = true, int(d.Seconds())
-			}
-			if password.Wanted() {
-				custom, err := password.Value()
-				if err != nil {
-					return err
-				}
-				opts.SetPassword, opts.CustomPassword = true, custom
-			}
-			dc, err := t.context(c)
-			if err != nil {
-				return err
-			}
-			var link *drivesvc.ShareLink
-			if err := kit.Mutate(c, ui.ResultSpec{
-				Action: ui.Linked, Kind: "links", Count: 1,
-				Detail: "for " + c.Args[0], AnswerFollows: true,
-			}, func() error {
-				var err error
-				link, err = c.App.Drive.EnsureLink(c.Ctx, dc, c.Args[0], opts)
-				return err
-			}); err != nil {
-				return err
-			}
-			if link == nil || c.App.DryRun {
-				return nil
-			}
-			// The URL is the answer, so it goes to stdout on its own line: the
-			// point of this command is to be able to capture it.
-			return kit.Show(c, ui.RecordSpec{
-				Object: link,
-				Fields: []ui.Field{
-					{Label: "URL", Value: link.URL},
-					{Label: "Access", Value: drivesvc.Access(link.CanEdit)},
-					{Label: "Expires", Value: expiry(link.ExpireTime), Always: true},
-					{Label: "Password", Value: link.CustomPassword},
-				},
-			})
-		}),
-	}
-	c.Flags().BoolVar(&edit, "edit", false, "Allow editing rather than only viewing")
-	c.Flags().StringVar(&expires, "expires", "",
-		"Stop working after DURATION (e.g. 7d, 2w, 6mo), or never")
-	password.Declare(c)
-	t.register(c, manages)
-	return c
-}
-
-func shareUnlinkCmd() *cobra.Command {
-	var t tree
-	c := &cobra.Command{
-		Use:   "unlink PATH",
-		Short: "Remove the public links for a file or folder",
-		RunE: kit.Run(nil, func(c *kit.Invocation) error {
-			dc, err := t.context(c)
-			if err != nil {
-				return err
-			}
-			n, err := c.App.Drive.CountLinks(c.Ctx, dc, c.Args[0])
-			if err != nil {
-				return err
-			}
-			return kit.Mutate(c, ui.ResultSpec{
-				Action: ui.Unlinked, Kind: "links", Count: n,
-				Detail: "from " + c.Args[0],
-			}, func() error {
-				_, err := c.App.Drive.RemoveLinks(c.Ctx, dc, c.Args[0])
-				return err
-			})
-		}),
-	}
-	t.register(c, manages)
-	return c
-}
-
 func shareAddCmd() *cobra.Command {
-	var edit bool
+	access := kit.Viewing()
 	var message string
 	var t tree
 	c := &cobra.Command{
@@ -198,6 +100,10 @@ func shareAddCmd() *cobra.Command {
 			"`share confirm`.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			dc, err := t.context(c)
+			if err != nil {
+				return err
+			}
+			edit, err := kit.CanEdit(access)
 			if err != nil {
 				return err
 			}
@@ -218,7 +124,7 @@ func shareAddCmd() *cobra.Command {
 			return nil
 		}),
 	}
-	c.Flags().BoolVar(&edit, "edit", false, "Allow editing rather than only viewing")
+	access.Register(c)
 	c.Flags().StringVar(&message, "message", "", "Note to include in the invitation email")
 	t.register(c, manages)
 	return c
@@ -271,7 +177,7 @@ func shareConfirmCmd() *cobra.Command {
 // collection uses for changing a field. Re-running `add` would read as inviting
 // them twice.
 func shareUpdateCmd() *cobra.Command {
-	var edit bool
+	access := kit.Viewing()
 	var t tree
 	c := &cobra.Command{
 		Use:   "update PATH EMAIL",
@@ -280,9 +186,9 @@ func shareUpdateCmd() *cobra.Command {
 			"Name them by address. It works whether they have accepted the share or\n" +
 			"still have it pending.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
-			if !c.Changed("edit") {
-				return kit.Fail("Nothing to change.").
-					Hint("--edit to allow editing, or --edit=false to restrict to viewing.")
+			edit, err := kit.CanEdit(access)
+			if err != nil {
+				return err
 			}
 			dc, err := t.context(c)
 			if err != nil {
@@ -296,7 +202,7 @@ func shareUpdateCmd() *cobra.Command {
 			})
 		}),
 	}
-	c.Flags().BoolVar(&edit, "edit", false, "Allow editing rather than only viewing")
+	access.Register(c)
 	t.register(c, manages)
 	return c
 }
@@ -361,7 +267,8 @@ func invitationsCmd() *cobra.Command {
 }
 
 func invitationsListCmd() *cobra.Command {
-	return &cobra.Command{
+	var held kit.Held[drivesvc.Invitation]
+	c := &cobra.Command{
 		Use:   "list",
 		Short: "List invitations waiting for an answer",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
@@ -369,9 +276,8 @@ func invitationsListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return kit.List(c, ui.TableSpec[drivesvc.Invitation]{
-				Noun:  "invitations",
-				Total: ui.Unknown, Page: ui.Unpaged,
+			return held.Answer(c, ui.TableSpec[drivesvc.Invitation]{
+				Noun: "invitations",
 				Columns: []ui.Column[drivesvc.Invitation]{
 					{Header: "ID", ID: true, Cell: func(i drivesvc.Invitation) string { return i.InvitationID }},
 					{Header: "FROM", Flex: true, Cell: func(i drivesvc.Invitation) string { return i.InviterEmail }},
@@ -381,6 +287,11 @@ func invitationsListCmd() *cobra.Command {
 			}, invitations)
 		}),
 	}
+	held.Register(c, "invitations",
+		kit.Key[drivesvc.Invitation]{Name: "created", Less: func(a, b drivesvc.Invitation) int { return kit.Ints(a.CreateTime, b.CreateTime) }},
+		kit.Key[drivesvc.Invitation]{Name: "sender", Less: func(a, b drivesvc.Invitation) int { return kit.Fold(a.InviterEmail, b.InviterEmail) }},
+	)
+	return c
 }
 
 func invitationVerb(use, short string, action ui.Action) *cobra.Command {
@@ -477,6 +388,7 @@ func trashListCmd() *cobra.Command {
 		}),
 	}
 	order.Register(c, "name", "size", "trashed")
+	page.Default = screenful
 	page.Register(c, "items")
 	return c
 }
@@ -575,7 +487,8 @@ func sharedCmd() *cobra.Command {
 }
 
 func sharedListCmd() *cobra.Command {
-	return &cobra.Command{
+	var held kit.Held[drivesvc.SharedItem]
+	c := &cobra.Command{
 		Use:   "list",
 		Short: "List what other people have shared with you",
 		Long: "List what other people have shared with you.\n\n" +
@@ -601,12 +514,17 @@ func sharedListCmd() *cobra.Command {
 					Header: "ROLE",
 					Cell:   func(i drivesvc.SharedItem) string { return i.Role },
 				})
-			return kit.List(c, ui.TableSpec[drivesvc.SharedItem]{
+			return held.Answer(c, ui.TableSpec[drivesvc.SharedItem]{
 				Noun: "items", Columns: cols,
-				Total: ui.Unknown, Page: ui.Unpaged,
 			}, items)
 		}),
 	}
+	held.Register(c, "items",
+		kit.Key[drivesvc.SharedItem]{Name: "name", Less: func(a, b drivesvc.SharedItem) int { return kit.Fold(a.Name, b.Name) }},
+		kit.Key[drivesvc.SharedItem]{Name: "size", Less: func(a, b drivesvc.SharedItem) int { return kit.Ints(a.Size, b.Size) }},
+		kit.Key[drivesvc.SharedItem]{Name: "shared", Less: func(a, b drivesvc.SharedItem) int { return kit.Ints(a.Created, b.Created) }},
+	)
+	return c
 }
 
 // sharedBy says where an item came from. A link came from a URL and says so:
@@ -628,7 +546,7 @@ func sharedAddCmd() *cobra.Command {
 			"URL is the link as it was sent to you, including everything after the #.\n" +
 			"Once added it appears in `shared list` and opens with `--shared REF`, with\n" +
 			"nothing to pass again. A link with a password takes it from\n" +
-			"--link-password-file or --link-password-stdin and keeps it.",
+			"--link-password-file, which takes - for stdin, and keeps it.",
 		RunE: kit.Run([]kit.Step{password.Supply}, func(c *kit.Invocation) error {
 			custom := ""
 			if password.Wanted() {
@@ -744,21 +662,28 @@ func sharedSpec(action ui.Action, items []drivesvc.SharedItem) ui.ResultSpec {
 
 func sharingCmd() *cobra.Command {
 	c := &cobra.Command{Use: "sharing", Short: "What you have shared with other people"}
-	c.AddCommand(&cobra.Command{
+	var held kit.Held[drivesvc.SharedItem]
+	sub := &cobra.Command{
 		Use:   "list",
-		Short: "List what you have shared",
-		Long: "List everything you have shared, by public link or with named people.\n\n" +
-			"To check a single item instead, run `items share get PATH`.",
+		Short: "List what you have shared with other people",
+		Long: "List the files and folders you have handed to named people.\n\n" +
+			"A public link is the other way to share, and `links list` has those. To check\n" +
+			"a single item instead, run `items share get PATH`.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			items, err := c.App.Drive.SharedByMe(c.Ctx)
 			if err != nil {
 				return err
 			}
-			return kit.List(c, ui.TableSpec[drivesvc.SharedItem]{
+			return held.Answer(c, ui.TableSpec[drivesvc.SharedItem]{
 				Noun: "items", Columns: sharedItemColumns(),
-				Total: ui.Unknown, Page: ui.Unpaged,
 			}, items)
 		}),
-	})
+	}
+	held.Register(sub, "items",
+		kit.Key[drivesvc.SharedItem]{Name: "name", Less: func(a, b drivesvc.SharedItem) int { return kit.Fold(a.Name, b.Name) }},
+		kit.Key[drivesvc.SharedItem]{Name: "size", Less: func(a, b drivesvc.SharedItem) int { return kit.Ints(a.Size, b.Size) }},
+		kit.Key[drivesvc.SharedItem]{Name: "shared", Less: func(a, b drivesvc.SharedItem) int { return kit.Ints(a.Created, b.Created) }},
+	)
+	c.AddCommand(sub)
 	return c
 }

@@ -36,6 +36,13 @@ proton drive computers list
 proton drive computers list
 ```
 
+| Flag | Description |
+| --- | --- |
+| `--desc` | Reverse the order |
+| `--limit int` | How many computers per page; 0 for all of them |
+| `--page int` | Which page of results, counting from zero |
+| `--sort string` | Order by: name, synced (default `name`) |
+
 ## `update`
 
 Rename a computer.

@@ -46,7 +46,7 @@ func shortID(id string) string {
 func TestShortIDDisplayInTTY(t *testing.T) {
 	stdout, _, code := runWithEnv(t,
 		map[string]string{"PROTON_CLI_FORCE_TTY": "1"},
-		"mail", "messages", "list", "--page-size", "3")
+		"mail", "messages", "list", "--limit", "3")
 	if code != 0 {
 		t.Fatalf("exit %d", code)
 	}
@@ -60,7 +60,7 @@ func TestShortIDDisplayInTTY(t *testing.T) {
 }
 
 func TestShortIDPipeFullIDs(t *testing.T) {
-	stdout := runOK(t, "mail", "messages", "list", "--page-size", "3")
+	stdout := runOK(t, "mail", "messages", "list", "--limit", "3")
 	id := firstIDLineCell(stdout)
 	if len(id) <= 8 {
 		t.Errorf("expected full ID when piped, got %q (len %d)", id, len(id))
@@ -73,7 +73,7 @@ func TestShortIDPipeFullIDs(t *testing.T) {
 func TestShortIDFullIDsFlagOverrides(t *testing.T) {
 	stdout, _, code := runWithEnv(t,
 		map[string]string{"PROTON_CLI_FORCE_TTY": "1"},
-		"--full-ids", "mail", "messages", "list", "--page-size", "3")
+		"--full-ids", "mail", "messages", "list", "--limit", "3")
 	if code != 0 {
 		t.Fatalf("exit %d", code)
 	}
@@ -87,7 +87,7 @@ func TestShortIDJSONAlwaysFull(t *testing.T) {
 	// Even with TTY forced.
 	stdout, _, code := runWithEnv(t,
 		map[string]string{"PROTON_CLI_FORCE_TTY": "1"},
-		"mail", "messages", "list", "--page-size", "1", "--output", "json")
+		"mail", "messages", "list", "--limit", "1", "--output", "json")
 	if code != 0 {
 		t.Fatalf("exit %d", code)
 	}
@@ -129,7 +129,7 @@ type cacheEntry struct {
 
 func TestShortIDCacheFilePopulated(t *testing.T) {
 	// Run any list command to populate the cache.
-	runOK(t, "mail", "messages", "list", "--page-size", "1")
+	runOK(t, "mail", "messages", "list", "--limit", "1")
 
 	path := idcachePath(t)
 	data, err := os.ReadFile(path)
@@ -189,7 +189,7 @@ func TestShortIDRoundTripMail(t *testing.T) {
 	msgID, _, subject := plainMail(t)
 
 	// Run a list command so the cache learns the ID.
-	runOK(t, "mail", "messages", "list", "--page-size", "20")
+	runOK(t, "mail", "messages", "list", "--limit", "20")
 
 	prefix := shortID(msgID)
 	stdout, stderr, code := run(t, "mail", "messages", "get", prefix)

@@ -26,9 +26,9 @@ The last word is the verb and a group never acts, so `{{.Program}} mail messages
 
 ## Reading
 
-A listing is one JSON object keyed by its plural name, always with `count`; a paged one also carries `total`, `page`, `page_size` and `has_more`. `total` counts the whole collection whatever the page holds, so counting never needs a second page. `--page-size 0` returns every row in one answer, for when they are all needed; otherwise narrowing the listing costs less than walking it.
+A listing is one JSON object keyed by its plural name, always with `count`; a paged one also carries `total`, `page`, `page_size` and `has_more`. `total` counts the whole collection whatever the page holds, so counting never needs a second page. `--limit 0` returns every row in one answer, for when they are all needed; otherwise narrowing the listing costs less than walking it.
 
-An all-day event's `end` is the midnight after its last day (`all_day` marks one). The last day it occupies is the day before `end`, and `--end` takes that day, not that timestamp.
+An all-day event's `end` is the midnight after its last day (`all_day` marks one). The last day it occupies is the day before `end`, and `--before` takes that day, not that timestamp.
 
 These are the listings that can be narrowed, and what narrows them. The same flags choose what a bulk verb in that collection acts on, so a selection can be worked out on `list` and then handed to `trash`, `move`, `label` or `export`. Everything else a command takes is in its `--help`.
 
@@ -45,7 +45,7 @@ A message Proton flagged carries `phishing`, `suspicious` or `dmarc_failed` set 
 {{.Program}} mail messages list --from billing@example.com --after 2026-01-01 --folder all --output json
 {{.Program}} mail messages get 5bH2mQxK --output json
 {{.Program}} drive items list /Documents --output json
-{{.Program}} calendar events list --start 2026-04-16 --end 2026-04-23 --output json
+{{.Program}} calendar events list --after 2026-04-16 --before 2026-04-23 --output json
 {{.Program}} contacts get jane@example.com --output json
 {{.Program}} pass items totp github.com
 ```
@@ -71,7 +71,7 @@ A bulk verb acts on at most `--limit` things, 150 by default; `--limit 0` lifts 
 
 `{{.Program}} pass items get` and `{{.Program}} pass items totp` print secrets in full.
 
-Secrets go in the same way they come out. `pass items create` and `pass items update` read them from `--secret-stdin NAME` or `--secret-file NAME=FILE`, never from a flag value, because a flag value is in the shell history.
+Secrets go in the same way they come out. `pass items create` and `pass items update` read them from `--secret-file NAME=FILE`, never from a flag value, because a flag value is in the shell history; `-` as the file reads standard input.
 
 ## Exit codes
 

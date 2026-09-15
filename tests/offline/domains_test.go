@@ -131,14 +131,6 @@ func TestAnEventsLengthIsStatedOnce(t *testing.T) {
 	}
 }
 
-// Which contact an address belongs to is a question only one contact can answer,
-// so naming several with --email is decided by the flags alone.
-func TestGroupingOneAddressNeedsOneContact(t *testing.T) {
-	refuses(t, 1, []string{"contacts", "groups", "add", "GROUP", "one", "two",
-		"--email", "a@example.com"},
-		"--email applies to one contact", "drop --email")
-}
-
 // Making a password reaches no account and needs no session: it happens on this
 // machine and may never leave it.
 func TestGeneratingAPasswordNeedsNoAccount(t *testing.T) {
@@ -169,7 +161,7 @@ func TestAFilterDescribedWronglyIsRefused(t *testing.T) {
 		phrases []string
 	}{
 		{create("--star"), []string{"needs something to match", "--if"}},
-		{create("--if", "subject contains x"), []string{"does nothing with it", "--move-to", "--star"}},
+		{create("--if", "subject contains x"), []string{"does nothing with it", "--into", "--star"}},
 		{create("--if", "topic contains x", "--star"),
 			[]string{"nothing called \"topic\"", "attachments", "recipient", "sender", "subject"}},
 		{create("--if", "subject holds x", "--star"),

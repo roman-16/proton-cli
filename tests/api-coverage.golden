@@ -192,9 +192,11 @@ POST /pass/v1/user/srp/auth
 POST /pass/v1/vault
 PUT /calendar/v1/{id}/events/sync
 PUT /calendar/v1/{id}/events/{id}/attendees/{id}
+PUT /calendar/v1/{id}/invitations/{id}
 PUT /calendar/v1/{id}/invitations/{id}/accept
 PUT /calendar/v1/{id}/invitations/{id}/reject
 PUT /calendar/v1/{id}/members/{id}
+PUT /calendar/v1/{id}/members/{id}/permission
 PUT /calendar/v1/{id}/settings
 PUT /contacts/v4/contacts/delete
 PUT /contacts/v4/contacts/emails/label

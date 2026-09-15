@@ -30,9 +30,9 @@ proton changelog --since 2.3.0 --until 2.4.0
 
 Generate a shell completion script.
 
-Completion knows the whole command tree, every flag, and the values each enumerated flag accepts - so it offers folder names, item types, output formats and setting keys as you type them.
+Completion knows the whole command tree, every flag, and the values each enumerated flag accepts - so it offers item types, output formats, setting keys, colours and icons as you type them.
 
-Where a command takes a reference it offers back what your listings showed: the short ID, and the subject, name or address beside it. It reads what this machine remembers rather than asking Proton, so a collection you have not listed yet offers nothing and says which listing would fill it.
+Where a reference is wanted it offers back what your listings showed: the short ID, and the subject, name or address beside it. A flag whose value names one of your things answers the same way, so --into, --vault and --folder offer what you have. It reads what this machine remembers rather than asking Proton, so a collection you have not listed yet offers nothing and says which listing would fill it.
 
 One script covers both proton and proton-cli.
 
@@ -121,6 +121,8 @@ proton uninstall --yes --purge
 
 Replace this proton binary in place with the latest GitHub release (or a specific version), verifying the download against the published SHA-256 checksums.
 
+--dry-run reports what it would install without installing it.
+
 Only a curl-script install or a manually downloaded binary can update itself. If proton was installed with a package manager (apt, dnf, apk, Homebrew, winget, npm, Nix), update it with that package manager.
 
 ```
@@ -129,15 +131,14 @@ proton update [VERSION]
 
 ```bash
 proton update
-proton update --check
+proton update --dry-run
 proton update 1.9.11
-proton update --reinstall
+proton update --force
 ```
 
 | Flag | Description |
 | --- | --- |
-| `--check` | Only report whether an update is available; don't install |
-| `--reinstall` | Install again even if already up to date |
+| `--force` | Install again even if already up to date |
 
 ## `version`
 

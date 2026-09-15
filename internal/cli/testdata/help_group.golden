@@ -7,7 +7,6 @@ Commands:
   attachments  Files attached to a message
   delete       Delete messages permanently
   empty        Delete everything in a folder, permanently
-  expire       Make messages delete themselves after a while
   export       Write messages out as .eml or mbox files
   forward      Forward a message
   get          Show one message, decrypted
@@ -23,6 +22,7 @@ Commands:
   unschedule   Cancel a scheduled send, returning the message to drafts
   unstar       Remove the star from messages
   unsubscribe  Ask a mailing list to stop
+  update       Change when messages delete themselves
   watch        Print each message as it arrives
 
 Global flags:    proton --help

@@ -39,9 +39,13 @@ type Selector[T any] struct {
 	// Scope names what --all would cover when nothing narrows it, for the warning
 	// that precedes an unbounded change.
 	Scope string
-	// Limit is the cap the filters were read under, so a selection that fills it
+	// Limit is the most things the verb may act on, so a selection that fills it
 	// says more may exist rather than presenting a truncated set as the whole
-	// match. Zero when nothing was capped.
+	// match. Zero lifts the cap.
+	//
+	// A collection Proton can narrow for us is read under the cap and arrives at
+	// that size already; one that arrives whole and is filtered here is cut to it
+	// below. Either way the cap means the same thing to the person who typed it.
 	Limit int
 }
 
@@ -150,6 +154,12 @@ func Select[T any](c *Invocation, s Selector[T]) (Selection[T], error) {
 		rows = append(rows, row)
 		sel.IDs = append(sel.IDs, id)
 	}
+	// A cap is what stands between a mistyped filter and a change nobody meant.
+	// References typed by hand are inside it too: a command line naming two
+	// hundred things under --limit 150 is one somebody should look at again.
+	if s.Limit > 0 && len(rows) > s.Limit {
+		rows, sel.IDs = rows[:s.Limit], sel.IDs[:s.Limit]
+	}
 	sel.Rows = rows
 	return sel, nil
 }
@@ -195,7 +205,7 @@ type Range struct {
 
 // Register adds the age filters. subject completes "not modified within", so the
 // help says what the age is actually measured against.
-func (r *Range) Register(f Flags, subject string) {
+func (r *Range) Register(f FlagSet, subject string) {
 	f.StringVar(&r.OlderThan, "older-than", "",
 		"Match "+subject+" older than DURATION (e.g. 30d, 2w, 1h)")
 	f.StringVar(&r.NewerThan, "newer-than", "",
@@ -221,11 +231,11 @@ func (r *Range) Set() bool { return r.OlderThan != "" || r.NewerThan != "" }
 const AllUsage = "Act on everything in scope, rather than a subset"
 
 // All registers --all on a command.
-func All(f Flags, into *bool) { f.BoolVar(into, "all", false, AllUsage) }
+func All(f FlagSet, into *bool) { f.BoolVar(into, "all", false, AllUsage) }
 
-// Flags is the slice of pflag.FlagSet the shared groups need. Declaring it as an
-// interface keeps kit from importing pflag into every caller's mental model.
-type Flags interface {
+// FlagSet is the slice of pflag.FlagSet the shared groups need. Declaring it as
+// an interface keeps kit from importing pflag into every caller's mental model.
+type FlagSet interface {
 	StringVar(p *string, name, value, usage string)
 	StringArrayVar(p *[]string, name string, value []string, usage string)
 	BoolVar(p *bool, name string, value bool, usage string)

@@ -1,8 +1,6 @@
 package pass
 
 import (
-	"strconv"
-
 	"github.com/roman-16/proton-cli/internal/cli/kit"
 	passsvc "github.com/roman-16/proton-cli/internal/service/pass"
 	"github.com/roman-16/proton-cli/internal/ui"
@@ -15,7 +13,7 @@ import (
 
 func aliasesCmd() *cobra.Command {
 	c := &cobra.Command{Use: "aliases", Short: "Hide-my-email addresses that forward to you"}
-	c.AddCommand(aliasesListCmd(), aliasesCreateCmd(), aliasesOptionsCmd(), aliasContactsCmd(),
+	c.AddCommand(aliasesListCmd(), aliasesCreateCmd(), aliasContactsCmd(),
 		aliasesToggleCmd("enable", "Start receiving mail sent to an alias", ui.Enabled, true),
 		aliasesToggleCmd("disable", "Stop receiving mail sent to an alias", ui.Disabled, false))
 	return c
@@ -23,6 +21,7 @@ func aliasesCmd() *cobra.Command {
 
 func aliasesListCmd() *cobra.Command {
 	var vault string
+	var held kit.Held[passsvc.Item]
 	c := &cobra.Command{
 		Use:   "list",
 		Short: "List your aliases",
@@ -36,9 +35,8 @@ func aliasesListCmd() *cobra.Command {
 				return err
 			}
 			aliases := keepType(items, "alias")
-			return kit.List(c, ui.TableSpec[passsvc.Item]{
-				Noun:  "aliases",
-				Total: ui.Unknown, Page: ui.Unpaged,
+			return held.Answer(c, ui.TableSpec[passsvc.Item]{
+				Noun: "aliases",
 				Columns: []ui.Column[passsvc.Item]{
 					{Header: "ID", ID: true, Cell: itemRef},
 					{Header: "STATUS", Cell: func(it passsvc.Item) string { return it.AliasStatus }},
@@ -49,13 +47,13 @@ func aliasesListCmd() *cobra.Command {
 		}),
 	}
 	c.Flags().StringVar(&vault, "vault", "", "Show only this vault, by name or ID")
+	held.Register(c, "aliases",
+		kit.Key[passsvc.Item]{Name: "address", Less: func(a, b passsvc.Item) int { return kit.Fold(a.Alias, b.Alias) }},
+		kit.Key[passsvc.Item]{Name: "name", Less: func(a, b passsvc.Item) int { return kit.Fold(a.Name, b.Name) }},
+	)
 	return c
 }
 
-// aliasesToggleCmd builds enable and disable, which differ only in which way the
-// switch goes. A disabled alias keeps its address and stops receiving, so it is
-// the answer to an address that has started attracting spam - `items delete`
-// burns the address instead, and cannot be taken back.
 func aliasesToggleCmd(use, short string, action ui.Action, enabled bool) *cobra.Command {
 	return &cobra.Command{
 		Use:   use + " REF",
@@ -90,12 +88,12 @@ func aliasesCreateCmd() *cobra.Command {
 		Short: "Create an alias",
 		Long: "Create an alias.\n\n" +
 			"The address is a prefix you choose plus a suffix Proton offers. Mail sent to\n" +
-			"it arrives in the mailboxes you name. Run `aliases options` to see the\n" +
-			"suffixes and mailboxes available.",
+			"it arrives in the mailboxes you name. `settings domains list` has the suffixes\n" +
+			"and `settings mailboxes list` the mailboxes.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			if prefix == "" {
 				return kit.Fail("An alias needs a prefix.").
-					Hint("--prefix shop", "proton pass aliases options")
+					Hint("--prefix shop", "proton pass settings domains list")
 			}
 			shareID, err := resolveVault(c, vault)
 			if err != nil {
@@ -134,56 +132,4 @@ func aliasesCreateCmd() *cobra.Command {
 	c.Flags().StringVar(&name, "name", "", "Name for the alias item")
 	c.Flags().StringVar(&vault, "vault", "", "Which vault to keep it in, by name or ID")
 	return c
-}
-
-// option is one choice `aliases options` offers, in either category.
-type option struct {
-	Kind  string `json:"kind"`
-	Value string `json:"value"`
-	ID    string `json:"id,omitempty"`
-}
-
-func aliasesOptionsCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "options",
-		Short: "List the suffixes and mailboxes an alias can use",
-		Long: "List the suffixes and mailboxes an alias can use.\n\n" +
-			"A suffix is the domain an alias is made on, and is what --suffix takes.\n\n" +
-			"Proton adds a random word in front of the suffix, and only settles on it\n" +
-			"when the alias is created.",
-		RunE: kit.Run(nil, func(c *kit.Invocation) error {
-			shareID, err := resolveVault(c, "")
-			if err != nil {
-				return err
-			}
-			suffixes, mailboxes, err := c.App.Pass.AliasOptions(c.Ctx, shareID)
-			if err != nil {
-				return err
-			}
-			rows := make([]option, 0, len(suffixes)+len(mailboxes))
-			// The domain, not the whole suffix. Proton mints the word before it
-			// afresh on every request, so the full form is out of date by the
-			// time it is read, and passing it back is refused.
-			seen := make(map[string]bool, len(suffixes))
-			for _, s := range suffixes {
-				if seen[s.Domain] {
-					continue
-				}
-				seen[s.Domain] = true
-				rows = append(rows, option{Kind: "suffix", Value: s.Domain})
-			}
-			for _, m := range mailboxes {
-				rows = append(rows, option{Kind: "mailbox", Value: m.Email, ID: strconv.Itoa(m.ID)})
-			}
-			return kit.List(c, ui.TableSpec[option]{
-				Noun:  "options",
-				Total: ui.Unknown, Page: ui.Unpaged,
-				Columns: []ui.Column[option]{
-					{Header: "KIND", Cell: func(o option) string { return o.Kind }},
-					{Header: "VALUE", Flex: true, Cell: func(o option) string { return o.Value }},
-					{Header: "ID", Cell: func(o option) string { return o.ID }},
-				},
-			}, rows)
-		}),
-	}
 }

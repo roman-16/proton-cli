@@ -25,8 +25,8 @@ func New() *cobra.Command {
 		Use:   "drive",
 		Short: "Files and folders in Drive",
 	}
-	c.AddCommand(computersCmd(), itemsCmd(), trashCmd(), invitationsCmd(), sharedCmd(),
-		sharingCmd(), photosCmd(), settingsCmd(), volumesCmd())
+	c.AddCommand(computersCmd(), itemsCmd(), linksCmd(), trashCmd(), invitationsCmd(),
+		sharedCmd(), sharingCmd(), photosCmd(), settingsCmd(), volumesCmd())
 	return c
 }
 
@@ -57,3 +57,7 @@ func yesNo(b bool) string {
 	}
 	return "no"
 }
+
+// screenful is how many rows a Drive listing holds when nothing asked for more.
+// Files and trashed items are the two collections here that grow without bound.
+const screenful = 50

@@ -48,7 +48,7 @@ func TestMailFiltersFromConditions(t *testing.T) {
 		"--if", "subject contains xyz-never-matches-"+testID(),
 		"--if", "sender not is nobody@example.com",
 		"--if", "attachments contains",
-		"--move-to", "Archive", "--mark-read"))
+		"--into", "Archive", "--mark-read"))
 	if !looksLikeID(id) {
 		t.Fatalf("expected bare ID on stdout, got %q", id)
 	}
@@ -58,7 +58,7 @@ func TestMailFiltersFromConditions(t *testing.T) {
 	sieve := filterSieve(t, id)
 	for _, want := range []string{
 		"anyof",                     // --match any
-		`fileinto "Archive"`,        // --move-to
+		`fileinto "Archive"`,        // --into
 		`addflag "\\Seen"`,          // --mark-read
 		"not address",               // the negated sender
 		`exists "X-Attached"`,       // the attachment condition
@@ -77,7 +77,7 @@ func TestMailFiltersRewriteARuleInPlace(t *testing.T) {
 	name := testID() + "-rewrite"
 
 	id := strings.TrimSpace(runOK(t, "mail", "settings", "filters", "create", "--name", name,
-		"--if", "subject contains before-"+testID(), "--move-to", "Archive"))
+		"--if", "subject contains before-"+testID(), "--into", "Archive"))
 	cleanupRun(t, fmt.Sprintf("Delete filter: proton mail settings filters delete -- %s", id),
 		"mail", "settings", "filters", "delete", "--", id)
 	before := filterPriority(t, id)

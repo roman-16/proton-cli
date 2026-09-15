@@ -8,6 +8,7 @@ import (
 	"github.com/roman-16/proton-cli/internal/config"
 	"github.com/roman-16/proton-cli/internal/profile"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 // Completing a reference.
@@ -22,6 +23,11 @@ import (
 // reference answers to its short form and to its whole self, and a thing answers
 // to its handle as well, because the shell decides between them by the prefix
 // already typed - "ket" keeps the ID and "Invo" keeps the subject.
+//
+// An argument and a flag are the same question asked in two places. `--into
+// Archive` and `move REF` both name something the CLI holds, so both are
+// answered from the same cache - the argument from what kit.Placeholders says it
+// picks, the flag from what kit.Flags says it picks.
 
 // Argument is one positional a command takes.
 type Argument struct {
@@ -148,6 +154,7 @@ func InstallArguments(root *cobra.Command) {
 		if c.HasSubCommands() {
 			return
 		}
+		installFlagCompletion(c)
 		args := Arguments(c.Use)
 		c.Args = counting(args, c.Args)
 		if c.ValidArgsFunction != nil || len(c.ValidArgs) > 0 || !namesAnything(c, args) {
@@ -158,6 +165,26 @@ func InstallArguments(root *cobra.Command) {
 		}
 	}
 	walk(root)
+}
+
+// installFlagCompletion offers back what the listings showed for every flag whose
+// value names something this CLI holds.
+//
+// A flag that already answers for itself keeps doing so: an Enum offers its
+// domain and a Color its palette, and those are closed sets the cache knows
+// nothing about. Registering a second function would replace the first, so the
+// declaration here only fills what is still empty.
+func installFlagCompletion(c *cobra.Command) {
+	c.LocalFlags().VisitAll(func(f *pflag.Flag) {
+		collection := Flags[f.Name].Picks
+		if _, answers := c.GetFlagCompletionFunc(f.Name); collection == "" || answers {
+			return
+		}
+		_ = c.RegisterFlagCompletionFunc(f.Name,
+			func(cmd *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+				return offer(cmd, collection, toComplete)
+			})
+	})
 }
 
 func namesAnything(c *cobra.Command, args []Argument) bool {
@@ -179,6 +206,12 @@ func complete(cmd *cobra.Command, arg Argument, toComplete string) ([]string, co
 	if collection == "" {
 		return nil, cobra.ShellCompDirectiveDefault
 	}
+	return offer(cmd, collection, toComplete)
+}
+
+// offer answers one press of the tab key from what a collection's listings have
+// shown on this machine.
+func offer(cmd *cobra.Command, collection, toComplete string) ([]string, cobra.ShellCompDirective) {
 	cache := app.Seen(profileFor(cmd))
 	found := cache.Candidates(collection, toComplete)
 	if len(found) == 0 {

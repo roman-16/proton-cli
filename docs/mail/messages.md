@@ -4,7 +4,7 @@ Individual messages.
 
 Every command under `proton mail messages`, with the arguments and flags it takes. For these commands in use, see [the mail guide](README.md).
 
-Holds `attachments`, `delete`, `empty`, `expire`, `export`, `forward`, `get`, `label`, `list`, `mark`, `move`, `reply`, `send`, `star`, `trash`, `unlabel`, `unschedule`, `unstar`, `unsubscribe` and `watch`.
+Holds `attachments`, `delete`, `empty`, `export`, `forward`, `get`, `label`, `list`, `mark`, `move`, `reply`, `send`, `star`, `trash`, `unlabel`, `unschedule`, `unstar`, `unsubscribe`, `update` and `watch`.
 
 ## `attachments`
 
@@ -67,9 +67,9 @@ proton mail messages delete --folder spam --all --yes
 
 | Flag | Description |
 | --- | --- |
-| `--after string` | Match messages after this date (YYYY-MM-DD) |
+| `--after string` | First day to include (YYYY-MM-DD) |
 | `--all` | Act on everything in scope, rather than a subset |
-| `--before string` | Match messages before this date (YYYY-MM-DD) |
+| `--before string` | Last day to include (YYYY-MM-DD) |
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text anywhere, including display names and bodies |
@@ -100,43 +100,6 @@ proton mail messages empty --folder spam
 | --- | --- |
 | `--folder string` | Folder or label to look in |
 
-## `expire`
-
-Make messages delete themselves after a while, or stop them.
-
---in takes a duration. A message already counting down reports the moment it expires rather than how long is left.
-
-```
-proton mail messages expire [REF...]
-```
-
-```bash
-proton mail messages expire 5bH2mQxK --in 7d
-proton mail messages expire --from newsletter@example.com --in 30d
-proton mail messages expire 5bH2mQxK --never
-```
-
-| Flag | Description |
-| --- | --- |
-| `--after string` | Match messages after this date (YYYY-MM-DD) |
-| `--all` | Act on everything in scope, rather than a subset |
-| `--before string` | Match messages before this date (YYYY-MM-DD) |
-| `--folder string` | Folder or label to look in (default: all) |
-| `--from string` | Match the sender's address |
-| `--in string` | Delete them after DURATION (e.g. 7d, 24h) |
-| `--keyword string` | Match text anywhere, including display names and bodies |
-| `--limit int` | Most messages to affect; 0 for no cap (default `150`) |
-| `--never` | Stop them expiring |
-| `--newer-than string` | Match messages newer than DURATION |
-| `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |
-| `--password-file string` | Read the account password from a file |
-| `--password-stdin` | Read the account password from stdin |
-| `--starred` | Match starred messages |
-| `--subject string` | Match text in the subject |
-| `--to string` | Match a recipient's address |
-| `--totp string` | Two-factor code |
-| `--unread` | Match unread messages |
-
 ## `export`
 
 Write messages out as standalone RFC 822 documents, readable by any mail client, grep, or anything else.
@@ -157,9 +120,9 @@ proton mail messages export --folder archive --older-than 1y --format mbox --des
 
 | Flag | Description |
 | --- | --- |
-| `--after string` | Match messages after this date (YYYY-MM-DD) |
+| `--after string` | First day to include (YYYY-MM-DD) |
 | `--all` | Act on everything in scope, rather than a subset |
-| `--before string` | Match messages before this date (YYYY-MM-DD) |
+| `--before string` | Last day to include (YYYY-MM-DD) |
 | `--dest string` | Write to this path, or - for stdout |
 | `--dest-dir string` | Write into this directory, keeping each item's own name |
 | `--folder string` | Folder or label to look in (default: all) |
@@ -199,9 +162,8 @@ proton mail messages forward 'Invoice #2291' --to jane@example.com --no-attachme
 | `--body string` | Your text, placed above the quoted original (- reads stdin) |
 | `--cc stringArray` | Carbon-copy recipient (repeatable) |
 | `--draft` | Save as a draft instead of sending |
-| `--eo-password-file string` | Read the password for recipients outside Proton from a file |
+| `--eo-password-file string` | Read the password for recipients outside Proton from a file, or - for stdin |
 | `--eo-password-hint string` | Hint shown to password-protected recipients |
-| `--eo-password-stdin` | Read the password for recipients outside Proton from stdin |
 | `--expires string` | Self-destruct after DURATION (e.g. 7d, 24h), or never |
 | `--from string` | Address to send from, by email or ID (default: your primary) |
 | `--html` | Compose in HTML (default: match the original) |
@@ -249,9 +211,9 @@ proton mail messages label --from billing@example.com --label Accounting
 
 | Flag | Description |
 | --- | --- |
-| `--after string` | Match messages after this date (YYYY-MM-DD) |
+| `--after string` | First day to include (YYYY-MM-DD) |
 | `--all` | Act on everything in scope, rather than a subset |
-| `--before string` | Match messages before this date (YYYY-MM-DD) |
+| `--before string` | Last day to include (YYYY-MM-DD) |
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text anywhere, including display names and bodies |
@@ -279,7 +241,7 @@ proton mail messages list
 ```bash
 proton mail messages list
 proton mail messages list --unread
-proton mail messages list --folder archive --page-size 50
+proton mail messages list --folder archive --limit 50
 proton mail messages list --starred --output json
 proton mail messages list --from billing@example.com --folder all
 proton mail messages list --keyword invoice --after 2026-01-01 --folder all
@@ -287,15 +249,15 @@ proton mail messages list --keyword invoice --after 2026-01-01 --folder all
 
 | Flag | Description |
 | --- | --- |
-| `--after string` | Match messages after this date (YYYY-MM-DD) |
-| `--before string` | Match messages before this date (YYYY-MM-DD) |
+| `--after string` | First day to include (YYYY-MM-DD) |
+| `--before string` | Last day to include (YYYY-MM-DD) |
 | `--folder string` | Folder or label to look in (default: inbox) |
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text anywhere, including display names and bodies |
+| `--limit int` | How many messages per page; 0 for all of them (default `25`) |
 | `--newer-than string` | Match messages newer than DURATION |
 | `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |
 | `--page int` | Which page of results, counting from zero |
-| `--page-size int` | How many messages per page; 0 for all of them (default `25`) |
 | `--starred` | Match starred messages |
 | `--subject string` | Match text in the subject |
 | `--to string` | Match a recipient's address |
@@ -351,9 +313,9 @@ proton mail messages mark read --folder inbox --all
 
 | Flag | Description |
 | --- | --- |
-| `--after string` | Match messages after this date (YYYY-MM-DD) |
+| `--after string` | First day to include (YYYY-MM-DD) |
 | `--all` | Act on everything in scope, rather than a subset |
-| `--before string` | Match messages before this date (YYYY-MM-DD) |
+| `--before string` | Last day to include (YYYY-MM-DD) |
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text anywhere, including display names and bodies |
@@ -379,9 +341,9 @@ proton mail messages mark unread 'Invoice #2291'
 
 | Flag | Description |
 | --- | --- |
-| `--after string` | Match messages after this date (YYYY-MM-DD) |
+| `--after string` | First day to include (YYYY-MM-DD) |
 | `--all` | Act on everything in scope, rather than a subset |
-| `--before string` | Match messages before this date (YYYY-MM-DD) |
+| `--before string` | Last day to include (YYYY-MM-DD) |
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text anywhere, including display names and bodies |
@@ -410,9 +372,9 @@ proton mail messages move --from newsletter@example.com --older-than 90d --into 
 
 | Flag | Description |
 | --- | --- |
-| `--after string` | Match messages after this date (YYYY-MM-DD) |
+| `--after string` | First day to include (YYYY-MM-DD) |
 | `--all` | Act on everything in scope, rather than a subset |
-| `--before string` | Match messages before this date (YYYY-MM-DD) |
+| `--before string` | Last day to include (YYYY-MM-DD) |
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
 | `--into string` | Destination folder, by name or ID |
@@ -451,9 +413,8 @@ proton mail messages reply 'Invoice #2291' --body 'Draft first.' --draft
 | `--body string` | Your text, placed above the quoted original (- reads stdin) |
 | `--cc stringArray` | Carbon-copy recipient (repeatable) |
 | `--draft` | Save as a draft instead of sending |
-| `--eo-password-file string` | Read the password for recipients outside Proton from a file |
+| `--eo-password-file string` | Read the password for recipients outside Proton from a file, or - for stdin |
 | `--eo-password-hint string` | Hint shown to password-protected recipients |
-| `--eo-password-stdin` | Read the password for recipients outside Proton from stdin |
 | `--everyone` | Reply to everyone who was on the message, not just the sender |
 | `--expires string` | Self-destruct after DURATION (e.g. 7d, 24h), or never |
 | `--from string` | Address to send from, by email or ID (default: your primary) |
@@ -487,9 +448,8 @@ proton mail messages send --eml ./draft.eml
 | `--body string` | Message body (- reads stdin) |
 | `--cc stringArray` | Carbon-copy recipient (repeatable) |
 | `--eml string` | Build the message from an RFC 822 file; other flags override what it says |
-| `--eo-password-file string` | Read the password for recipients outside Proton from a file |
+| `--eo-password-file string` | Read the password for recipients outside Proton from a file, or - for stdin |
 | `--eo-password-hint string` | Hint shown to password-protected recipients |
-| `--eo-password-stdin` | Read the password for recipients outside Proton from stdin |
 | `--expires string` | Self-destruct after DURATION (e.g. 7d, 24h), or never |
 | `--from string` | Address to send from, by email or ID (default: your primary) |
 | `--html` | Treat the body as HTML rather than plain text |
@@ -512,9 +472,9 @@ proton mail messages star 'Invoice #2291'
 
 | Flag | Description |
 | --- | --- |
-| `--after string` | Match messages after this date (YYYY-MM-DD) |
+| `--after string` | First day to include (YYYY-MM-DD) |
 | `--all` | Act on everything in scope, rather than a subset |
-| `--before string` | Match messages before this date (YYYY-MM-DD) |
+| `--before string` | Last day to include (YYYY-MM-DD) |
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text anywhere, including display names and bodies |
@@ -542,9 +502,9 @@ proton mail messages trash --from newsletter@example.com --older-than 90d --dry-
 
 | Flag | Description |
 | --- | --- |
-| `--after string` | Match messages after this date (YYYY-MM-DD) |
+| `--after string` | First day to include (YYYY-MM-DD) |
 | `--all` | Act on everything in scope, rather than a subset |
-| `--before string` | Match messages before this date (YYYY-MM-DD) |
+| `--before string` | Last day to include (YYYY-MM-DD) |
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text anywhere, including display names and bodies |
@@ -570,9 +530,9 @@ proton mail messages unlabel 'Invoice #2291' --label Accounting
 
 | Flag | Description |
 | --- | --- |
-| `--after string` | Match messages after this date (YYYY-MM-DD) |
+| `--after string` | First day to include (YYYY-MM-DD) |
 | `--all` | Act on everything in scope, rather than a subset |
-| `--before string` | Match messages before this date (YYYY-MM-DD) |
+| `--before string` | Last day to include (YYYY-MM-DD) |
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text anywhere, including display names and bodies |
@@ -618,9 +578,9 @@ proton mail messages unstar 'Invoice #2291'
 
 | Flag | Description |
 | --- | --- |
-| `--after string` | Match messages after this date (YYYY-MM-DD) |
+| `--after string` | First day to include (YYYY-MM-DD) |
 | `--all` | Act on everything in scope, rather than a subset |
-| `--before string` | Match messages before this date (YYYY-MM-DD) |
+| `--before string` | Last day to include (YYYY-MM-DD) |
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text anywhere, including display names and bodies |
@@ -645,6 +605,41 @@ proton mail messages unsubscribe REF...
 ```bash
 proton mail messages unsubscribe 5bH2mQxK
 ```
+
+## `update`
+
+Change when messages delete themselves.
+
+--expires takes a duration, or never to stop them expiring. A message already counting down reports the moment it expires rather than how long is left.
+
+```
+proton mail messages update [REF...]
+```
+
+```bash
+proton mail messages update 5bH2mQxK --expires 7d
+proton mail messages update --from newsletter@example.com --expires 30d
+proton mail messages update 5bH2mQxK --expires never
+```
+
+| Flag | Description |
+| --- | --- |
+| `--after string` | First day to include (YYYY-MM-DD) |
+| `--all` | Act on everything in scope, rather than a subset |
+| `--before string` | Last day to include (YYYY-MM-DD) |
+| `--expires string` | Delete them after DURATION (e.g. 7d, 24h), or never |
+| `--folder string` | Folder or label to look in (default: all) |
+| `--from string` | Match the sender's address |
+| `--keyword string` | Match text anywhere, including display names and bodies |
+| `--limit int` | Most messages to affect; 0 for no cap (default `150`) |
+| `--newer-than string` | Match messages newer than DURATION |
+| `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |
+| `--password-file string` | Read the account password from a file, or - for stdin |
+| `--starred` | Match starred messages |
+| `--subject string` | Match text in the subject |
+| `--to string` | Match a recipient's address |
+| `--totp string` | Two-factor code |
+| `--unread` | Match unread messages |
 
 ## `watch`
 

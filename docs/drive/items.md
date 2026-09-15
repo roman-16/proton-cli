@@ -25,6 +25,7 @@ proton drive items copy --pattern '*.pdf' --scope /Documents --into /Backup
 | `--computer string` | Work inside this computer's files, by name or ID |
 | `--into string` | Destination folder |
 | `--larger-than string` | Match files above SIZE (e.g. 100MB, 2GB) |
+| `--limit int` | Most items to affect; 0 for no cap (default `150`) |
 | `--newer-than string` | Match files newer than DURATION |
 | `--older-than string` | Match files older than DURATION (e.g. 30d, 2w, 1h) |
 | `--pattern string` | Match names against a shell glob, e.g. *.tmp |
@@ -52,8 +53,7 @@ proton drive items create /2026 --link 'https://drive.proton.me/urls/7X2K9M3N1P#
 | --- | --- |
 | `--computer string` | Work inside this computer's files, by name or ID |
 | `--link string` | Work inside a public link somebody sent you, by URL |
-| `--link-password-file string` | Read the public link's password from a file |
-| `--link-password-stdin` | Read the public link's password from stdin |
+| `--link-password-file string` | Read the public link's password from a file, or - for stdin |
 | `--shared string` | Work inside an item shared with you, by name or ID |
 
 ## `delete`
@@ -77,9 +77,9 @@ proton drive items delete /photo.jpg --link 'https://drive.proton.me/urls/7X2K9M
 | `--all` | Act on everything in scope, rather than a subset |
 | `--computer string` | Work inside this computer's files, by name or ID |
 | `--larger-than string` | Match files above SIZE (e.g. 100MB, 2GB) |
+| `--limit int` | Most items to affect; 0 for no cap (default `150`) |
 | `--link string` | Work inside a public link somebody sent you, by URL |
-| `--link-password-file string` | Read the public link's password from a file |
-| `--link-password-stdin` | Read the public link's password from stdin |
+| `--link-password-file string` | Read the public link's password from a file, or - for stdin |
 | `--newer-than string` | Match files newer than DURATION |
 | `--older-than string` | Match files older than DURATION (e.g. 30d, 2w, 1h) |
 | `--pattern string` | Match names against a shell glob, e.g. *.tmp |
@@ -92,7 +92,7 @@ proton drive items delete /photo.jpg --link 'https://drive.proton.me/urls/7X2K9M
 
 Download a file.
 
-Behind a public link, a file is / when the link points at the file itself, and a path inside the folder when it points at a folder. A link with a password takes it from --link-password-file or --link-password-stdin.
+Behind a public link, a file is / when the link points at the file itself, and a path inside the folder when it points at a folder. A link with a password takes it from --link-password-file, which takes - for stdin.
 
 ```
 proton drive items download PATH
@@ -113,8 +113,7 @@ proton drive items download / --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ
 | `--dest-dir string` | Write into this directory, keeping each item's own name |
 | `--force` | Overwrite a file that already exists |
 | `--link string` | Work inside a public link somebody sent you, by URL |
-| `--link-password-file string` | Read the public link's password from a file |
-| `--link-password-stdin` | Read the public link's password from stdin |
+| `--link-password-file string` | Read the public link's password from a file, or - for stdin |
 | `--shared string` | Work inside an item shared with you, by name or ID |
 
 ## `get`
@@ -136,8 +135,7 @@ proton drive items get / --shared Q3-report.pdf
 | --- | --- |
 | `--computer string` | Work inside this computer's files, by name or ID |
 | `--link string` | Work inside a public link somebody sent you, by URL |
-| `--link-password-file string` | Read the public link's password from a file |
-| `--link-password-stdin` | Read the public link's password from stdin |
+| `--link-password-file string` | Read the public link's password from a file, or - for stdin |
 | `--shared string` | Work inside an item shared with you, by name or ID |
 
 ## `list`
@@ -165,13 +163,12 @@ proton drive items list / --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mD
 | `--computer string` | Work inside this computer's files, by name or ID |
 | `--desc` | Reverse the order |
 | `--larger-than string` | Match files above SIZE (e.g. 100MB, 2GB) |
+| `--limit int` | How many items per page; 0 for all of them (default `50`) |
 | `--link string` | Work inside a public link somebody sent you, by URL |
-| `--link-password-file string` | Read the public link's password from a file |
-| `--link-password-stdin` | Read the public link's password from stdin |
+| `--link-password-file string` | Read the public link's password from a file, or - for stdin |
 | `--newer-than string` | Match files newer than DURATION |
 | `--older-than string` | Match files older than DURATION (e.g. 30d, 2w, 1h) |
 | `--page int` | Which page of results, counting from zero |
-| `--page-size int` | How many items per page; 0 for all of them (default `50`) |
 | `--pattern string` | Match names against a shell glob, e.g. *.tmp |
 | `--recursive` | Descend into subfolders when filtering |
 | `--shared string` | Work inside an item shared with you, by name or ID |
@@ -197,6 +194,7 @@ proton drive items move --pattern '*.log' --scope /Build --recursive --into /Arc
 | `--computer string` | Work inside this computer's files, by name or ID |
 | `--into string` | Destination folder |
 | `--larger-than string` | Match files above SIZE (e.g. 100MB, 2GB) |
+| `--limit int` | Most items to affect; 0 for no cap (default `150`) |
 | `--newer-than string` | Match files newer than DURATION |
 | `--older-than string` | Match files older than DURATION (e.g. 30d, 2w, 1h) |
 | `--pattern string` | Match names against a shell glob, e.g. *.tmp |
@@ -288,9 +286,9 @@ proton drive items revisions restore /Documents/report.pdf 5bH2mQxK
 
 ## `share`
 
-Public links and the people you share with.
+The people you share a file or folder with.
 
-Holds `add`, `confirm`, `get`, `link`, `remove`, `resend`, `unlink` and `update`.
+Holds `add`, `confirm`, `get`, `remove`, `resend` and `update`.
 
 ### `share add`
 
@@ -304,13 +302,13 @@ proton drive items share add PATH EMAIL
 
 ```bash
 proton drive items share add /Documents jane@example.com
-proton drive items share add /Documents jane@example.com --edit --message 'Have a look'
+proton drive items share add /Documents jane@example.com --access editor --message 'Have a look'
 ```
 
 | Flag | Description |
 | --- | --- |
+| `--access string` | What they may do with it: viewer, editor (default `viewer`) |
 | `--computer string` | Work inside this computer's files, by name or ID |
-| `--edit` | Allow editing rather than only viewing |
 | `--message string` | Note to include in the invitation email |
 | `--shared string` | Work inside an item shared with you, by name or ID |
 
@@ -350,35 +348,6 @@ proton drive items share get /Documents/report.pdf
 | `--computer string` | Work inside this computer's files, by name or ID |
 | `--shared string` | Work inside an item shared with you, by name or ID |
 
-### `share link`
-
-Create or update the public link for a file or folder.
-
-Running it again changes the existing link rather than making a second one, so a URL you have already shared keeps working.
-
-The password is read from a file or from stdin, never from a flag value, and may be at most 50 characters. --clear-link-password takes it off again, and --expires never makes an expiring link permanent.
-
-```
-proton drive items share link PATH
-```
-
-```bash
-proton drive items share link /Documents/report.pdf
-proton drive items share link /Documents/report.pdf --expires 7d --link-password-file /run/secrets/report-link
-proton drive items share link /Documents/report.pdf --clear-link-password --expires never
-proton drive items share link /Documents --edit
-```
-
-| Flag | Description |
-| --- | --- |
-| `--clear-link-password` | Remove the public link's password |
-| `--computer string` | Work inside this computer's files, by name or ID |
-| `--edit` | Allow editing rather than only viewing |
-| `--expires string` | Stop working after DURATION (e.g. 7d, 2w, 6mo), or never |
-| `--link-password-file string` | Read the public link's password from a file |
-| `--link-password-stdin` | Read the public link's password from stdin |
-| `--shared string` | Work inside an item shared with you, by name or ID |
-
 ### `share remove`
 
 Revoke someone's access, or cancel their invitation.
@@ -413,23 +382,6 @@ proton drive items share resend /Reports jane@proton.me
 | `--computer string` | Work inside this computer's files, by name or ID |
 | `--shared string` | Work inside an item shared with you, by name or ID |
 
-### `share unlink`
-
-Remove the public links for a file or folder.
-
-```
-proton drive items share unlink PATH
-```
-
-```bash
-proton drive items share unlink /Documents/report.pdf
-```
-
-| Flag | Description |
-| --- | --- |
-| `--computer string` | Work inside this computer's files, by name or ID |
-| `--shared string` | Work inside an item shared with you, by name or ID |
-
 ### `share update`
 
 Change what somebody may do with a file or folder.
@@ -441,14 +393,14 @@ proton drive items share update PATH EMAIL
 ```
 
 ```bash
-proton drive items share update /Reports jane@proton.me --edit
-proton drive items share update /Reports jane@proton.me --edit=false
+proton drive items share update /Reports jane@proton.me --access editor
+proton drive items share update /Reports jane@proton.me --access viewer
 ```
 
 | Flag | Description |
 | --- | --- |
+| `--access string` | What they may do with it: viewer, editor (default `viewer`) |
 | `--computer string` | Work inside this computer's files, by name or ID |
-| `--edit` | Allow editing rather than only viewing |
 | `--shared string` | Work inside an item shared with you, by name or ID |
 
 ## `trash`
@@ -472,6 +424,7 @@ proton drive items trash --older-than 1y --scope /Downloads --dry-run
 | `--all` | Act on everything in scope, rather than a subset |
 | `--computer string` | Work inside this computer's files, by name or ID |
 | `--larger-than string` | Match files above SIZE (e.g. 100MB, 2GB) |
+| `--limit int` | Most items to affect; 0 for no cap (default `150`) |
 | `--newer-than string` | Match files newer than DURATION |
 | `--older-than string` | Match files older than DURATION (e.g. 30d, 2w, 1h) |
 | `--pattern string` | Match names against a shell glob, e.g. *.tmp |
@@ -503,8 +456,7 @@ proton drive items update /photo.jpg --name holiday.jpg --link 'https://drive.pr
 | --- | --- |
 | `--computer string` | Work inside this computer's files, by name or ID |
 | `--link string` | Work inside a public link somebody sent you, by URL |
-| `--link-password-file string` | Read the public link's password from a file |
-| `--link-password-stdin` | Read the public link's password from stdin |
+| `--link-password-file string` | Read the public link's password from a file, or - for stdin |
 | `--name string` | New name, without a path |
 | `--shared string` | Work inside an item shared with you, by name or ID |
 
@@ -541,8 +493,7 @@ pg_dump mydb | gzip | proton drive items upload - /Backups/db.sql.gz
 | `--computer string` | Work inside this computer's files, by name or ID |
 | `--if-exists string` | What to do when the folder already has that name: rename, replace, skip |
 | `--link string` | Work inside a public link somebody sent you, by URL |
-| `--link-password-file string` | Read the public link's password from a file |
-| `--link-password-stdin` | Read the public link's password from stdin |
+| `--link-password-file string` | Read the public link's password from a file, or - for stdin |
 | `--recursive` | Upload a directory and everything under it |
 | `--shared string` | Work inside an item shared with you, by name or ID |
 

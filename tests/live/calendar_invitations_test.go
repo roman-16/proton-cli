@@ -100,8 +100,8 @@ func TestCalendarEventsRespondRoundTrip(t *testing.T) {
 	var primaryEventID string
 	waitFor(45*time.Second, 3*time.Second, func() bool {
 		evs := runJSONArray(t, "calendar", "events", "list", "--calendar", primaryCal,
-			"--start", time.Now().Format("2006-01-02"),
-			"--end", time.Now().Add(120*time.Hour).Format("2006-01-02"))
+			"--after", time.Now().Format("2006-01-02"),
+			"--before", time.Now().Add(120*time.Hour).Format("2006-01-02"))
 		for _, e := range evs {
 			id := e.(map[string]interface{})["id"].(string)
 			ev := eventIfStillThere(t, primaryCal, id)

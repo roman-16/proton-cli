@@ -8,20 +8,20 @@ This page is what people actually do. For every command and flag, see the refere
 
 ```bash
 proton calendar events list
-proton calendar events list --calendar Work --start 2026-04-15 --end 2026-04-30
+proton calendar events list --calendar Work --after 2026-04-15 --before 2026-04-30
 proton calendar events get "Team sync"
 ```
 
 Every calendar is included unless `--calendar` narrows it.
 
-`--start` and `--end` are the first and last **whole** days to include, read in your own zone. Without them you get the next 30 days.
+`--after` and `--before` are the first and last **whole** days to include, read in your own zone, and both are included. Without them you get the next 30 days.
 
 An event is on a day when it touches any part of it, so a query for one day inside a three-day event returns it.
 
 Each occurrence of a recurring event is listed on its own day, with a reference naming that occurrence:
 
 ```console
-$ proton calendar events list --start 2026-04-20 --end 2026-04-27
+$ proton calendar events list --after 2026-04-20 --before 2026-04-27
 ID                         DATE        TIME     DURATION  TITLE           LOCATION
 ─────────────────────────  ──────────  ───────  ────────  ──────────────  ────────
 4f2a1b9c@2026-04-20T09:00  2026-04-20  09:00    15m       Standup         Meet
@@ -47,7 +47,7 @@ Say how long an event lasts **once**, with either `--end` or `--duration`. Both 
 | `--end` | the last day it runs through (`2026-04-22`), or a day and a time |
 | `--duration` | `15m`, `90m`, `1h`, `2h30m`, or `3d` for an all-day event |
 | `--remind` | `15m`, `1h`, `1d`, repeatable; add `:email` for an emailed one |
-| `--start` / `--end` on `list` | `YYYY-MM-DD`, both days included |
+| `--after` / `--before` on `list` | `YYYY-MM-DD`, both days included |
 
 `--all-day` makes an event with no time of day, measured in days. It ends at the midnight after its last day, which is how every other calendar client writes it.
 
@@ -166,7 +166,7 @@ A series with no end says so instead of giving a number.
 `events list` shows which triggers an event carries. `reminders list` answers the other question, which is when they go off:
 
 ```console
-$ proton calendar reminders list --start 2026-08-27 --end 2026-08-28
+$ proton calendar reminders list --after 2026-08-27 --before 2026-08-28
 ID                         FIRES             REMIND  TITLE    STARTS              LOCATION
 ─────────────────────────  ────────────────  ──────  ───────  ──────────────────  ────────
 7bd3e011                   2026-08-27 06:00  6h      Piano    2026-08-27 all day
@@ -192,7 +192,7 @@ The last column is the sentence a notification would say, which is `says` in JSO
 ## Import and export
 
 ```bash
-proton calendar events export --start 2026-01-01 --end 2026-12-31 --dest year.ics
+proton calendar events export --after 2026-01-01 --before 2026-12-31 --dest year.ics
 proton calendar events import holidays.ics
 curl -s https://example.com/team.ics | proton calendar events import -
 ```
@@ -223,7 +223,7 @@ Each calendar carries its own defaults for the events made in it.
 
 Colours have to be Proton accent colours.
 
-**Deleting a calendar asks for your password** even though you are signed in. With no terminal, pass `--password-file` or `--password-stdin`. The other commands that do this are listed in [Account](../account/README.md#commands-that-ask-for-the-password-again).
+**Deleting a calendar asks for your password** even though you are signed in. With no terminal, pass `--password-file`, which takes `-` for standard input. The other commands that do this are listed in [Account](../account/README.md#commands-that-ask-for-the-password-again).
 
 ### Subscribe to a published calendar
 
@@ -238,14 +238,15 @@ Proton is asked whether it can read the address before the calendar is made, so 
 ### Share a calendar
 
 ```bash
-proton calendar settings calendars share add Work jane@proton.me --edit
-proton calendar settings calendars share list Work
+proton calendar settings calendars share add Work jane@proton.me --access editor
+proton calendar settings calendars share get Work
+proton calendar settings calendars share update Work jane@proton.me --access viewer
 proton calendar settings calendars share remove Work jane@proton.me
 ```
 
 **It only works with another Proton account.**
 
-They see nothing until they accept, and until then `share list` shows them as `pending`. `share remove` withdraws an unanswered invitation or ends a membership.
+They see nothing until they accept, and until then `share get` shows them as `pending`. `share update` changes what they may do whether they have accepted or not, and `share remove` withdraws an unanswered invitation or ends a membership.
 
 For a calendar somebody gave you:
 

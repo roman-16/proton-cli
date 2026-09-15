@@ -23,6 +23,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// screenful is how many contacts a listing holds when nothing asked for more.
+const screenful = 50
+
 func New() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "contacts",
@@ -85,6 +88,7 @@ func listCmd() *cobra.Command {
 	}
 	c.Flags().StringVar(&keyword, "keyword", "", "Match text in the name or the address")
 	order.Register(c, "name", "email")
+	page.Default = screenful
 	page.Register(c, "contacts")
 	return c
 }

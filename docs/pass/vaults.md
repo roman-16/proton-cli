@@ -58,6 +58,13 @@ proton pass vaults list
 proton pass vaults list
 ```
 
+| Flag | Description |
+| --- | --- |
+| `--desc` | Reverse the order |
+| `--limit int` | How many vaults per page; 0 for all of them |
+| `--page int` | Which page of results, counting from zero |
+| `--sort string` | Order by: name, members (default `name`) |
+
 ## `share`
 
 Who else can open a vault.
@@ -165,7 +172,7 @@ proton pass vaults transfer Work jane@proton.me
 
 Rename a vault, or change how it looks.
 
-Icons and colors are numbers: --icon 7, --color 3.
+Icons and colors are named: --icon star, --color teal.
 
 Anything you do not mention is left alone, including a description written in the Pass app.
 
@@ -175,14 +182,14 @@ proton pass vaults update REF
 
 ```bash
 proton pass vaults update Work --name Office
-proton pass vaults update Work --description 'Shared team logins' --icon 7 --color 3
+proton pass vaults update Work --description 'Shared team logins' --icon star --color teal
 ```
 
 | Flag | Description |
 | --- | --- |
-| `--color string` | Which of Pass's vault colors it takes: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 |
+| `--color string` | Which of Pass's vault colors it takes: violet, pink, yellow, green, blue, magenta, red, orange, grey, teal |
 | `--description string` | What the vault is for |
-| `--icon string` | Which of Pass's icons represents it: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30 |
+| `--icon string` | Which of Pass's icons represents it: home, work, gift, shop, heart, bear, circles, flower, group, pacman, shopping-cart, leaf, shield, basketball, credit-card, fish, smile, lock, mushroom, star, fire, wallet, bookmark, cream, laptop, json, book, box, atom, cheque |
 | `--name string` | New name |
 
 ---

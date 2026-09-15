@@ -229,7 +229,7 @@ const pageMax = 150
 // A page no wider than Proton's own is one request, which is every ordinary
 // listing. A wider one, and the whole result asked for with a size of zero, are
 // read at Proton's width and cut down to what was asked for. That is what keeps
-// --page-size the reader's number: how many requests it costs is this layer's
+// --limit the reader's number: how many requests it costs is this layer's
 // business, and 150 never reaches a screen.
 func window[T any](ctx context.Context, page, size int, fetch func(ctx context.Context, page, size int) ([]T, int, error)) ([]T, int, error) {
 	if size > 0 && size <= pageMax {

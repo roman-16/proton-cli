@@ -88,7 +88,7 @@ func TestDriveShareInvitationRoundTrip(t *testing.T) {
 
 	before := altInvitationIDs(t)
 
-	runOK(t, "drive", "items", "share", "add", folder, secondaryEmail(), "--edit")
+	runOK(t, "drive", "items", "share", "add", folder, secondaryEmail(), "--access", "editor")
 	cleanupRun(t, fmt.Sprintf("Revoke member: proton drive items share remove %s %s", folder, secondaryEmail()),
 		"drive", "items", "share", "remove", folder, secondaryEmail())
 

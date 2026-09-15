@@ -104,7 +104,8 @@ func lockedVolumes(c *kit.Invocation, all bool, verb string) (kit.Selection[driv
 }
 
 func volumesListCmd() *cobra.Command {
-	return &cobra.Command{
+	var held kit.Held[drivesvc.Volume]
+	c := &cobra.Command{
 		Use:   "list",
 		Short: "List the volumes your files and photos are kept on",
 		Long: "List the volumes your files and photos are kept on.\n\n" +
@@ -117,12 +118,16 @@ func volumesListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return kit.List(c, ui.TableSpec[drivesvc.Volume]{
+			return held.Answer(c, ui.TableSpec[drivesvc.Volume]{
 				Noun: "volumes", Columns: volumeColumns(),
-				Total: ui.Unknown, Page: ui.Unpaged,
 			}, volumes)
 		}),
 	}
+	held.Register(c, "volumes",
+		kit.Key[drivesvc.Volume]{Name: "created", Less: func(a, b drivesvc.Volume) int { return kit.Ints(a.Created, b.Created) }},
+		kit.Key[drivesvc.Volume]{Name: "used", Less: func(a, b drivesvc.Volume) int { return kit.Ints(a.UsedSpace, b.UsedSpace) }},
+	)
+	return c
 }
 
 func volumesRestoreCmd() *cobra.Command {

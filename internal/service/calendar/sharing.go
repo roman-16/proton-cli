@@ -65,10 +65,24 @@ type CalendarMember struct {
 	Owner bool `json:"owner"`
 }
 
+// CalendarShare is how one calendar is shared: the calendar, and everybody with
+// a claim on it.
+//
+// It is a record rather than a listing, because the question `share get` answers
+// is about the calendar - one thing, whose members are a field of it, the way a
+// Drive item's are. A bare list of members would answer a different question and
+// leave a reader with no name to hang it on.
+type CalendarShare struct {
+	Name string `json:"name"`
+	// Members holds everybody with a claim, answered or not; each says which it
+	// is under Status.
+	Members []CalendarMember `json:"members"`
+}
+
 // memberStatuses are Proton's own numbering of where an invitation stands.
 var memberStatuses = map[int]string{0: "pending", 1: "active", 2: "declined"}
 
-// accessWord names a permission bundle the way --edit reads. It tests the bit
+// accessWord names a permission bundle the way --access reads. It tests the bit
 // rather than comparing the number, because these are flags: a combination this
 // version has not seen still says whether it can write.
 func accessWord(p int) string {
@@ -196,6 +210,29 @@ func (s *Service) CalendarMembers(ctx context.Context, calendarID string) ([]Cal
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Email < out[j].Email })
 	return out, nil
+}
+
+// CalendarSetAccess changes what somebody may do with a calendar.
+//
+// The key they hold is untouched: what changes is the permission bundle Proton
+// checks against it. An invitation nobody answered carries its permissions at a
+// path of its own, so which it is has to be known - CalendarMembers says.
+func (s *Service) CalendarSetAccess(ctx context.Context, calendarID string, m CalendarMember, canEdit bool) error {
+	permissions := permViewer
+	if canEdit {
+		permissions = permEditor
+	}
+	req := proton.Request{
+		Method: "PUT", Path: "/calendar/v1/" + calendarID + "/members/" + m.ID + "/permission",
+		Body: map[string]any{"Permissions": permissions},
+	}
+	if m.Status == "pending" {
+		req = proton.Request{
+			Method: "PUT", Path: "/calendar/v1/" + calendarID + "/invitations/" + m.ID,
+			Body: map[string]any{"Permissions": permissions},
+		}
+	}
+	return s.C.Decode(ctx, req, nil)
 }
 
 // CalendarUnshare takes somebody's access away.

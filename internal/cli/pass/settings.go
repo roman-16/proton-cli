@@ -164,7 +164,8 @@ func mailboxesUpdateCmd() *cobra.Command {
 }
 
 func mailboxesListCmd() *cobra.Command {
-	return &cobra.Command{
+	var held kit.Held[passsvc.Mailbox]
+	c := &cobra.Command{
 		Use:   "list",
 		Short: "List the addresses your aliases forward to",
 		Long: "List the addresses your aliases forward to.\n\n" +
@@ -176,8 +177,8 @@ func mailboxesListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return kit.List(c, ui.TableSpec[passsvc.Mailbox]{
-				Noun: "mailboxes", Total: ui.Unknown, Page: ui.Unpaged,
+			return held.Answer(c, ui.TableSpec[passsvc.Mailbox]{
+				Noun: "mailboxes",
 				Columns: []ui.Column[passsvc.Mailbox]{
 					{Header: "EMAIL", Flex: true, Cell: func(m passsvc.Mailbox) string { return m.Email }},
 					{Header: "VERIFIED", Cell: func(m passsvc.Mailbox) string { return yesNo(m.Verified) }},
@@ -190,6 +191,10 @@ func mailboxesListCmd() *cobra.Command {
 			}, rows)
 		}),
 	}
+	held.Register(c, "mailboxes",
+		kit.Key[passsvc.Mailbox]{Name: "email", Less: func(a, b passsvc.Mailbox) int { return kit.Fold(a.Email, b.Email) }},
+	)
+	return c
 }
 
 func domainsCmd() *cobra.Command {
@@ -199,7 +204,8 @@ func domainsCmd() *cobra.Command {
 }
 
 func domainsListCmd() *cobra.Command {
-	return &cobra.Command{
+	var held kit.Held[passsvc.Domain]
+	c := &cobra.Command{
 		Use:   "list",
 		Short: "List the domains an alias can be made on",
 		Long: "List the domains an alias can be made on.\n\n" +
@@ -210,8 +216,8 @@ func domainsListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return kit.List(c, ui.TableSpec[passsvc.Domain]{
-				Noun: "domains", Total: ui.Unknown, Page: ui.Unpaged,
+			return held.Answer(c, ui.TableSpec[passsvc.Domain]{
+				Noun: "domains",
 				Columns: []ui.Column[passsvc.Domain]{
 					{Header: "DOMAIN", Flex: true, Cell: func(d passsvc.Domain) string { return d.Domain }},
 					{Header: "DEFAULT", Cell: func(d passsvc.Domain) string { return yesNo(d.Default) }},
@@ -227,4 +233,8 @@ func domainsListCmd() *cobra.Command {
 			}, rows)
 		}),
 	}
+	held.Register(c, "domains",
+		kit.Key[passsvc.Domain]{Name: "domain", Less: func(a, b passsvc.Domain) int { return kit.Fold(a.Domain, b.Domain) }},
+	)
+	return c
 }

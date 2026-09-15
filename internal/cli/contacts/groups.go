@@ -77,7 +77,8 @@ func groupsGetCmd() *cobra.Command {
 }
 
 func groupsListCmd() *cobra.Command {
-	return &cobra.Command{
+	var held kit.Held[ctsvc.Group]
+	c := &cobra.Command{
 		Use:   "list",
 		Short: "List contact groups",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
@@ -85,12 +86,15 @@ func groupsListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return kit.List(c, ui.TableSpec[ctsvc.Group]{
+			return held.Answer(c, ui.TableSpec[ctsvc.Group]{
 				Noun: "groups", Columns: groupColumns(),
-				Total: ui.Unknown, Page: ui.Unpaged,
 			}, groups)
 		}),
 	}
+	held.Register(c, "groups",
+		kit.Key[ctsvc.Group]{Name: "name", Less: func(a, b ctsvc.Group) int { return kit.Fold(a.Name, b.Name) }},
+	)
+	return c
 }
 
 func groupsCreateCmd() *cobra.Command {
@@ -170,56 +174,20 @@ func groupsDeleteCmd() *cobra.Command {
 // That is the same rule that puts the messages first in `mail messages label` and
 // the label in a flag.
 func membersCmd(use, short string, action ui.Action, preposition string) *cobra.Command {
-	var addresses []string
-	c := &cobra.Command{
+	return &cobra.Command{
 		Use:   use + " REF CONTACT_REF...",
 		Short: short,
 		Long: short + ".\n\n" +
 			"Proton groups addresses rather than people, so a colleague's work address\n" +
 			"can be in a group while their personal one is not. Naming a contact means\n" +
-			"all of their addresses; --email narrows it to the ones you name, and then\n" +
-			"exactly one contact may be named.",
+			"all of their addresses, and naming one of their addresses means that one.",
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
-			// Judged before the network: which contact an address belongs to is a
-			// question only one contact can answer.
-			if len(addresses) > 0 && len(c.Args) != 2 {
-				return kit.Fail("--email applies to one contact, but %d were named.",
-					len(c.Args)-1).
-					Hint("name one contact, or drop --email to act on every address.")
-			}
 			groupID := c.Args[0]
-			ids := make([]string, 0, len(c.Args)-1)
-			for _, ref := range c.Args[1:] {
-				id, err := c.App.Contacts.Resolve(c.Ctx, ref)
-				if err != nil {
-					return err
-				}
-				ids = append(ids, id)
-			}
-			ids = kit.Dedupe(ids)
-
-			if len(addresses) > 0 {
-				emailIDs, err := c.App.Contacts.ResolveContactEmails(c.Ctx, ids[0], addresses)
-				if err != nil {
-					return err
-				}
-				return kit.Mutate(c, ui.ResultSpec{
-					Action: action, Kind: "addresses", Count: len(emailIDs), IDs: emailIDs,
-					Detail: preposition + " the group",
-				}, func() error {
-					if use == "add" {
-						return c.App.Contacts.GroupAddEmails(c.Ctx, groupID, emailIDs)
-					}
-					return c.App.Contacts.GroupRemoveEmails(c.Ctx, groupID, emailIDs)
-				})
-			}
-			// Naming a contact means every address they hold, which is what the
-			// help above promises. Proton groups addresses and nothing else, so
-			// this resolves them rather than handing over contact IDs and hoping.
-			emailIDs, err := c.App.Contacts.AddressesOf(c.Ctx, ids)
+			emailIDs, err := c.App.Contacts.GroupTargets(c.Ctx, c.Args[1:])
 			if err != nil {
 				return err
 			}
+			emailIDs = kit.Dedupe(emailIDs)
 			return kit.Mutate(c, ui.ResultSpec{
 				Action: action, Kind: "addresses", Count: len(emailIDs), IDs: emailIDs,
 				Detail: preposition + " the group",
@@ -231,7 +199,4 @@ func membersCmd(use, short string, action ui.Action, preposition string) *cobra.
 			})
 		}),
 	}
-	c.Flags().StringArrayVar(&addresses, "email", nil,
-		"Act on this address only, rather than all of the contact's (repeatable)")
-	return c
 }

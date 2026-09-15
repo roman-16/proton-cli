@@ -58,7 +58,8 @@ func breachColumns() []ui.Column[passsvc.MonitoredAddress] {
 }
 
 func breachesListCmd() *cobra.Command {
-	return &cobra.Command{
+	var held kit.Held[passsvc.MonitoredAddress]
+	c := &cobra.Command{
 		Use:   "list",
 		Short: "List the addresses Proton watches, and how many breaches each is in",
 		Long: "List the addresses Proton watches, and how many breaches each is in.\n\n" +
@@ -75,12 +76,16 @@ func breachesListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return kit.List(c, ui.TableSpec[passsvc.MonitoredAddress]{
+			return held.Answer(c, ui.TableSpec[passsvc.MonitoredAddress]{
 				Noun: "watched addresses", Columns: breachColumns(),
-				Total: len(rows), Page: ui.Unpaged,
 			}, rows)
 		}),
 	}
+	held.Register(c, "watched addresses",
+		kit.Key[passsvc.MonitoredAddress]{Name: "breaches", Less: func(a, b passsvc.MonitoredAddress) int { return kit.Ints(int64(b.Breaches), int64(a.Breaches)) }},
+		kit.Key[passsvc.MonitoredAddress]{Name: "email", Less: func(a, b passsvc.MonitoredAddress) int { return kit.Fold(a.Email, b.Email) }},
+	)
+	return c
 }
 
 func breachesGetCmd() *cobra.Command {

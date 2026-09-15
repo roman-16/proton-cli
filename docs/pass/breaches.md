@@ -104,6 +104,13 @@ proton pass breaches list
 proton pass breaches list
 ```
 
+| Flag | Description |
+| --- | --- |
+| `--desc` | Reverse the order |
+| `--limit int` | How many watched addresses per page; 0 for all of them |
+| `--page int` | Which page of results, counting from zero |
+| `--sort string` | Order by: breaches, email (default `breaches`) |
+
 ## `resend`
 
 Send the confirmation code again.

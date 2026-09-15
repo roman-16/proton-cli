@@ -62,7 +62,7 @@ func (s *Service) PlanExport(ctx context.Context, userID string, withFiles bool)
 		}
 		plan.Doc.Vaults[v.ShareID] = &passfile.ExportedVault{
 			Name: v.Name, Description: v.Description,
-			Display: passfile.ExportedDisplay{Color: v.Color, Icon: v.Icon},
+			Display: passfile.ExportedDisplay{Color: ColorValue(v.Color), Icon: IconValue(v.Icon)},
 			Items:   []passfile.ExportedItem{},
 		}
 	}

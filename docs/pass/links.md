@@ -58,6 +58,13 @@ proton pass links list
 proton pass links list
 ```
 
+| Flag | Description |
+| --- | --- |
+| `--desc` | Reverse the order |
+| `--limit int` | How many links per page; 0 for all of them |
+| `--page int` | Which page of results, counting from zero |
+| `--sort string` | Order by: expires, reads (default `expires`) |
+
 ## `revoke`
 
 Stop a link working.

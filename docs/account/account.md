@@ -43,19 +43,16 @@ proton account login
 proton account login
 proton account login --profile work
 proton account login --user me@proton.me --password-file /run/secrets/proton
-proton account login --user me@proton.me --password-stdin --totp 123456
+proton account login --user me@proton.me --password-file - --totp 123456
 proton account login --user me@proton.me --password-file /run/secrets/proton --second-password-file /run/secrets/proton-second
 proton account login --user me@proton.me --password-file /run/secrets/proton --extra-password-file /run/secrets/proton-pass
 ```
 
 | Flag | Description |
 | --- | --- |
-| `--extra-password-file string` | Read the Pass extra password from a file |
-| `--extra-password-stdin` | Read the Pass extra password from stdin |
-| `--password-file string` | Read the account password from a file |
-| `--password-stdin` | Read the account password from stdin |
-| `--second-password-file string` | Read the second password (two-password mode) from a file |
-| `--second-password-stdin` | Read the second password (two-password mode) from stdin |
+| `--extra-password-file string` | Read the Pass extra password from a file, or - for stdin |
+| `--password-file string` | Read the account password from a file, or - for stdin |
+| `--second-password-file string` | Read the second password (two-password mode) from a file, or - for stdin |
 | `--totp string` | Two-factor code |
 | `--user string` | Proton account email to sign in as |
 

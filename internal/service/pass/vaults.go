@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log/slog"
-	"strconv"
 
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
 	"github.com/roman-16/proton-cli/internal/crypto/aead"
@@ -25,10 +24,10 @@ type Vault struct {
 	Shared      bool   `json:"shared"`
 	Members     int    `json:"members"`
 	AddressID   string `json:"address_id,omitempty"`
-	// Icon and Color are which of Pass's grid the vault picked, numbered from
-	// one. Zero means it never chose.
-	Icon  int `json:"icon,omitempty"`
-	Color int `json:"color,omitempty"`
+	// Icon and Color are which of Pass's grid the vault picked, by name. Empty
+	// means it never chose.
+	Icon  string `json:"icon,omitempty"`
+	Color string `json:"color,omitempty"`
 }
 
 func (s *Service) VaultsList(ctx context.Context) ([]Vault, error) {
@@ -98,8 +97,8 @@ func describe(ctx context.Context, s *Service, sh Share, v *Vault) error {
 	v.Name = vv.Name
 	v.Description = vv.Description
 	if d := vv.GetDisplay(); d != nil {
-		v.Icon = DisplayNumber(int(d.Icon))
-		v.Color = DisplayNumber(int(d.Color))
+		v.Icon = IconName(int(d.Icon))
+		v.Color = ColorName(int(d.Color))
 	}
 	return nil
 }
@@ -164,40 +163,66 @@ func (s *Service) VaultDelete(ctx context.Context, shareID string) error {
 type VaultPatch struct {
 	Name        *string
 	Description *string
-	Icon        *int
-	Color       *int
+	Icon        *string
+	Color       *string
 }
 
-// VaultIcons and VaultColors are the sets Pass offers, named the way a person
-// would say them rather than by the proto's ICON1..ICON30.
+// A vault's icon and colour are chosen from a grid, and the grid has names.
 //
-// Proton's own picker shows a grid with no names at all, so the numbers are what
-// there is; naming them one to thirty is the honest rendering of a choice that
-// has no other vocabulary.
-func VaultIcons() []string  { return numbered(30) }
-func VaultColors() []string { return numbered(10) }
-
-func numbered(n int) []string {
-	out := make([]string, 0, n)
-	for i := 1; i <= n; i++ {
-		out = append(out, strconv.Itoa(i))
+// Proton's own picker draws them as pictures with nothing written underneath,
+// but the client knows what each one is: the icon is `pass-home`, `pass-work`,
+// `pass-gift` and so on, and the colour is one of ten. Those names are what a
+// person can type, guess and complete, so they are what --icon and --color take.
+//
+// The colour names are the plain English for the swatch. Proton's own names for
+// them are a paint chart - heliotrope, mauvelous, de-york - which nobody can
+// spell from looking at the colour.
+var (
+	vaultIcons = []string{
+		"home", "work", "gift", "shop", "heart", "bear", "circles", "flower",
+		"group", "pacman", "shopping-cart", "leaf", "shield", "basketball",
+		"credit-card", "fish", "smile", "lock", "mushroom", "star", "fire",
+		"wallet", "bookmark", "cream", "laptop", "json", "book", "box", "atom",
+		"cheque",
 	}
-	return out
-}
+	vaultColors = []string{
+		"violet", "pink", "yellow", "green", "blue", "magenta", "red", "orange",
+		"grey", "teal",
+	}
+)
+
+// VaultIcons and VaultColors are the sets Pass offers.
+func VaultIcons() []string  { return append([]string(nil), vaultIcons...) }
+func VaultColors() []string { return append([]string(nil), vaultColors...) }
 
 // icon and colour numbers are offset by two in the proto: zero is unspecified
 // and one is custom, so the first pickable one is two.
 const displayOffset = 2
 
-// DisplayValue turns the number a person writes into the enum Pass stores.
-func DisplayValue(n int) int { return n + displayOffset - 1 }
+// IconValue and ColorValue turn a name into the enum Pass stores. A name off the
+// grid never reaches here: the flag's declared domain refuses it first.
+func IconValue(name string) int  { return gridValue(vaultIcons, name) }
+func ColorValue(name string) int { return gridValue(vaultColors, name) }
 
-// DisplayNumber is the inverse, and answers zero for a vault that never chose.
-func DisplayNumber(v int) int {
-	if v < displayOffset {
-		return 0
+// IconName and ColorName are the inverse, and answer nothing for a vault that
+// never chose.
+func IconName(v int) string  { return gridName(vaultIcons, v) }
+func ColorName(v int) string { return gridName(vaultColors, v) }
+
+func gridValue(grid []string, name string) int {
+	for i, n := range grid {
+		if n == name {
+			return i + displayOffset
+		}
 	}
-	return v - displayOffset + 1
+	return 0
+}
+
+func gridName(grid []string, v int) string {
+	if i := v - displayOffset; i >= 0 && i < len(grid) {
+		return grid[i]
+	}
+	return ""
 }
 
 func (s *Service) VaultEdit(ctx context.Context, shareID string, patch VaultPatch) error {
@@ -295,10 +320,10 @@ func patchedVault(content string, shareKey []byte, patch VaultPatch) ([]byte, er
 			vault.Display = &pb.VaultDisplayPreferences{}
 		}
 		if patch.Icon != nil {
-			vault.Display.Icon = pb.VaultIcon(DisplayValue(*patch.Icon))
+			vault.Display.Icon = pb.VaultIcon(IconValue(*patch.Icon))
 		}
 		if patch.Color != nil {
-			vault.Display.Color = pb.VaultColor(DisplayValue(*patch.Color))
+			vault.Display.Color = pb.VaultColor(ColorValue(*patch.Color))
 		}
 	}
 	return proto.Marshal(vault)

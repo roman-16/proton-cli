@@ -199,7 +199,7 @@ proton account login --user "$ACCOUNT" --password-file "$CRED"
 
 ## It asks for my password again
 
-A few commands ask for your password even when you are signed in; they are listed in [Account](../account/README.md#commands-that-ask-for-the-password-again). They prompt, or take `--password-file` and `--password-stdin`.
+A few commands ask for your password even when you are signed in; they are listed in [Account](../account/README.md#commands-that-ask-for-the-password-again). They prompt, or take `--password-file` and `--password-file -`.
 
 One of them may ask for your password and then be refused anyway, for a reason no password would have fixed.
 

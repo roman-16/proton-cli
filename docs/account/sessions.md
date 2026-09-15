@@ -18,6 +18,13 @@ proton account sessions list
 proton account sessions list
 ```
 
+| Flag | Description |
+| --- | --- |
+| `--desc` | Reverse the order |
+| `--limit int` | How many sessions per page; 0 for all of them |
+| `--page int` | Which page of results, counting from zero |
+| `--sort string` | Order by: created, client (default `created`) |
+
 ## `revoke`
 
 Invalidate sessions at Proton.

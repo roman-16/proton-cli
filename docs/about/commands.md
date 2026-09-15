@@ -40,8 +40,9 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton calendar settings calendars get`](../calendar/settings.md#calendars-get) | Show one calendar, with the defaults it gives new events |
 | [`proton calendar settings calendars list`](../calendar/settings.md#calendars-list) | List your calendars |
 | [`proton calendar settings calendars share add`](../calendar/settings.md#calendars-share-add) | Give somebody a calendar |
-| [`proton calendar settings calendars share list`](../calendar/settings.md#calendars-share-list) | List who has a calendar |
+| [`proton calendar settings calendars share get`](../calendar/settings.md#calendars-share-get) | Show who has a calendar |
 | [`proton calendar settings calendars share remove`](../calendar/settings.md#calendars-share-remove) | Take somebody's access to a calendar away |
+| [`proton calendar settings calendars share update`](../calendar/settings.md#calendars-share-update) | Change what somebody may do with a calendar |
 | [`proton calendar settings calendars update`](../calendar/settings.md#calendars-update) | Rename or recolor a calendar, or change what it gives new events |
 | [`proton calendar settings get`](../calendar/settings.md#get) | Show the calendar settings now in effect |
 | [`proton calendar settings list`](../calendar/settings.md#list) | List the calendar settings that can be changed |
@@ -84,20 +85,22 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton drive items share add`](../drive/items.md#share-add) | Invite someone to a file or folder |
 | [`proton drive items share confirm`](../drive/items.md#share-confirm) | Let somebody in once they join Proton |
 | [`proton drive items share get`](../drive/items.md#share-get) | Show how a file or folder is shared |
-| [`proton drive items share link`](../drive/items.md#share-link) | Create or update the public link for a file or folder |
 | [`proton drive items share remove`](../drive/items.md#share-remove) | Revoke someone's access, or cancel their invitation |
 | [`proton drive items share resend`](../drive/items.md#share-resend) | Send an unanswered invitation again |
-| [`proton drive items share unlink`](../drive/items.md#share-unlink) | Remove the public links for a file or folder |
 | [`proton drive items share update`](../drive/items.md#share-update) | Change what somebody may do with a file or folder |
 | [`proton drive items trash`](../drive/items.md#trash) | Move files or folders to the trash |
 | [`proton drive items update`](../drive/items.md#update) | Rename a file or folder |
 | [`proton drive items upload`](../drive/items.md#upload) | Upload a file or directory |
+| [`proton drive links create`](../drive/links.md#create) | Make a link that opens a file or folder for anyone |
+| [`proton drive links get`](../drive/links.md#get) | Show the link on a file or folder, URL and all |
+| [`proton drive links list`](../drive/links.md#list) | List the links you have made |
+| [`proton drive links revoke`](../drive/links.md#revoke) | Stop the link on a file or folder working |
 | [`proton drive photos albums add`](../drive/photos.md#albums-add) | Put photos into an album |
 | [`proton drive photos albums create`](../drive/photos.md#albums-create) | Create an album |
 | [`proton drive photos albums delete`](../drive/photos.md#albums-delete) | Delete albums |
 | [`proton drive photos albums list`](../drive/photos.md#albums-list) | List albums |
 | [`proton drive photos albums remove`](../drive/photos.md#albums-remove) | Take photos out of an album |
-| [`proton drive photos albums update`](../drive/photos.md#albums-update) | Change an album's cover |
+| [`proton drive photos albums update`](../drive/photos.md#albums-update) | Rename an album, or change its cover |
 | [`proton drive photos delete`](../drive/photos.md#delete) | Delete photos permanently |
 | [`proton drive photos download`](../drive/photos.md#download) | Download a photo |
 | [`proton drive photos favorite`](../drive/photos.md#favorite) | Mark photos as favourites |
@@ -112,7 +115,7 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton drive shared leave`](../drive/shared.md#leave) | Give up an item somebody shared with you |
 | [`proton drive shared list`](../drive/shared.md#list) | List what other people have shared with you |
 | [`proton drive shared remove`](../drive/shared.md#remove) | Forget a public link you saved |
-| [`proton drive sharing list`](../drive/sharing.md#list) | List what you have shared |
+| [`proton drive sharing list`](../drive/sharing.md#list) | List what you have shared with other people |
 | [`proton drive trash empty`](../drive/trash.md#empty) | Delete everything in the trash, permanently |
 | [`proton drive trash list`](../drive/trash.md#list) | List what is in the trash |
 | [`proton drive trash restore`](../drive/trash.md#restore) | Put items back where they came from |
@@ -146,7 +149,6 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton mail messages attachments list`](../mail/messages.md#attachments-list) | List a message's attachments |
 | [`proton mail messages delete`](../mail/messages.md#delete) | Delete messages permanently |
 | [`proton mail messages empty`](../mail/messages.md#empty) | Delete everything in a folder, permanently |
-| [`proton mail messages expire`](../mail/messages.md#expire) | Make messages delete themselves after a while |
 | [`proton mail messages export`](../mail/messages.md#export) | Write messages out as .eml or mbox files |
 | [`proton mail messages forward`](../mail/messages.md#forward) | Forward a message |
 | [`proton mail messages get`](../mail/messages.md#get) | Show one message, decrypted |
@@ -165,6 +167,7 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton mail messages unschedule`](../mail/messages.md#unschedule) | Cancel a scheduled send, returning the message to drafts |
 | [`proton mail messages unstar`](../mail/messages.md#unstar) | Remove the star from messages |
 | [`proton mail messages unsubscribe`](../mail/messages.md#unsubscribe) | Ask a mailing list to stop |
+| [`proton mail messages update`](../mail/messages.md#update) | Change when messages delete themselves |
 | [`proton mail messages watch`](../mail/messages.md#watch) | Print each message as it arrives |
 | [`proton mail settings addresses create`](../mail/settings.md#addresses-create) | Add an address to the account |
 | [`proton mail settings addresses delete`](../mail/settings.md#addresses-delete) | Delete addresses |
@@ -213,8 +216,8 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton mail settings list`](../mail/settings.md#list) | List the mail settings that can be changed |
 | [`proton mail settings senders allow`](../mail/settings.md#senders-allow) | Always let someone reach the inbox |
 | [`proton mail settings senders block`](../mail/settings.md#senders-block) | Send someone's mail straight to blocked |
-| [`proton mail settings senders forget`](../mail/settings.md#senders-forget) | Drop a standing decision, letting the spam filter decide again |
 | [`proton mail settings senders list`](../mail/settings.md#senders-list) | List every standing decision about a sender |
+| [`proton mail settings senders remove`](../mail/settings.md#senders-remove) | Drop a standing decision, letting the spam filter decide again |
 | [`proton mail settings senders spam`](../mail/settings.md#senders-spam) | Send someone's mail straight to spam |
 | [`proton mail settings set`](../mail/settings.md#set) | Change one mail setting |
 | [`proton pass aliases contacts allow`](../pass/aliases.md#contacts-allow) | Let a contact's mail reach you again |
@@ -226,7 +229,6 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton pass aliases disable`](../pass/aliases.md#disable) | Stop receiving mail sent to an alias |
 | [`proton pass aliases enable`](../pass/aliases.md#enable) | Start receiving mail sent to an alias |
 | [`proton pass aliases list`](../pass/aliases.md#list) | List your aliases |
-| [`proton pass aliases options`](../pass/aliases.md#options) | List the suffixes and mailboxes an alias can use |
 | [`proton pass breaches create`](../pass/breaches.md#create) | Have Proton watch an address you own elsewhere |
 | [`proton pass breaches delete`](../pass/breaches.md#delete) | Stop Proton watching an address you added |
 | [`proton pass breaches disable`](../pass/breaches.md#disable) | Stop Proton watching an address |

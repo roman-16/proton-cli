@@ -19,7 +19,8 @@ func sessionsCmd() *cobra.Command {
 }
 
 func sessionsListCmd() *cobra.Command {
-	return &cobra.Command{
+	var held kit.Held[proton.Session]
+	c := &cobra.Command{
 		Use:   "list",
 		Short: "List every signed-in session",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
@@ -27,9 +28,8 @@ func sessionsListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return kit.List(c, ui.TableSpec[proton.Session]{
-				Noun:  "sessions",
-				Total: ui.Unknown, Page: ui.Unpaged,
+			return held.Answer(c, ui.TableSpec[proton.Session]{
+				Noun: "sessions",
 				Columns: []ui.Column[proton.Session]{
 					{Header: "ID", ID: true, Cell: func(s proton.Session) string { return s.UID }},
 					{Header: "CLIENT", Flex: true, Cell: func(s proton.Session) string { return s.ClientID }},
@@ -48,6 +48,11 @@ func sessionsListCmd() *cobra.Command {
 			}, sessions)
 		}),
 	}
+	held.Register(c, "sessions",
+		kit.Key[proton.Session]{Name: "created", Less: func(a, b proton.Session) int { return kit.Ints(a.CreateTime, b.CreateTime) }},
+		kit.Key[proton.Session]{Name: "client", Less: func(a, b proton.Session) int { return kit.Fold(a.ClientID, b.ClientID) }},
+	)
+	return c
 }
 
 func sessionsRevokeCmd() *cobra.Command {

@@ -59,8 +59,8 @@ proton mail drafts list
 
 | Flag | Description |
 | --- | --- |
+| `--limit int` | How many drafts per page; 0 for all of them (default `25`) |
 | `--page int` | Which page of results, counting from zero |
-| `--page-size int` | How many drafts per page; 0 for all of them (default `25`) |
 
 ## `send`
 
@@ -79,9 +79,8 @@ proton mail drafts send 5bH2mQxK --send-at 2026-04-16T09:00
 
 | Flag | Description |
 | --- | --- |
-| `--eo-password-file string` | Read the password for recipients outside Proton from a file |
+| `--eo-password-file string` | Read the password for recipients outside Proton from a file, or - for stdin |
 | `--eo-password-hint string` | Hint shown to password-protected recipients |
-| `--eo-password-stdin` | Read the password for recipients outside Proton from stdin |
 | `--expires string` | Self-destruct after DURATION (e.g. 7d, 24h), or never |
 | `--send-at string` | Schedule delivery (RFC 3339, or YYYY-MM-DDTHH:MM in the zone you are working in) |
 
@@ -109,9 +108,8 @@ proton mail drafts update 5bH2mQxK --detach report.pdf
 | `--cc stringArray` | Carbon-copy recipient (repeatable) |
 | `--detach stringArray` | Remove an attachment by name or ID (repeatable) |
 | `--from string` | Address to send from, by email or ID (default: your primary) |
-| `--html` | Switch the draft to text/html |
+| `--html` | Switch the draft to HTML; --html=false switches it to plain text |
 | `--no-signature` | Leave out this address's signature and Proton's footer |
-| `--plain` | Switch the draft to text/plain |
 | `--subject string` | Subject line |
 | `--to stringArray` | Recipient (repeatable; accepts "Name <addr>") |
 

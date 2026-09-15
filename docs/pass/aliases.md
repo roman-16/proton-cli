@@ -4,7 +4,7 @@ Hide-my-email addresses that forward to you.
 
 Every command under `proton pass aliases`, with the arguments and flags it takes. For these commands in use, see [the pass guide](README.md).
 
-Holds `contacts`, `create`, `disable`, `enable`, `list` and `options`.
+Holds `contacts`, `create`, `disable`, `enable` and `list`.
 
 ## `contacts`
 
@@ -79,11 +79,18 @@ proton pass aliases contacts list REF
 proton pass aliases contacts list shopping
 ```
 
+| Flag | Description |
+| --- | --- |
+| `--desc` | Reverse the order |
+| `--limit int` | How many contacts per page; 0 for all of them |
+| `--page int` | Which page of results, counting from zero |
+| `--sort string` | Order by: email (default `email`) |
+
 ## `create`
 
 Create an alias.
 
-The address is a prefix you choose plus a suffix Proton offers. Mail sent to it arrives in the mailboxes you name. Run `aliases options` to see the suffixes and mailboxes available.
+The address is a prefix you choose plus a suffix Proton offers. Mail sent to it arrives in the mailboxes you name. `settings domains list` has the suffixes and `settings mailboxes list` the mailboxes.
 
 ```
 proton pass aliases create
@@ -141,23 +148,11 @@ proton pass aliases list --vault Work
 
 | Flag | Description |
 | --- | --- |
+| `--desc` | Reverse the order |
+| `--limit int` | How many aliases per page; 0 for all of them |
+| `--page int` | Which page of results, counting from zero |
+| `--sort string` | Order by: address, name (default `address`) |
 | `--vault string` | Show only this vault, by name or ID |
-
-## `options`
-
-List the suffixes and mailboxes an alias can use.
-
-A suffix is the domain an alias is made on, and is what --suffix takes.
-
-Proton adds a random word in front of the suffix, and only settles on it when the alias is created.
-
-```
-proton pass aliases options
-```
-
-```bash
-proton pass aliases options
-```
 
 ---
 

@@ -89,13 +89,13 @@ type LinkOptions struct {
 
 func (o LinkOptions) modifies() bool { return o.SetEdit || o.SetExpiry || o.SetPassword }
 
-// Access is what a public link permits, in the two words every screen and every
-// response says it in.
+// Access is what a share or a link permits, in the two words every screen, every
+// response and --access itself says it in.
 func Access(canEdit bool) string {
 	if canEdit {
-		return "edit"
+		return "editor"
 	}
-	return "view"
+	return "viewer"
 }
 
 type shareURLResp struct {
@@ -684,36 +684,92 @@ func (s *Service) SharedWithMe(ctx context.Context) ([]SharedItem, error) {
 	return out, nil
 }
 
-// SharedByMe lists what you have shared, whether by link or with named people.
+// SharedByMe lists the items you have handed to named people.
 //
 // `share get PATH` answers the question for one item; this answers the one a
-// person actually has, which is "what have I left open".
+// person actually has, which is "who did I let in". A public link is the other
+// mechanism and has a collection of its own, so it is not counted here: a row
+// meaning "somebody holds this" and a row meaning "a URL opens this" call for
+// different next steps.
 func (s *Service) SharedByMe(ctx context.Context) ([]SharedItem, error) {
+	out, _, err := s.mine(ctx)
+	return out, err
+}
+
+// PublicLink is one link the account has made, beside the item it opens.
+type PublicLink struct {
+	ShareLink
+	Name string `json:"name"`
+	Type string `json:"type"`
+}
+
+// Ref is how a link is addressed and shortened, which is the link's own ID
+// rather than the item's: an item can carry more than one.
+func (l PublicLink) Ref() string { return l.ShareURLID }
+
+// LinksMade lists every public link the account has open.
+//
+// Drive puts one link on an item at a time, so in practice this is a row per
+// item - but the row is about the link, because that is what expires, what has a
+// password and what has been opened a number of times.
+func (s *Service) LinksMade(ctx context.Context) ([]PublicLink, error) {
+	_, links, err := s.mine(ctx)
+	return links, err
+}
+
+// mine walks the shares this account created once, and sorts what it finds into
+// the two mechanisms: people who hold the thing, and links that open it.
+//
+// One walk, because the two listings ask Proton one question and differ only in
+// which half of the answer they keep. A share that will not open is reported by
+// its identity rather than dropped: leaving it out would understate what is
+// shared, which is the one direction this question must not be wrong in.
+func (s *Service) mine(ctx context.Context) ([]SharedItem, []PublicLink, error) {
 	shares, mine, err := s.listShares(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	var out []SharedItem
+	var items []SharedItem
+	var links []PublicLink
 	for _, sh := range shares {
 		if sh.Locked || sh.Type != shareTypeStandard || !mine[strings.ToLower(sh.Creator)] {
 			continue
 		}
-		item, err := s.describeShare(ctx, sh)
-		if err != nil {
-			// This listing answers "what have I left open", so a share that will not
-			// open is reported by its identity rather than dropped: leaving it out
-			// would understate what is shared, which is the one direction this
-			// question must not be wrong in.
-			slog.Debug("drive: could not read a share of mine", "share", sh.ShareID, "error", err)
-			out = append(out, SharedItem{
+		dc, err := s.unlockShare(ctx, sh.ShareID, sh.LinkID, sh.VolumeID)
+		if err != nil || dc.rootLink == nil {
+			slog.DebugContext(ctx, "drive: could not read a share of mine", "share", sh.ShareID, "error", err)
+			items = append(items, SharedItem{
 				ShareID: sh.ShareID, LinkID: sh.LinkID, VolumeID: sh.VolumeID,
 				Created: sh.CreateTime,
 			})
 			continue
 		}
-		out = append(out, *item)
+		item := SharedItem{
+			ShareID: sh.ShareID, LinkID: sh.LinkID, VolumeID: sh.VolumeID,
+			Name: dc.RootName, Type: linkType(dc.rootLink.Type), Size: dc.rootLink.Size,
+			Role: grantedRole(dc.Permissions), Created: sh.CreateTime,
+		}
+		raws, err := s.fetchShareURLs(ctx, sh.ShareID)
+		if err != nil {
+			skip.Record(ctx, skip.KindShare, sh.ShareID, skip.Unreadable, err)
+			continue
+		}
+		for _, u := range raws {
+			gen, custom := s.decryptURLPassword(dc, u)
+			l := u.toShareLink(gen)
+			l.CustomPassword = custom
+			links = append(links, PublicLink{ShareLink: l, Name: item.Name, Type: item.Type})
+		}
+		members, invites, err := s.whoHolds(ctx, sh.ShareID)
+		if err != nil {
+			skip.Record(ctx, skip.KindShare, sh.ShareID, skip.Unreadable, err)
+			continue
+		}
+		if len(members) > 0 || len(invites) > 0 {
+			items = append(items, item)
+		}
 	}
-	return out, nil
+	return items, links, nil
 }
 
 type rawShare struct {

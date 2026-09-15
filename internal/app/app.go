@@ -200,10 +200,10 @@ func New(opts Options) (*App, error) {
 
 // Stdin hands out the process's standard input, which only one reader may have.
 //
-// Two things want it: a --*-stdin flag for one of the secrets, and `-` for a
-// body, a key, or a file to upload. Whichever asked second would find an empty
-// stream and fail somewhere further along with a puzzle, so it is told here
-// instead, in terms of the two flags that collided.
+// Everything that wants it asks with the same word: `-`, as the value of a flag
+// or as an argument. Whichever asked second would find an empty stream and fail
+// somewhere further along with a puzzle, so it is told here instead, in terms of
+// the two flags that collided.
 //
 // Standard input that nothing is piped into is a terminal, and reading one
 // waits for typing. A run that sat there silently would look like a run that
@@ -224,14 +224,15 @@ func (a *App) Stdin(claim string) (io.Reader, error) {
 	return a.UI.In, nil
 }
 
-// elsewhere is the way out of a collision: whichever claim is a secret's
-// --*-stdin flag has a --*-file twin that reads the same value from somewhere
-// else, and that is the one thing to change. A `-` argument has no twin, so when
-// neither claim is a flag the reader is left to pick which one moves.
+// elsewhere is the way out of a collision: whichever claim reads a secret takes
+// a path as readily as it takes `-`, and that is the one thing to change. A `-`
+// argument has no path to move to, so when neither claim is a secret's flag the
+// reader is left to pick which one moves.
 func elsewhere(claims ...string) string {
 	for _, claim := range claims {
-		if flag, ok := strings.CutSuffix(claim, "-stdin"); ok && strings.HasPrefix(flag, "--") {
-			return "pass it with " + flag + "-file instead"
+		flag, _, ok := strings.Cut(claim, " ")
+		if ok && strings.HasSuffix(flag, "-file") {
+			return "pass it with " + flag + " FILE instead"
 		}
 	}
 	return "read one of them from a path rather than -"

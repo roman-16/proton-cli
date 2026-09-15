@@ -92,7 +92,7 @@ proton pass items attachments update github.com passport.pdf --name passport-203
 
 Create an item.
 
-A secret is read from a file or from stdin, never from a flag value: --secret-file NAME=FILE, or --secret-stdin NAME for one of them. NAME is cvv, number, password, pin, private-key, totp-uri, or any name at all, which makes a hidden custom field of it.
+A secret is read from a file, never from a flag value: --secret-file NAME=FILE, and - as the file reads standard input. NAME is cvv, number, password, pin, private-key, totp-uri, or any name at all, which makes a hidden custom field of it.
 
 --generate-password makes one instead, so a new login needs no file: it is shaped by the same flags `pass generate` takes.
 
@@ -150,8 +150,7 @@ proton pass items create --type custom --name Router --field 'Network/SSID=home'
 | `--public-key string` | Set the public key (ssh-key) |
 | `--reddit string` | Set the reddit (identity) |
 | `--second-phone string` | Set the second phone (identity) |
-| `--secret-file stringArray` | Read a secret field from a file, as NAME=FILE (repeatable) |
-| `--secret-stdin string` | Read the named secret field from stdin |
+| `--secret-file stringArray` | Read a secret field from a file, as NAME=FILE; - is stdin (repeatable) |
 | `--security string` | Wi-Fi security (wifi): WPA, WPA2, WPA3, WEP |
 | `--separator string` | What stands between the words of a passphrase: comma, digit, hyphen, period, space, symbol, underscore (default `hyphen`) |
 | `--social-security-number string` | Set the social security number (identity) |
@@ -184,6 +183,7 @@ proton pass items delete --vault Work --all --yes
 | Flag | Description |
 | --- | --- |
 | `--all` | Act on everything in scope, rather than a subset |
+| `--limit int` | Most items to affect; 0 for no cap (default `150`) |
 | `--newer-than string` | Match items newer than DURATION |
 | `--older-than string` | Match items older than DURATION (e.g. 30d, 2w, 1h) |
 | `--type string` | Match only this kind of item: login, note, credit-card, wifi, ssh-key, identity, alias, custom |
@@ -237,10 +237,10 @@ proton pass items list --risk compromised
 | Flag | Description |
 | --- | --- |
 | `--desc` | Reverse the order |
+| `--limit int` | How many items per page; 0 for all of them (default `50`) |
 | `--newer-than string` | Match items newer than DURATION |
 | `--older-than string` | Match items older than DURATION (e.g. 30d, 2w, 1h) |
 | `--page int` | Which page of results, counting from zero |
-| `--page-size int` | How many items per page; 0 for all of them (default `50`) |
 | `--risk string` | Keep only the logins failing this password check: compromised, missing-2fa, reused, weak |
 | `--sort string` | Order by: name, type, modified, created (default `name`) |
 | `--type string` | Match only this kind of item: login, note, credit-card, wifi, ssh-key, identity, alias, custom |
@@ -495,6 +495,7 @@ proton pass items trash --vault Work --older-than 1y
 | Flag | Description |
 | --- | --- |
 | `--all` | Act on everything in scope, rather than a subset |
+| `--limit int` | Most items to affect; 0 for no cap (default `150`) |
 | `--newer-than string` | Match items newer than DURATION |
 | `--older-than string` | Match items older than DURATION (e.g. 30d, 2w, 1h) |
 | `--type string` | Match only this kind of item: login, note, credit-card, wifi, ssh-key, identity, alias, custom |
@@ -516,7 +517,7 @@ proton pass items unpin github.com
 
 Change an item's fields.
 
-A secret is read from a file or from stdin, never from a flag value: --secret-file NAME=FILE, or --secret-stdin NAME for one of them. NAME is cvv, number, password, pin, private-key, totp-uri, or any name at all, which makes a hidden custom field of it.
+A secret is read from a file, never from a flag value: --secret-file NAME=FILE, and - as the file reads standard input. NAME is cvv, number, password, pin, private-key, totp-uri, or any name at all, which makes a hidden custom field of it.
 
 --generate-password replaces the password with one it makes.
 
@@ -528,7 +529,7 @@ proton pass items update REF
 
 ```bash
 proton pass items update GitHub --secret-file password=/run/secrets/github
-proton pass items update GitHub --secret-stdin password
+proton pass items update GitHub --secret-file password=-
 proton pass items update GitHub --username roman-16 --url github.com
 proton pass items update GitHub --generate-password
 proton pass items update Passport --attach ~/scans/visa.pdf --detach passport.pdf
@@ -576,8 +577,7 @@ proton pass items update Passport --attach ~/scans/visa.pdf --detach passport.pd
 | `--public-key string` | Replace the public key (ssh-key) |
 | `--reddit string` | Replace the reddit (identity) |
 | `--second-phone string` | Replace the second phone (identity) |
-| `--secret-file stringArray` | Read a secret field from a file, as NAME=FILE (repeatable) |
-| `--secret-stdin string` | Read the named secret field from stdin |
+| `--secret-file stringArray` | Read a secret field from a file, as NAME=FILE; - is stdin (repeatable) |
 | `--security string` | Wi-Fi security (wifi): WPA, WPA2, WPA3, WEP |
 | `--separator string` | What stands between the words of a passphrase: comma, digit, hyphen, period, space, symbol, underscore (default `hyphen`) |
 | `--social-security-number string` | Replace the social security number (identity) |

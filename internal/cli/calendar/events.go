@@ -101,6 +101,7 @@ func eventColumns() []ui.Column[calsvc.Event] {
 func eventsListCmd() *cobra.Command {
 	var calendar string
 	var days kit.DayRange
+	var held kit.Held[calsvc.Event]
 	c := &cobra.Command{
 		Use:   "list",
 		Short: "List events in a date range",
@@ -119,14 +120,14 @@ func eventsListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return kit.List(c, ui.TableSpec[calsvc.Event]{
+			return held.Answer(c, ui.TableSpec[calsvc.Event]{
 				Noun: "events", Columns: eventColumns(),
-				Total: ui.Unknown, Page: ui.Unpaged,
 			}, events)
 		}),
 	}
 	c.Flags().StringVar(&calendar, "calendar", "", "Which calendar, by name or ID (default: all of them)")
 	days.Register(c)
+	held.Register(c, "events")
 	return c
 }
 

@@ -63,7 +63,6 @@ var (
 	Blocked      = Action{"Blocked", "block", "blocked", Ordinary}
 	Allowed      = Action{"Allowed", "allow", "allowed", Ordinary}
 	Filed        = Action{"Filed", "file", "filed", Ordinary}
-	Forgot       = Action{"Forgot", "forget", "forgot", Ordinary}
 	Unsubscribed = Action{"Unsubscribed", "unsubscribe", "unsubscribed", Ordinary}
 	Snoozed      = Action{"Snoozed", "snooze", "snoozed", Ordinary}
 	Unsnoozed    = Action{"Unsnoozed", "unsnooze", "unsnoozed", Ordinary}
@@ -84,8 +83,6 @@ var (
 	Reported         = Action{"Reported", "report", "reported", Ordinary}
 	Enabled          = Action{"Enabled", "enable", "enabled", Ordinary}
 	Disabled         = Action{"Disabled", "disable", "disabled", Ordinary}
-	Linked           = Action{"Created", "create", "linked", Ordinary}
-	Unlinked         = Action{"Removed", "remove", "unlinked", Ordinary}
 	Added            = Action{"Added", "add", "added", Ordinary}
 	Removed          = Action{"Removed", "remove", "removed", Ordinary}
 	Confirmed        = Action{"Confirmed", "confirm", "confirmed", Ordinary}
@@ -118,10 +115,10 @@ func (a Action) Asks(computed bool) bool {
 // Actions is the vocabulary, for the conformance test to check against.
 var Actions = []Action{
 	Created, Updated, Deleted, Trashed, Restored, Emptied, Uninstalled, Moved,
-	Copied, Uploaded, Downloaded, Exported, Imported, Merged, Resent, Verified, Blocked, Allowed, Filed, Forgot, Unsubscribed, Snoozed, Unsnoozed, Applied, Reordered, Sent, Scheduled, Unscheduled, Saved,
+	Copied, Uploaded, Downloaded, Exported, Imported, Merged, Resent, Verified, Blocked, Allowed, Filed, Unsubscribed, Snoozed, Unsnoozed, Applied, Reordered, Sent, Scheduled, Unscheduled, Saved,
 	Labelled, Unlabelled, Starred, Unstarred, MarkedRead, MarkedUnread,
 	MarkedLegitimate, Reported,
-	Enabled, Disabled, Linked, Unlinked, Added, Removed, Confirmed, Left, Accepted, Declined,
+	Enabled, Disabled, Added, Removed, Confirmed, Left, Accepted, Declined,
 	Favorited, Unfavorited, Pinned, Unpinned, Reactivated, Responded, Set, Invited, Revoked,
 	Transferred, SignedIn, SignedOut,
 }

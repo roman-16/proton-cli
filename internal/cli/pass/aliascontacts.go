@@ -40,7 +40,8 @@ func aliasContactColumns() []ui.Column[passsvc.AliasContact] {
 }
 
 func aliasContactsListCmd() *cobra.Command {
-	return &cobra.Command{
+	var held kit.Held[passsvc.AliasContact]
+	c := &cobra.Command{
 		Use:   "list REF",
 		Short: "List the addresses an alias can write to",
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
@@ -52,12 +53,15 @@ func aliasContactsListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return kit.List(c, ui.TableSpec[passsvc.AliasContact]{
+			return held.Answer(c, ui.TableSpec[passsvc.AliasContact]{
 				Noun: "contacts", Columns: aliasContactColumns(),
-				Total: ui.Unknown, Page: ui.Unpaged,
 			}, rows)
 		}),
 	}
+	held.Register(c, "contacts",
+		kit.Key[passsvc.AliasContact]{Name: "email", Less: func(a, b passsvc.AliasContact) int { return kit.Fold(a.Email, b.Email) }},
+	)
+	return c
 }
 
 func aliasContactsCreateCmd() *cobra.Command {

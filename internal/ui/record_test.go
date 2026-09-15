@@ -198,3 +198,27 @@ func TestRecordColourLeavesTheTextAlone(t *testing.T) {
 			stripANSI(colOut.String()), plainOut.String())
 	}
 }
+
+// A record is one thing, and a slice handed to it emits a bare array where every
+// consumer expects an object. The screen looks right either way, so the refusal
+// is what tells anybody.
+func TestARecordRefusesACollection(t *testing.T) {
+	spec := RecordSpec{
+		Fields: []Field{{Label: "Name", Value: "Work"}},
+		Object: []map[string]string{{"email": "jane@proton.me"}},
+	}
+
+	u, out, _ := fixture(t, Options{Format: FormatJSON})
+	if err := Record(u, spec); err == nil {
+		t.Fatalf("a slice was accepted as a record: %s", out.String())
+	}
+
+	// On a terminal the fields are what is drawn, so nothing is refused there.
+	u, out, _ = fixture(t, Options{Format: FormatText})
+	if err := Record(u, spec); err != nil {
+		t.Fatalf("Record: %v", err)
+	}
+	if !strings.Contains(out.String(), "Work") {
+		t.Errorf("the fields were not drawn: %q", out.String())
+	}
+}

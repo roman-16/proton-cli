@@ -60,12 +60,12 @@ func TestContactsPinUnpinKey(t *testing.T) {
 	cleanupRun(t, fmt.Sprintf("Delete contact: proton contacts delete %s", id),
 		"contacts", "delete", "--", id)
 
-	runOK(t, "contacts", "keys", "pin", "--key", writeGeneratedPubKey(t), "--email", email, id)
+	runOK(t, "contacts", "keys", "pin", "--key", writeGeneratedPubKey(t), email)
 	if !strings.Contains(signedCardData(t, id), "KEY;") {
 		t.Error("expected a pinned KEY property in the signed card after pin-key")
 	}
 
-	runOK(t, "contacts", "keys", "unpin", "--email", email, id)
+	runOK(t, "contacts", "keys", "unpin", email)
 	if strings.Contains(signedCardData(t, id), "KEY;") {
 		t.Error("KEY property should be gone after unpin-key")
 	}
@@ -77,7 +77,7 @@ func TestContactsUpdatePreservesPinnedKey(t *testing.T) {
 	cleanupRun(t, fmt.Sprintf("Delete contact: proton contacts delete %s", id),
 		"contacts", "delete", "--", id)
 
-	runOK(t, "contacts", "keys", "pin", "--key", writeGeneratedPubKey(t), "--email", email, id)
+	runOK(t, "contacts", "keys", "pin", "--key", writeGeneratedPubKey(t), email)
 	if !strings.Contains(signedCardData(t, id), "KEY;") {
 		t.Fatal("setup: pinned key missing after pin-key")
 	}
@@ -108,7 +108,7 @@ func TestContactsMatchingPinStillDelivers(t *testing.T) {
 	id := strings.TrimSpace(runOK(t, "contacts", "create", "--name", testID()+"-altpin", "--email", secondaryEmail()))
 	cleanupRun(t, fmt.Sprintf("Delete contact: proton contacts delete %s", id),
 		"contacts", "delete", "--", id)
-	runOK(t, "contacts", "keys", "pin", "--key", keyPath, "--email", secondaryEmail(), id)
+	runOK(t, "contacts", "keys", "pin", "--key", keyPath, secondaryEmail())
 
 	subject := testID() + "-pinned-send"
 	body := "pinned-key body for " + subject
@@ -144,7 +144,7 @@ func TestContactsPinnedMismatchRefusesTheSend(t *testing.T) {
 	cleanupRun(t, fmt.Sprintf("Delete contact: proton contacts delete %s", id),
 		"contacts", "delete", "--", id)
 	// A freshly generated key is a valid PGP key but not the second account's.
-	runOK(t, "contacts", "keys", "pin", "--key", writeGeneratedPubKey(t), "--email", secondaryEmail(), id)
+	runOK(t, "contacts", "keys", "pin", "--key", writeGeneratedPubKey(t), secondaryEmail())
 
 	subject := testID() + "-mismatch"
 	_, stderr, code := run(t, "mail", "messages", "send", "--to", secondaryEmail(), "--subject", subject, "--body", "nope")

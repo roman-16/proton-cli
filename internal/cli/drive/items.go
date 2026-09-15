@@ -91,6 +91,7 @@ func itemsListCmd() *cobra.Command {
 	f.registerNarrowing(c.Flags())
 	t.register(c, reads)
 	order.Register(c, "name", "size", "modified")
+	page.Default = screenful
 	page.Register(c, "items")
 	return c
 }
@@ -447,7 +448,7 @@ func itemsDownloadCmd() *cobra.Command {
 		Long: "Download a file.\n\n" +
 			"Behind a public link, a file is / when the link points at the file itself, and\n" +
 			"a path inside the folder when it points at a folder. A link with a password\n" +
-			"takes it from --link-password-file or --link-password-stdin.",
+			"takes it from --link-password-file, which takes - for stdin.",
 		RunE: kit.Run([]kit.Step{t.supply}, func(c *kit.Invocation) error {
 			if err := dest.Validate(true); err != nil {
 				return err

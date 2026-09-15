@@ -34,7 +34,7 @@ func forwardingCmd() *cobra.Command {
 			long: "REF is the forwarder's address, or the forwarding's ID. Only a pending\n" +
 				"forwarding to one of your addresses can be accepted.\n\n" +
 				"Asks for your password even when you are signed in. With no terminal to ask,\n" +
-				"pass --password-file or --password-stdin.",
+				"pass --password-file, which takes - for stdin.",
 			action: ui.Accepted,
 			reason: "accept a forwarding",
 			takes:  answerable("accept", "accepted"),
@@ -58,7 +58,7 @@ func forwardingCmd() *cobra.Command {
 			long: "REF is a forwarding in either direction. Taking down the last forwarding\n" +
 				"from one of your addresses to an address outside Proton turns end-to-end\n" +
 				"encryption for it back on, and asks for your password to do it. With no\n" +
-				"terminal to ask, pass --password-file or --password-stdin.",
+				"terminal to ask, pass --password-file, which takes - for stdin.",
 			action: ui.Deleted,
 			reason: "turn end-to-end encryption back on",
 			apply: func(ctx context.Context, m *mailsvc.Service, f mailsvc.Forwarding) error {
@@ -137,7 +137,8 @@ func forwardingList(c *kit.Invocation) *kit.Lookup[mailsvc.Forwarding] {
 }
 
 func forwardingListCmd() *cobra.Command {
-	return &cobra.Command{
+	var held kit.Held[mailsvc.Forwarding]
+	c := &cobra.Command{
 		Use:   "list",
 		Short: "List forwardings in both directions",
 		Long: "List forwardings in both directions.\n\n" +
@@ -149,12 +150,16 @@ func forwardingListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return kit.List(c, ui.TableSpec[mailsvc.Forwarding]{
+			return held.Answer(c, ui.TableSpec[mailsvc.Forwarding]{
 				Noun: "forwardings", Columns: forwardingColumns(),
-				Total: ui.Unknown, Page: ui.Unpaged,
 			}, rows)
 		}),
 	}
+	held.Register(c, "forwardings",
+		kit.Key[mailsvc.Forwarding]{Name: "created", Less: func(a, b mailsvc.Forwarding) int { return kit.Ints(a.Created, b.Created) }},
+		kit.Key[mailsvc.Forwarding]{Name: "address", Less: func(a, b mailsvc.Forwarding) int { return kit.Fold(a.To, b.To) }},
+	)
+	return c
 }
 
 func forwardingGetCmd() *cobra.Command {
@@ -196,7 +201,7 @@ func forwardingCreateCmd() *cobra.Command {
 			"To a Proton address, mail stays end-to-end encrypted. To an address outside\n" +
 			"Proton, end-to-end encryption for REF is turned off until the last such\n" +
 			"forwarding from it is deleted, and your password is asked for to turn it\n" +
-			"off. With no terminal to ask, pass --password-file or --password-stdin.",
+			"off. With no terminal to ask, pass --password-file, which takes - for stdin.",
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			if err := reauth.Supply(c); err != nil {
 				return err

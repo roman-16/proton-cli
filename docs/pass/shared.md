@@ -22,6 +22,13 @@ proton pass shared list
 proton pass shared list
 ```
 
+| Flag | Description |
+| --- | --- |
+| `--desc` | Reverse the order |
+| `--limit int` | How many items per page; 0 for all of them |
+| `--page int` | Which page of results, counting from zero |
+| `--sort string` | Order by: name, type (default `name`) |
+
 ---
 
 Every command also takes the [flags that work everywhere](../about/commands.md#flags-that-work-on-every-command).

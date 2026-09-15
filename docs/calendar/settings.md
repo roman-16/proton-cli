@@ -38,7 +38,7 @@ proton calendar settings calendars create --name Timetable --url https://example
 
 Delete calendars, and every event in them.
 
-Asks for your password even when you are signed in. With no terminal to ask, pass --password-file or --password-stdin.
+Asks for your password even when you are signed in. With no terminal to ask, pass --password-file, which takes - for stdin.
 
 ```
 proton calendar settings calendars delete REF...
@@ -50,8 +50,7 @@ proton calendar settings calendars delete Work
 
 | Flag | Description |
 | --- | --- |
-| `--password-file string` | Read the account password from a file |
-| `--password-stdin` | Read the account password from stdin |
+| `--password-file string` | Read the account password from a file, or - for stdin |
 | `--totp string` | Two-factor code |
 
 ### `calendars get`
@@ -78,11 +77,18 @@ proton calendar settings calendars list
 proton calendar settings calendars list
 ```
 
+| Flag | Description |
+| --- | --- |
+| `--desc` | Reverse the order |
+| `--limit int` | How many calendars per page; 0 for all of them |
+| `--page int` | Which page of results, counting from zero |
+| `--sort string` | Order by: name (default `name`) |
+
 ### `calendars share`
 
 Who else can see a calendar.
 
-Holds `add`, `list` and `remove`.
+Holds `add`, `get`, `remove` and `update`.
 
 ### `calendars share add`
 
@@ -90,7 +96,7 @@ Give somebody a calendar.
 
 Only another Proton account can be given one.
 
-They are sent an invitation and see nothing until they accept. They can then read the calendar; --edit lets them change it too.
+They are sent an invitation and see nothing until they accept. A viewer reads the calendar; an editor changes it too.
 
 ```
 proton calendar settings calendars share add REF EMAIL
@@ -98,25 +104,25 @@ proton calendar settings calendars share add REF EMAIL
 
 ```bash
 proton calendar settings calendars share add Work jane@proton.me
-proton calendar settings calendars share add Work jane@proton.me --edit
+proton calendar settings calendars share add Work jane@proton.me --access editor
 ```
 
 | Flag | Description |
 | --- | --- |
-| `--edit` | Let them change the calendar, not just see it |
+| `--access string` | What they may do with it: viewer, editor (default `viewer`) |
 
-### `calendars share list`
+### `calendars share get`
 
-List who has a calendar.
+Show who has a calendar.
 
 Somebody who has not answered yet is listed as pending. They can see nothing until they accept.
 
 ```
-proton calendar settings calendars share list REF
+proton calendar settings calendars share get REF
 ```
 
 ```bash
-proton calendar settings calendars share list Work
+proton calendar settings calendars share get Work
 ```
 
 ### `calendars share remove`
@@ -132,6 +138,24 @@ proton calendar settings calendars share remove REF EMAIL
 ```bash
 proton calendar settings calendars share remove Work jane@proton.me
 ```
+
+### `calendars share update`
+
+Change what somebody may do with a calendar.
+
+Name them by address. It works whether they have accepted the calendar or still have it pending.
+
+```
+proton calendar settings calendars share update REF EMAIL
+```
+
+```bash
+proton calendar settings calendars share update Work jane@proton.me --access viewer
+```
+
+| Flag | Description |
+| --- | --- |
+| `--access string` | What they may do with it: viewer, editor (default `viewer`) |
 
 ### `calendars update`
 

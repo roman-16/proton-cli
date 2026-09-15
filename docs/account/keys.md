@@ -25,14 +25,11 @@ proton account keys reactivate --previous-password-file /run/secrets/proton-old 
 
 | Flag | Description |
 | --- | --- |
-| `--password-file string` | Read the account password from a file |
-| `--password-stdin` | Read the account password from stdin |
-| `--previous-password-file string` | Read the password from before the reset from a file |
-| `--previous-password-stdin` | Read the password from before the reset from stdin |
+| `--password-file string` | Read the account password from a file, or - for stdin |
+| `--previous-password-file string` | Read the password from before the reset from a file, or - for stdin |
 | `--recovery-file string` | Recover with a recovery file downloaded from Proton |
 | `--recovery-phrase` | Recover with the recovery phrase, asked for at the prompt |
-| `--recovery-phrase-file string` | Read the recovery phrase from a file |
-| `--recovery-phrase-stdin` | Read the recovery phrase from stdin |
+| `--recovery-phrase-file string` | Read the recovery phrase from a file, or - for stdin |
 | `--totp string` | Two-factor code |
 
 ---

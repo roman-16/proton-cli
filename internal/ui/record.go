@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 )
 
@@ -51,13 +52,37 @@ type RecordSpec struct {
 
 // Record renders one object as an aligned label/value block on Out, or as the
 // object itself in a machine format.
+//
+// A record is one thing, so its object is one thing. Handing it a slice reads
+// perfectly on a terminal - the fields were built by hand anyway - and emits a
+// bare array under --output json, where every other record emits an object and
+// every consumer expects one. That is a wrong document with a right-looking
+// screen behind it, which is why it is refused here rather than discovered by
+// whatever was parsing it.
 func Record(u *UI, spec RecordSpec) error {
 	if u.Format.Machine() {
+		if err := oneThing(spec.Object); err != nil {
+			return err
+		}
 		return u.encode(spec.Object, spec.Skipped.Count)
 	}
 	writeFields(u, spec.Fields, "")
 	u.Incomplete(spec.Skipped)
 	return nil
+}
+
+// oneThing refuses a record whose object is a collection. A collection has its
+// own shape - an envelope with a count - and Table is what writes that.
+func oneThing(object any) error {
+	v := reflect.ValueOf(object)
+	for v.Kind() == reflect.Pointer || v.Kind() == reflect.Interface {
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Slice && v.Kind() != reflect.Array {
+		return nil
+	}
+	return fmt.Errorf("a record is one thing and this one is a %s; "+
+		"give it the object the fields describe, or answer with a table", v.Type())
 }
 
 // writeFields draws a label/value block, prefixed by indent. Empty fields are

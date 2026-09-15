@@ -77,9 +77,10 @@ func TestSecretsRefuseWhatCannotBeASecret(t *testing.T) {
 // Standard input is claimed by name, so the field it belongs to is known before
 // anything reads it.
 func TestASecretMayComeFromStdin(t *testing.T) {
-	var s Secrets
-	s.stdinField = "password"
-	s.stdin = strings.NewReader("hunter2\n")
+	s := Secrets{
+		files: []string{"password=-"}, stdinField: "password",
+		stdin: strings.NewReader("hunter2\n"),
+	}
 	got, err := s.Values()
 	if err != nil {
 		t.Fatalf("Values: %v", err)
@@ -88,7 +89,7 @@ func TestASecretMayComeFromStdin(t *testing.T) {
 		t.Errorf("the password came back as %v", got)
 	}
 
-	s = Secrets{stdinField: "password", stdin: strings.NewReader("\n")}
+	s = Secrets{files: []string{"password=-"}, stdinField: "password", stdin: strings.NewReader("\n")}
 	if _, err := s.Values(); err == nil {
 		t.Error("an empty stream was accepted as a password")
 	}
