@@ -217,8 +217,8 @@ func TestCalendarSharingRoundTrip(t *testing.T) {
 
 	// Changing what a pending invitation grants goes through the invitation's own
 	// endpoint, because there is no membership to change yet.
-	runOKPaid(t, "calendar", "settings", "calendars", "share", "update", ref,
-		secondaryEmail(), "--access", "editor")
+	runOKPaid(t, "calendar", "settings", "calendars", "share", "update",
+		"--access", "editor", ref, secondaryEmail())
 	assertAccess(t, ref, secondaryEmail(), "editor")
 
 	// The other side takes it, which is the half that proves the key it was
@@ -274,8 +274,8 @@ func TestCalendarSharingRoundTrip(t *testing.T) {
 	}
 
 	// And once it is a membership, the same command reaches the other endpoint.
-	runOKPaid(t, "calendar", "settings", "calendars", "share", "update", ref,
-		secondaryEmail(), "--access", "viewer")
+	runOKPaid(t, "calendar", "settings", "calendars", "share", "update",
+		"--access", "viewer", ref, secondaryEmail())
 	assertAccess(t, ref, secondaryEmail(), "viewer")
 
 	runOKPaid(t, "calendar", "settings", "calendars", "share", "remove", ref, secondaryEmail())

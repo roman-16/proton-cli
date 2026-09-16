@@ -11,28 +11,10 @@ import (
 // including the `list` that makes restoring possible without knowing in advance
 // what is in there.
 
-// trashedState is the State value Proton gives an item in the trash.
-const trashedState = 2
-
 func trashCmd() *cobra.Command {
 	c := &cobra.Command{Use: "trash", Short: "Items you have removed but not yet deleted"}
 	c.AddCommand(trashListCmd(), trashRestoreCmd(), trashEmptyCmd())
 	return c
-}
-
-// trashed lists the items in the trash, across every vault.
-func trashed(c *kit.Invocation) ([]passsvc.Item, error) {
-	items, err := c.App.Pass.ItemsList(c.Ctx, "")
-	if err != nil {
-		return nil, err
-	}
-	out := make([]passsvc.Item, 0)
-	for _, it := range items {
-		if it.State == trashedState {
-			out = append(out, it)
-		}
-	}
-	return out, nil
 }
 
 func trashListCmd() *cobra.Command {
@@ -41,7 +23,7 @@ func trashListCmd() *cobra.Command {
 		Use:   "list",
 		Short: "List what is in the trash",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
-			items, err := trashed(c)
+			items, err := c.App.Pass.ItemsTrashed(c.Ctx)
 			if err != nil {
 				return err
 			}
@@ -90,7 +72,7 @@ func trashEmptyCmd() *cobra.Command {
 		Use:   "empty",
 		Short: "Delete everything in the trash, permanently",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
-			items, err := trashed(c)
+			items, err := c.App.Pass.ItemsTrashed(c.Ctx)
 			if err != nil {
 				return err
 			}
@@ -116,7 +98,7 @@ func trashTargets(c *kit.Invocation, all bool) ([]passsvc.Item, error) {
 		if len(c.Args) > 0 {
 			return nil, kit.Fail("--all restores everything, so it takes no REF.")
 		}
-		return trashed(c)
+		return c.App.Pass.ItemsTrashed(c.Ctx)
 	}
 	if len(c.Args) == 0 {
 		return nil, kit.Fail("Nothing selected.").

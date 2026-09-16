@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 Adding a version section here is what publishes a release, so this file is the one place a version is decided: see [Releases](CONTRIBUTING.md#releases). Versions that shipped before this file existed are on the [releases page](https://github.com/roman-16/proton-cli/releases).
 
+## [4.2.0] - 2026-09-17
+
+### Added
+
+- `proton index` keeps an encrypted copy of your mail, files and events under `~/.config/proton-cli/index/`, and a search reads it once it exists: `--keyword` reaches message bodies, `--from` and `--to` match display names, a Drive `--pattern` is answered without opening every folder, and an event is found by what it says. A build can be stopped and resumed, `index update` and `index watch` keep it current, and `index delete` takes it off the machine. Proton's search operators stop applying to an indexed search, which matches every term literally.
+
+### Fixed
+
+- `calendar events list` and `events export` take any date range. Proton refuses a window wider than a few months, so a semester failed outright; the range is fetched six weeks at a time and the answers joined.
+- A calendar that cannot be read is reported under the listing or export rather than leaving it short without a word, and an export says which events it could not decrypt.
+- A starred mail listing returned a short page with a count that included the messages it had dropped. `--starred` narrows before paging.
+- `pass trash list`, `pass trash restore --all` and `pass trash empty` always came back empty, however much was in the trash.
+
 ## [4.1.0] - 2026-09-15
 
 ### Changed

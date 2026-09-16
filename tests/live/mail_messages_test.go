@@ -137,9 +137,11 @@ func TestMailMessagesListEmptyFilterFooter(t *testing.T) {
 		"--keyword", "xyz-no-match-"+testID())
 	// A search that matched nothing says so. "No messages." would read as an
 	// empty mailbox, which is a different and more alarming fact.
-	last := lastNonEmpty(stderr)
-	if last != "No messages match." {
-		t.Errorf("expected 'No messages match.' on an empty search, got: %q", last)
+	//
+	// The footer is not the last line here: what the search did not look inside
+	// is said after it, about it.
+	if !strings.Contains(stderr, "No messages match.") {
+		t.Errorf("expected 'No messages match.' on an empty search, got: %q", stderr)
 	}
 }
 

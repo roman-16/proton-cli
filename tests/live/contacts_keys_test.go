@@ -108,7 +108,10 @@ func TestContactsMatchingPinStillDelivers(t *testing.T) {
 	id := strings.TrimSpace(runOK(t, "contacts", "create", "--name", testID()+"-altpin", "--email", secondaryEmail()))
 	cleanupRun(t, fmt.Sprintf("Delete contact: proton contacts delete %s", id),
 		"contacts", "delete", "--", id)
-	runOK(t, "contacts", "keys", "pin", "--key", keyPath, secondaryEmail())
+	// The contact made here is named, not the address: an address book that
+	// already holds somebody at that address makes the address ambiguous, and
+	// the contact holds one address, so the pin lands on it either way.
+	runOK(t, "contacts", "keys", "pin", "--key", keyPath, "--", id)
 
 	subject := testID() + "-pinned-send"
 	body := "pinned-key body for " + subject
@@ -144,7 +147,7 @@ func TestContactsPinnedMismatchRefusesTheSend(t *testing.T) {
 	cleanupRun(t, fmt.Sprintf("Delete contact: proton contacts delete %s", id),
 		"contacts", "delete", "--", id)
 	// A freshly generated key is a valid PGP key but not the second account's.
-	runOK(t, "contacts", "keys", "pin", "--key", writeGeneratedPubKey(t), secondaryEmail())
+	runOK(t, "contacts", "keys", "pin", "--key", writeGeneratedPubKey(t), "--", id)
 
 	subject := testID() + "-mismatch"
 	_, stderr, code := run(t, "mail", "messages", "send", "--to", secondaryEmail(), "--subject", subject, "--body", "nope")

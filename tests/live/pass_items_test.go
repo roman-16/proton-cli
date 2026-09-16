@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -153,8 +154,27 @@ func TestPassItemsTrashRestoreDelete(t *testing.T) {
 	cleanupRun(t, fmt.Sprintf("Delete item: proton pass items delete -- %s", ref),
 		"pass", "items", "delete", "--", ref)
 
+	// The listing is what makes restoring possible without knowing the reference
+	// in advance, so what is in the trash has to reach it - and leave it again.
+	trashHolds := func() bool {
+		for _, row := range listAll(t, "pass", "trash", "list") {
+			m, _ := row.(map[string]interface{})
+			if n, _ := m["name"].(string); n == name {
+				return true
+			}
+		}
+		return false
+	}
+
 	runOK(t, "pass", "items", "trash", name)
+	if !trashHolds() {
+		t.Error("the trash does not list an item just put there")
+	}
+
 	runOK(t, "pass", "trash", "restore", "--", ref)
+	if trashHolds() {
+		t.Error("the trash still lists an item that was restored")
+	}
 
 	// It should be searchable again
 	got := runOK(t, "pass", "items", "get", name)
@@ -579,17 +599,22 @@ func TestPassExportAndImportRoundTrip(t *testing.T) {
 	assertContains(t, stderr, "Dry run")
 
 	before := passItemRefs(t)
-	cleanup(t, "Delete the items a restored backup added: proton pass items list, "+
-		"then delete every duplicate", func() error {
+	cleanup(t, "Delete the items a restored backup added: proton pass items list and "+
+		"proton pass trash list, then delete every duplicate", func() error {
+		var added []string
 		for ref := range passItemRefs(t) {
-			if before[ref] {
-				continue
+			if !before[ref] {
+				added = append(added, ref)
 			}
-			if _, stderr, code, err := runArgs(nil, "--yes", "pass", "items", "delete", "--", ref); err != nil {
-				return err
-			} else if code != 0 {
-				return fmt.Errorf("exit %d: %s", code, stderr)
-			}
+		}
+		if len(added) == 0 {
+			return nil
+		}
+		args := append([]string{"--yes", "pass", "items", "delete", "--"}, added...)
+		if _, stderr, code, err := runArgs(nil, args...); err != nil {
+			return err
+		} else if code != 0 {
+			return fmt.Errorf("exit %d: %s", code, stderr)
 		}
 		return nil
 	})
@@ -652,7 +677,13 @@ func archivedEntry(t *testing.T, archive, name string) []byte {
 	return nil
 }
 
-// passItemRefs is every item in the account, as the references a command takes.
+// passItemRefs is every item the account holds, as the references a command
+// takes - the trash included.
+//
+// A backup carries what was in the trash and puts it back there, so a listing of
+// the vaults cannot see what a restore added. The cleanup that reads this would
+// then leave those items behind for good, and the next run would back up twice
+// as many of them.
 //
 // It pages, because a listing stops at fifty. Reading only the first page makes
 // a vault that outgrew it look unchanged however much was added to it - and
@@ -661,19 +692,22 @@ func passItemRefs(t *testing.T) map[string]bool {
 	t.Helper()
 	const pageSize = 100
 	out := map[string]bool{}
-	for page := 0; ; page++ {
-		rows := runJSONArray(t, "pass", "items", "list",
-			"--page", strconv.Itoa(page), "--limit", strconv.Itoa(pageSize))
-		for _, row := range rows {
-			m, _ := row.(map[string]interface{})
-			share, _ := m["share_id"].(string)
-			id, _ := m["item_id"].(string)
-			out[share+"/"+id] = true
-		}
-		if len(rows) < pageSize {
-			return out
+	for _, collection := range [][]string{{"pass", "items", "list"}, {"pass", "trash", "list"}} {
+		for page := 0; ; page++ {
+			rows := runJSONArray(t, append(slices.Clone(collection),
+				"--page", strconv.Itoa(page), "--limit", strconv.Itoa(pageSize))...)
+			for _, row := range rows {
+				m, _ := row.(map[string]interface{})
+				share, _ := m["share_id"].(string)
+				id, _ := m["item_id"].(string)
+				out[share+"/"+id] = true
+			}
+			if len(rows) < pageSize {
+				break
+			}
 		}
 	}
+	return out
 }
 
 // A passphrase locks the archive, and without it nothing can be read back.

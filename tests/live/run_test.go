@@ -495,8 +495,18 @@ func refuseToPush(t *testing.T, stderr string) {
 // not.
 const busy = "[HTTP 409]"
 
-// runOKUntilFree runs a command Proton may be busy with, and fails only once it
-// has been saying so for a minute.
+// refused is how Proton turns away a contacts write it would otherwise take.
+//
+// It is neither rate limiting, which arrives as 429, nor a card Proton could not
+// read: the same bytes are taken on one attempt and refused on the next, writes
+// three seconds apart are never refused, and back-to-back ones are refused about
+// two in five times. So it is about pace. A genuinely unreadable card is refused
+// with 2001 too, which is why this waits rather than excusing it - one that is
+// really broken is refused every time and fails the test anyway.
+const refused = "2001: Contact update failed"
+
+// runOKUntilFree runs a command Proton may turn away, and fails only once it has
+// been turning it away for a minute.
 func runOKUntilFree(t *testing.T, args ...string) {
 	t.Helper()
 	var last string
@@ -506,7 +516,7 @@ func runOKUntilFree(t *testing.T, args ...string) {
 			return true
 		}
 		last = stderr
-		if strings.Contains(stderr, busy) {
+		if strings.Contains(stderr, busy) || strings.Contains(stderr, refused) {
 			return false
 		}
 		t.Fatalf("command %v failed (exit %d): %s", args, code, truncateOutput(stderr))

@@ -52,7 +52,7 @@ func TestContactsGroups(t *testing.T) {
 
 	// Renaming is the last thing a group does that nothing had tried.
 	renamed := gname + "-renamed"
-	runOKPaid(t, "contacts", "groups", "update", group, "--name", renamed)
+	runOKPaid(t, "contacts", "groups", "update", "--name", renamed, group)
 	assertContains(t, runOKPaid(t, "contacts", "groups", "list"), renamed)
 }
 

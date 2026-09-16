@@ -199,6 +199,25 @@ func (s *Service) ItemsList(ctx context.Context, vaultFilter string) ([]Item, er
 	return out, nil
 }
 
+// ItemsTrashed is what the account holds in its trash, across every vault.
+//
+// Proton answers for a vault with its trash left out unless asked otherwise, so
+// this is the only listing that sees one - which is what a restore and an
+// emptying are for.
+func (s *Service) ItemsTrashed(ctx context.Context) ([]Item, error) {
+	full, err := s.itemsFull(ctx, "", true)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Item, 0)
+	for _, it := range full {
+		if it.State == trashedState {
+			out = append(out, it.Item)
+		}
+	}
+	return out, nil
+}
+
 // itemsFull reads every item whole, which only a backup wants.
 //
 // The vaults are read at the same time and their items joined in the order the
@@ -615,8 +634,12 @@ func (s *Service) ItemCreate(ctx context.Context, shareID string, nc NewItem) (s
 	return itemID, nil
 }
 
-// activeState is what Proton calls an item that is not in the trash.
-const activeState = 1
+// activeState is what Proton calls an item that is not in the trash, and
+// trashedState what it calls one that is.
+const (
+	activeState  = 1
+	trashedState = 2
+)
 
 // contentFormatVersion is the version of the item protobuf this writes. It
 // travels with every item, so a reader knows how to take the content apart, and
@@ -940,7 +963,7 @@ func (s *Service) ItemDelete(ctx context.Context, shareID, itemID string) error 
 	if err := s.C.Decode(ctx, proton.Request{Method: "GET", Path: fmt.Sprintf("/pass/v1/share/%s/item/%s", shareID, itemID)}, &r); err != nil {
 		return err
 	}
-	if r.Item.State != 2 {
+	if r.Item.State != trashedState {
 		if err := s.ItemTrash(ctx, shareID, itemID); err != nil {
 			return err
 		}

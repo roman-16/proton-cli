@@ -90,7 +90,7 @@ func TestPassVaultSharingRoundTrip(t *testing.T) {
 		t.Errorf("the second account's export says nothing about the vault it does not own: %s", truncateOutput(note))
 	}
 
-	runOKPaid(t, "pass", "vaults", "share", "update", vault, secondaryEmail(), "--access", "manager")
+	runOKPaid(t, "pass", "vaults", "share", "update", "--access", "manager", vault, secondaryEmail())
 	if !strings.Contains(fmt.Sprintf("%v", runJSONPaid(t, "pass", "vaults", "share", "get", vault)["members"]), "manager") {
 		t.Error("the member's access did not change")
 	}

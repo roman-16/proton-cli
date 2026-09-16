@@ -55,7 +55,7 @@ lint:
     just web
     actionlint
     goreleaser check
-    shellcheck scripts/*.sh scripts/terminal-demo/*.sh
+    shellcheck scripts/*.sh scripts/terminal-demo/*.sh .agents/skills/*/scripts/*.sh
     golangci-lint run ./...
     GOOS=windows go build ./...
     GOOS=darwin go build ./...
@@ -170,7 +170,7 @@ test-fast:
 
 [doc("Run a single test (or a `|`-separated regex of test names)")]
 test-one pattern:
-    go test ./tests/live/ -v -count=1 -run '{{ pattern }}' -timeout 10m
+    go test ./tests/live/ -v -count=1 -run '{{ pattern }}' -timeout 45m
 
 # What one run reached is added to the recording rather than replacing it: a
 # subset cannot know that a line no longer belongs, so only the full `coverage`
@@ -182,7 +182,7 @@ coverage-one pattern:
     set -euo pipefail
     trace="${PROTON_CLI_TEST_TRACE:-/tmp/proton-cli-trace.jsonl}"
     PROTON_CLI_TEST_TRACE="$trace" PROTON_CLI_TEST_TRACE_REQUESTS=1 \
-        go test ./tests/live/ -v -count=1 -run '{{ pattern }}' -timeout 10m
+        go test ./tests/live/ -v -count=1 -run '{{ pattern }}' -timeout 45m
     reached=$(go run ./scripts/testreport --coverage "$trace")
     merged=$({ cat tests/api-coverage.golden; printf '%s\n' "$reached"; } | LC_ALL=C sort --unique)
     printf '%s\n' "$merged" > tests/api-coverage.golden

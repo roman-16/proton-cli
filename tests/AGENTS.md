@@ -11,7 +11,7 @@ just test         # that, then the live suite against all three accounts
 
 Nothing else decides a tier. A subscription is a property of an *account*, not of a question, so the tests that need one act as the paid account like any other and run in the same pass. There is no build tag, no `-run` filter, no "this needs a plan" skip.
 
-**An agent runs `just test-fast` and nothing else.** The live suite takes the best part of an hour, spends allowances Proton meters by the hour, and acts on real accounts - one of them somebody's own. When a change wants it, say so and why, and let the user decide.
+**An agent starts `just test-fast` by itself and nothing else.** The live suite takes the best part of an hour, spends allowances Proton meters by the hour, and acts on real accounts - one of them somebody's own. A live run is the user's decision, put to them through the `live-test` skill (`.agents/skills/live-test/SKILL.md`), which names the tests a change points at and starts nothing until they pick one.
 
 ## Layout
 
