@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -221,9 +222,11 @@ func TestAReadRidesOutAPassingServerFailure(t *testing.T) {
 func TestARequestOutOfTimeIsNotAskedAgain(t *testing.T) {
 	shrinkBackoff(t)
 
-	var asked int
+	// The handler outlives the request it is answering, so what it counts is
+	// read while it is still running.
+	var asked atomic.Int64
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		asked++
+		asked.Add(1)
 		time.Sleep(50 * time.Millisecond)
 		_, _ = w.Write([]byte(`{"Code":1000}`))
 	}))
@@ -239,8 +242,8 @@ func TestARequestOutOfTimeIsNotAskedAgain(t *testing.T) {
 	if !errors.As(err, &netErr) {
 		t.Fatalf("err = %v, want a network failure", err)
 	}
-	if asked != 1 {
-		t.Errorf("the request was made %d times, want once", asked)
+	if made := asked.Load(); made != 1 {
+		t.Errorf("the request was made %d times, want once", made)
 	}
 }
 

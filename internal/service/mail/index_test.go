@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
@@ -27,11 +28,15 @@ type mailbox struct {
 	messages []rawListMessage
 	bodies   map[string]string
 	events   map[string]string
+
+	// A build fetches bodies ten at a time, so both counters are written from
+	// several goroutines at once.
+	//
 	// pages counts the metadata requests, so a resumed build can be shown to
 	// have asked for what it did not have rather than for the whole mailbox.
-	pages int
+	pages atomic.Int64
 	// fetched counts the bodies asked for, which is the expensive half.
-	fetched int
+	fetched atomic.Int64
 }
 
 func newMailbox(t *testing.T, count int) *mailbox {
@@ -70,7 +75,7 @@ func (m *mailbox) Do(context.Context, proton.Request) (*proton.Response, error) 
 func (m *mailbox) Decode(_ context.Context, r proton.Request, out any) error {
 	switch {
 	case r.Path == "/mail/v4/messages":
-		m.pages++
+		m.pages.Add(1)
 		// Proton counts what the query covers, and a page anchored partway down
 		// the mailbox covers what is left from there.
 		from, page := m.page(r)
@@ -83,7 +88,7 @@ func (m *mailbox) Decode(_ context.Context, r proton.Request, out any) error {
 		if !ok {
 			return fmt.Errorf("no such message %q", id)
 		}
-		m.fetched++
+		m.fetched.Add(1)
 		return encodeInto(out, map[string]any{"Message": map[string]any{
 			"ID": id, "Body": body, "AddressID": "addr-1", "MIMEType": "text/plain",
 			"ToList": []map[string]any{{"Name": "Me", "Address": "me@proton.me"}},
@@ -200,8 +205,8 @@ func TestABuildCountsTheMailboxRatherThanThePageItIsOn(t *testing.T) {
 	if _, err := s.buildIndex(t.Context(), progress.Nop{}); err != nil {
 		t.Fatalf("build: %v", err)
 	}
-	if m.pages < 3 {
-		t.Fatalf("the walk took %d metadata requests; it has to span pages for this to mean anything", m.pages)
+	if pages := m.pages.Load(); pages < 3 {
+		t.Fatalf("the walk took %d metadata requests; it has to span pages for this to mean anything", pages)
 	}
 	status, err := s.index.Status(search.AppMail)
 	if err != nil {
@@ -231,7 +236,7 @@ func TestAnInterruptedBuildCarriesOnWhereItStopped(t *testing.T) {
 	if partial.Complete {
 		t.Fatal("a cancelled build marked the index complete")
 	}
-	firstPass := m.fetched
+	firstPass := m.fetched.Load()
 
 	s.C = m
 	if _, err := s.buildIndex(t.Context(), progress.Nop{}); err != nil {
@@ -244,9 +249,9 @@ func TestAnInterruptedBuildCarriesOnWhereItStopped(t *testing.T) {
 	if !status.Complete || status.Indexed != 6 {
 		t.Errorf("status = %+v, want all 6 indexed", status)
 	}
-	if m.fetched != 6 {
+	if fetched := m.fetched.Load(); fetched != 6 {
 		t.Errorf("bodies fetched = %d after %d before the interruption, want each fetched once",
-			m.fetched, firstPass)
+			fetched, firstPass)
 	}
 }
 
@@ -259,7 +264,7 @@ func TestASyncAppliesWhatTheFeedReports(t *testing.T) {
 	if _, err := s.buildIndex(t.Context(), progress.Nop{}); err != nil {
 		t.Fatalf("build: %v", err)
 	}
-	afterBuild := m.fetched
+	afterBuild := m.fetched.Load()
 
 	m.add(t, rawListMessage{
 		ID: "msg-new", ConversationID: "thread-new", Subject: "Subject msg-new",
@@ -278,8 +283,8 @@ func TestASyncAppliesWhatTheFeedReports(t *testing.T) {
 	if got.Indexed != 2 || got.Removed != 1 {
 		t.Errorf("sync = %+v, want 2 indexed and 1 removed", got)
 	}
-	if m.fetched != afterBuild+1 {
-		t.Errorf("bodies fetched = %d, want only the new message's", m.fetched-afterBuild)
+	if fetched := m.fetched.Load(); fetched != afterBuild+1 {
+		t.Errorf("bodies fetched = %d, want only the new message's", fetched-afterBuild)
 	}
 
 	in, err := s.indexRecords(t.Context())
