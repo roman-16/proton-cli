@@ -1,27 +1,25 @@
 {
   "updated_at": "2026-09-16T08:53:34.879709087Z",
+  "read_at": {
+    "audience": "2026-09-16T08:53:34.879709087Z",
+    "aur": "2026-09-16T08:53:34.879709087Z",
+    "counts": "2026-09-16T08:53:34.879709087Z",
+    "npm": "2026-09-16T08:53:34.879709087Z",
+    "packaging": "2026-09-13T08:34:57.095383505Z",
+    "traffic": "2026-09-16T08:53:34.879709087Z"
+  },
   "totals": {
     "downloads": 3521,
     "stars": 70,
     "forks": 10,
-    "latest": "3.7.0"
+    "latest": "4.1.0"
   },
   "downloads": [
     {
       "date": "2026-09-01",
-      "hours": 0.2756749722408333,
-      "update": 0,
-      "script": 0,
-      "other": 0,
-      "platform": {},
-      "version": {}
-    },
-    {
-      "date": "2026-09-02",
-      "hours": 16.281450139158057,
-      "update": 3,
-      "script": 0,
-      "other": 31,
+      "hours": 16.55712511139889,
+      "binary": 3,
+      "packaged": 31,
       "platform": {
         "darwin_amd64": 1,
         "darwin_arm64": 2,
@@ -41,11 +39,10 @@
       }
     },
     {
-      "date": "2026-09-03",
+      "date": "2026-09-02",
       "hours": 24.15889512841722,
-      "update": 10,
-      "script": 0,
-      "other": 85,
+      "binary": 10,
+      "packaged": 85,
       "platform": {
         "darwin_amd64": 1,
         "darwin_arm64": 2,
@@ -80,11 +77,10 @@
       }
     },
     {
-      "date": "2026-09-04",
+      "date": "2026-09-03",
       "hours": 23.927842963305,
-      "update": 21,
-      "script": 0,
-      "other": 96,
+      "binary": 21,
+      "packaged": 96,
       "platform": {
         "darwin_amd64": 2,
         "darwin_arm64": 4,
@@ -108,11 +104,10 @@
       }
     },
     {
-      "date": "2026-09-05",
+      "date": "2026-09-04",
       "hours": 23.6171624348125,
-      "update": 21,
-      "script": 0,
-      "other": 131,
+      "binary": 21,
+      "packaged": 131,
       "platform": {
         "darwin_amd64": 4,
         "darwin_arm64": 5,
@@ -151,11 +146,10 @@
       }
     },
     {
-      "date": "2026-09-06",
+      "date": "2026-09-05",
       "hours": 24.2811546658825,
-      "update": 29,
-      "script": 0,
-      "other": 175,
+      "binary": 29,
+      "packaged": 175,
       "platform": {
         "darwin_amd64": 6,
         "darwin_arm64": 7,
@@ -196,11 +190,10 @@
       }
     },
     {
-      "date": "2026-09-07",
+      "date": "2026-09-06",
       "hours": 24.51876739789389,
-      "update": 3,
-      "script": 0,
-      "other": 119,
+      "binary": 3,
+      "packaged": 119,
       "platform": {
         "darwin_arm64": 3,
         "linux_amd64": 9,
@@ -240,11 +233,10 @@
       }
     },
     {
-      "date": "2026-09-08",
+      "date": "2026-09-07",
       "hours": 23.6972186361625,
-      "update": 12,
-      "script": 0,
-      "other": 130,
+      "binary": 12,
+      "packaged": 130,
       "platform": {
         "darwin_amd64": 2,
         "darwin_arm64": 2,
@@ -287,11 +279,10 @@
       }
     },
     {
-      "date": "2026-09-09",
+      "date": "2026-09-08",
       "hours": 24.04394410463972,
-      "update": 10,
-      "script": 0,
-      "other": 109,
+      "binary": 10,
+      "packaged": 109,
       "platform": {
         "darwin_amd64": 4,
         "darwin_arm64": 3,
@@ -334,11 +325,10 @@
       }
     },
     {
-      "date": "2026-09-10",
+      "date": "2026-09-09",
       "hours": 24.02336328093639,
-      "update": 27,
-      "script": 0,
-      "other": 65,
+      "binary": 27,
+      "packaged": 65,
       "platform": {
         "darwin_amd64": 5,
         "darwin_arm64": 9,
@@ -381,11 +371,10 @@
       }
     },
     {
-      "date": "2026-09-11",
+      "date": "2026-09-10",
       "hours": 23.910295771301943,
-      "update": 29,
-      "script": 0,
-      "other": 132,
+      "binary": 29,
+      "packaged": 132,
       "platform": {
         "darwin_amd64": 4,
         "darwin_arm64": 6,
@@ -429,11 +418,10 @@
       }
     },
     {
-      "date": "2026-09-12",
+      "date": "2026-09-11",
       "hours": 23.809276667484443,
-      "update": 15,
-      "script": 0,
-      "other": 124,
+      "binary": 15,
+      "packaged": 124,
       "platform": {
         "darwin_amd64": 1,
         "darwin_arm64": 4,
@@ -477,11 +465,10 @@
       }
     },
     {
-      "date": "2026-09-13",
+      "date": "2026-09-12",
       "hours": 24.40688875416889,
-      "update": 21,
-      "script": 0,
-      "other": 58,
+      "binary": 21,
+      "packaged": 58,
       "platform": {
         "darwin_amd64": 2,
         "darwin_arm64": 2,
@@ -525,11 +512,10 @@
       }
     },
     {
-      "date": "2026-09-14",
+      "date": "2026-09-13",
       "hours": 24.7345940546975,
-      "update": 32,
-      "script": 0,
-      "other": 133,
+      "binary": 32,
+      "packaged": 133,
       "platform": {
         "darwin_amd64": 4,
         "darwin_arm64": 4,
@@ -573,11 +559,10 @@
       }
     },
     {
-      "date": "2026-09-15",
+      "date": "2026-09-14",
       "hours": 23.703508827443056,
-      "update": 14,
-      "script": 0,
-      "other": 24,
+      "binary": 14,
+      "packaged": 24,
       "platform": {
         "darwin_amd64": 2,
         "darwin_arm64": 4,
@@ -598,11 +583,10 @@
       }
     },
     {
-      "date": "2026-09-16",
+      "date": "2026-09-15",
       "hours": 23.872392763854446,
-      "update": 38,
-      "script": 0,
-      "other": 159,
+      "binary": 38,
+      "packaged": 159,
       "platform": {
         "darwin_amd64": 5,
         "darwin_arm64": 11,
@@ -2860,14 +2844,6 @@
     {
       "date": "2026-09-14",
       "count": 31
-    },
-    {
-      "date": "2026-09-15",
-      "count": 0
-    },
-    {
-      "date": "2026-09-16",
-      "count": 0
     }
   ],
   "npm_platforms": {
@@ -2985,13 +2961,11 @@
   "packaging": [
     {
       "repository": "aur",
-      "version": "3.7.0",
-      "status": "newest"
+      "version": "3.7.0"
     },
     {
       "repository": "nix_unstable",
-      "version": "2.2.3",
-      "status": "outdated"
+      "version": "2.2.3"
     }
   ],
   "aur": {
