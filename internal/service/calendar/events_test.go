@@ -3,6 +3,8 @@ package calendar
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"sort"
 	"strings"
 	"sync"
@@ -11,23 +13,31 @@ import (
 
 	"github.com/roman-16/proton-cli/internal/ical"
 	"github.com/roman-16/proton-cli/internal/proton"
+	"github.com/roman-16/proton-cli/internal/skip"
 )
 
 // windowDoer answers the events endpoint from a per-window fixture and records
-// which windows and pages were asked for.
+// which windows, spans and pages were asked for. A calendar named in failing
+// refuses every request, the way one deleted a moment ago does.
 type windowDoer struct {
-	mu     sync.Mutex
-	asked  []string
-	byType map[string][][]map[string]any
+	mu      sync.Mutex
+	asked   []string
+	spans   []string
+	byType  map[string][][]map[string]any
+	failing map[string]error
 }
 
 func (d *windowDoer) Do(context.Context, proton.Request) (*proton.Response, error) { return nil, nil }
 
 func (d *windowDoer) Decode(_ context.Context, r proton.Request, out any) error {
+	if err := d.failing[calendarOf(r)]; err != nil {
+		return err
+	}
 	typ := r.Query.Get("Type")
 	page := r.Query.Get("Page")
 	d.mu.Lock()
 	d.asked = append(d.asked, typ+"/"+page)
+	d.spans = append(d.spans, r.Query.Get("Start")+"-"+r.Query.Get("End"))
 	pages := d.byType[typ]
 	d.mu.Unlock()
 
@@ -66,8 +76,45 @@ func (d *windowDoer) askedFor() []string {
 	return out
 }
 
+// spansAsked are the distinct Start-End pairs the endpoint was asked for.
+func (d *windowDoer) spansAsked() []string {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	distinct := map[string]bool{}
+	for _, s := range d.spans {
+		distinct[s] = true
+	}
+	out := make([]string, 0, len(distinct))
+	for s := range distinct {
+		out = append(out, s)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// calendarOf is the calendar a request names.
+func calendarOf(r proton.Request) string {
+	return strings.TrimSuffix(strings.TrimPrefix(r.Path, "/calendar/v1/"), "/events")
+}
+
 func rawJSON(id string) map[string]any {
 	return map[string]any{"ID": id, "CalendarID": "cal1", "UID": "uid-" + id, "SharedEvents": []any{}}
+}
+
+// opened is a service whose calendars are already unlocked, which is what lets a
+// test about reading them run without a key hierarchy. A calendar mapped to an
+// error is one whose keys will not open.
+func opened(d proton.Doer, calendars map[string]error) *Service {
+	s := New(d, testKeys(nil))
+	for id, err := range calendars {
+		_, _ = s.unlocked.Do(id, func() (*calKeys, error) {
+			if err != nil {
+				return nil, err
+			}
+			return &calKeys{}, nil
+		})
+	}
+	return s
 }
 
 // Type is a two-by-two selector, not a kind of event. Asking only for the first
@@ -131,17 +178,91 @@ func TestRawEventsBetweenWalksEveryPage(t *testing.T) {
 	}
 }
 
-func TestRawEventsBetweenNeverSendsANegativeBound(t *testing.T) {
-	// The endpoint refuses a negative timestamp, and a zero time is what an unset
-	// range looks like.
-	d := &windowDoer{byType: map[string][][]map[string]any{}}
-	if _, err := New(d, testKeys(nil)).rawEventsBetween(context.Background(), "cal1", ical.Days(time.Time{}, time.Time{})); err != nil {
+// Proton refuses a range wider than it cares to answer, and a person asking about a
+// semester or a year has asked a fair question. The range is asked for a span at a
+// time, every span for all four windows, and the answers are one list.
+func TestRawEventsBetweenAsksEverySpanForAllFourWindows(t *testing.T) {
+	first := time.Date(2026, 9, 16, 0, 0, 0, 0, time.UTC)
+	w := ical.Days(first, first.AddDate(0, 0, 90))
+	d := &windowDoer{byType: map[string][][]map[string]any{
+		"0": {{rawJSON("a")}},
+		"1": {{rawJSON("b")}},
+	}}
+	got, err := New(d, testKeys(nil)).rawEventsBetween(context.Background(), "cal1", w)
+	if err != nil {
 		t.Fatal(err)
 	}
-	for _, a := range d.askedFor() {
-		if strings.Contains(a, "-") {
-			t.Errorf("asked with a negative bound: %s", a)
+	spans := fetchSpans(w)
+	if len(spans) < 2 {
+		t.Fatalf("a 91-day window was cut into %d span(s); the test needs more than one", len(spans))
+	}
+	if asked := d.spansAsked(); len(asked) != len(spans) {
+		t.Errorf("asked for %d distinct spans, want %d: %v", len(asked), len(spans), asked)
+	}
+	for _, sp := range spans {
+		want := fmt.Sprintf("%d-%d", sp.from.Unix(), sp.to.Unix())
+		if !contains(d.spansAsked(), want) {
+			t.Errorf("never asked for span %s; asked %v", want, d.spansAsked())
 		}
+	}
+	if asked := d.askedFor(); len(asked) != len(spans)*len(queryTypes) {
+		t.Errorf("made %d requests, want each span asked for all %d windows", len(asked), len(queryTypes))
+	}
+	if len(got) != 2 {
+		t.Errorf("got %d events, want an event answering every span reported once", len(got))
+	}
+}
+
+// Consecutive spans meet, none is wider than the endpoint accepts, and together
+// they are exactly the bounds - so nothing between them goes unasked and nothing
+// outside them is asked for.
+func TestFetchSpansCoverTheBoundsInRangesTheEndpointAccepts(t *testing.T) {
+	first := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	w := ical.Days(first, first.AddDate(1, 0, 0))
+	from, to := fetchBounds(w)
+	spans := fetchSpans(w)
+	if len(spans) == 0 {
+		t.Fatal("a year was cut into no spans at all")
+	}
+	if !spans[0].from.Equal(from) {
+		t.Errorf("the first span starts %s, want the bounds' start %s", spans[0].from, from)
+	}
+	if last := spans[len(spans)-1]; !last.to.Equal(to) {
+		t.Errorf("the last span ends %s, want the bounds' end %s", last.to, to)
+	}
+	for i, sp := range spans {
+		if width := sp.to.Sub(sp.from); width > fetchSpan || width <= 0 {
+			t.Errorf("span %d is %s wide, want within (0, %s]", i, width, fetchSpan)
+		}
+		if i > 0 && !sp.from.Equal(spans[i-1].to) {
+			t.Errorf("span %d starts %s, want where span %d ended, %s", i, sp.from, i-1, spans[i-1].to)
+		}
+	}
+}
+
+// A listing that names no days covers the next thirty, and it pays four requests
+// rather than eight: the span is wide enough for the default window plus the day
+// either side of it.
+func TestFetchSpansAskForADefaultListingAtOnce(t *testing.T) {
+	first, last := DefaultDays()
+	if spans := fetchSpans(ical.Days(first, last)); len(spans) != 1 {
+		t.Errorf("the default window was cut into %d spans, want 1", len(spans))
+	}
+}
+
+// The endpoint refuses a negative timestamp and nothing is stored before the
+// epoch, so a window reaching back past it is asked for from the epoch on.
+func TestFetchBoundsStartNoEarlierThanTheEpoch(t *testing.T) {
+	last := time.Date(1970, 1, 10, 0, 0, 0, 0, time.UTC)
+	from, to := fetchBounds(ical.Days(time.Date(1969, 12, 20, 0, 0, 0, 0, time.UTC), last))
+	if from.Unix() != 0 {
+		t.Errorf("asked from %d, want the epoch", from.Unix())
+	}
+	if want := last.AddDate(0, 0, 2); !to.Equal(want) {
+		t.Errorf("asked to %s, want %s", to, want)
+	}
+	if spans := fetchSpans(ical.Days(time.Time{}, time.Time{})); len(spans) != 0 {
+		t.Errorf("a window entirely before the epoch was cut into %d spans, want none to ask for", len(spans))
 	}
 }
 
@@ -157,6 +278,118 @@ func TestFetchBoundsReachADayPastTheWindow(t *testing.T) {
 	}
 	if want := first.AddDate(0, 0, 2); !to.Equal(want) {
 		t.Errorf("asked to %s, want %s", to, want)
+	}
+}
+
+// The list of calendars is eventually consistent, so one deleted a moment ago can
+// still be named. What the others hold is worth answering with - but a listing that
+// is short and says nothing is a wrong answer presented as a right one, so the
+// calendar left out is recorded.
+func TestReadCalendarsLeavesOutTheOneItCannotRead(t *testing.T) {
+	d := &windowDoer{
+		byType:  map[string][][]map[string]any{"0": {{rawJSON("a")}}},
+		failing: map[string]error{"cal2": errors.New("no such calendar")},
+	}
+	s := opened(d, map[string]error{"cal1": nil, "cal2": nil})
+	ctx, tally := skip.With(context.Background())
+
+	groups, err := s.readCalendars(ctx, []string{"cal1", "cal2"}, s.inWindow(someWindow()))
+	if err != nil {
+		t.Fatalf("one unreadable calendar emptied the answer: %v", err)
+	}
+	if len(groups) != 1 || len(groups[0]) != 1 {
+		t.Fatalf("read %d calendars, want the one that answered", len(groups))
+	}
+	if tally.Count() != 1 {
+		t.Errorf("counted %d skips, want the calendar that was left out", tally.Count())
+	}
+	if tally.Kind() != skip.KindCalendar {
+		t.Errorf("recorded a missing %q, want a calendar", tally.Kind())
+	}
+	if !tally.Hides() {
+		t.Error("a calendar went missing and nothing says its events went with it")
+	}
+}
+
+// Only when nothing could be read at all is the failure the answer, which is what
+// makes a single named calendar strict. Every failure is recorded on the way, since
+// the run reports one of them and the log is where the others survive.
+func TestReadCalendarsIsStrictWhenNothingCouldBeRead(t *testing.T) {
+	first, second := errors.New("first is gone"), errors.New("second is gone")
+	d := &windowDoer{
+		byType:  map[string][][]map[string]any{"0": {{rawJSON("a")}}},
+		failing: map[string]error{"cal1": first, "cal2": second},
+	}
+	s := opened(d, map[string]error{"cal1": nil, "cal2": nil})
+	ctx, tally := skip.With(context.Background())
+
+	if _, err := s.readCalendars(ctx, []string{"cal1"}, s.inWindow(someWindow())); !errors.Is(err, first) {
+		t.Errorf("the one calendar named failed and the answer was %v, want the failure", err)
+	}
+	_, err := s.readCalendars(ctx, []string{"cal2", "cal1"}, s.inWindow(someWindow()))
+	if !errors.Is(err, second) {
+		t.Errorf("reported %v, want the failure of the first calendar named", err)
+	}
+	if tally.Count() != 3 {
+		t.Errorf("counted %d skips, want every calendar that failed recorded", tally.Count())
+	}
+}
+
+// Which half failed is what the record says, so a report tells a calendar nobody
+// can open from one the server would not hand over.
+func TestReadCalendarsRecordsACalendarItCannotUnlock(t *testing.T) {
+	d := &windowDoer{byType: map[string][][]map[string]any{"0": {{rawJSON("a")}}}}
+	s := opened(d, map[string]error{"cal1": nil, "cal2": errors.New("the passphrase will not open")})
+	ctx, tally := skip.With(context.Background())
+
+	groups, err := s.readCalendars(ctx, []string{"cal1", "cal2"}, s.inWindow(someWindow()))
+	if err != nil {
+		t.Fatalf("one calendar that would not unlock emptied the answer: %v", err)
+	}
+	if len(groups) != 1 {
+		t.Fatalf("read %d calendars, want the one that opened", len(groups))
+	}
+	if tally.Count() != 1 || tally.Kind() != skip.KindCalendar {
+		t.Errorf("counted %d missing %q, want one calendar", tally.Count(), tally.Kind())
+	}
+}
+
+// Each calendar's events stay their own group: a series is expanded by UID, and the
+// same UID lives in two calendars whenever somebody holds both an invitation and
+// the organiser's shared copy.
+func TestReadCalendarsKeepsEachCalendarsEventsApart(t *testing.T) {
+	d := &windowDoer{byType: map[string][][]map[string]any{"0": {{rawJSON("a")}}}}
+	s := opened(d, map[string]error{"cal1": nil, "cal2": nil})
+
+	groups, err := s.readCalendars(context.Background(), []string{"cal1", "cal2"}, s.inWindow(someWindow()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(groups) != 2 {
+		t.Fatalf("two calendars answered and came back as %d group(s)", len(groups))
+	}
+}
+
+// An export leaves out an event it cannot decrypt, because a file is something
+// another client will trust. A file that is short says nothing about what is
+// missing from it, so the screen has to.
+func TestEventsExportRecordsAnEventItCannotRead(t *testing.T) {
+	d := &windowDoer{byType: map[string][][]map[string]any{"0": {{rawJSON("a"), rawJSON("b")}}}}
+	s := opened(d, map[string]error{"cal1": nil})
+	ctx, tally := skip.With(context.Background())
+
+	out, err := s.EventsExport(ctx, []string{"cal1"}, someWindow())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out) != 0 {
+		t.Fatalf("exported %d events nobody could read, want a file of what opened", len(out))
+	}
+	if tally.Count() != 2 {
+		t.Errorf("counted %d skips, want the two events left out of the file", tally.Count())
+	}
+	if tally.Kind() != skip.KindEvent {
+		t.Errorf("recorded a missing %q, want an event", tally.Kind())
 	}
 }
 

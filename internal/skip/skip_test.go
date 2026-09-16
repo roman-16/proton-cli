@@ -42,7 +42,7 @@ func TestTheFirstKindStandsForAllOfThem(t *testing.T) {
 }
 
 func TestAContainerSaysItTookThingsWithIt(t *testing.T) {
-	for _, kind := range []Kind{KindFolder, KindShare, KindVault} {
+	for _, kind := range []Kind{KindCalendar, KindFolder, KindShare, KindVault} {
 		ctx, tally := With(context.Background())
 		Record(ctx, kind, "abc", Unlockable, nil)
 		if !tally.Hides() {

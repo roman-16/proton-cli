@@ -503,6 +503,38 @@ func TestCalendarListIncludesTheLastDayNamed(t *testing.T) {
 	}
 }
 
+// Proton answers the events endpoint for a few weeks at a time and refuses a range
+// of months, and a person asking about a semester has asked a fair question. The
+// listing is what the days named hold, however many: an event at either end of a
+// four-month window is on it, once.
+func TestCalendarListCoversMoreDaysThanProtonAnswersAtOnce(t *testing.T) {
+	prefix := testID() + "-wide"
+	ends := []struct{ name, day string }{
+		{name: "early", day: "2027-09-02"},
+		{name: "late", day: "2027-12-28"},
+	}
+	for _, end := range ends {
+		ref := strings.TrimSpace(runOK(t, "calendar", "events", "create",
+			"--calendar", "Default", "--title", prefix+"-"+end.name,
+			"--start", end.day+"T10:00", "--duration", "1h"))
+		cleanupRun(t, fmt.Sprintf("Delete event: proton calendar events delete -- %s", ref),
+			"calendar", "events", "delete", "--", ref)
+	}
+
+	rows := occurrencesOf(t, prefix, "2027-09-01", "2027-12-31")
+	if len(rows) != 2 {
+		t.Fatalf("a four-month window listed %d rows of the two events in it, want both once: %+v", len(rows), rows)
+	}
+	for _, end := range ends {
+		if !slices.ContainsFunc(rows, func(row map[string]interface{}) bool {
+			title, _ := row["title"].(string)
+			return title == prefix+"-"+end.name
+		}) {
+			t.Errorf("the %s event is not on the listing", end.name)
+		}
+	}
+}
+
 // Proton reads an absent reminder list as "use the calendar's defaults", so
 // sending one on every write silently resets whatever the event had. 42 minutes is
 // a value no default uses.

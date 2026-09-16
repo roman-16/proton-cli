@@ -80,9 +80,10 @@ const (
 // express, because what was inside is exactly what could not be read. The
 // warning has to say so instead of reporting one.
 var Hides = map[Kind]bool{
-	KindFolder: true,
-	KindShare:  true,
-	KindVault:  true,
+	KindCalendar: true,
+	KindFolder:   true,
+	KindShare:    true,
+	KindVault:    true,
 }
 
 // Tally counts what one invocation could not show.

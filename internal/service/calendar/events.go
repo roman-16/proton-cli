@@ -19,6 +19,7 @@ import (
 	"github.com/roman-16/proton-cli/internal/ical"
 	"github.com/roman-16/proton-cli/internal/proton"
 	"github.com/roman-16/proton-cli/internal/ref"
+	"github.com/roman-16/proton-cli/internal/skip"
 	"github.com/roman-16/proton-cli/internal/units"
 )
 
@@ -196,8 +197,25 @@ func (s *Service) decrypt(ctx context.Context, ck *calKeys, raw rawEvent) stored
 	return stored{raw: raw, model: model, sig: sig, readErr: err}
 }
 
-// EventsList returns everything the window covers on the given calendars,
-// expanding each series into the occurrences that fall in it.
+// eventFetch is how one calendar's events are asked for: the ones a window
+// covers, or every one it holds where the question is about words rather than
+// days.
+type eventFetch func(ctx context.Context, calendarID string) ([]rawEvent, error)
+
+// inWindow fetches what a window covers, which is what a listing and an export
+// each want of every calendar they name.
+func (s *Service) inWindow(w ical.Window) eventFetch {
+	return func(ctx context.Context, calendarID string) ([]rawEvent, error) {
+		return s.rawEventsBetween(ctx, calendarID, w)
+	}
+}
+
+// readCalendars opens the named calendars at the same time and reads what each
+// one holds, keeping every calendar's events their own group.
+//
+// Groups rather than one list, because a series is expanded by UID and the same
+// UID lives in two calendars whenever somebody holds both an invitation and the
+// organiser's shared copy: flattening first would leave one of them out.
 //
 // A calendar that cannot be read is left out rather than allowed to empty the
 // answer: the list of calendars is eventually consistent, so one that was deleted
@@ -205,36 +223,84 @@ func (s *Service) decrypt(ctx context.Context, ck *calKeys, raw rawEvent) stored
 // answering from the ones that are there. Only when nothing could be read at all
 // is that reported - which is also what makes a single named calendar strict,
 // since then the one failure is the only one.
-func (s *Service) EventsList(ctx context.Context, calendarIDs []string, w ical.Window) ([]Event, error) {
-	var (
-		mu    sync.Mutex
-		wg    sync.WaitGroup
-		out   []Event
-		first error
-		read  int
-	)
-	for _, calID := range calendarIDs {
+func (s *Service) readCalendars(ctx context.Context, calendarIDs []string, events eventFetch) ([][]stored, error) {
+	answers := make([][]stored, len(calendarIDs))
+	failures := make([]error, len(calendarIDs))
+	var wg sync.WaitGroup
+	for i, calendarID := range calendarIDs {
 		wg.Add(1)
-		go func(calID string) {
+		go func() {
 			defer wg.Done()
-			events, err := s.calendarEvents(ctx, calID, w)
-			mu.Lock()
-			defer mu.Unlock()
-			if err != nil {
-				if first == nil {
-					first = err
-				}
-				slog.Debug("calendar: skipped a calendar that could not be read",
-					"calendar", calID, "error", err)
-				return
-			}
-			read++
-			out = append(out, events...)
-		}(calID)
+			answers[i], failures[i] = s.readCalendar(ctx, calendarID, events)
+		}()
 	}
 	wg.Wait()
-	if read == 0 && first != nil {
+
+	out := make([][]stored, 0, len(calendarIDs))
+	var first error
+	for i := range calendarIDs {
+		if failures[i] != nil {
+			// Recorded by readCalendar, where which half failed is still known.
+			if first == nil {
+				first = failures[i]
+			}
+			continue
+		}
+		out = append(out, answers[i])
+	}
+	if len(out) == 0 && first != nil {
 		return nil, first
+	}
+	return out, nil
+}
+
+// readCalendar opens one calendar and reads the events it holds.
+//
+// The keys and the events are asked for at the same time: the calendar ID names
+// both, so neither request needs the other's answer - only the decryption between
+// them does. Which of the two failed is what the record says, so a report tells a
+// calendar nobody can open from one the server would not hand over.
+func (s *Service) readCalendar(ctx context.Context, calendarID string, events eventFetch) ([]stored, error) {
+	var (
+		ck      *calKeys
+		raws    []rawEvent
+		keysErr error
+	)
+	if err := fetch.Together(ctx,
+		func(ctx context.Context) error {
+			ck, keysErr = s.unlockCalendar(ctx, calendarID)
+			return keysErr
+		},
+		func(ctx context.Context) error {
+			var err error
+			raws, err = events(ctx, calendarID)
+			return err
+		},
+	); err != nil {
+		reason := skip.Unreadable
+		if keysErr != nil {
+			reason = skip.Unlockable
+		}
+		skip.Record(ctx, skip.KindCalendar, calendarID, reason, err)
+		return nil, err
+	}
+	out := make([]stored, 0, len(raws))
+	for _, raw := range raws {
+		out = append(out, s.decrypt(ctx, ck, raw))
+	}
+	return out, nil
+}
+
+// EventsList returns everything the window covers on the given calendars,
+// expanding each series into the occurrences that fall in it.
+func (s *Service) EventsList(ctx context.Context, calendarIDs []string, w ical.Window) ([]Event, error) {
+	groups, err := s.readCalendars(ctx, calendarIDs, s.inWindow(w))
+	if err != nil {
+		return nil, err
+	}
+	var out []Event
+	for _, events := range groups {
+		out = append(out, expand(events, w)...)
 	}
 	slices.SortStableFunc(out, func(a, b Event) int {
 		if c := a.Start.Compare(b.Start); c != 0 {
@@ -245,37 +311,26 @@ func (s *Service) EventsList(ctx context.Context, calendarIDs []string, w ical.W
 	return out, nil
 }
 
-func (s *Service) calendarEvents(ctx context.Context, calendarID string, w ical.Window) ([]Event, error) {
-	ck, err := s.unlockCalendar(ctx, calendarID)
-	if err != nil {
-		return nil, err
-	}
-	raws, err := s.rawEventsBetween(ctx, calendarID, w)
-	if err != nil {
-		return nil, err
-	}
-	events := make([]stored, 0, len(raws))
-	for _, raw := range raws {
-		events = append(events, s.decrypt(ctx, ck, raw))
-	}
-	return expand(events, w), nil
-}
-
-// rawEventsBetween asks for all four windows and pages each one.
+// rawEventsBetween asks for all four windows over every span of the range, and
+// pages each one.
 //
-// The four are independent queries over the same range, so they run together:
-// serialising them would quadruple the wall-clock of a call that is already
-// waiting on the network. An event can legitimately answer more than one of them,
-// so the union is deduplicated.
+// The queries are independent asks over the same calendar, so they run together:
+// serialising them would multiply the wall-clock of a call that is already waiting
+// on the network. An event can legitimately answer more than one of them - a
+// series both starts in the range and reaches into it, and an event on the seam
+// between two spans touches both - so the union is deduplicated.
 func (s *Service) rawEventsBetween(ctx context.Context, calendarID string, w ical.Window) ([]rawEvent, error) {
-	from, to := fetchBounds(w)
-	byType := make([][]rawEvent, len(queryTypes))
-	queries := make([]func(context.Context) error, len(queryTypes))
-	for i, typ := range queryTypes {
-		queries[i] = func(ctx context.Context) error {
-			page, err := s.rawEventsOfType(ctx, calendarID, from, to, typ)
-			byType[i] = page
-			return err
+	spans := fetchSpans(w)
+	answers := make([][]rawEvent, len(spans)*len(queryTypes))
+	queries := make([]func(context.Context) error, 0, len(answers))
+	for _, sp := range spans {
+		for _, typ := range queryTypes {
+			i := len(queries)
+			queries = append(queries, func(ctx context.Context) error {
+				var err error
+				answers[i], err = s.rawEventsOfType(ctx, calendarID, sp.from, sp.to, typ)
+				return err
+			})
 		}
 	}
 	if err := fetch.Together(ctx, queries...); err != nil {
@@ -284,8 +339,8 @@ func (s *Service) rawEventsBetween(ctx context.Context, calendarID string, w ica
 
 	var out []rawEvent
 	seen := map[string]bool{}
-	for _, page := range byType {
-		for _, e := range page {
+	for _, answer := range answers {
+		for _, e := range answer {
 			if seen[e.ID] {
 				continue
 			}
@@ -297,22 +352,58 @@ func (s *Service) rawEventsBetween(ctx context.Context, calendarID string, w ica
 }
 
 // fetchBounds are the instants the events endpoint is asked for: the window, a day
-// wider at each end.
+// wider at each end, and nothing before the epoch.
 //
 // Wider on purpose. An all-day event names a date rather than an instant, so Proton
 // holds it at an instant up to a day from the day it belongs to here, and the
 // endpoint's own idea of which events touch the edge of a range is not this CLI's.
 // What is fetched only has to contain the answer; the window decides it.
+//
+// The endpoint refuses a negative timestamp, and nothing is stored before the
+// epoch, so a range is cut there rather than asked for.
 func fetchBounds(w ical.Window) (from, to time.Time) {
 	first, until := w.Bounds()
-	return first.AddDate(0, 0, -1), until.AddDate(0, 0, 1)
+	from, to = first.AddDate(0, 0, -1), until.AddDate(0, 0, 1)
+	if from.Unix() < 0 {
+		from = time.Unix(0, 0)
+	}
+	if to.Before(from) {
+		to = from
+	}
+	return from, to
+}
+
+// fetchSpan is the widest range the events endpoint is asked for at once.
+//
+// Proton refuses a range it considers too wide, at a width it does not publish;
+// three months is already too many. Six weeks is the widest range Proton's own
+// calendar asks for - a month view's grid - so it is one the endpoint has to keep
+// answering.
+const fetchSpan = 42 * 24 * time.Hour
+
+// span is one stretch of instants the endpoint is asked for.
+type span struct{ from, to time.Time }
+
+// fetchSpans cuts the instants the endpoint is asked for into ranges it accepts.
+// Consecutive spans meet, so nothing between the bounds goes unasked.
+func fetchSpans(w ical.Window) []span {
+	from, to := fetchBounds(w)
+	var out []span
+	for start := from; start.Before(to); start = start.Add(fetchSpan) {
+		end := start.Add(fetchSpan)
+		if end.After(to) {
+			end = to
+		}
+		out = append(out, span{from: start, to: end})
+	}
+	return out
 }
 
 func (s *Service) rawEventsOfType(ctx context.Context, calendarID string, from, to time.Time, typ string) ([]rawEvent, error) {
 	return proton.All(ctx, func(ctx context.Context, page int) ([]rawEvent, bool, error) {
 		q := url.Values{}
-		q.Set("Start", fmt.Sprintf("%d", max(from.Unix(), 0)))
-		q.Set("End", fmt.Sprintf("%d", max(to.Unix(), 0)))
+		q.Set("Start", fmt.Sprintf("%d", from.Unix()))
+		q.Set("End", fmt.Sprintf("%d", to.Unix()))
 		// UTC, because that is the frame in which a full-day event's cleartext times
 		// are the dates it names.
 		q.Set("Timezone", "UTC")
@@ -986,53 +1077,29 @@ func triggerDuration(trigger string) time.Duration {
 // could put it back.
 //
 // An event that cannot be decrypted is left out rather than written as a stub,
-// because a file is something another client will trust.
+// because a file is something another client will trust - and recorded, because a
+// file that is short says nothing about what is missing from it.
 func (s *Service) EventsExport(ctx context.Context, calendarIDs []string, w ical.Window) ([]ical.VEvent, error) {
-	var out []ical.VEvent
-	var first error
-	read := 0
-	for _, calID := range calendarIDs {
-		events, err := s.calendarExport(ctx, calID, w)
-		if err != nil {
-			if first == nil {
-				first = err
-			}
-			slog.Debug("calendar: skipped a calendar that could not be exported",
-				"calendar", calID, "error", err)
-			continue
-		}
-		read++
-		out = append(out, events...)
+	groups, err := s.readCalendars(ctx, calendarIDs, s.inWindow(w))
+	if err != nil {
+		return nil, err
 	}
-	if read == 0 && first != nil {
-		return nil, first
+	var out []ical.VEvent
+	for _, events := range groups {
+		for _, e := range events {
+			if e.readErr != nil {
+				skip.Record(ctx, skip.KindEvent, e.raw.ID, skip.Undecryptable, e.readErr)
+				continue
+			}
+			v := e.model
+			v.Alarms = alarmsOf(e.raw)
+			v.Color = e.raw.ownColor()
+			out = append(out, v)
+		}
 	}
 	slices.SortStableFunc(out, func(a, b ical.VEvent) int {
 		return a.Start.Time.Compare(b.Start.Time)
 	})
-	return out, nil
-}
-
-func (s *Service) calendarExport(ctx context.Context, calendarID string, w ical.Window) ([]ical.VEvent, error) {
-	ck, err := s.unlockCalendar(ctx, calendarID)
-	if err != nil {
-		return nil, err
-	}
-	raws, err := s.rawEventsBetween(ctx, calendarID, w)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]ical.VEvent, 0, len(raws))
-	for _, raw := range raws {
-		e := s.decrypt(ctx, ck, raw)
-		if e.readErr != nil {
-			continue
-		}
-		v := e.model
-		v.Alarms = alarmsOf(raw)
-		v.Color = e.raw.ownColor()
-		out = append(out, v)
-	}
 	return out, nil
 }
 

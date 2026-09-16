@@ -207,10 +207,12 @@ func (s *Service) indexCalendar(ctx context.Context, log *search.Log, calendarID
 
 // everyEvent is every event a calendar holds, page by page.
 //
-// A listing asks for a range, and Proton refuses one that spans years: the
-// endpoint is built to answer "what touches these days". Asked with no range at
-// all it enumerates the calendar instead, which is what an export does and what
-// an index is - the whole thing, once, rather than a window at a time.
+// A listing names days, and the endpoint refuses a range much wider than a
+// month: it is built to answer "what touches these days", so a listing pays a
+// request per span of the range it covers. Asked with no range at all the
+// endpoint enumerates the calendar instead, which is what an index is and what a
+// search costs without one - the whole thing, once, rather than a window at a
+// time.
 func (s *Service) everyEvent(ctx context.Context, calendarID string) ([]rawEvent, error) {
 	return proton.All(ctx, func(ctx context.Context, page int) ([]rawEvent, bool, error) {
 		q := url.Values{}
@@ -481,33 +483,13 @@ func (s *Service) EventsSearch(ctx context.Context, calendarIDs []string, w ical
 // everyStoredEvent reads every event of the named calendars from Proton, which
 // is what a search costs where nothing is indexed.
 func (s *Service) everyStoredEvent(ctx context.Context, calendarIDs []string) ([]stored, error) {
-	var out []stored
-	var first error
-	read := 0
-	for _, calID := range calendarIDs {
-		ck, err := s.unlockCalendar(ctx, calID)
-		if err != nil {
-			skip.Record(ctx, skip.KindCalendar, calID, skip.Unlockable, err)
-			if first == nil {
-				first = err
-			}
-			continue
-		}
-		raws, err := s.everyEvent(ctx, calID)
-		if err != nil {
-			skip.Record(ctx, skip.KindCalendar, calID, skip.Unreadable, err)
-			if first == nil {
-				first = err
-			}
-			continue
-		}
-		read++
-		for _, raw := range raws {
-			out = append(out, s.decrypt(ctx, ck, raw))
-		}
+	groups, err := s.readCalendars(ctx, calendarIDs, s.everyEvent)
+	if err != nil {
+		return nil, err
 	}
-	if read == 0 && first != nil {
-		return nil, first
+	var out []stored
+	for _, events := range groups {
+		out = append(out, events...)
 	}
 	return out, nil
 }
