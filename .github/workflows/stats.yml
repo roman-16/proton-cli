@@ -16,9 +16,11 @@ name: Stats
 # recording everything except the part that expires.
 on:
   schedule:
-    # 04:00 UTC: 06:00 CEST in summer, 05:00 CET in winter. Cron is UTC-only and
-    # cannot follow DST, so this is a slot that stays overnight all year.
-    - cron: "0 4 * * *"
+    # Midnight UTC, so a run covers a calendar day. GitHub starts a scheduled
+    # job whenever it has room, which at this hour is often hours late; a
+    # download row is named for the day its interval began, so the delay moves
+    # nothing out of the day it belongs to.
+    - cron: "0 0 * * *"
   workflow_dispatch:
 
 # One writer to the data branch. A queued run has nothing new to say that a

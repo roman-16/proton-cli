@@ -50,9 +50,8 @@ import Footer from "../components/Footer.astro";
   type DownloadDay = {
     date: string;
     hours: number;
-    update: number;
-    script: number;
-    other: number;
+    binary: number;
+    packaged: number;
     platform: Record<string, number>;
     version: Record<string, number>;
   };
@@ -64,9 +63,10 @@ import Footer from "../components/Footer.astro";
     visitors: number;
   };
   type Source = { name: string; count: number; uniques: number };
-  type Packaged = { repository: string; version: string; status: string };
+  type Distribution = { repository: string; version: string };
   type Stats = {
     updated_at: string;
+    read_at: Record<string, string>;
     totals: { downloads: number; stars: number; forks: number; latest: string };
     downloads: DownloadDay[];
     traffic: TrafficDay[];
@@ -77,14 +77,13 @@ import Footer from "../components/Footer.astro";
     npm_platforms: Record<string, number>;
     referrers: Source[];
     paths: Source[];
-    packaging: Packaged[];
+    packaging: Distribution[];
     aur: { votes: number; popularity: number };
   };
 
   const channels = [
-    { key: "script", label: "Install script" },
-    { key: "other", label: "Package managers and direct" },
-    { key: "update", label: "Self-updates" },
+    { key: "binary", label: "Install script or self-update" },
+    { key: "packaged", label: "Package manager or archive" },
   ] as const;
 
   const number = new Intl.NumberFormat("en");
@@ -120,10 +119,10 @@ import Footer from "../components/Footer.astro";
     return from.toISOString().slice(0, 10);
   };
 
+  const total = (row: DownloadDay) => row.binary + row.packaged;
+
   const sum = (rows: DownloadDay[], from: string) =>
-    rows
-      .filter((row) => row.date >= from)
-      .reduce((total, row) => total + row.script + row.other + row.update, 0);
+    rows.filter((row) => row.date >= from).reduce((all, row) => all + total(row), 0);
 
   const tally = (rows: DownloadDay[], from: string, field: "platform" | "version") => {
     const totals: Record<string, number> = {};
@@ -142,6 +141,15 @@ import Footer from "../components/Footer.astro";
     return node;
   };
 
+  /* A source that could not be read leaves its last reading standing, which is
+   * right up until the page shows it as though it were today's. */
+  const asOf = (data: Stats, source: string) => {
+    const read = data.read_at?.[source];
+    if (!read) return "";
+    if (Date.parse(data.updated_at) - Date.parse(read) < 864e5) return "";
+    return ` Last reachable ${read.slice(0, 10)} - this is that reading.`;
+  };
+
   /* Bars rather than an area, because each day is a separate count rather than
    * a reading of something continuous, and a line between two of them would
    * draw values that were never measured.
@@ -158,7 +166,7 @@ import Footer from "../components/Footer.astro";
       role: "img",
       "aria-label": "Downloads per day, by channel",
     });
-    const peak = Math.max(1, ...rows.map((r) => perDay(r, r.script + r.other + r.update)));
+    const peak = Math.max(1, ...rows.map((r) => perDay(r, total(r))));
     const slot = width / span;
     const start = Date.parse(`${since(span - 1)}T00:00:00Z`);
 
@@ -183,9 +191,9 @@ import Footer from "../components/Footer.astro";
           }),
         );
       }
-      const total = Math.round(perDay(row, row.script + row.other + row.update));
+      const counted = Math.round(perDay(row, total(row)));
       const label = svg("title", {});
-      label.textContent = `${row.date}: ${total} download${total === 1 ? "" : "s"}`;
+      label.textContent = `${row.date}: ${counted} download${counted === 1 ? "" : "s"}`;
       column.append(label);
       chart.append(column);
     }
@@ -312,7 +320,19 @@ import Footer from "../components/Footer.astro";
         ),
       );
     } else {
-      downloads.append(bars(recent, span), axis(span), legend(), figures(data.downloads));
+      downloads.append(
+        bars(recent, span),
+        axis(span),
+        legend(),
+        el(
+          "p",
+          "note",
+          "The install script and a self-update fetch the same file, so they cannot be told " +
+            "apart, and a binary downloaded by hand lands there too. The AUR, Homebrew and " +
+            "winget fetch the versioned archive, as does anyone downloading one.",
+        ),
+        figures(data.downloads),
+      );
     }
     root.append(downloads);
 
@@ -334,7 +354,8 @@ import Footer from "../components/Footer.astro";
     if (window && window.views + window.clones > 0) {
       const audience = section(
         "Repository visitors",
-        "Last 14 days, as GitHub counts them: someone who came back on a later day is still one person, so these are smaller than the daily figures added together.",
+        "Last 14 days, as GitHub counts them: someone who came back on a later day is still one person, so these are smaller than the daily figures added together." +
+          asOf(data, "traffic"),
       );
       audience.append(
         table(
@@ -349,9 +370,9 @@ import Footer from "../components/Footer.astro";
     }
 
     const arrivals = el("div", "columns");
-    const from = section("Where people arrive from", "Last 14 days");
+    const from = section("Where people arrive from", `Last 14 days.${asOf(data, "audience")}`);
     from.append(ranked(data.referrers.map((r) => [r.name, r.uniques] as [string, number])));
-    const read = section("What they read", "Last 14 days");
+    const read = section("What they read", `Last 14 days.${asOf(data, "audience")}`);
     read.append(
       ranked(
         data.paths.map(
@@ -363,33 +384,46 @@ import Footer from "../components/Footer.astro";
     root.append(arrivals);
 
     if (data.packaging.length > 0) {
-      const packaged = section(
+      const distributions = section(
         "Packaged in",
-        "Via Repology. A version behind the newest release means that distribution's users are on older code.",
+        "Via Repology. A version behind the newest release means that distribution's users are on older code." +
+          asOf(data, "packaging"),
       );
-      packaged.append(
+      distributions.append(
         table(
-          data.packaging.map((p) => [p.repository, p.version, p.status]),
+          data.packaging.map((p) => [
+            p.repository,
+            p.version,
+            p.version === data.totals.latest ? "current" : "behind",
+          ]),
           ["Repository", "Version", "State"],
         ),
       );
-      packaged.append(
+      distributions.append(
         el(
           "p",
           "note",
-          `AUR: ${data.aur.votes} vote${data.aur.votes === 1 ? "" : "s"}, popularity ${data.aur.popularity.toFixed(2)}.`,
+          `AUR: ${data.aur.votes} vote${data.aur.votes === 1 ? "" : "s"}, popularity ${data.aur.popularity.toFixed(2)}.${asOf(data, "aur")}`,
         ),
       );
-      root.append(packaged);
+      root.append(distributions);
     }
 
-    const npmRecent = data.npm.slice(-30).reduce((total, d) => total + d.count, 0);
+    const counted = data.npm.at(-1)?.date;
+    const npmRecent = data.npm.slice(-30).reduce((all, d) => all + d.count, 0);
     const npm = section(
       "npm",
-      "Counted apart from everything above, and never added into it. npm reports registry requests rather than installs, and mirrors re-fetch packages continuously. The six platform packages are mutually exclusive - an install pulls exactly one of them - so whatever the six have in common is machinery rather than people.",
+      "Counted apart from everything above, and never added into it. npm reports registry requests rather than installs, and mirrors re-fetch packages continuously. The six platform packages are mutually exclusive - an install pulls exactly one of them - so whatever the six have in common is machinery rather than people." +
+        asOf(data, "npm"),
     );
     npm.append(
-      el("p", "figure-inline", `${number.format(npmRecent)} requests in the last 30 days`),
+      el(
+        "p",
+        "figure-inline",
+        counted
+          ? `${number.format(npmRecent)} requests in the 30 days to ${counted}`
+          : "Nothing recorded yet.",
+      ),
       ranked(Object.entries(data.npm_platforms).sort(([, a], [, b]) => b - a)),
     );
     root.append(npm);
@@ -455,16 +489,12 @@ import Footer from "../components/Footer.astro";
     overflow: visible;
   }
 
-  .stats :global(.bar-script) {
+  .stats :global(.bar-binary) {
     fill: var(--proton-purple);
   }
 
-  .stats :global(.bar-other) {
-    fill: color-mix(in oklab, var(--proton-purple) 55%, transparent);
-  }
-
-  .stats :global(.bar-update) {
-    fill: color-mix(in oklab, var(--proton-purple) 25%, transparent);
+  .stats :global(.bar-packaged) {
+    fill: color-mix(in oklab, var(--proton-purple) 45%, transparent);
   }
 
   .stats :global(.line) {
@@ -507,12 +537,8 @@ import Footer from "../components/Footer.astro";
     background: var(--proton-purple);
   }
 
-  .stats :global(.swatch-other) {
-    background: color-mix(in oklab, var(--proton-purple) 55%, transparent);
-  }
-
-  .stats :global(.swatch-update) {
-    background: color-mix(in oklab, var(--proton-purple) 25%, transparent);
+  .stats :global(.swatch-packaged) {
+    background: color-mix(in oklab, var(--proton-purple) 45%, transparent);
   }
 
   .stats :global(.figures) {
