@@ -38,28 +38,33 @@ func convListCmd() *cobra.Command {
 		Short: "List threads in a folder",
 		Long: "List threads in a folder.\n\n" +
 			"Takes the same filters as the verbs that organise threads, so you can\n" +
-			"preview a selection here before acting on it. Text filters go through\n" +
-			"Proton's index, which lags a change by a few seconds.\n\n" +
+			"preview a selection here before acting on it. A text filter goes through\n" +
+			"Proton's own index, which lags a change by a few seconds, or through the\n" +
+			"copy `index create mail` builds, which also reads bodies.\n\n" +
 			"Looks in the inbox unless told otherwise. Use --folder all to search\n" +
 			"everything.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
-			opts, err := f.list()
+			opts, err := f.list(c.Ctx, c)
 			if err != nil {
 				return err
 			}
-			convs, total, err := c.App.Mail.ConversationsList(c.Ctx, opts)
+			convs, total, cover, err := c.App.Mail.SearchConversations(c.Ctx, opts)
 			if err != nil {
 				return err
 			}
-			convs = keepStarred(convs, f.starred)
-			if len(convs) == 0 {
-				addressOnlyHint(c, opts.Keyword, opts.From, opts.To)
-			}
-			return kit.List(c, ui.TableSpec[mailsvc.Conversation]{
+			if err := kit.List(c, ui.TableSpec[mailsvc.Conversation]{
 				Noun: "conversations", Columns: conversationColumns(),
 				Total: f.total(total, len(convs)), Page: opts.Page, PageSize: opts.PageSize,
 				Filtered: f.narrowed(),
-			}, convs)
+			}, convs); err != nil {
+				return err
+			}
+			if len(convs) == 0 {
+				unsearchedBodies(c, cover, opts)
+				addressOnlyHint(c, cover, opts)
+			}
+			shortIndex(c, cover)
+			return nil
 		}),
 	}
 	f.registerNarrowing(c, "inbox")

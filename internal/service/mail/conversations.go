@@ -32,6 +32,9 @@ func toConversation(c rawConversation) Conversation {
 }
 
 func (s *Service) ConversationsList(ctx context.Context, opts ListOptions) ([]Conversation, int, error) {
+	if opts.Starred {
+		return starredOnly(ctx, opts, s.ConversationsList, func(c Conversation) []string { return c.Labels })
+	}
 	q := listQuery(opts, true)
 	return window(ctx, opts.Page, opts.PageSize, func(ctx context.Context, page, size int) ([]Conversation, int, error) {
 		q.Set("Page", fmt.Sprintf("%d", page))

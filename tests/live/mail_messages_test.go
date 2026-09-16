@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/roman-16/proton-cli/tests/account"
 )
 
 // Messages: listing them, finding one, reading it, and moving it about.
@@ -302,6 +304,67 @@ func TestMailMessagesMarkLegitimate(t *testing.T) {
 	if legitimate, _ := msg["marked_legitimate"].(bool); !legitimate {
 		t.Errorf("marked_legitimate = %v, want true after mark legitimate", msg["marked_legitimate"])
 	}
+}
+
+// --starred is a filter, not a folder, so it narrows whatever else was asked
+// for - and every row it answers with carries the star.
+//
+// The second half is what makes this worth a live test: a predicate the server
+// quietly dropped would answer with the whole folder, and every row of it would
+// look like a match.
+func TestMailMessagesListStarredFilter(t *testing.T) {
+	msgID := mutableMail(t)
+	runOK(t, "mail", "messages", "star", "--", msgID)
+	cleanupRun(t, "Unstar: proton mail messages unstar "+msgID,
+		"mail", "messages", "unstar", "--", msgID)
+
+	data := runJSON(t, "mail", "messages", "list", "--starred", "--folder", "all", "--limit", "50")
+	msgs, _ := data["messages"].([]interface{})
+	found := false
+	for _, row := range msgs {
+		m := row.(map[string]interface{})
+		if m["id"] == msgID {
+			found = true
+		}
+		if !starred(m) {
+			t.Errorf("--starred answered with %v, which carries no star", m["id"])
+		}
+	}
+	if !found {
+		t.Error("--starred did not answer with the message that was just starred")
+	}
+}
+
+func starred(m map[string]interface{}) bool {
+	labels, _ := m["labels"].([]interface{})
+	for _, label := range labels {
+		if label == "10" {
+			return true
+		}
+	}
+	return false
+}
+
+// A folder of your own is named the way it is named on screen, and the listing
+// answers for that folder rather than for a label nobody has.
+func TestMailMessagesListACustomFolderByName(t *testing.T) {
+	name, _ := pinned(t, account.Primary, "folder", "Projects")["name"].(string)
+	if name == "" {
+		t.Fatal("the folder fixture has no name")
+	}
+	msgID := mutableMail(t)
+	runOK(t, "mail", "messages", "move", "--into", name, "--", msgID)
+	cleanupRun(t, "Put the message back: proton mail messages move --into inbox "+msgID,
+		"mail", "messages", "move", "--into", "inbox", "--", msgID)
+
+	data := runJSON(t, "mail", "messages", "list", "--folder", name, "--limit", "50")
+	msgs, _ := data["messages"].([]interface{})
+	for _, row := range msgs {
+		if row.(map[string]interface{})["id"] == msgID {
+			return
+		}
+	}
+	t.Errorf("--folder %q did not answer with the message moved into it", name)
 }
 
 func TestMailMessagesStarUnstar(t *testing.T) {

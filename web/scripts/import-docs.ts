@@ -34,6 +34,16 @@ const skipped = new Set(["docs/README.md"]);
  */
 const slugs = new Map([["CHANGELOG.md", "changelog"]]);
 
+/*
+ * `proton index` is documented in docs/index/, named for the command like every
+ * other section, and index is the one word a page here cannot be published
+ * under: it is how a directory names itself, and at the top of the tree it is
+ * the front page. So the section is served under a name of its own, and the
+ * reference inside it under the word for what it holds.
+ */
+const republished = (slug: string) =>
+  slug === "index/index" ? "local-index/commands" : slug.replace(/^index(?=\/|$)/, "local-index");
+
 const alerts = new Map([
   ["CAUTION", "danger"],
   ["IMPORTANT", "note"],
@@ -61,12 +71,14 @@ const pages = new Set(sources);
  * docs/mail/messages.md at /mail/messages/.
  */
 const slugOf = (path: string) =>
-  slugs.get(path) ??
-  path
-    .replace(/^docs\//, "")
-    .replace(/\.md$/, "")
-    .replace(/(^|\/)README$/, "")
-    .replace(/\/$/, "");
+  republished(
+    slugs.get(path) ??
+      path
+        .replace(/^docs\//, "")
+        .replace(/\.md$/, "")
+        .replace(/(^|\/)README$/, "")
+        .replace(/\/$/, ""),
+  );
 
 const pageURL = (path: string) => `/${slugOf(path)}/`;
 
@@ -168,7 +180,14 @@ const importDocs = async () => {
   await rm(store, { force: true });
   await rm(content, { force: true, recursive: true });
   for (const path of sources) {
-    const out = join(content, `${slugOf(path)}.md`);
+    /*
+     * A page is written where its own URL is, as that directory's index.
+     * Starlight reads an index.md as the directory it sits in, so a page that is
+     * already called index.md - the reference for `proton index` - would
+     * otherwise be published over the section holding it, and a guide published
+     * at the top of the tree would be published over the front page.
+     */
+    const out = join(content, slugOf(path), "index.md");
     await mkdir(dirname(out), { recursive: true });
     await writeFile(out, render(path, await readFile(join(root, path), "utf8")));
   }

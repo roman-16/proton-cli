@@ -2,6 +2,7 @@ package account
 
 import (
 	"github.com/roman-16/proton-cli/internal/account/session"
+	"github.com/roman-16/proton-cli/internal/app"
 	"github.com/roman-16/proton-cli/internal/cli/kit"
 	"github.com/roman-16/proton-cli/internal/profile"
 	"github.com/roman-16/proton-cli/internal/ui"
@@ -61,10 +62,14 @@ func profilesListCmd() *cobra.Command {
 	return c
 }
 
+// Removing a profile removes everything this machine kept for it, which is the
+// session, the references it has been shown, and the index of its contents. A
+// profile is the whole of what one account is here, so leaving any of it behind
+// would leave a copy of an account nothing can name.
 func profilesDeleteCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "delete REF...",
-		Short: "Remove saved sessions by profile name",
+		Short: "Remove a profile and everything it keeps on this machine",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			// A profile names a file, so the names are judged before anything is
 			// removed rather than at the point of removal.
@@ -77,7 +82,7 @@ func profilesDeleteCmd() *cobra.Command {
 				Name: single(c.Args), IDs: c.Args,
 			}, func() error {
 				for _, name := range names {
-					if err := session.Clear(name); err != nil {
+					if err := app.Forget(name); err != nil {
 						return err
 					}
 				}

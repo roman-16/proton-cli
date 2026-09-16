@@ -39,6 +39,8 @@ GET /calendar/v1/{id}/events
 GET /calendar/v1/{id}/events/{id}
 GET /calendar/v1/{id}/invitations
 GET /calendar/v1/{id}/members/all
+GET /calendar/v1/{id}/modelevents/latest
+GET /calendar/v1/{id}/modelevents/{id}
 GET /calendar/v1/{id}/settings
 GET /calendar/v2/{id}/bootstrap
 GET /contacts/v4/contacts/emails
@@ -82,6 +84,8 @@ GET /drive/v2/shares/{id}/external-invitations
 GET /drive/v2/shares/{id}/invitations
 GET /drive/v2/shares/{id}/members
 GET /drive/volumes
+GET /drive/volumes/{id}/events/latest
+GET /drive/volumes/{id}/events/{id}
 GET /drive/volumes/{id}/photos
 GET /drive/volumes/{id}/trash
 GET /mail/v4/attachments/{id}

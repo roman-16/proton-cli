@@ -101,7 +101,7 @@ Remove a proton binary installed with the curl or PowerShell installer, or downl
 
 A package-managed install (apt, dnf, apk, AUR, Homebrew, winget, npm, Nix) is refused, with the right command to use instead.
 
-Only the binary goes, under both names it answers to. --purge also deletes your saved sessions, the ID cache and the diagnostic log.
+Only the binary goes, under both names it answers to. --purge also deletes your saved sessions, the ID cache, the local indexes and the diagnostic log.
 
 ```
 proton uninstall
@@ -115,7 +115,7 @@ proton uninstall --yes --purge
 
 | Flag | Description |
 | --- | --- |
-| `--purge` | Also remove local data (saved sessions, ID cache and diagnostic log) |
+| `--purge` | Also remove local data (saved sessions, ID cache, local indexes and diagnostic log) |
 
 ## `update`
 

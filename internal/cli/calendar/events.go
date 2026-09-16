@@ -99,7 +99,7 @@ func eventColumns() []ui.Column[calsvc.Event] {
 }
 
 func eventsListCmd() *cobra.Command {
-	var calendar string
+	var calendar, keyword string
 	var days kit.DayRange
 	var held kit.Held[calsvc.Event]
 	c := &cobra.Command{
@@ -108,6 +108,10 @@ func eventsListCmd() *cobra.Command {
 		Long: "List what is on your calendars between two dates.\n\n" +
 			"With neither --after nor --before it covers the next 30 days, starting today.\n" +
 			"With one of them, the other is 30 days away from it.\n\n" +
+			"--keyword matches the title, the location, the description, the organizer\n" +
+			"and the people invited. On its own it covers every event there has been\n" +
+			"and the next three years of every repeating one; with --after or --before\n" +
+			"it covers those days instead.\n\n" +
 			"Each occurrence of a recurring event is listed on its own day, with a\n" +
 			"reference that names that occurrence.\n\n" +
 			"Covers every calendar unless --calendar narrows it to one.",
@@ -116,20 +120,39 @@ func eventsListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			first, last := days.Or(calsvc.DefaultDays())
-			events, err := c.App.Calendar.EventsList(c.Ctx, calIDs, ical.Days(first, last))
+			events, err := listEvents(c, calIDs, days, keyword)
 			if err != nil {
 				return err
 			}
 			return held.Answer(c, ui.TableSpec[calsvc.Event]{
-				Noun: "events", Columns: eventColumns(),
+				Noun: "events", Columns: eventColumns(), Filtered: keyword != "",
 			}, events)
 		}),
 	}
 	c.Flags().StringVar(&calendar, "calendar", "", "Which calendar, by name or ID (default: all of them)")
+	c.Flags().StringVar(&keyword, "keyword", "", "Match text in the title, location, description, organizer or attendees")
 	days.Register(c)
 	held.Register(c, "events")
 	return c
+}
+
+// listEvents is the range the listing covers and what it answers with.
+//
+// A question about days is a question about days, and stays one. A question
+// about words has no range of its own, so it covers everything unless the reader
+// named one - which is what makes "when was the dentist" a question this CLI can
+// answer at all.
+func listEvents(c *kit.Invocation, calIDs []string, days kit.DayRange, keyword string) ([]calsvc.Event, error) {
+	if keyword == "" {
+		first, last := days.Or(calsvc.DefaultDays())
+		return c.App.Calendar.EventsList(c.Ctx, calIDs, ical.Days(first, last))
+	}
+	window := calsvc.SearchWindow()
+	if days.Set() {
+		first, last := days.Or(calsvc.DefaultDays())
+		window = ical.Days(first, last)
+	}
+	return c.App.Calendar.EventsSearch(c.Ctx, calIDs, window, keyword)
 }
 
 func eventsGetCmd() *cobra.Command {

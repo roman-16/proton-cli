@@ -59,7 +59,9 @@ proton mail messages list --from billing@example.com --after 2026-01-01 --folder
 proton mail messages list --subject "Q1 report" --folder archive
 ```
 
-`--from` and `--to` match addresses. `--keyword` also matches display names and body text.
+`--from` and `--to` match addresses. `--keyword` matches the subject, a display name and an address.
+
+Bodies are not searched. To search what a message says, build an index on this machine: [Local index](../index/README.md). With one, `--keyword` covers bodies and `--from` covers display names.
 
 `--after` and `--before` are the first and last whole days to include, read in your own zone, and both are included.
 

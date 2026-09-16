@@ -28,10 +28,11 @@ func messagesCmd() *cobra.Command {
 
 // list is where a set of messages is worked out.
 //
-// Paging a folder and querying the index are one request to Proton -
-// `/mail/v4/messages` takes a label, a page and the text predicates together -
-// so they are one command, and the selection it works out is the same one the
-// bulk verbs take.
+// Paging a folder and asking a question about its contents are one command,
+// because the selection either produces is the same one the bulk verbs take.
+// Where the question is answered differs: a folder and a page are Proton's to
+// answer, and anything about what a message says is answered by the copy on
+// this machine when there is one, since Proton cannot read a body.
 func listCmd() *cobra.Command {
 	var f filters
 	c := &cobra.Command{
@@ -39,28 +40,35 @@ func listCmd() *cobra.Command {
 		Short: "List messages in a folder",
 		Long: "List messages in a folder.\n\n" +
 			"Takes the same filters as trash, move, label and export, so you can preview\n" +
-			"a selection here before acting on it. Text filters go through Proton's\n" +
-			"index, which lags a change by a few seconds.\n\n" +
+			"a selection here before acting on it. A text filter goes through Proton's\n" +
+			"own index, which lags a change by a few seconds and does not cover bodies,\n" +
+			"or through the copy `index create mail` builds, which does.\n\n" +
 			"Looks in the inbox unless told otherwise. Use --folder all to search\n" +
 			"everything.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
-			opts, err := f.list()
+			opts, err := f.list(c.Ctx, c)
 			if err != nil {
 				return err
 			}
-			msgs, total, err := c.App.Mail.List(c.Ctx, opts)
+			msgs, total, cover, err := c.App.Mail.Search(c.Ctx, opts)
 			if err != nil {
 				return err
 			}
-			msgs = applyLocalFilters(msgs, &f)
-			if len(msgs) == 0 {
-				addressOnlyHint(c, opts.Keyword, opts.From, opts.To)
-			}
-			return kit.List(c, ui.TableSpec[mailsvc.Message]{
+			if err := kit.List(c, ui.TableSpec[mailsvc.Message]{
 				Noun: "messages", Columns: messageColumns(),
 				Total: f.total(total, len(msgs)), Page: opts.Page, PageSize: opts.PageSize,
 				Filtered: f.narrowed(),
-			}, msgs)
+			}, msgs); err != nil {
+				return err
+			}
+			// What the answer did not cover is said after the answer, so the rows
+			// and the count come first and the caveat reads as being about them.
+			if len(msgs) == 0 {
+				unsearchedBodies(c, cover, opts)
+				addressOnlyHint(c, cover, opts)
+			}
+			shortIndex(c, cover)
+			return nil
 		}),
 	}
 	f.registerNarrowing(c, "inbox")
@@ -567,21 +575,38 @@ func registerFolderCompletion(c *cobra.Command, flag string) {
 }
 
 // addressOnlyHint explains an empty result that a different flag would have
-// found, since --from matches the address alone.
-func addressOnlyHint(c *kit.Invocation, keyword, from, to string) {
-	if keyword != "" {
+// found, since Proton's --from matches the address alone.
+//
+// An index answers the same question over display names as well, so the hint is
+// for the server's answer only: offered where it does not apply, it would send
+// somebody to a flag that searches exactly what they just searched.
+func addressOnlyHint(c *kit.Invocation, cover mailsvc.Coverage, opts mailsvc.ListOptions) {
+	if cover.Indexed || opts.Keyword != "" {
 		return
 	}
-	term := from
+	term := opts.From
 	flag := "--from"
 	if term == "" {
-		term, flag = to, "--to"
+		term, flag = opts.To, "--to"
 	}
 	if term == "" {
 		return
 	}
-	c.UI().Hint(flag + " matches the address only. To search display names and bodies too, " +
+	c.UI().Hint(flag + " matches the address only. To search display names too, " +
 		"use --keyword " + term + ".")
+}
+
+// unsearchedBodies says what an empty answer did not look inside.
+//
+// Proton cannot search a body, so a keyword that found nothing has not
+// established that nothing says it - which is exactly what an empty listing
+// looks like it has established.
+func unsearchedBodies(c *kit.Invocation, cover mailsvc.Coverage, opts mailsvc.ListOptions) {
+	if cover.Indexed || opts.Keyword == "" {
+		return
+	}
+	c.UI().Hint("Subjects, names and addresses were searched, not message bodies. " +
+		"`" + kit.Program + " index create mail` makes bodies searchable too.")
 }
 
 func quoted(s string) string { return strconv.Quote(s) }

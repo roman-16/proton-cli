@@ -22,11 +22,13 @@ There is no telemetry, and there is nothing to turn off. proton-cli never report
 
 ## What is stored on disk
 
-The paths are listed under [Files on disk](../using/settings.md#files-on-disk). Two of them hold something sensitive.
+The paths are listed under [Files on disk](../using/settings.md#files-on-disk). Three of them hold something sensitive.
 
 **The session file**, one per profile, mode `0600`, holds the session tokens and your key password. The key password is stored encrypted with a key that Proton holds and hands out only to a live session, so it is never on disk in cleartext, and **revoking the session** - `proton account logout --revoke`, or from any Proton app - makes a leaked copy undecryptable. The file still holds the session's refresh token, so it is not safe to share; revoking neutralises a leak, it does not excuse one.
 
 **The diagnostic log**, mode `0600`, holds what each run did, written so it can be handed to a stranger: addresses, IDs, paths, tokens, subjects, filenames, search terms and flag values never enter it. `--no-log` or `PROTON_NO_LOG` stops it being written ([Settings](../using/settings.md#the-diagnostic-log)).
+
+**The local index**, mode `0600`, exists only after `proton index create` and holds a copy of what it indexed: for mail, every message with its subject, its addresses and its body as text. It is encrypted with AES-256-GCM under a key of its own, and that key is encrypted and signed to your account's keys, so **revoking the session** makes a leaked copy unreadable the same way it does the session file. `proton index delete` removes it ([Local index](../index/README.md)).
 
 ## A file downloaded from a public link
 

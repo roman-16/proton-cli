@@ -214,6 +214,10 @@ export default defineConfig({
           label: "Contacts",
         },
         {
+          items: [{ label: "Guide", slug: "local-index" }, "local-index/commands"],
+          label: "Local index",
+        },
+        {
           items: [{ label: "Guide", slug: "api" }, "api/api"],
           label: "Raw API",
         },

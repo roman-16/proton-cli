@@ -14,7 +14,7 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton account login`](../account/account.md#login) | Sign in and save the session for this profile |
 | [`proton account logout`](../account/account.md#logout) | Discard the saved session for this profile |
 | [`proton account keys reactivate`](../account/keys.md#reactivate) | Bring back the keys a password reset locked |
-| [`proton account profiles delete`](../account/profiles.md#delete) | Remove saved sessions by profile name |
+| [`proton account profiles delete`](../account/profiles.md#delete) | Remove a profile and everything it keeps on this machine |
 | [`proton account profiles list`](../account/profiles.md#list) | List the profiles with a saved session |
 | [`proton account sessions list`](../account/sessions.md#list) | List every signed-in session |
 | [`proton account sessions revoke`](../account/sessions.md#revoke) | Invalidate sessions at Proton |
@@ -122,6 +122,11 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton drive volumes delete`](../drive/volumes.md#delete) | Delete a locked volume and everything on it |
 | [`proton drive volumes list`](../drive/volumes.md#list) | List the volumes your files and photos are kept on |
 | [`proton drive volumes restore`](../drive/volumes.md#restore) | Put the files of a locked volume back |
+| [`proton index create`](../index/index.md#create) | Index an app so its contents can be searched |
+| [`proton index delete`](../index/index.md#delete) | Remove an index from this machine |
+| [`proton index list`](../index/index.md#list) | List what is indexed on this machine |
+| [`proton index update`](../index/index.md#update) | Bring every index up to date |
+| [`proton index watch`](../index/index.md#watch) | Keep every index current until you stop it |
 | [`proton mail conversations attachments download`](../mail/conversations.md#attachments-download) | Download and decrypt attachments from a thread |
 | [`proton mail conversations attachments list`](../mail/conversations.md#attachments-list) | List every attachment in a thread |
 | [`proton mail conversations delete`](../mail/conversations.md#delete) | Delete threads permanently |

@@ -54,7 +54,7 @@ func (f *filters) registerNarrowing(c *cobra.Command, folder string) {
 	fl.StringVar(&f.from, "from", "", "Match the sender's address")
 	fl.StringVar(&f.to, "to", "", "Match a recipient's address")
 	fl.StringVar(&f.subject, "subject", "", "Match text in the subject")
-	fl.StringVar(&f.keyword, "keyword", "", "Match text anywhere, including display names and bodies")
+	fl.StringVar(&f.keyword, "keyword", "", "Match text in the subject, a name or an address, and in bodies once a mail index exists")
 	f.days.Register(c)
 	f.age.Register(fl, "messages")
 	registerFolder(c, &f.folder, "", folder)
@@ -88,15 +88,26 @@ func (f *filters) set() bool { return f.narrowed() || f.folder != "" || f.all }
 func (f *filters) unbounded() bool { return f.all && !f.narrowed() && f.folder == "" }
 
 // list converts the filters into the one request Proton takes.
-func (f *filters) list() (mailsvc.ListOptions, error) {
+//
+// The folder is resolved rather than passed along, because a custom folder is a
+// name here and an ID everywhere the query goes: unresolved, `--folder Receipts`
+// reached Proton as a label called Receipts, which matches nothing.
+func (f *filters) list(ctx context.Context, c *kit.Invocation) (mailsvc.ListOptions, error) {
 	folder := f.folder
 	if folder == "" {
 		folder = f.whereByDefault
 	}
+	if folder != "" {
+		box, err := c.App.Mail.ResolveMailbox(ctx, folder)
+		if err != nil {
+			return mailsvc.ListOptions{}, err
+		}
+		folder = box.ID
+	}
 	after, before := f.days.Days()
 	opts := mailsvc.ListOptions{
 		Keyword: f.keyword, From: f.from, To: f.to, Subject: f.subject,
-		Folder: folder, Unread: f.unread,
+		Folder: folder, Unread: f.unread, Starred: f.starred,
 		After: after, Before: before,
 		Page: f.page.Number, PageSize: f.page.Size,
 	}
@@ -163,15 +174,16 @@ func selectMessages(c *kit.Invocation, f *filters) (kit.Selection[mailsvc.Messag
 	}
 	if f.set() {
 		sel.ByFilter = func(ctx context.Context) ([]mailsvc.Message, error) {
-			opts, err := f.list()
+			opts, err := f.list(ctx, c)
 			if err != nil {
 				return nil, err
 			}
-			msgs, _, err := c.App.Mail.List(ctx, opts)
+			msgs, _, cover, err := c.App.Mail.Search(ctx, opts)
 			if err != nil {
 				return nil, err
 			}
-			return applyLocalFilters(msgs, f), nil
+			shortIndex(c, cover)
+			return msgs, nil
 		}
 	}
 	return kit.Select(c, sel)
@@ -195,47 +207,32 @@ func selectConversations(c *kit.Invocation, f *filters) (kit.Selection[mailsvc.C
 	}
 	if f.set() {
 		sel.ByFilter = func(ctx context.Context) ([]mailsvc.Conversation, error) {
-			opts, err := f.list()
+			opts, err := f.list(ctx, c)
 			if err != nil {
 				return nil, err
 			}
-			convs, _, err := c.App.Mail.ConversationsList(ctx, opts)
+			convs, _, cover, err := c.App.Mail.SearchConversations(ctx, opts)
 			if err != nil {
 				return nil, err
 			}
-			return keepStarred(convs, f.starred), nil
+			shortIndex(c, cover)
+			return convs, nil
 		}
 	}
 	return kit.Select(c, sel)
 }
 
-// applyLocalFilters narrows what the server could not. Proton's search has no
-// starred predicate, so that one is applied here rather than being silently
-// ignored - which is what a flag the server drops amounts to.
-func applyLocalFilters(msgs []mailsvc.Message, f *filters) []mailsvc.Message {
-	if f == nil || !f.starred {
-		return msgs
+// shortIndex says when a search read an index that does not hold the whole
+// mailbox yet.
+//
+// A half-built index holds the newest mail, so an answer from it is right about
+// everything it covers and silent about the rest. Left unsaid, that is a wrong
+// answer with a plausible shape: nothing on the screen distinguishes "there is
+// no such message" from "the part of your mailbox that has it is not indexed".
+func shortIndex(c *kit.Invocation, cover mailsvc.Coverage) {
+	if !cover.Indexed || !cover.Partial {
+		return
 	}
-	kept := make([]mailsvc.Message, 0, len(msgs))
-	for _, m := range msgs {
-		if m.Starred() {
-			kept = append(kept, m)
-		}
-	}
-	return kept
-}
-
-// keepStarred narrows what the server could not: Proton's query has no starred
-// predicate, so a flag it would silently drop is applied here instead.
-func keepStarred(convs []mailsvc.Conversation, starred bool) []mailsvc.Conversation {
-	if !starred {
-		return convs
-	}
-	kept := make([]mailsvc.Conversation, 0, len(convs))
-	for _, cv := range convs {
-		if cv.Starred() {
-			kept = append(kept, cv)
-		}
-	}
-	return kept
+	c.Warn("Only %d of %d messages are indexed, newest first, so older mail was not searched. "+
+		"`%s index create mail` continues the download.", cover.Have, cover.Total, kit.Program)
 }

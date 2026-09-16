@@ -32,13 +32,13 @@ A package-managed install (apt, dnf, apk, AUR, Homebrew, winget, npm, Nix)
 is refused, with the right command to use instead.
 
 Only the binary goes, under both names it answers to. --purge also deletes
-your saved sessions, the ID cache and the diagnostic log.`,
+your saved sessions, the ID cache, the local indexes and the diagnostic log.`,
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			return runUninstall(c, purge)
 		}),
 	}
 	cmd.Flags().BoolVar(&purge, "purge", false,
-		"Also remove local data (saved sessions, ID cache and diagnostic log)")
+		"Also remove local data (saved sessions, ID cache, local indexes and diagnostic log)")
 	return cmd
 }
 

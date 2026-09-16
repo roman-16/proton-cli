@@ -89,6 +89,7 @@ var examples = map[string][]string{
 		"proton calendar events list",
 		"proton calendar events list --after 2026-04-15 --before 2026-04-30",
 		"proton calendar events list --calendar Work",
+		"proton calendar events list --keyword dentist",
 	},
 	"proton calendar reminders list": {
 		"proton calendar reminders list",
@@ -163,6 +164,30 @@ var examples = map[string][]string{
 	"proton calendar settings set": {
 		"proton calendar settings set view week",
 		"proton calendar settings set primary-timezone Europe/Vienna",
+	},
+
+	// ── the local index ──
+	"proton index list": {
+		"proton index list",
+		"proton index list --output json",
+	},
+	"proton index create": {
+		"proton index create",
+		"proton index create mail",
+		"proton index create drive calendar",
+		"proton index create drive --dry-run",
+	},
+	"proton index update": {
+		"proton index update",
+		"proton index update --quiet",
+	},
+	"proton index watch": {
+		"proton index watch",
+		"proton index watch --output json",
+	},
+	"proton index delete": {
+		"proton index delete",
+		"proton index delete --yes mail",
 	},
 
 	// ── contacts ──
@@ -379,6 +404,7 @@ var examples = map[string][]string{
 		"proton mail messages list --starred --output json",
 		"proton mail messages list --from billing@example.com --folder all",
 		"proton mail messages list --keyword invoice --after 2026-01-01 --folder all",
+		"proton mail messages list --keyword 'parking permit' --folder all",
 	},
 	"proton mail messages watch": {
 		"proton mail messages watch",

@@ -4,6 +4,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -23,6 +24,7 @@ import (
 	"github.com/roman-16/proton-cli/internal/profile"
 	"github.com/roman-16/proton-cli/internal/proton"
 	"github.com/roman-16/proton-cli/internal/runlog"
+	"github.com/roman-16/proton-cli/internal/search"
 	"github.com/roman-16/proton-cli/internal/service/account"
 	"github.com/roman-16/proton-cli/internal/service/calendar"
 	"github.com/roman-16/proton-cli/internal/service/contacts"
@@ -46,6 +48,10 @@ type App struct {
 	Calendar *calendar.Service
 	Contacts *contacts.Service
 	Pass     *pass.Service
+
+	// Index is the encrypted copy of the account this machine keeps, which is
+	// what answers a question Proton cannot read the answer to.
+	Index *search.Store
 
 	// UI renders everything the command produces.
 	UI *ui.UI
@@ -168,9 +174,15 @@ func New(opts Options) (*App, error) {
 	// A service that decrypts holds the keys it decrypts with, the way it holds the
 	// client it fetches with. Unlock is memoised, so the hierarchy is fetched at
 	// most once per invocation and only if something actually asks for it.
+	// The index is the account's own content at rest on this machine, so it is
+	// sealed to the account's keys and belongs to the profile that holds them.
+	a.Index = search.New(indexDir(profileName), a.UserID, a.indexKeys)
 	a.Mail = mail.New(c, a.Unlock)
+	a.Mail.SetIndex(a.Index)
 	a.Drive = drive.New(c, a.Unlock)
+	a.Drive.SetIndex(a.Index)
 	a.Calendar = calendar.New(c, a.Unlock)
+	a.Calendar.SetIndex(a.Index)
 	a.Contacts = contacts.New(c, a.Unlock)
 	a.Pass = pass.New(c, a.Unlock)
 	// The client persists the session file whenever its tokens change (e.g. a
@@ -281,6 +293,49 @@ func idCachePath(name profile.Name) string {
 		dir = "."
 	}
 	return filepath.Join(dir, "idcache", name.FileName(".json"))
+}
+
+// Forget removes everything this machine keeps for a profile: the session, the
+// references it has been shown, and the index of the account's contents.
+//
+// They are one thing rather than three - what this computer holds about one
+// account - so a profile that has been removed leaves nothing that outlives it.
+func Forget(name profile.Name) error {
+	if err := session.Clear(name); err != nil {
+		return err
+	}
+	if err := Seen(name).Clear(); err != nil {
+		return err
+	}
+	if err := os.RemoveAll(indexDir(name)); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return nil
+}
+
+// indexDir is where a profile's indexes live, beside everything else that is
+// this machine's rather than the account's.
+func indexDir(name profile.Name) string {
+	dir, err := config.Dir()
+	if err != nil {
+		dir = "."
+	}
+	return filepath.Join(dir, "index", name.FileName(""))
+}
+
+// indexKeys is what seals the index: the account's primary user key to write
+// with, and every user key to read with, so an index made before a key rotation
+// still opens after one.
+func (a *App) indexKeys(ctx context.Context) (search.Keys, error) {
+	u, err := a.Unlock(ctx)
+	if err != nil {
+		return search.Keys{}, err
+	}
+	primary, err := u.PrimaryUserKey()
+	if err != nil {
+		return search.Keys{}, err
+	}
+	return search.Keys{Seal: primary, Open: u.UserKR}, nil
 }
 
 // SignedIn reports whether this profile holds a session.

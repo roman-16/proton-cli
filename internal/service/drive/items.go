@@ -67,7 +67,15 @@ func (s *Service) List(ctx context.Context, dc *Context, path string) ([]Child, 
 
 // Walk lists all descendants depth-first; each Child carries its full
 // decrypted Path.
+//
+// A tree this machine holds an index of is answered from it, brought up to date
+// first. Everything else is read from Proton a folder at a time, which is every
+// tree that is not the account's own: a public link, somebody else's share, a
+// computer's backup.
 func (s *Service) Walk(ctx context.Context, dc *Context, path string) ([]Child, error) {
+	if indexed, ok := s.indexedTree(ctx, dc, path); ok {
+		return indexed, nil
+	}
 	res, err := s.ResolvePath(ctx, dc, path)
 	if err != nil {
 		return nil, err
@@ -79,11 +87,29 @@ func (s *Service) Walk(ctx context.Context, dc *Context, path string) ([]Child, 
 }
 
 func (s *Service) walk(ctx context.Context, dc *Context, linkID string, parentKR *pgp.KeyRing, prefix string) ([]Child, error) {
+	var out []Child
+	err := s.walkTree(ctx, dc, linkID, parentKR, prefix, func(l Link, name, path string) error {
+		out = append(out, Child{
+			LinkID: l.LinkID, Name: name, Path: path, Type: linkType(l.Type),
+			Size: l.Size, CreateTime: l.CreateTime, ModifyTime: l.ModifyTime,
+		})
+		return nil
+	})
+	return out, err
+}
+
+// walkTree reads a folder and everything under it, depth-first, and hands each
+// link to visit with its decrypted name and its path in the tree.
+//
+// It is one walk rather than one per caller, because what a walk has to get
+// right - a name decrypted with its parent's key, a folder opened with its own,
+// a subtree that would not open recorded rather than dropped - is the same
+// whether the answer is a listing on the screen or a record in the index.
+func (s *Service) walkTree(ctx context.Context, dc *Context, linkID string, parentKR *pgp.KeyRing, prefix string, visit func(l Link, name, path string) error) error {
 	raw, err := s.listRawChildren(ctx, dc, linkID)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	var out []Child
 	for _, r := range raw {
 		name, err := decryptName(r.Name, parentKR)
 		if err != nil {
@@ -94,22 +120,25 @@ func (s *Service) walk(ctx context.Context, dc *Context, linkID string, parentKR
 			name = "(decrypt failed)"
 		}
 		full := prefix + "/" + name
-		out = append(out, Child{LinkID: r.LinkID, Name: name, Path: full, Type: linkType(r.Type), Size: r.Size, CreateTime: r.CreateTime, ModifyTime: r.ModifyTime})
-		if r.Type == 1 {
-			childKR, err := unlockNode(&r, parentKR, nil)
-			if err != nil {
-				skip.Record(ctx, skip.KindFolder, r.LinkID, skip.Unlockable, err)
-				continue
+		if err := visit(r, name, full); err != nil {
+			return err
+		}
+		if r.Type != protonFolder {
+			continue
+		}
+		childKR, err := unlockNode(&r, parentKR, nil)
+		if err != nil {
+			skip.Record(ctx, skip.KindFolder, r.LinkID, skip.Unlockable, err)
+			continue
+		}
+		if err := s.walkTree(ctx, dc, r.LinkID, childKR, full, visit); err != nil {
+			if ctx.Err() != nil {
+				return err
 			}
-			nested, err := s.walk(ctx, dc, r.LinkID, childKR, full)
-			if err != nil {
-				skip.Record(ctx, skip.KindFolder, r.LinkID, skip.Unreadable, err)
-				continue
-			}
-			out = append(out, nested...)
+			skip.Record(ctx, skip.KindFolder, r.LinkID, skip.Unreadable, err)
 		}
 	}
-	return out, nil
+	return nil
 }
 
 // PlanFolders lists the folders that making a path exist would create, the

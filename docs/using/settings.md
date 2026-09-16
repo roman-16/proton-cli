@@ -128,6 +128,7 @@ $ proton --quiet=false mail messages list
 | `~/.config/proton-cli/config.yaml` | Your settings and confirmation policy. You write this one |
 | `~/.config/proton-cli/sessions/<profile>.json` | Session tokens and the encrypted key password (mode `0600`) |
 | `~/.config/proton-cli/idcache/<profile>.json` | Short-ID lookup table ([what that is](naming.md#short-ids)) |
+| `~/.config/proton-cli/index/<profile>/` | The encrypted copy `proton index create` builds (mode `0600`, [what it is for](../index/README.md)) |
 | `~/.config/proton-cli/update-check.json` | When proton last looked for a new release ([why](../install.md#updating)) |
 | `~/.config/proton-cli/logs/` | What every run did, one file per day ([below](#the-diagnostic-log)) |
 

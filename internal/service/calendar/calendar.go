@@ -15,6 +15,7 @@ import (
 	"github.com/roman-16/proton-cli/internal/fetch"
 	"github.com/roman-16/proton-cli/internal/ical"
 	"github.com/roman-16/proton-cli/internal/proton"
+	"github.com/roman-16/proton-cli/internal/search"
 	"github.com/roman-16/proton-cli/internal/skip"
 )
 
@@ -60,6 +61,10 @@ type Service struct {
 	bootstraps fetch.Memo[*bootstrap]
 	unlocked   fetch.Memo[*calKeys]
 	calendars  fetch.Memo[[]Calendar]
+
+	// index is this machine's copy of the events, which is what can answer a
+	// question about what one says rather than about when it is.
+	index *search.Store
 }
 
 func New(c proton.Doer, k keys.Get) *Service { return &Service{C: c, keys: k} }

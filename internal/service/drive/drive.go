@@ -14,6 +14,7 @@ import (
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/fetch"
 	"github.com/roman-16/proton-cli/internal/proton"
+	"github.com/roman-16/proton-cli/internal/search"
 )
 
 // Client is what Drive asks of the transport: every request, and the handshake
@@ -27,6 +28,10 @@ type Client interface {
 type Service struct {
 	C    Client
 	keys keys.Get
+
+	// index is this machine's copy of the tree, which is what turns a question
+	// about a name into one request rather than one per folder.
+	index *search.Store
 }
 
 func New(c Client, k keys.Get) *Service { return &Service{C: c, keys: k} }

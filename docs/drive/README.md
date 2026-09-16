@@ -13,6 +13,8 @@ proton drive items list /Build --pattern "*.tmp" --recursive
 proton drive items get /Documents/report.pdf  # type, size, checksum, sharing state
 ```
 
+A filter such as `--pattern` opens every folder in its scope, which takes a while over a large tree. `proton index create drive` keeps a copy of the tree on this machine and answers from it instead: [Local index](../index/README.md).
+
 ## Upload and download
 
 ```bash

@@ -15,6 +15,7 @@ Apps:
 Account:
   account     Your Proton account, its settings and your session
   api         Send a raw authenticated request to the Proton API
+  index       An encrypted, searchable copy of your mail, files and events on this machine
 
 proton itself:
   changelog   Print what each release changed

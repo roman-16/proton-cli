@@ -39,7 +39,7 @@ An all-day event's `end` is the midnight after its last day (`all_day` marks one
 
 These are the listings that can be narrowed, and what narrows them. The same flags choose what a bulk verb in that collection acts on, so a selection can be worked out on `list` and then handed to `trash`, `move`, `label` or `export`. Everything else a command takes is in its `--help`.
 
-- `proton calendar events list --after string --before string --calendar string --limit int --page int`
+- `proton calendar events list --after string --before string --calendar string --keyword string --limit int --page int`
 - `proton calendar invitations list --desc --limit int --page int --sort string`
 - `proton calendar reminders list --after string --before string --calendar string --limit int --page int`
 - `proton calendar settings calendars list --desc --limit int --page int --sort string`
@@ -85,6 +85,12 @@ These are the listings that can be narrowed, and what narrows them. The same fla
 - `proton account sessions list --desc --limit int --page int --sort string`
 
 Mail looks in the inbox unless told otherwise, and `--folder all` is what a question about "my mail" usually means.
+
+Mail's `--keyword` searches subjects, names and addresses. It searches message bodies too, but only once this machine holds an index: `proton index list --output json` says which apps have one, and `indexed` short of `total` means a build that has not finished, which covers the newest mail and not the oldest. Without one, a keyword that finds nothing has established nothing about bodies - say so rather than reporting that the user has no such mail.
+
+`proton calendar events list --keyword` searches what an event says, at any date, with or without an index. A Drive filter such as `--pattern` opens every folder in its scope, which is slow over a large tree; an index answers it without the walk.
+
+Building an index is the user's decision to make: it downloads what it indexes, and for a large mailbox that takes hours. Suggest `proton index create` rather than running it.
 
 A `watch` stays attached and reports things as they happen, so it ends only when something stops it. It reports what arrives from then on, not what is already there.
 
@@ -223,6 +229,10 @@ One line per group, with the verbs under it. Arguments, flags and examples are i
 - `proton account profiles` - Accounts signed in on this machine: delete, list
 - `proton account sessions` - Sessions Proton holds for this account: list, revoke
 - `proton account settings` - Account-wide preferences: get, list, set
+
+### index - An encrypted, searchable copy of your mail, files and events on this machine
+
+- `proton index` - create, delete, list, update, watch
 
 ### proton - the tool itself, and the raw API
 

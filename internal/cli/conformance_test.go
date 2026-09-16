@@ -896,13 +896,14 @@ func TestExtraPasswordCommandsAreDeclared(t *testing.T) {
 // A dry run asserts that an account exists, because it sends no request and
 // would otherwise be the one path answering as though it had one. The exceptions
 // are the commands that change this machine instead of the account, and there
-// are exactly two: they would have run signed out, so their previews do too.
+// are exactly three: they would have run signed out, so their previews do too.
 //
 // The set is pinned rather than counted, because the failure this guards against
-// is a third command quietly declaring itself local and skipping a check it
+// is a fourth command quietly declaring itself local and skipping a check it
 // needed.
 func TestCommandsThatActOnThisMachineAreDeclared(t *testing.T) {
 	want := []string{
+		"proton index delete",
 		"proton uninstall",
 		"proton update",
 	}
@@ -1433,6 +1434,11 @@ var layers = map[string][]string{
 	// is declared where references are read and written. A rule of thumb here
 	// instead would disagree with that one, and did.
 	"redact": {"ref"},
+	// search is the index on disk and the rules for matching against it. It seals
+	// records with the symmetric primitive Pass items are sealed with, and reports
+	// a build through the same sink a transfer reports through; the keys it seals
+	// to are handed in, so it reaches for nothing that knows about an account.
+	"search": {"crypto/aead", "progress"},
 	// skip logs through the package-level logger and counts on the context, so it
 	// needs nothing of ours. That is what lets every service reach it.
 	"skip":   {},

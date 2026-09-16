@@ -8,7 +8,7 @@ Holds `delete` and `list`.
 
 ## `delete`
 
-Remove saved sessions by profile name.
+Remove a profile and everything it keeps on this machine.
 
 ```
 proton account profiles delete REF...

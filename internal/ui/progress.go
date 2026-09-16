@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,13 +21,19 @@ const (
 	barWidth = 30
 	// barFloor is the shortest a bar still says anything at.
 	barFloor = 8
-	// rateWindow is how much history the speed is averaged over. Short enough to
-	// notice a stall, long enough not to flicker on a bursty connection.
-	rateWindow = 5 * time.Second
+	// rateWindow is how much history the speed is averaged over.
+	//
+	// Long enough to cover the way work actually arrives. A transfer streams and
+	// would read steadily over any window, but indexing arrives in bursts - ten
+	// requests in flight, then a page written to disk with nothing moving - and a
+	// window that fits inside one burst measures the burst rather than the work,
+	// which is how a bar comes to say 34/s and 20/s a second apart. A stall still
+	// shows: with nothing arriving the average falls away across the window.
+	rateWindow = 30 * time.Second
 	// minRateWindow is how much has to have happened before a speed is worth
 	// claiming. Two readings a millisecond apart support an extrapolation to
 	// hundreds of megabytes a second, which is a number, not information.
-	minRateWindow = 250 * time.Millisecond
+	minRateWindow = time.Second
 	// redrawEvery throttles the line so a fast transfer spends its time
 	// transferring rather than drawing.
 	redrawEvery = 80 * time.Millisecond
@@ -52,6 +59,12 @@ type Progress struct {
 	// wants and what makes the frames deterministic.
 	interval time.Duration
 	active   bool
+	// noun is what is being counted, for work measured in things rather than in
+	// bytes. Empty is bytes, which is what a transfer moves.
+	noun string
+	// finished says Done has drawn the closing frame, which is what lets work
+	// whose size was never known end at 100% rather than at nought.
+	finished bool
 
 	// prefix numbers this transfer within a batch, e.g. "[3/27] ".
 	prefix  string
@@ -81,11 +94,18 @@ type sample struct {
 // escape sequence like any other - so a terminal that renders none gets the
 // result and no bar, rather than one frame per update with the erase printed in
 // front of each.
-func NewProgress(u *UI) progress.Sink {
+func NewProgress(u *UI) progress.Sink { return newProgress(u, "") }
+
+// NewCounter is the same bar over work measured in things rather than in bytes:
+// messages indexed, files walked. The noun is what the count is of, so the line
+// reads "12400 / 48213 messages" where a transfer would read "36.2 MB / 1.9 GB".
+func NewCounter(u *UI, noun string) progress.Sink { return newProgress(u, noun) }
+
+func newProgress(u *UI, noun string) progress.Sink {
 	if !u.animates() {
 		return progress.Nop{}
 	}
-	return &Progress{w: u.drawing, style: u.errStyle, active: true, interval: redrawEvery, width: func() int {
+	return &Progress{w: u.drawing, style: u.errStyle, active: true, interval: redrawEvery, noun: noun, width: func() int {
 		if cols := u.err.columns(); cols > 0 {
 			return cols
 		}
@@ -116,6 +136,7 @@ func Batch(s progress.Sink, index, total int) progress.Sink {
 
 func (p *Progress) Start(total int64, label string) {
 	p.total, p.label, p.current = total, label, 0
+	p.finished = false
 	p.started = time.Now()
 	p.lastDraw = time.Time{}
 	p.samples = p.samples[:0]
@@ -127,11 +148,21 @@ func (p *Progress) Add(n int64) {
 	p.draw(false)
 }
 
+// Resume places the bar at what was done before this run began, without any of
+// it counting as progress made now.
+func (p *Progress) Resume(done int64) {
+	p.current = done
+	p.started = time.Now()
+	p.samples = p.samples[:0]
+	p.draw(true)
+}
+
 // Done closes the line so whatever prints next starts fresh.
 func (p *Progress) Done() {
 	if !p.active {
 		return
 	}
+	p.finished = true
 	p.draw(true)
 	_, _ = fmt.Fprintln(p.w)
 	p.active = false
@@ -160,9 +191,15 @@ func (p *Progress) draw(force bool) {
 	}
 	p.observe(now, done)
 
+	// Work whose size was never known draws an empty bar while it runs: a
+	// fraction of an unknown is not a thing to claim. It closes at full, because
+	// finishing is the one moment the fraction is known.
 	ratio := 0.0
-	if p.total > 0 {
+	switch {
+	case p.total > 0:
 		ratio = float64(done) / float64(p.total)
+	case p.finished:
+		ratio = 1
 	}
 	_, _ = fmt.Fprint(p.w, "\r"+clearToEOL+p.line(ratio, done, now))
 }
@@ -204,12 +241,15 @@ func (p *Progress) line(ratio float64, done int64, now time.Time) string {
 
 	var bytes, speed, eta string
 	if p.total > 0 {
-		bytes = units.Size(done) + " / " + units.Size(p.total)
+		bytes = p.amount(done) + " / " + p.amount(p.total)
 	} else {
-		bytes = units.Size(done)
+		bytes = p.amount(done)
+	}
+	if p.noun != "" {
+		bytes += " " + p.noun
 	}
 	if r := p.rate(); r > 0 {
-		speed = units.Size(int64(r)) + "/s"
+		speed = p.speed(r)
 		if p.total > 0 && done < p.total {
 			left := time.Duration(float64(p.total-done)/r) * time.Second
 			eta = units.Duration(left) + " left"
@@ -239,6 +279,30 @@ func (p *Progress) line(ratio float64, done int64, now time.Time) string {
 		}
 	}
 	return truncateCells(head+separator+pct, budget)
+}
+
+// amount renders how much has been done, in whatever the work is measured in.
+func (p *Progress) amount(n int64) string {
+	if p.noun == "" {
+		return units.Size(n)
+	}
+	return strconv.FormatInt(n, 10)
+}
+
+// speed says how fast it is going.
+//
+// Bytes carry their own unit. A count of things is per second, to one decimal
+// while that decimal distinguishes anything - eight a second from nine - and
+// whole above ten, where it is a digit that changes on every redraw and tells
+// the reader nothing they can use.
+func (p *Progress) speed(r float64) string {
+	switch {
+	case p.noun == "":
+		return units.Size(int64(r)) + "/s"
+	case r < 10:
+		return fmt.Sprintf("%.1f/s", r)
+	}
+	return fmt.Sprintf("%.0f/s", r)
 }
 
 func (p *Progress) bar(width int, ratio float64) string {

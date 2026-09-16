@@ -41,7 +41,7 @@ require (
 	github.com/telesma-app/ctap v0.49.0
 	github.com/telesma-app/hid v0.12.0 // indirect
 	golang.org/x/crypto v0.54.0 // indirect
-	golang.org/x/text v0.40.0 // indirect
+	golang.org/x/text v0.40.0
 )
 
 replace github.com/go-ctap/winhello => github.com/ProtonMail/winhello v0.0.0-20260223131736-d2c4f2d06287

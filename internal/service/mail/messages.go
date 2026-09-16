@@ -24,6 +24,11 @@ type rawListMessage struct {
 	NumAttachments int
 	LabelIDs       []string
 	Flags          int64
+	// Order is where Proton puts the message among the others of its second,
+	// which is what keeps a page boundary in the same place twice.
+	Order int64
+	// ExpirationTime is when the message stops existing, if it does.
+	ExpirationTime int64
 }
 
 func toMessage(m rawListMessage) Message {
@@ -38,7 +43,12 @@ func toMessage(m rawListMessage) Message {
 	}
 }
 
+// List is a page of messages: a folder, a page, and the predicates Proton's own
+// query takes.
 func (s *Service) List(ctx context.Context, opts ListOptions) ([]Message, int, error) {
+	if opts.Starred {
+		return starredOnly(ctx, opts, s.List, func(m Message) []string { return m.Labels })
+	}
 	q := listQuery(opts, false)
 	return window(ctx, opts.Page, opts.PageSize, func(ctx context.Context, page, size int) ([]Message, int, error) {
 		q.Set("Page", fmt.Sprintf("%d", page))
@@ -104,6 +114,44 @@ func listQuery(opts ListOptions, recipients bool) url.Values {
 		q.Set("End", fmt.Sprintf("%d", startOfDay(opts.Before).AddDate(0, 0, 1).Unix()-1))
 	}
 	return q
+}
+
+// starredOnly answers a question about starred mail.
+//
+// A star is a label, and the listing takes one label, so this asks for the
+// starred one and narrows the rest here: everything else the query says goes to
+// Proton with it, and a folder named beside it is applied to what comes back.
+//
+// The whole result is read before it is cut into pages, which is what makes the
+// count the number of starred messages rather than the number of messages a
+// page happened to hold. What that costs is bounded by how much is starred,
+// which is the smallest label anybody keeps.
+func starredOnly[T any](ctx context.Context, opts ListOptions,
+	list func(context.Context, ListOptions) ([]T, int, error), labels func(T) []string,
+) ([]T, int, error) {
+	within := ""
+	if opts.Folder != "" {
+		within = ResolveFolder(opts.Folder)
+	}
+	starred := opts
+	starred.Starred = false
+	starred.Folder = "starred"
+	starred.Page, starred.PageSize = 0, 0
+	rows, _, err := list(ctx, starred)
+	if err != nil {
+		return nil, 0, err
+	}
+	if within != "" && within != labelAllMail && within != labelStarred {
+		kept := make([]T, 0, len(rows))
+		for _, row := range rows {
+			if hasLabel(labels(row), within) {
+				kept = append(kept, row)
+			}
+		}
+		rows = kept
+	}
+	page, total := pageOf(rows, opts)
+	return page, total, nil
 }
 
 // startOfDay is the midnight a day opens with, which is what turns a bound into

@@ -18,6 +18,14 @@ Every calendar is included unless `--calendar` narrows it.
 
 An event is on a day when it touches any part of it, so a query for one day inside a three-day event returns it.
 
+`--keyword` matches the title, the location, the description, the organizer and the people invited. Without a date range it covers every event there has been and the next three years of every repeating one, which is how to find one whose date you do not know:
+
+```bash
+proton calendar events list --keyword dentist
+```
+
+Reading every event takes a moment. To have it answered from a copy on this machine instead, see [Local index](../index/README.md).
+
 Each occurrence of a recurring event is listed on its own day, with a reference naming that occurrence:
 
 ```console

@@ -66,7 +66,7 @@ proton mail conversations delete 5bH2mQxK
 | `--before string` | Last day to include (YYYY-MM-DD) |
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
-| `--keyword string` | Match text anywhere, including display names and bodies |
+| `--keyword string` | Match text in the subject, a name or an address, and in bodies once a mail index exists |
 | `--limit int` | Most messages to affect; 0 for no cap (default `150`) |
 | `--newer-than string` | Match messages newer than DURATION |
 | `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |
@@ -166,7 +166,7 @@ proton mail conversations label 'Quarterly numbers' --label Accounting
 | `--before string` | Last day to include (YYYY-MM-DD) |
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
-| `--keyword string` | Match text anywhere, including display names and bodies |
+| `--keyword string` | Match text in the subject, a name or an address, and in bodies once a mail index exists |
 | `--label string` | The label to attach or detach, by name or ID |
 | `--limit int` | Most messages to affect; 0 for no cap (default `150`) |
 | `--newer-than string` | Match messages newer than DURATION |
@@ -180,7 +180,7 @@ proton mail conversations label 'Quarterly numbers' --label Accounting
 
 List threads in a folder.
 
-Takes the same filters as the verbs that organise threads, so you can preview a selection here before acting on it. Text filters go through Proton's index, which lags a change by a few seconds.
+Takes the same filters as the verbs that organise threads, so you can preview a selection here before acting on it. A text filter goes through Proton's own index, which lags a change by a few seconds, or through the copy `index create mail` builds, which also reads bodies.
 
 Looks in the inbox unless told otherwise. Use --folder all to search everything.
 
@@ -200,7 +200,7 @@ proton mail conversations list --from jane@example.com --folder all
 | `--before string` | Last day to include (YYYY-MM-DD) |
 | `--folder string` | Folder or label to look in (default: inbox) |
 | `--from string` | Match the sender's address |
-| `--keyword string` | Match text anywhere, including display names and bodies |
+| `--keyword string` | Match text in the subject, a name or an address, and in bodies once a mail index exists |
 | `--limit int` | How many threads per page; 0 for all of them (default `25`) |
 | `--newer-than string` | Match messages newer than DURATION |
 | `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |
@@ -236,7 +236,7 @@ proton mail conversations mark read --folder inbox --all
 | `--before string` | Last day to include (YYYY-MM-DD) |
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
-| `--keyword string` | Match text anywhere, including display names and bodies |
+| `--keyword string` | Match text in the subject, a name or an address, and in bodies once a mail index exists |
 | `--limit int` | Most messages to affect; 0 for no cap (default `150`) |
 | `--newer-than string` | Match messages newer than DURATION |
 | `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |
@@ -264,7 +264,7 @@ proton mail conversations mark unread 'Quarterly numbers'
 | `--before string` | Last day to include (YYYY-MM-DD) |
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
-| `--keyword string` | Match text anywhere, including display names and bodies |
+| `--keyword string` | Match text in the subject, a name or an address, and in bodies once a mail index exists |
 | `--limit int` | Most messages to affect; 0 for no cap (default `150`) |
 | `--newer-than string` | Match messages newer than DURATION |
 | `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |
@@ -294,7 +294,7 @@ proton mail conversations move --older-than 90d --folder inbox --into archive
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
 | `--into string` | Destination folder, by name or ID |
-| `--keyword string` | Match text anywhere, including display names and bodies |
+| `--keyword string` | Match text in the subject, a name or an address, and in bodies once a mail index exists |
 | `--limit int` | Most messages to affect; 0 for no cap (default `150`) |
 | `--newer-than string` | Match messages newer than DURATION |
 | `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |
@@ -357,7 +357,7 @@ proton mail conversations snooze --unread --until 2026-04-17T09:00
 | `--before string` | Last day to include (YYYY-MM-DD) |
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
-| `--keyword string` | Match text anywhere, including display names and bodies |
+| `--keyword string` | Match text in the subject, a name or an address, and in bodies once a mail index exists |
 | `--limit int` | Most messages to affect; 0 for no cap (default `150`) |
 | `--newer-than string` | Match messages newer than DURATION |
 | `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |
@@ -386,7 +386,7 @@ proton mail conversations star 'Quarterly numbers'
 | `--before string` | Last day to include (YYYY-MM-DD) |
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
-| `--keyword string` | Match text anywhere, including display names and bodies |
+| `--keyword string` | Match text in the subject, a name or an address, and in bodies once a mail index exists |
 | `--limit int` | Most messages to affect; 0 for no cap (default `150`) |
 | `--newer-than string` | Match messages newer than DURATION |
 | `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |
@@ -415,7 +415,7 @@ proton mail conversations trash --from newsletter@example.com --older-than 90d
 | `--before string` | Last day to include (YYYY-MM-DD) |
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
-| `--keyword string` | Match text anywhere, including display names and bodies |
+| `--keyword string` | Match text in the subject, a name or an address, and in bodies once a mail index exists |
 | `--limit int` | Most messages to affect; 0 for no cap (default `150`) |
 | `--newer-than string` | Match messages newer than DURATION |
 | `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |
@@ -443,7 +443,7 @@ proton mail conversations unlabel 'Quarterly numbers' --label Accounting
 | `--before string` | Last day to include (YYYY-MM-DD) |
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
-| `--keyword string` | Match text anywhere, including display names and bodies |
+| `--keyword string` | Match text in the subject, a name or an address, and in bodies once a mail index exists |
 | `--label string` | The label to attach or detach, by name or ID |
 | `--limit int` | Most messages to affect; 0 for no cap (default `150`) |
 | `--newer-than string` | Match messages newer than DURATION |
@@ -472,7 +472,7 @@ proton mail conversations unsnooze 5bH2mQxK
 | `--before string` | Last day to include (YYYY-MM-DD) |
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
-| `--keyword string` | Match text anywhere, including display names and bodies |
+| `--keyword string` | Match text in the subject, a name or an address, and in bodies once a mail index exists |
 | `--limit int` | Most messages to affect; 0 for no cap (default `150`) |
 | `--newer-than string` | Match messages newer than DURATION |
 | `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |
@@ -500,7 +500,7 @@ proton mail conversations unstar 'Quarterly numbers'
 | `--before string` | Last day to include (YYYY-MM-DD) |
 | `--folder string` | Folder or label to look in (default: all) |
 | `--from string` | Match the sender's address |
-| `--keyword string` | Match text anywhere, including display names and bodies |
+| `--keyword string` | Match text in the subject, a name or an address, and in bodies once a mail index exists |
 | `--limit int` | Most messages to affect; 0 for no cap (default `150`) |
 | `--newer-than string` | Match messages newer than DURATION |
 | `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |

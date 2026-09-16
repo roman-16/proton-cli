@@ -133,6 +133,8 @@ List what is on your calendars between two dates.
 
 With neither --after nor --before it covers the next 30 days, starting today. With one of them, the other is 30 days away from it.
 
+--keyword matches the title, the location, the description, the organizer and the people invited. On its own it covers every event there has been and the next three years of every repeating one; with --after or --before it covers those days instead.
+
 Each occurrence of a recurring event is listed on its own day, with a reference that names that occurrence.
 
 Covers every calendar unless --calendar narrows it to one.
@@ -145,6 +147,7 @@ proton calendar events list
 proton calendar events list
 proton calendar events list --after 2026-04-15 --before 2026-04-30
 proton calendar events list --calendar Work
+proton calendar events list --keyword dentist
 ```
 
 | Flag | Description |
@@ -152,6 +155,7 @@ proton calendar events list --calendar Work
 | `--after string` | First day to include (YYYY-MM-DD) |
 | `--before string` | Last day to include (YYYY-MM-DD) |
 | `--calendar string` | Which calendar, by name or ID (default: all of them) |
+| `--keyword string` | Match text in the title, location, description, organizer or attendees |
 | `--limit int` | How many events per page; 0 for all of them |
 | `--page int` | Which page of results, counting from zero |
 

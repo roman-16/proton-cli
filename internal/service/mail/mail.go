@@ -13,6 +13,7 @@ import (
 	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/proton"
 	"github.com/roman-16/proton-cli/internal/ref"
+	"github.com/roman-16/proton-cli/internal/search"
 )
 
 // WrongTableError signals that an ID-shaped REF was passed to the wrong
@@ -62,6 +63,10 @@ const (
 type Service struct {
 	C    proton.Doer
 	keys keys.Get
+
+	// index is the encrypted copy of the mailbox this machine keeps, which is
+	// the only thing that can answer a question about a body.
+	index *search.Store
 
 	// senderKeys caches fetched sender public key rings (per email) for body
 	// signature verification. A nil entry means "no key available" - cached so
@@ -204,13 +209,14 @@ func FilterInline(atts []Attachment) []Attachment {
 // selection to one another.
 type ListOptions struct {
 	Folder string
-	// Keyword, From, To and Subject are the server's text predicates.
+	// Keyword, From, To and Subject are the text predicates.
 	Keyword, From, To, Subject string
 	// After and Before bound the range by date: the first and last day to
 	// include, both of them whole and both of them included. The zero time is an
 	// end nobody named.
 	After, Before time.Time
 	Unread        bool
+	Starred       bool
 
 	// Page and PageSize are the caller's page of the result, counting from zero.
 	// A size of zero is the whole result. A bulk selection asks for page zero the
@@ -271,7 +277,7 @@ func window[T any](ctx context.Context, page, size int, fetch func(ctx context.C
 // unmatched filter.
 func (o ListOptions) Narrowed() bool {
 	return o.Keyword != "" || o.From != "" || o.To != "" || o.Subject != "" ||
-		!o.After.IsZero() || !o.Before.IsZero() || o.Unread
+		!o.After.IsZero() || !o.Before.IsZero() || o.Unread || o.Starred
 }
 
 // decryptBody decrypts an armored PGP body with decKR and, when verKR is

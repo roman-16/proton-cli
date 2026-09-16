@@ -12,7 +12,7 @@ A refusal that comes from Proton rather than from proton-cli belongs to [Trouble
 
 **A recurring event needs a zone that can be named.** proton reads one from `TZ`, `/etc/localtime` or `/etc/timezone`, then from your Proton calendar settings. Where none of those answers, a recurring event drifts by an hour when the clocks change. Pass `--zone Europe/Vienna` to be sure.
 
-**A Drive filter over a large tree is slow.** Narrow it with `--scope`.
+**A Drive filter over a large tree is slow.** Narrow it with `--scope`, or index the tree once with `proton index create drive` ([Local index](../index/README.md)).
 
 ## Out of scope
 

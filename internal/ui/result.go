@@ -58,6 +58,7 @@ var (
 	Exported     = Action{"Exported", "export", "exported", Ordinary}
 	Imported     = Action{"Imported", "import", "imported", Ordinary}
 	Merged       = Action{"Merged", "merge", "merged", Ordinary}
+	Indexed      = Action{"Indexed", "index", "indexed", Ordinary}
 	Resent       = Action{"Resent", "resend", "resent", Ordinary}
 	Verified     = Action{"Verified", "verify", "verified", Ordinary}
 	Blocked      = Action{"Blocked", "block", "blocked", Ordinary}
@@ -115,7 +116,7 @@ func (a Action) Asks(computed bool) bool {
 // Actions is the vocabulary, for the conformance test to check against.
 var Actions = []Action{
 	Created, Updated, Deleted, Trashed, Restored, Emptied, Uninstalled, Moved,
-	Copied, Uploaded, Downloaded, Exported, Imported, Merged, Resent, Verified, Blocked, Allowed, Filed, Unsubscribed, Snoozed, Unsnoozed, Applied, Reordered, Sent, Scheduled, Unscheduled, Saved,
+	Copied, Uploaded, Downloaded, Exported, Imported, Indexed, Merged, Resent, Verified, Blocked, Allowed, Filed, Unsubscribed, Snoozed, Unsnoozed, Applied, Reordered, Sent, Scheduled, Unscheduled, Saved,
 	Labelled, Unlabelled, Starred, Unstarred, MarkedRead, MarkedUnread,
 	MarkedLegitimate, Reported,
 	Enabled, Disabled, Added, Removed, Confirmed, Left, Accepted, Declined,

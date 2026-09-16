@@ -20,6 +20,7 @@ import (
 	calendarcmd "github.com/roman-16/proton-cli/internal/cli/calendar"
 	contactscmd "github.com/roman-16/proton-cli/internal/cli/contacts"
 	drivecmd "github.com/roman-16/proton-cli/internal/cli/drive"
+	indexcmd "github.com/roman-16/proton-cli/internal/cli/index"
 	"github.com/roman-16/proton-cli/internal/cli/kit"
 	mailcmd "github.com/roman-16/proton-cli/internal/cli/mail"
 	passcmd "github.com/roman-16/proton-cli/internal/cli/pass"
@@ -218,7 +219,7 @@ func newRoot() *cobra.Command {
 		}
 	}
 	add(kit.GroupApps, mailcmd.New(), drivecmd.New(), calendarcmd.New(), contactscmd.New(), passcmd.New())
-	add(kit.GroupAccount, accountcmd.New(), apicmd.New())
+	add(kit.GroupAccount, accountcmd.New(), apicmd.New(), indexcmd.New())
 	add(kit.GroupSelf, selfcmd.ChangelogCmd(), selfcmd.ReportCmd(version), selfcmd.UpdateCmd(version),
 		selfcmd.UninstallCmd(), selfcmd.VersionCmd(version), completionCmd(root), skillCmd(root, version))
 

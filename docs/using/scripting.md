@@ -191,6 +191,24 @@ WantedBy=default.target
 
 `systemctl --user enable --now proton-mail-watch proton-reminders-watch` starts both. A watch stops cleanly on SIGTERM, so `systemctl --user stop` is not logged as a failure.
 
+The same unit shape keeps a [local index](../index/README.md) current, so a search answers without catching up first:
+
+```ini
+# ~/.config/systemd/user/proton-index-watch.service
+[Unit]
+Description=Proton local index
+
+[Service]
+Environment=PROTON_NO_INPUT=1
+ExecStart=/usr/local/bin/proton index watch --quiet
+Restart=always
+
+[Install]
+WantedBy=default.target
+```
+
+With a timer instead of a daemon, run `proton index update` on a schedule.
+
 Which folders count as an arrival is a setting of its own. `mail settings folders list` shows it per folder under NOTIFY, and `folders create` and `folders update` take `--notify`. Without `--folder`, the watch covers the inbox plus every folder marked that way.
 
 ### Nightly backup with cron

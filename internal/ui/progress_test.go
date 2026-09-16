@@ -81,6 +81,48 @@ func TestProgressFrames(t *testing.T) {
 	}
 }
 
+// Work measured in things counts them, in the same line a transfer draws: the
+// bar, the percentage, what is done of what there is, and how fast.
+func TestProgressCountsThingsWhereThereAreNoBytes(t *testing.T) {
+	p, buf := bar(80)
+	p.noun = "messages"
+	p.Start(48213, "Indexing mail")
+	p.Add(12400)
+
+	got := frames(buf)[1]
+	for _, want := range []string{"Indexing mail", " 26%", "12400 / 48213 messages"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("want %q in %q", want, got)
+		}
+	}
+	if strings.Contains(got, "B") {
+		t.Errorf("a count of messages should carry no byte unit: %q", got)
+	}
+
+	if rate := p.speed(8); rate != "8.0/s" {
+		t.Errorf("speed = %q, want things per second", rate)
+	}
+}
+
+// Work whose size is not known until it ends closes at 100%: a walk that has
+// finished is a walk that covered all of it, whatever the number turned out to
+// be.
+func TestProgressWithNoTotalClosesFull(t *testing.T) {
+	p, buf := bar(80)
+	p.noun = "items"
+	p.Start(0, "Indexing drive")
+	p.Add(8120)
+	p.Done()
+
+	drawn := frames(buf)
+	if running := drawn[1]; !strings.Contains(running, "  0%") || !strings.Contains(running, "8120 items") {
+		t.Errorf("while running, want the count and no claim about the share done: %q", running)
+	}
+	if last := drawn[len(drawn)-1]; !strings.Contains(last, "100%") {
+		t.Errorf("a finished walk should close at 100%%: %q", last)
+	}
+}
+
 // A shorter line has to erase the longer one it replaces, or the tail of the old
 // frame stays on screen.
 func TestProgressErasesTheRestOfTheLine(t *testing.T) {
@@ -155,6 +197,90 @@ func TestProgressWithholdsARateUntilItMeansSomething(t *testing.T) {
 	p.samples = []sample{{time.Now().Add(-2 * time.Second), 0}, {time.Now(), 200}}
 	if r := p.rate(); r < 90 || r > 110 {
 		t.Errorf("rate over a real window = %v, want about 100", r)
+	}
+}
+
+// Work that arrives in bursts is reported at the rate it is being done, not at
+// the rate of whichever burst it is in.
+//
+// Indexing spends its time in bursts: requests in flight, then a page written
+// to disk with nothing moving. Averaged over a window that fits inside one of
+// them, the same steady work reads as 34 a second and then as 20 - a number
+// nobody can act on, and an estimate that swings with it.
+func TestProgressRateSurvivesBurstyWork(t *testing.T) {
+	p, _ := bar(120)
+	p.noun = "messages"
+	p.total = 100000
+	now := time.Now()
+
+	// Twenty-five a second, arriving ten at a time with a pause after each page.
+	done := int64(0)
+	at := now.Add(-rateWindow)
+	for at.Before(now) {
+		for range 10 {
+			at = at.Add(40 * time.Millisecond)
+			done += 10
+			p.samples = append(p.samples, sample{at, done})
+		}
+		at = at.Add(3600 * time.Millisecond)
+		p.samples = append(p.samples, sample{at, done})
+	}
+	p.current = done
+
+	rate := p.rate()
+	if rate < 20 || rate > 30 {
+		t.Errorf("rate = %.1f, want the work's own 25 a second rather than a burst's", rate)
+	}
+
+	// And the burst the bar happens to be drawn in does not run away with it.
+	for range 10 {
+		at = at.Add(40 * time.Millisecond)
+		done += 10
+		p.samples = append(p.samples, sample{at, done})
+	}
+	if burst := p.rate(); burst > rate*1.3 {
+		t.Errorf("a burst moved the rate from %.1f to %.1f", rate, burst)
+	}
+}
+
+// A build that carries on shows how much of the whole is covered, and counts
+// none of it as work done just now.
+func TestProgressResumesWithoutCountingThePast(t *testing.T) {
+	p, buf := bar(80)
+	p.noun = "messages"
+	p.Start(48213, "Indexing mail")
+	p.Resume(12400)
+
+	resumed := frames(buf)[1]
+	if !strings.Contains(resumed, " 26%") || !strings.Contains(resumed, "12400 / 48213 messages") {
+		t.Errorf("a resumed build should open where it left off: %q", resumed)
+	}
+	if strings.Contains(resumed, "/s") {
+		t.Errorf("what was done before the run began is not a rate: %q", resumed)
+	}
+	if r := p.rate(); r != 0 {
+		t.Errorf("rate = %v straight after resuming, want none claimed yet", r)
+	}
+
+	// From there it measures what this run does, not what a previous one did.
+	p.samples = []sample{{time.Now().Add(-10 * time.Second), 12400}, {time.Now(), 12600}}
+	if r := p.rate(); r < 15 || r > 25 {
+		t.Errorf("rate = %.1f, want the 20 a second this run managed", r)
+	}
+}
+
+// A count of things is reported to a decimal only while the decimal says
+// something; above ten a second it is a digit that changes every redraw.
+func TestProgressRoundsARateThatIsFastEnough(t *testing.T) {
+	p, _ := bar(120)
+	p.noun = "messages"
+	for _, tc := range []struct {
+		rate float64
+		want string
+	}{{8.24, "8.2/s"}, {9.96, "10.0/s"}, {26.7, "27/s"}, {120.4, "120/s"}} {
+		if got := p.speed(tc.rate); got != tc.want {
+			t.Errorf("speed(%v) = %q, want %q", tc.rate, got, tc.want)
+		}
 	}
 }
 
