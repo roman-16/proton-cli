@@ -620,9 +620,7 @@ func TestMailMessagesEmptyClearsAFolder(t *testing.T) {
 		t.Fatalf("the message %q never reached the trash", subject)
 	}
 
-	// Another test moving something into the trash locks the label, and Proton
-	// says so rather than queueing, so this waits for it to be free.
-	runOKUntilFree(t, "mail", "messages", "empty", "--folder", "trash", "--yes")
+	runOK(t, "mail", "messages", "empty", "--folder", "trash", "--yes")
 
 	if !waitFor(60*time.Second, 3*time.Second, func() bool {
 		return messageIDInFolder("trash", subject) == ""

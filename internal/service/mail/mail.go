@@ -60,6 +60,24 @@ const (
 	labelTransactions = "26"
 )
 
+// mailboxBusy is Proton holding the mailbox for something it is already doing.
+//
+// Clearing a folder and running filters over mail that is already there are both
+// carried out in the background and over the account rather than over a
+// selection, so Proton takes one at a time and turns the next away until the
+// first is done. That is a moment - a trash emptied while another job held it
+// was taken three seconds later on one occasion and ten on another - but it is
+// Proton's moment, not this run's, which is why the wait is bounded by how long
+// such a job runs rather than by how long a client ought to be patient. Proton
+// words it differently from one endpoint to the next ("Another action is
+// currently in progress", "There is already an active operation on your folders
+// or labels"), so the status is what this is recognised by.
+var mailboxBusy = proton.Refusal{
+	Status: 409,
+	Within: time.Minute,
+	Reason: "Proton is still finishing an earlier action on this mailbox",
+}
+
 type Service struct {
 	C    proton.Doer
 	keys keys.Get

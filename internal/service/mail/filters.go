@@ -152,6 +152,7 @@ func (s *Service) FilterApply(ctx context.Context, ids []string) error {
 	}
 	return s.C.Decode(ctx, proton.Request{
 		Method: "POST", Path: "/mail/v4/messages/apply-filters", Body: body,
+		Transient: []proton.Refusal{mailboxBusy},
 	}, nil)
 }
 

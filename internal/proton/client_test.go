@@ -312,6 +312,130 @@ func TestRateLimitedRequestIsWaitedOutRatherThanFailed(t *testing.T) {
 	}
 }
 
+// Proton turns some requests away with a status that everywhere else means the
+// request itself was wrong: a lock it is holding over the account, a pace it
+// wants writes kept to. A request that names that answer waits it out, whether
+// or not it is one that may simply arrive twice.
+func TestARefusalARequestDeclaredIsWaitedOutRatherThanReported(t *testing.T) {
+	shrinkBackoff(t)
+
+	cases := []struct {
+		name   string
+		req    Request
+		status int
+		body   string
+	}{
+		{
+			name: "a status on its own",
+			req: Request{Method: "DELETE", Path: "/x", Transient: []Refusal{{
+				Status: http.StatusConflict, Within: time.Minute,
+				Reason: "Proton is still finishing an earlier action on this mailbox",
+			}}},
+			status: http.StatusConflict,
+			body:   `{"Code":2000,"Error":"Another action is currently in progress"}`,
+		},
+		{
+			name: "a status and the code under it",
+			req: Request{Method: "PUT", Path: "/x", Transient: []Refusal{{
+				Status: http.StatusBadRequest, Code: 2001, Within: time.Minute,
+				Reason: "Proton is not taking this contact write yet",
+			}}},
+			status: http.StatusBadRequest,
+			body:   `{"Code":2001,"Error":"Contact update failed"}`,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var asked int
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				asked++
+				if asked == 1 {
+					w.WriteHeader(tc.status)
+					_, _ = w.Write([]byte(tc.body))
+					return
+				}
+				_, _ = w.Write([]byte(`{"Code":1000}`))
+			}))
+			defer srv.Close()
+
+			c := New(Options{BaseURL: srv.URL, Logger: slog.New(slog.DiscardHandler)})
+			resp, err := c.Do(context.Background(), tc.req)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if resp.Status != http.StatusOK {
+				t.Errorf("status = %d, want the answer after the wait", resp.Status)
+			}
+			if asked != 2 {
+				t.Errorf("the server was asked %d times, want a second attempt", asked)
+			}
+		})
+	}
+}
+
+// Everywhere it was not declared, the same answer means the request was wrong,
+// and a mistyped ID asked about again is the same refusal four times over and
+// seconds before somebody is told about the typo.
+func TestARefusalNobodyDeclaredIsReportedAtOnce(t *testing.T) {
+	shrinkBackoff(t)
+
+	var asked int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		asked++
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"Code":2001,"Error":"Contact update failed"}`))
+	}))
+	defer srv.Close()
+
+	c := New(Options{BaseURL: srv.URL, Logger: slog.New(slog.DiscardHandler)})
+	_, err := c.Do(context.Background(), Request{Method: "PUT", Path: "/x"})
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) || apiErr.Code != 2001 {
+		t.Fatalf("err = %v, want Proton's own refusal reported", err)
+	}
+	if asked != 1 {
+		t.Errorf("the server was asked %d times, want the refusal taken at its word", asked)
+	}
+}
+
+// What a wait that ran out of patience reports is what Proton said, not that the
+// waiting stopped: a lock nothing releases and a folder that cannot be emptied
+// at all reach this the same way, and the answer is the only thing telling them
+// apart.
+func TestARefusalThatNeverClearsIsReportedAsItStands(t *testing.T) {
+	shrinkBackoff(t)
+
+	var asked int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		asked++
+		w.WriteHeader(http.StatusConflict)
+		_, _ = w.Write([]byte(`{"Code":2000,"Error":"Another action is currently in progress"}`))
+	}))
+	defer srv.Close()
+
+	c := New(Options{BaseURL: srv.URL, Logger: slog.New(slog.DiscardHandler)})
+	const within = 30 * time.Millisecond
+	start := time.Now()
+	_, err := c.Do(context.Background(), Request{Method: "DELETE", Path: "/x", Transient: []Refusal{{
+		Status: http.StatusConflict, Within: within,
+		Reason: "Proton is still finishing an earlier action on this mailbox",
+	}}})
+
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) || apiErr.HTTPStatus != http.StatusConflict || apiErr.Code != 2000 {
+		t.Fatalf("err = %v, want the refusal reported with what Proton said", err)
+	}
+	if apiErr.ExitCode() != 4 {
+		t.Errorf("exit = %d, want 4 (something else holds it)", apiErr.ExitCode())
+	}
+	if asked < 2 {
+		t.Errorf("the server was asked %d times, want the refusal waited out first", asked)
+	}
+	if elapsed := time.Since(start); elapsed < within {
+		t.Errorf("gave up after %v, want the declared %v spent first", elapsed, within)
+	}
+}
+
 func TestNoMoreThanMaxInFlightRequestsAtOnce(t *testing.T) {
 	var mu sync.Mutex
 	var inFlight, peak int

@@ -200,6 +200,14 @@ type hvDetails struct {
 	WebUrl                   string
 }
 
+// errorCode is the code Proton named in an answer, and zero when it named none
+// - an error page from the edge carries no body it could be read out of.
+func errorCode(body []byte) int {
+	var env struct{ Code int }
+	_ = json.Unmarshal(body, &env)
+	return env.Code
+}
+
 // classifyErrorBody decodes a non-2xx Proton response body into either a
 // *HumanVerificationError (Code 9001) or a generic *APIError.
 func classifyErrorBody(status int, body []byte) (*HumanVerificationError, *APIError) {

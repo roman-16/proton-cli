@@ -53,6 +53,7 @@ var Fields = map[string]Policy{
 	// ── the request ──
 	"method":      Keep,
 	"status":      Keep,
+	"code":        Keep, // the reason Proton named for an answer, from its own numbered set
 	"bytes":       Keep,
 	"duration_ms": Keep,
 	"wait_ms":     Keep,

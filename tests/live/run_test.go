@@ -469,7 +469,7 @@ func rowsOf(stdout string) ([]interface{}, bool) {
 // ── when Proton asks for room ──
 
 // rateLimited is what the client says when Proton asks for room.
-const rateLimited = "rate limited by Proton"
+const rateLimited = "Proton is rate limiting this run"
 
 // refuseToPush stops the run the first time Proton throttles it.
 //
@@ -483,48 +483,6 @@ func refuseToPush(t *testing.T, stderr string) {
 		t.Fatalf("Proton rate-limited this run. Give the account a few minutes before running it again.\n%s",
 			truncateOutput(stderr))
 	}
-}
-
-// busy is how Proton says something else holds what a command wants.
-//
-// This is not rate limiting - which fails a run on purpose - but an account-wide
-// lock on one folder or one background job, and Proton's own answer says to try
-// again. It has more than one sentence for it ("Another action is currently in
-// progress", "There is already an active operation on your folders or labels"),
-// so the status is what is matched: the wording is Proton's to reword, 409 is
-// not.
-const busy = "[HTTP 409]"
-
-// refused is how Proton turns away a contacts write it would otherwise take.
-//
-// It is neither rate limiting, which arrives as 429, nor a card Proton could not
-// read: the same bytes are taken on one attempt and refused on the next, writes
-// three seconds apart are never refused, and back-to-back ones are refused about
-// two in five times. So it is about pace. A genuinely unreadable card is refused
-// with 2001 too, which is why this waits rather than excusing it - one that is
-// really broken is refused every time and fails the test anyway.
-const refused = "2001: Contact update failed"
-
-// runOKUntilFree runs a command Proton may turn away, and fails only once it has
-// been turning it away for a minute.
-func runOKUntilFree(t *testing.T, args ...string) {
-	t.Helper()
-	var last string
-	if waitFor(60*time.Second, 3*time.Second, func() bool {
-		_, stderr, code := run(t, args...)
-		if code == 0 {
-			return true
-		}
-		last = stderr
-		if strings.Contains(stderr, busy) || strings.Contains(stderr, refused) {
-			return false
-		}
-		t.Fatalf("command %v failed (exit %d): %s", args, code, truncateOutput(stderr))
-		return false
-	}) {
-		return
-	}
-	t.Fatalf("command %v was still refused after a minute: %s", args, truncateOutput(last))
 }
 
 // waitFor polls check every interval until it returns true or the timeout

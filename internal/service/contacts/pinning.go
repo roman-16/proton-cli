@@ -224,7 +224,7 @@ func (s *Service) putSignedCard(ctx context.Context, id string, model vcard.Sign
 	for _, o := range others {
 		cards = append(cards, o)
 	}
-	return s.C.Decode(ctx, proton.Request{Method: "PUT", Path: "/contacts/v4/contacts/" + id, Body: map[string]any{"Cards": cards}}, nil)
+	return s.C.Decode(ctx, contactWrite(id, cards), nil)
 }
 
 // PinKey pins armoredKey to the contact for email as the preferred key. Encrypt

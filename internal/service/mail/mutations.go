@@ -186,6 +186,7 @@ func (s *Service) EmptyFolder(ctx context.Context, folder string) error {
 	q.Set("LabelID", ResolveFolder(folder))
 	return s.C.Decode(ctx, proton.Request{
 		Method: "DELETE", Path: "/mail/v4/messages/empty", Query: q,
+		Transient: []proton.Refusal{mailboxBusy},
 	}, nil)
 }
 

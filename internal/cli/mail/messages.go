@@ -641,11 +641,14 @@ func emptyCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			// What was emptied is the folder, which is the only thing this command
+			// knows: nothing was enumerated, so a number of messages would be invented.
+			kind := "folders"
+			if !box.Folder {
+				kind = "labels"
+			}
 			return kit.Mutate(c, ui.ResultSpec{
-				// Count stands for "everything", which is the honest number when
-				// nothing was enumerated: a count here would be invented.
-				Action: ui.Emptied, Kind: "messages", Count: 1,
-				Detail: "from " + box.Name,
+				Action: ui.Emptied, Kind: kind, Count: 1, Name: box.Name,
 			}, func() error {
 				return c.App.Mail.EmptyFolder(c.Ctx, box.ID)
 			})

@@ -196,7 +196,7 @@ func TestMailFiltersApplyToExistingMail(t *testing.T) {
 	// job, meters it hard, and refuses a second while the first is going - so
 	// asking twice teaches nothing the endpoint has not already answered and
 	// spends an allowance the rest of the suite needs.
-	runOKUntilFree(t, "mail", "settings", "filters", "apply", "--", id)
+	runOK(t, "mail", "settings", "filters", "apply", "--", id)
 }
 
 // The first rule to file a message wins, so naming a filter moves it to the

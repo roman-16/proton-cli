@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"sort"
 	"strings"
+	"time"
 
 	gopenpgp "github.com/ProtonMail/gopenpgp/v2/crypto"
 	"github.com/roman-16/proton-cli/internal/account/keys"
@@ -151,6 +152,35 @@ func storedCards(ctx context.Context, kr *gopenpgp.KeyRing, signed, encrypted, c
 	// from the answer.
 	slog.DebugContext(ctx, "contacts: cards written", "cards", strings.Join(kinds, ","))
 	return out, nil
+}
+
+// contactWriteRefused is the code Proton turns a contact write away with when
+// it will still take it a moment later.
+//
+// It is neither rate limiting, which arrives as 429, nor a card Proton could not
+// read. The same bytes are taken on one attempt and refused on the next, writes
+// three seconds apart are never refused, and back-to-back ones are refused about
+// two in five times - so it is about pace. The code is Proton's general "invalid
+// input", which is why this is declared on the one endpoint that answers with it
+// for that reason rather than read as a meaning the code carries: a card that is
+// genuinely unreadable is refused with it too, every time, and is still reported
+// once the waiting is done.
+const contactWriteRefused = 2001
+
+// contactWrite is the request that replaces a contact's cards.
+//
+// Every card the contact keeps goes in each time, whichever property is being
+// edited, so the same write twice leaves the contact where the first one put it.
+func contactWrite(id string, cards []any) proton.Request {
+	return proton.Request{
+		Method: "PUT", Path: "/contacts/v4/contacts/" + id,
+		Body:       map[string]any{"Cards": cards},
+		Repeatable: true,
+		Transient: []proton.Refusal{{
+			Status: 400, Code: contactWriteRefused, Within: 10 * time.Second,
+			Reason: "Proton is not taking this contact write yet",
+		}},
+	}
 }
 
 // encryptedPart lays the new values over what the contact already had, so
@@ -437,7 +467,7 @@ func (s *Service) Update(ctx context.Context, id string, patch NewContact) (pgp.
 	if err != nil {
 		return "", err
 	}
-	return existing.Signature, s.C.Decode(ctx, proton.Request{Method: "PUT", Path: "/contacts/v4/contacts/" + id, Body: map[string]any{"Cards": stored}}, nil)
+	return existing.Signature, s.C.Decode(ctx, contactWrite(id, stored), nil)
 }
 
 func (s *Service) Delete(ctx context.Context, ids []string) error {
@@ -826,10 +856,7 @@ func (s *Service) Merge(ctx context.Context, group Duplicate) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if err := s.C.Decode(ctx, proton.Request{
-		Method: "PUT", Path: "/contacts/v4/contacts/" + keep.ID,
-		Body: map[string]any{"Cards": stored},
-	}, nil); err != nil {
+	if err := s.C.Decode(ctx, contactWrite(keep.ID, stored), nil); err != nil {
 		return "", err
 	}
 

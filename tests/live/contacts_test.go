@@ -37,7 +37,7 @@ func TestContactsCRUD(t *testing.T) {
 	assertField(t, got, "Phone:", "+1234567890")
 
 	// Update phone
-	runOKUntilFree(t, "contacts", "update", "--phone", "+9999999999", "--", id)
+	runOK(t, "contacts", "update", "--phone", "+9999999999", "--", id)
 	got2 := runOK(t, "contacts", "get", "--", id)
 	assertField(t, got2, "Phone:", "+9999999999")
 	// name/email unchanged

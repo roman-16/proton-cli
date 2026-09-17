@@ -315,6 +315,16 @@ type Request struct {
 	// knows.
 	Repeatable bool
 
+	// Transient are the answers this endpoint gives that mean "not now", which are
+	// waited out rather than reported.
+	//
+	// Proton does not always ask for room with a 429. Some endpoints turn a request
+	// away with a status that everywhere else means the request itself was wrong,
+	// and the only way through is to ask again. Which endpoints do that, and how
+	// long it is worth asking, is a fact about the endpoint, so it belongs to the
+	// caller that knows which one it is naming.
+	Transient []Refusal
+
 	// elevated marks a request already retried after a scope elevation, so a
 	// second refusal cannot restart the cycle.
 	elevated bool
@@ -334,6 +344,31 @@ type Request struct {
 	// which is what lets a link be opened without an account, and what keeps a
 	// session being proved again from carrying the one it is replacing.
 	opensLink bool
+}
+
+// Refusal is Proton declining to do something now that it is still going to do:
+// a lock it is holding over the account, a pace it wants writes kept to.
+//
+// Declaring one is a claim that nothing was applied, the same claim a 429
+// carries, which is what makes it safe to ask again whether or not the request
+// is Repeatable. Status is matched exactly; Code narrows it to one of Proton's
+// own codes, and zero matches whatever the body says. Within bounds how long
+// asking again stays worth it, measured from the first attempt, because how long
+// Proton takes to come free is a property of what it is doing rather than of
+// this run; a refusal is waited out for a stated time or not at all, so a zero
+// Within declares nothing. Reason is what the person sitting through the wait is
+// told, as a sentence: the client knows only that the request was refused, and
+// the caller knows what for.
+type Refusal struct {
+	Status int
+	Code   int
+	Within time.Duration
+	Reason string
+}
+
+// matches reports whether an answer is this refusal.
+func (r Refusal) matches(resp *Response) bool {
+	return resp != nil && resp.Status == r.Status && (r.Code == 0 || r.Code == errorCode(resp.Body))
 }
 
 // credential is what a request identifies itself with: a session's UID and the
@@ -372,9 +407,19 @@ type Response struct {
 	retryHeader string
 }
 
+// retryAfter is the delay the server named, and nothing when it named none or
+// when the attempt never reached an answer to carry one.
+func (r *Response) retryAfter() string {
+	if r == nil {
+		return ""
+	}
+	return r.retryHeader
+}
+
 // Do sends a request and returns the response. Non-2xx responses return a
 // typed error. It transparently handles a transient failure (waiting and asking
-// again), 401 (refresh + retry), 429 (Retry-After + retry) and 9001 (human
+// again), 401 (refresh + retry), 429 (Retry-After + retry), a refusal the
+// request declared Transient (waiting until it clears) and 9001 (human
 // verification + retry).
 func (c *Client) Do(ctx context.Context, req Request) (*Response, error) {
 	if err := c.guardRefuses(req); err != nil {
@@ -483,10 +528,12 @@ func (c *Client) attempt(ctx context.Context, req Request) (*Response, error) {
 // retrying runs one attempt at a time until the request settles: either the
 // answer is one worth returning, or asking again cannot change it.
 //
-// Two things are worth asking about again. A 429 is Proton refusing without
+// Three things are worth asking about again. A 429 is Proton refusing without
 // having done anything, so it is always waited out. A server that broke or a
 // connection that failed says nothing about whether the request arrived, so it
-// is only sent again when arriving twice would change nothing.
+// is only sent again when arriving twice would change nothing. A refusal the
+// request declared is Proton asking for room in a status that usually means
+// something else, and is waited out for as long as the declaration says.
 //
 // req is the request the attempts are trying to get through, which is not always
 // all an attempt sends: an SRP exchange has to ask for fresh parameters each
@@ -494,7 +541,7 @@ func (c *Client) attempt(ctx context.Context, req Request) (*Response, error) {
 // yields that request's answer, or the failure that stopped the attempt reaching
 // one.
 func (c *Client) retrying(ctx context.Context, req Request, once func() (*Response, error)) (*Response, error) {
-	repeat := repeatable(req)
+	started := time.Now()
 	for attempt := 1; ; attempt++ {
 		resp, err := once()
 		// An attempt that reports neither an answer nor a failure has settled,
@@ -502,31 +549,28 @@ func (c *Client) retrying(ctx context.Context, req Request, once func() (*Respon
 		if resp == nil && err == nil {
 			return nil, nil
 		}
-		if attempt > transientWaits {
+		pause, again := worthWaiting(req, resp, err)
+		if !again || pause.over(attempt, time.Since(started)) {
 			return resp, err
 		}
-		var delay time.Duration
+		delay := retryDelay(resp.retryAfter(), attempt)
 		// Each wait is said out loud rather than logged at debug: waiting is the right
 		// thing to do and it can run to seconds, so a person watching a command sit
 		// there deserves to know what it is waiting for and not read it as a hang.
+		// What is worth recording beside it differs: a wait with no answer to record
+		// has the failure instead, and a refusal recognised by a code is told apart
+		// from every other refusal of that status by it.
 		switch {
 		case err != nil:
-			if !repeat || !worthRepeating(err) {
-				return resp, err
-			}
-			delay = retryDelay("", attempt)
-			c.log.Warn(waiting(notAnswering, delay), "method", req.Method, "path", req.Path,
+			c.log.Warn(waiting(pause.reason, delay), "method", req.Method, "path", req.Path,
 				"error", err, "wait_ms", delay.Milliseconds(), "attempt", attempt)
-		case resp.Status == http.StatusTooManyRequests:
-			delay = retryDelay(resp.retryHeader, attempt)
-			c.log.Warn(waiting(rateLimited, delay),
-				"method", req.Method, "path", req.Path, "wait_ms", delay.Milliseconds(), "attempt", attempt)
-		case resp.Status >= 500 && repeat:
-			delay = retryDelay(resp.retryHeader, attempt)
-			c.log.Warn(waiting(notAnswering, delay), "method", req.Method, "path", req.Path,
-				"status", resp.Status, "wait_ms", delay.Milliseconds(), "attempt", attempt)
+		case pause.code != 0:
+			c.log.Warn(waiting(pause.reason, delay), "method", req.Method, "path", req.Path,
+				"status", resp.Status, "code", pause.code,
+				"wait_ms", delay.Milliseconds(), "attempt", attempt)
 		default:
-			return resp, nil
+			c.log.Warn(waiting(pause.reason, delay), "method", req.Method, "path", req.Path,
+				"status", resp.Status, "wait_ms", delay.Milliseconds(), "attempt", attempt)
 		}
 		select {
 		case <-ctx.Done():
@@ -534,6 +578,60 @@ func (c *Client) retrying(ctx context.Context, req Request, once func() (*Respon
 		case <-time.After(delay):
 		}
 	}
+}
+
+// pause is what an answer worth asking about again costs: why the run is about
+// to sit still, and how long sitting there stays worth it.
+type pause struct {
+	reason string
+	// code is the Proton code a declared refusal was recognised by, which is what
+	// tells one refusal of a status apart from another in the log.
+	code int
+	// waits bounds the client's own patience, within a declared refusal's. Exactly
+	// one of them is set.
+	waits  int
+	within time.Duration
+}
+
+// over reports whether waiting any longer has stopped being worth it.
+//
+// The two bounds answer different questions. A bad moment at Proton's edge is
+// over in seconds or it is not a bad moment, so what the client decides by
+// itself is counted in attempts. A refusal a request declared is Proton working
+// through something it has already started, and how long that takes is a fact
+// about the endpoint rather than about this run, so the declaration bounds it by
+// the clock.
+func (p pause) over(attempt int, elapsed time.Duration) bool {
+	if p.within > 0 {
+		return elapsed >= p.within
+	}
+	return attempt > p.waits
+}
+
+// worthWaiting weighs one attempt's answer: whether asking again could change
+// it, and if it could, why the run is waiting and for how long.
+func worthWaiting(req Request, resp *Response, err error) (pause, bool) {
+	if err != nil {
+		if !repeatable(req) || !worthRepeating(err) {
+			return pause{}, false
+		}
+		return pause{reason: notAnswering, waits: transientWaits}, true
+	}
+	// What the request declared is weighed before what the client knows by itself,
+	// because it is the caller saying what this endpoint means by an answer the
+	// client would otherwise read as a refusal to be passed on.
+	for _, refusal := range req.Transient {
+		if refusal.matches(resp) {
+			return pause{reason: refusal.Reason, code: refusal.Code, within: refusal.Within}, true
+		}
+	}
+	switch {
+	case resp.Status == http.StatusTooManyRequests:
+		return pause{reason: rateLimited, waits: transientWaits}, true
+	case resp.Status >= 500 && repeatable(req):
+		return pause{reason: notAnswering, waits: transientWaits}, true
+	}
+	return pause{}, false
 }
 
 // waiting is how a wait is put to the person sitting through it: what is wrong,
@@ -791,11 +889,19 @@ func encodeBody(b any) (io.Reader, error) {
 // The server's own Retry-After is the answer when it gives one. Without it the
 // wait doubles from a floor to a ceiling, and half of it is random: requests
 // refused together would otherwise return together and be refused together.
+//
+// The doubling stops at the ceiling rather than being computed and then capped,
+// because nothing bounds how many attempts there have been: a refusal a request
+// declared is waited out by the clock, and a delay doubled once per attempt for
+// long enough is not a long wait but a negative one.
 func retryDelay(retryAfter string, attempt int) time.Duration {
 	if d, ok := namedDelay(retryAfter); ok {
 		return d
 	}
-	d := backoffFloor << (attempt - 1)
+	d := backoffFloor
+	for i := 1; i < attempt && d < backoffCeiling; i++ {
+		d *= 2
+	}
 	if d > backoffCeiling {
 		d = backoffCeiling
 	}
