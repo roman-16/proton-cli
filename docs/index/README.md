@@ -95,7 +95,7 @@ proton index watch
 
 `update` catches up once, for cron or a systemd timer. `watch` stays attached and applies changes as they land; while it runs, a search reads the copy as of the last poll, at most 30 seconds old. Prefer `watch` when searches are frequent, and `update` on a timer when they are not. Both finish a build that was interrupted, and neither indexes an app that has no index; `create` does that. For running `watch` unattended, see [Scripting](../using/scripting.md#run-a-watch-under-systemd).
 
-When Proton cannot say what has changed since the last catch-up - after a long gap, or a change across the whole account - the next `create` or `update` reads the app again and settles it. Until then a search says so:
+When Proton cannot say what has changed since the last catch-up - after a long gap, or a change across the whole account - the next `create` or `update` reads the app again and settles it. The same happens when part of the copy on this machine would not read back, and when a password reset has put your files on a new volume. Until then a search says so:
 
 ```console
 $ proton mail messages list --unread --folder all

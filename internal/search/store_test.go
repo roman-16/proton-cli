@@ -148,8 +148,11 @@ func TestATornTailIsReadAsTheEndAndWrittenOver(t *testing.T) {
 	if got := len(torn.Records()); got != 2 {
 		t.Fatalf("records = %d, want the 2 written before the tear", got)
 	}
-	if torn.Lost == 0 {
+	if torn.lost == 0 {
 		t.Error("a torn tail should be reported as bytes that did not read back")
+	}
+	if torn.State.Stale {
+		t.Error("a torn tail is an interrupted write, not a reason to read the account again")
 	}
 	if err := torn.Append(record(t, "c", "third")); err != nil {
 		t.Fatalf("append after a tear: %v", err)
@@ -161,6 +164,88 @@ func TestATornTailIsReadAsTheEndAndWrittenOver(t *testing.T) {
 	if got := len(again.Records()); got != 3 {
 		t.Errorf("records = %d, want 3: a write after a tear has to be readable", got)
 	}
+}
+
+// A record that went bad where it lay is not a torn tail: the records after it
+// are as good as they were and are read on, the index says it owes a reading of
+// the account for the one it lost, and the first write leaves a file without
+// the bad frame in it.
+func TestARecordThatWentBadIsSkippedAndOwed(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		spoil func(frame []byte)
+	}{
+		{name: "in its contents", spoil: func(frame []byte) { frame[frameLen+len(frame)/2] ^= 0xff }},
+		{name: "in its length", spoil: func(frame []byte) { frame[0] ^= 0xff }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := testStore(t)
+			log, err := s.Load(t.Context(), AppMail)
+			if err != nil {
+				t.Fatalf("load: %v", err)
+			}
+			if err := log.Append(record(t, "a", "first"), record(t, "b", "second"), record(t, "c", "third")); err != nil {
+				t.Fatalf("append: %v", err)
+			}
+			if err := log.Save(1000); err != nil {
+				t.Fatalf("save: %v", err)
+			}
+
+			path := filepath.Join(s.Dir(), "mail.bin")
+			data, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatalf("read: %v", err)
+			}
+			start, end := frameAt(data, 1)
+			tc.spoil(data[start:end])
+			if err := os.WriteFile(path, data, 0600); err != nil {
+				t.Fatalf("spoil: %v", err)
+			}
+
+			spoiled, err := s.Load(t.Context(), AppMail)
+			if err != nil {
+				t.Fatalf("reload: %v", err)
+			}
+			if !spoiled.State.Stale {
+				t.Error("a record that would not open should leave the index owing a reading of the account")
+			}
+			if spoiled.Has("b") {
+				t.Error("the record that went bad still answers")
+			}
+			if !spoiled.Has("a") {
+				t.Error("the record before the bad one went with it")
+			}
+			if tc.name == "in its contents" && !spoiled.Has("c") {
+				t.Error("the record after the bad one was thrown away with it")
+			}
+
+			if err := spoiled.Save(1001); err != nil {
+				t.Fatalf("save after a bad record: %v", err)
+			}
+			mended, err := s.Load(t.Context(), AppMail)
+			if err != nil {
+				t.Fatalf("reload after mending: %v", err)
+			}
+			if mended.corrupt != 0 || mended.lost != 0 {
+				t.Errorf("after a write the file still holds %d bad frames and %d stray bytes", mended.corrupt, mended.lost)
+			}
+			if got, want := len(mended.Records()), len(spoiled.Records()); got != want {
+				t.Errorf("records = %d after mending, want the %d that read back", got, want)
+			}
+			if !mended.State.Stale {
+				t.Error("mending the file is not reading the account: the index still owes one")
+			}
+		})
+	}
+}
+
+// frameAt is where the n-th frame of a log begins and ends.
+func frameAt(data []byte, n int) (int, int) {
+	at := 0
+	for range n {
+		at += frameLen + int(binary.BigEndian.Uint32(data[at:at+frameLen]))
+	}
+	return at, at + frameLen + int(binary.BigEndian.Uint32(data[at:at+frameLen]))
 }
 
 // An index is sealed to the account it was built for. Another account's keys

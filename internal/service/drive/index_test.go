@@ -315,6 +315,53 @@ func TestATreeThatIsNotTheAccountsIsWalked(t *testing.T) {
 	}
 }
 
+// An account whose files moved to another volume has a different tree, and the
+// index follows it there: what was indexed goes, the new tree is read, and the
+// catch-ups after that follow the new volume's history rather than asking the
+// old one for ever.
+func TestAnIndexFollowsTheAccountToANewVolume(t *testing.T) {
+	d := newIndexedTree(t)
+	d.build(t)
+
+	const moved = "volume-2"
+	d.doer.routes["GET /drive/volumes"] = volumeList(`{"VolumeID":"` + moved + `","State":1,"Type":1,` +
+		`"Share":{"ShareID":"` + testShareID + `","LinkID":"` + testRootID + `"}}`)
+	d.doer.routes["GET /drive/volumes/"+moved+"/events/latest"] = `{"EventID":"moved-0"}`
+	d.doer.routes["GET /drive/volumes/"+moved+"/events/moved-0"] = `{"EventID":"moved-1","More":0,"Events":[]}`
+
+	// What one run does: build, catch up, and read again where the catch-up says
+	// the index owes a reading.
+	x := d.indexing(t)
+	if _, err := x.Build(t.Context(), progress.Nop{}); err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	got, err := x.Sync(t.Context())
+	if err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	if !got.Refreshed || got.Removed != 4 {
+		t.Fatalf("sync = %+v, want the 4 items of the old tree removed and a reading owed", got)
+	}
+	if again, err := x.Build(t.Context(), progress.Nop{}); err != nil || again.Indexed != 4 {
+		t.Fatalf("reading the new tree = %+v, %v, want its 4 items indexed", again, err)
+	}
+	after, err := x.Sync(t.Context())
+	if err != nil {
+		t.Fatalf("sync after the reading: %v", err)
+	}
+	if after.Refreshed {
+		t.Error("the index still owes a reading after the new tree was read")
+	}
+
+	st := x.Status()
+	if st.Volume != moved || !st.Complete || st.Stale || st.Indexed != 4 {
+		t.Errorf("status = %+v, want a whole index of the new volume", st)
+	}
+	if !d.doer.sent("GET", "/drive/volumes/"+moved+"/events/moved-0") {
+		t.Error("the catch-up did not follow the new volume's history")
+	}
+}
+
 // What is written down reads back as the item it was.
 func TestWhatIsIndexedReadsBackAsTheItemItWas(t *testing.T) {
 	in := stored{LinkID: "a", ParentID: "b", Name: "invoice.pdf", Type: TypeFile, Size: 312}

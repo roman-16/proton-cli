@@ -200,10 +200,14 @@ func (x *indexSession) Build(ctx context.Context, sink progress.Sink) (search.Re
 	// A walk that could not read part of the tree has not established that what
 	// it did not see is gone, so the index keeps it and says it is unfinished.
 	if tally.whole() {
-		gone, err := x.tombstoneUnseen(ctx, seen)
+		gone, err := x.tombstoneUnseen(seen)
 		done = search.Total(done, gone)
 		if err != nil {
 			return done, err
+		}
+		if gone.Removed > 0 {
+			slog.DebugContext(ctx, "drive: items left the volume while nothing was following it",
+				"kind", string(skip.KindVolume), "reason", string(skip.Unreadable), "count", gone.Removed)
 		}
 	}
 	done.Unreadable = unreadable + tally.Sealed
@@ -214,8 +218,9 @@ func (x *indexSession) Build(ctx context.Context, sink progress.Sink) (search.Re
 	return done, x.save()
 }
 
-// tombstoneUnseen takes out what a whole walk did not come across.
-func (x *indexSession) tombstoneUnseen(ctx context.Context, seen map[string]bool) (search.Result, error) {
+// tombstoneUnseen takes out everything a reading of the tree did not come
+// across - and everything there is, when nothing was seen.
+func (x *indexSession) tombstoneUnseen(seen map[string]bool) (search.Result, error) {
 	var done search.Result
 	var records []search.Record
 	for _, rec := range x.log.Records() {
@@ -224,10 +229,6 @@ func (x *indexSession) tombstoneUnseen(ctx context.Context, seen map[string]bool
 		}
 		records = append(records, search.Record{ID: rec.ID, Gone: true})
 		done.Removed++
-	}
-	if len(records) > 0 {
-		slog.DebugContext(ctx, "drive: items left the volume while nothing was following it",
-			"kind", string(skip.KindVolume), "reason", string(skip.Unreadable), "count", len(records))
 	}
 	return done, x.log.Append(records...)
 }
@@ -261,11 +262,8 @@ func (x *indexSession) Sync(ctx context.Context) (search.Result, error) {
 	if err != nil {
 		return search.Result{}, err
 	}
-	// A volume that is not the one the index was built from is a different tree
-	// altogether, so what is indexed says nothing about it.
 	if log.State.Volume != "" && log.State.Volume != dc.VolumeID {
-		log.State.Complete = false
-		return search.Result{}, x.save()
+		return x.forgetVolume(ctx)
 	}
 
 	names := &naming{s: x.s, dc: dc, keys: map[string]*pgp.KeyRing{}}
@@ -290,16 +288,41 @@ func (x *indexSession) Sync(ctx context.Context) (search.Result, error) {
 			done.Refreshed = true
 			return done, x.save()
 		}
-		log.State.Cursor = batch.EventID
 		applied, err := x.applyEvents(ctx, names, batch)
 		done = search.Total(done, applied)
 		if err != nil {
 			return done, err
 		}
+		// The cursor moves once the page is in the index, so a page that could not
+		// be applied is asked for again rather than skipped - by the next run, or by
+		// the next poll of a watch that keeps this session open.
+		log.State.Cursor = batch.EventID
 		if batch.More == 0 {
 			break
 		}
 	}
+	return done, x.save()
+}
+
+// forgetVolume empties an index whose volume is not the one the account's files
+// are on any more.
+//
+// A different volume is a different tree altogether, with a history of its own:
+// what is indexed says nothing about it, and the feed that was being followed
+// does not describe it. So the index is left owing a reading of the account with
+// no cursor and no volume, which is what has the build that follows read the
+// new tree and take a cursor into its history.
+func (x *indexSession) forgetVolume(ctx context.Context) (search.Result, error) {
+	slog.WarnContext(ctx, "The account's files are on a different volume from the one the Drive index was built from, so it will be read from Proton again.",
+		"kind", string(skip.KindVolume), "reason", string(skip.Unreadable))
+	done, err := x.tombstoneUnseen(nil)
+	if err != nil {
+		return done, err
+	}
+	log := x.log
+	log.State.Cursor, log.State.Volume, log.State.Unreadable = "", "", 0
+	log.State.Stale = true
+	done.Refreshed = true
 	return done, x.save()
 }
 
@@ -585,6 +608,12 @@ func (s *Service) indexedTree(ctx context.Context, dc *Context, prefix string) (
 	}
 	x.dc = dc
 	x.syncBeforeRead(ctx)
+	// What the catch-up found out about the index counts as much as what the file
+	// said before it: one that has just been told it owes a reading of the tree
+	// answers for nothing.
+	if !x.log.State.Complete || x.log.State.Stale {
+		return nil, false
+	}
 
 	items := indexedItems(ctx, x.log)
 	paths := make(map[string]string, len(items))

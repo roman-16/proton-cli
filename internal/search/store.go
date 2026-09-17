@@ -1,11 +1,13 @@
 package search
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -75,10 +77,11 @@ type State struct {
 	Bodies int `json:"bodies,omitempty"`
 	// Complete says the first build reached the end.
 	Complete bool `json:"complete"`
-	// Stale says Proton could not describe what has happened since the index was
-	// last brought up to date, so what is in it can no longer be trusted to be
-	// what the account holds. It is settled by reading the account again rather
-	// than by following the feed, which is why it is the build that clears it.
+	// Stale says what is in the index can no longer be trusted to be what the
+	// account holds: Proton could not describe what has happened since it was
+	// last brought up to date, or a record of it would not read back. It is
+	// settled by reading the account again rather than by following the feed,
+	// which is why it is the build that clears it.
 	Stale bool `json:"stale,omitempty"`
 	// Oldest is the far end of what is indexed, which is what a search over a
 	// half-built index has to say about what it did not cover.
@@ -97,14 +100,17 @@ type Log struct {
 
 	recs []Record
 	at   map[string]int
-	// parsed is how much of the file read back whole, so a torn tail is written
-	// over rather than left in front of everything appended after it.
+	// parsed is how far the file could be read frame by frame, so a torn tail is
+	// written over rather than left in front of everything appended after it.
 	parsed int64
 	// dead is how many records in the file are superseded by a later one.
 	dead int
-	// Lost is how many bytes at the end of the file did not read back, which is
-	// what an interrupted write leaves and what a caller logs.
-	Lost int64
+	// lost is how many bytes at the end of the file did not read back, which is
+	// what an interrupted write leaves.
+	lost int64
+	// corrupt is how many frames were whole and would not open, which no write
+	// of this program leaves and which mend rewrites the file without.
+	corrupt int
 }
 
 // Load opens an app's index for reading and appending, creating the key and the
@@ -122,6 +128,7 @@ func (s *Store) Load(ctx context.Context, app App) (*Log, error) {
 	if err := l.read(); err != nil {
 		return nil, err
 	}
+	l.note(ctx)
 
 	if l.State.Account == "" {
 		l.State.Account = s.account()
@@ -150,6 +157,19 @@ func (l *Log) Get(id string) (Record, bool) {
 	return l.recs[i], true
 }
 
+// note says what did not read back, for the log a report is made from.
+func (l *Log) note(ctx context.Context) {
+	if l.lost > 0 {
+		// Recorded and not counted: the records are written again by the run that
+		// carries on, and what is in the index is what `index list` reports.
+		slog.DebugContext(ctx, "search: the end of the index did not read back", "bytes", l.lost)
+	}
+	if l.corrupt > 0 {
+		slog.WarnContext(ctx, fmt.Sprintf("%d of the %s index's records would not open, so it will be read from Proton again.", l.corrupt, l.app),
+			"count", l.corrupt)
+	}
+}
+
 // Append seals records onto the end of the log and remembers them.
 //
 // One write carries the whole batch, so a page of a build lands or does not: a
@@ -159,15 +179,12 @@ func (l *Log) Append(recs ...Record) error {
 	if len(recs) == 0 {
 		return nil
 	}
-	var buf []byte
-	for _, r := range recs {
-		sealed, err := l.seal(r)
-		if err != nil {
-			return err
-		}
-		frame := make([]byte, frameLen)
-		binary.BigEndian.PutUint32(frame, uint32(len(sealed)))
-		buf = append(append(buf, frame...), sealed...)
+	if err := l.mend(); err != nil {
+		return err
+	}
+	buf, err := l.frames(recs)
+	if err != nil {
+		return err
 	}
 	if err := l.store.ensureDir(); err != nil {
 		return err
@@ -204,6 +221,9 @@ func (l *Log) Append(recs ...Record) error {
 // Save writes the state file. The log is the index; this is the summary beside
 // it, and it is rewritten whole because it is four lines long.
 func (l *Log) Save(now int64) error {
+	if err := l.mend(); err != nil {
+		return err
+	}
 	l.State.Updated = now
 	l.State.Indexed = len(l.recs)
 	if err := l.store.ensureDir(); err != nil {
@@ -251,11 +271,19 @@ func (l *Log) drop(i int) {
 	}
 }
 
-// read loads the log, stopping at the first frame that is not whole.
+// read loads the log, telling a tail an interrupted write left from a record
+// that went bad where it lay.
 //
-// A tail that does not parse is a run interrupted between a write and its end,
-// which is the ordinary way a build stops: the records in front of it are every
-// bit as good as they were, and the next append writes over it.
+// A frame that reaches past the end of the file, or a length nothing could have
+// written in front of nothing but zeros, is a run interrupted between a write
+// and its end, which is the ordinary way a build stops: the records in front of
+// it are every bit as good as they were, and the next append writes over it.
+//
+// A frame that is whole and will not open is something else. What it held is
+// gone, and nothing in the file says what it was, so the index is marked as
+// owing a reading of the account; the frames after it are read on rather than
+// thrown away with it, and the file is rewritten without it under the first
+// write.
 func (l *Log) read() error {
 	data, err := os.ReadFile(l.store.logPath(l.app))
 	if errors.Is(err, os.ErrNotExist) {
@@ -267,22 +295,49 @@ func (l *Log) read() error {
 	for at := 0; at+frameLen <= len(data); {
 		size := int(binary.BigEndian.Uint32(data[at : at+frameLen]))
 		end := at + frameLen + size
-		if size <= 0 || size > maxRecord || end > len(data) {
+		if size <= 0 || size > maxRecord {
+			if !zeros(data[at:]) {
+				l.corrupt++
+			}
+			break
+		}
+		if end > len(data) {
 			break
 		}
 		r, err := l.open(data[at+frameLen : end])
-		if err != nil {
-			break
-		}
-		l.remember(r)
 		at = end
 		l.parsed = int64(at)
+		if err != nil {
+			l.corrupt++
+			continue
+		}
+		l.remember(r)
 	}
-	// What did not read back is a short reading of the index, which the reader is
-	// told about by the count of what is in it rather than by a warning: a build
-	// that carries on covers the difference.
-	l.Lost = int64(len(data)) - l.parsed
+	l.lost = int64(len(data)) - l.parsed
+	if l.corrupt > 0 {
+		l.State.Stale = true
+	}
 	return nil
+}
+
+// zeros reports whether a tail holds nothing, which is what a crash leaves in a
+// file it had extended and not yet written to.
+func zeros(tail []byte) bool { return len(bytes.Trim(tail, "\x00")) == 0 }
+
+// frames seals records and puts a length in front of each, as the file holds
+// them.
+func (l *Log) frames(recs []Record) ([]byte, error) {
+	var buf []byte
+	for _, r := range recs {
+		sealed, err := l.seal(r)
+		if err != nil {
+			return nil, err
+		}
+		frame := make([]byte, frameLen)
+		binary.BigEndian.PutUint32(frame, uint32(len(sealed)))
+		buf = append(append(buf, frame...), sealed...)
+	}
+	return buf, nil
 }
 
 func (l *Log) seal(r Record) ([]byte, error) {
@@ -311,24 +366,27 @@ func (l *Log) worthCompacting() bool {
 	return total > 64 && float64(l.dead) > float64(total)*compactAtWaste
 }
 
+// mend rewrites a log that was found holding a frame nothing can open. It is
+// done under the run's first write rather than at the reading, because a
+// reading may be a search's while another run holds the directory.
+func (l *Log) mend() error {
+	if l.corrupt == 0 {
+		return nil
+	}
+	return l.compact()
+}
+
 // compact rewrites the log as the records it currently holds, under fresh
 // nonces, and swaps it in. A crash partway leaves the old file in place.
 func (l *Log) compact() error {
-	recs := append([]Record{}, l.recs...)
-	var buf []byte
-	for _, r := range recs {
-		sealed, err := l.seal(r)
-		if err != nil {
-			return err
-		}
-		frame := make([]byte, frameLen)
-		binary.BigEndian.PutUint32(frame, uint32(len(sealed)))
-		buf = append(append(buf, frame...), sealed...)
+	buf, err := l.frames(l.recs)
+	if err != nil {
+		return err
 	}
 	if err := writeFile(l.store.logPath(l.app), buf); err != nil {
 		return err
 	}
-	l.parsed, l.dead = int64(len(buf)), 0
+	l.parsed, l.dead, l.lost, l.corrupt = int64(len(buf)), 0, 0, 0
 	return nil
 }
 

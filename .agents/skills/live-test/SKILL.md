@@ -56,11 +56,13 @@ Leave `allowOther` on. Free text is a correction to the selection: apply it and 
 
 ## 3. Run it
 
-One call, and it lasts as long as the run does:
+One call, and it lasts as long as the run does. Make it bare, with the bash tool's timeout set to one hour (3600 seconds):
 
 ```bash
 .agents/skills/live-test/scripts/live-test.sh run coverage-one 'TestContactsMatchingPinStillDelivers|TestPassExportAndImportRoundTrip'
 ```
+
+Bare means no pipe and no redirect - not `| tail`, not `| grep`, not `> file`. The progress lines are for the user to watch, and a pipe holds every one of them back until the run ends, which for the full suite is forty minutes of nothing on screen. One hour is what the full suite needs with room to spare; a shorter timeout aborts the call partway, and a longer one holds nothing.
 
 ```
 started just coverage-one (2 tests) in zellij session proton-cli-live
@@ -104,5 +106,7 @@ Then stop. Reading the failures and fixing them is the next thing the user asks 
 - Start a run without a picked option in the questionnaire.
 - Run `just test`, `just coverage`, `just test-one`, `just coverage-one` or `go test ./tests/live/…` any other way.
 - Poll `check` in a loop. `run` and `watch` already report once a minute.
+- Pipe or redirect the script's output. Every line it prints is the user's to see as it is printed.
+- Give the `run` or `watch` call a timeout other than one hour.
 - Touch a multiplexer session other than `proton-cli-live`.
 - Start a second run while one is going.

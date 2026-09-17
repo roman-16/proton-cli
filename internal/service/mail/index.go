@@ -1,13 +1,13 @@
 package mail
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/url"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -187,17 +187,11 @@ type indexSession struct {
 	// which is what says whether a reply's quoted history is already covered.
 	oldest map[string]int64
 	// bodies is how many messages are not waiting on their text, unreadable how
-	// many of those went in without it, and owed the ones still waiting.
+	// many of those went in without it, and owed the ones still waiting, by ID,
+	// with when each arrived, which is the order the text is fetched in.
 	bodies     int
 	unreadable int
-	owed       []owed
-}
-
-// owed is a message the index holds without its text, and when it arrived,
-// which is the order the text is fetched in.
-type owed struct {
-	id string
-	at int64
+	owed       map[string]int64
 }
 
 func (s *Service) openIndex(ctx context.Context) (*indexSession, error) {
@@ -205,11 +199,15 @@ func (s *Service) openIndex(ctx context.Context) (*indexSession, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.noteLostRecords(ctx, log)
-	return &indexSession{s: s, log: log, oldest: map[string]int64{}}, nil
+	return &indexSession{s: s, log: log, oldest: map[string]int64{}, owed: map[string]int64{}}, nil
 }
 
-func (x *indexSession) Status() search.Status { return x.log.Status() }
+func (x *indexSession) Status() search.Status {
+	if x.surveyed {
+		x.counts()
+	}
+	return x.log.Status()
+}
 
 // Build brings the index to every message the account holds, and then to the
 // bodies of the ones it is owed.
@@ -268,8 +266,11 @@ func (x *indexSession) reckon(before stored, had bool, now stored) {
 		x.bodies++
 	case !now.settled() && settled:
 		x.bodies--
-	case !now.settled() && !had:
-		x.owed = append(x.owed, owed{id: now.ID, at: now.Time})
+	}
+	if now.settled() {
+		delete(x.owed, now.ID)
+	} else {
+		x.owed[now.ID] = now.Time
 	}
 	switch {
 	case now.Unreadable && !unreadable:
@@ -284,6 +285,7 @@ func (x *indexSession) dropped(before stored, had bool) {
 	if !had {
 		return
 	}
+	delete(x.owed, before.ID)
 	if before.settled() {
 		x.bodies--
 	}
@@ -304,7 +306,16 @@ func (x *indexSession) counts() {
 // that it did not have. An envelope written for a message whose body is still
 // owed is half an arrival, and the half worth a line is the body: counting both
 // would report a mailbox of ten thousand as twenty.
-func counted(before, now stored) bool { return now.settled() || before.settled() }
+func counted(now stored) bool { return now.settled() }
+
+// owing reports whether the summary beside the log says bodies are still to be
+// fetched.
+//
+// The summary is written after the work it summarises, so a run stopped between
+// the two leaves one that says less than the log holds - never more. One that
+// says nothing is owed can be taken at its word; one that says something is has
+// to be checked against the log, which is what a survey does.
+func (x *indexSession) owing() bool { return x.log.State.Bodies < x.log.State.Indexed }
 
 // held is what the index says about one message.
 func (x *indexSession) held(id string) (stored, bool) {
@@ -319,8 +330,12 @@ func (x *indexSession) held(id string) (stored, bool) {
 	return in, true
 }
 
-// save writes the state file, with the counts this run has kept.
-func (x *indexSession) save() error {
+// save writes the state file, with the counts this run has kept, and with the
+// log read through first where the summary claims there is work to do.
+func (x *indexSession) save(ctx context.Context) error {
+	if x.owing() {
+		x.survey(ctx)
+	}
 	if x.surveyed {
 		x.counts()
 	}
@@ -347,7 +362,7 @@ func (x *indexSession) walkMailbox(ctx context.Context, sink progress.Sink) (sea
 			return search.Result{}, err
 		}
 		log.State.Cursor = cursor
-		if err := x.save(); err != nil {
+		if err := x.save(ctx); err != nil {
 			return search.Result{}, err
 		}
 	}
@@ -364,7 +379,7 @@ func (x *indexSession) walkMailbox(ctx context.Context, sink progress.Sink) (sea
 	// How much there is to index is written down as soon as it is known, so a
 	// walk interrupted on its first page still leaves an index that can say how
 	// little of the mailbox it covers.
-	if err := x.save(); err != nil {
+	if err := x.save(ctx); err != nil {
 		return search.Result{}, err
 	}
 	progress.Counting(sink, "messages")
@@ -395,7 +410,7 @@ func (x *indexSession) walkMailbox(ctx context.Context, sink progress.Sink) (sea
 			log.State.Oldest = oldest
 		}
 		sink.Add(int64(len(page)))
-		if err := x.save(); err != nil {
+		if err := x.save(ctx); err != nil {
 			return done, err
 		}
 		if len(page) < indexPage {
@@ -412,7 +427,7 @@ func (x *indexSession) walkMailbox(ctx context.Context, sink progress.Sink) (sea
 	}
 	log.State.Complete, log.State.Stale = true, false
 	sink.Done()
-	return done, x.save()
+	return done, x.save(ctx)
 }
 
 // writeEnvelopes writes down what one page of the walk says, leaving alone the
@@ -433,7 +448,7 @@ func (x *indexSession) writeEnvelopes(page []rawListMessage, seen map[string]boo
 		}
 		records = append(records, rec)
 		x.reckon(before, had, in)
-		if counted(before, in) {
+		if counted(in) {
 			done.Indexed++
 		}
 	}
@@ -468,10 +483,9 @@ func (x *indexSession) tombstoneUnseen(seen map[string]bool) (search.Result, err
 // that is already current - would otherwise pay for the whole mailbox to find
 // out that there is nothing to do.
 func (x *indexSession) fetchOwedBodies(ctx context.Context, sink progress.Sink) (search.Result, error) {
-	if !x.surveyed && x.log.State.Bodies >= x.log.State.Indexed {
-		return search.Result{}, nil
+	if x.owing() {
+		x.survey(ctx)
 	}
-	x.survey(ctx)
 	wanted := x.owedNow()
 	if len(wanted) == 0 {
 		return search.Result{}, nil
@@ -491,22 +505,26 @@ func (x *indexSession) fetchOwedBodies(ctx context.Context, sink progress.Sink) 
 		}
 	}
 	sink.Done()
-	return done, x.save()
+	return done, x.save(ctx)
 }
 
 // owedNow is what the index is still owed a body for, newest first, as the
-// envelopes to write once the text is there.
+// envelopes to write once the text is there. A message stays owed until its
+// text is written, so one whose fetch failed is asked for again by the next
+// run, whether that is a new process or the next poll of the same one.
 func (x *indexSession) owedNow() []stored {
-	sort.SliceStable(x.owed, func(i, j int) bool { return x.owed[i].at > x.owed[j].at })
 	out := make([]stored, 0, len(x.owed))
-	for _, o := range x.owed {
-		in, had := x.held(o.id)
+	for id := range x.owed {
+		in, had := x.held(id)
 		if !had || in.settled() {
+			delete(x.owed, id)
 			continue
 		}
 		out = append(out, in)
 	}
-	x.owed = x.owed[:0]
+	slices.SortFunc(out, func(a, b stored) int {
+		return cmp.Or(cmp.Compare(b.Time, a.Time), cmp.Compare(a.ID, b.ID))
+	})
 	return out
 }
 
@@ -570,7 +588,7 @@ func (x *indexSession) fetchBodies(ctx context.Context, want []stored, sink prog
 		records = append(records, rec)
 		before, had := x.held(in.ID)
 		x.reckon(before, had, in)
-		if counted(before, in) {
+		if counted(in) {
 			done.Indexed++
 		}
 	}
@@ -696,14 +714,23 @@ func (x *indexSession) indexText(in stored, raw *rawMessage, body string) string
 
 // restated is the message as the index will hold it: the envelope Proton just
 // gave, over whatever the index already holds about its body.
+func restated(before stored, m rawListMessage) stored {
+	in := awaiting(before, m)
+	in.Body, in.Opened, in.Unreadable = before.Body, before.Opened, before.Unreadable
+	return in
+}
+
+// awaiting is the message as the index holds it while its text is fetched: the
+// envelope Proton just gave, owed a body. Whatever text the index held is not
+// carried over, because the event that brings a message here says the text is
+// what changed.
 //
 // Who it was addressed to is kept where the envelope says nothing about it, so
 // that a listing row without the addressees cannot take away what a message
 // carried - --to matches a name in them, and a search that lost them would
 // answer with less than it did before.
-func restated(before stored, m rawListMessage) stored {
+func awaiting(before stored, m rawListMessage) stored {
 	in := indexedFrom(m)
-	in.Body, in.Opened, in.Unreadable = before.Body, before.Opened, before.Unreadable
 	if len(in.To)+len(in.CC)+len(in.BCC) == 0 {
 		in.To, in.CC, in.BCC = before.To, before.CC, before.BCC
 	}
@@ -752,7 +779,7 @@ func (x *indexSession) syncIndex(ctx context.Context) (search.Result, error) {
 			return search.Result{}, err
 		}
 		log.State.Cursor = cursor
-		return search.Result{}, x.save()
+		return search.Result{}, x.save(ctx)
 	}
 
 	var done search.Result
@@ -777,19 +804,22 @@ func (x *indexSession) syncIndex(ctx context.Context) (search.Result, error) {
 			}
 			log.State.Cursor = cursor
 			done.Refreshed = true
-			return done, x.save()
+			return done, x.save(ctx)
 		}
-		log.State.Cursor = batch.EventID
 		applied, err := x.applyEvents(ctx, batch)
 		done = search.Total(done, applied)
 		if err != nil {
 			return done, err
 		}
+		// The cursor moves once the page is in the index, so a page that could not
+		// be applied is asked for again rather than skipped - by the next run, or by
+		// the next poll of a watch that keeps this session open.
+		log.State.Cursor = batch.EventID
 		if batch.More == 0 {
 			break
 		}
 	}
-	return done, x.save()
+	return done, x.save(ctx)
 }
 
 // indexBatch is one page of the feed, reduced to what an index needs: every
@@ -798,11 +828,14 @@ type indexBatch struct {
 	EventID  string
 	More     int
 	Refresh  int
-	Messages []struct {
-		ID      string
-		Action  int
-		Message *rawListMessage
-	}
+	Messages []indexEvent
+}
+
+// indexEvent is one thing the feed says happened to one message.
+type indexEvent struct {
+	ID      string
+	Action  int
+	Message *rawListMessage
 }
 
 // The feed's actions, as Proton numbers them.
@@ -815,9 +848,10 @@ const (
 //
 // A message whose flags or labels moved is rewritten from the event itself,
 // which carries the whole envelope: no request, and the body already in the
-// index is kept. A message that was edited is fetched again, because what
-// changed is the text - which is the difference between a draft that was saved
-// and a message that was filed.
+// index is kept. A message that arrived or was edited goes in the way the walk
+// puts one in - the envelope first, owed its text, and the text fetched after -
+// so a fetch that fails leaves a message the index holds and will ask about
+// again, rather than one it never heard of.
 func (x *indexSession) applyEvents(ctx context.Context, batch indexBatch) (search.Result, error) {
 	if len(batch.Messages) == 0 {
 		return search.Result{}, nil
@@ -826,7 +860,7 @@ func (x *indexSession) applyEvents(ctx context.Context, batch indexBatch) (searc
 	var done search.Result
 	var records []search.Record
 	var fetch []stored
-	for _, e := range batch.Messages {
+	for _, e := range latest(batch.Messages) {
 		before, had := x.held(e.ID)
 		switch {
 		case e.Action == eventDelete:
@@ -840,17 +874,27 @@ func (x *indexSession) applyEvents(ctx context.Context, batch indexBatch) (searc
 				"kind", string(skip.KindMessage), "reason", string(skip.Unreadable), "ref", e.ID)
 		case had && e.Action != eventUpdate:
 			in := restated(before, *e.Message)
+			if before.envelopeIs(in) {
+				continue
+			}
 			rec, err := record(in)
 			if err != nil {
 				return done, err
 			}
 			records = append(records, rec)
 			x.reckon(before, had, in)
-			if counted(before, in) {
+			if counted(in) {
 				done.Indexed++
 			}
 		default:
-			fetch = append(fetch, restated(before, *e.Message))
+			in := awaiting(before, *e.Message)
+			rec, err := record(in)
+			if err != nil {
+				return done, err
+			}
+			records = append(records, rec)
+			x.reckon(before, had, in)
+			fetch = append(fetch, in)
 		}
 	}
 	if err := x.log.Append(records...); err != nil {
@@ -859,37 +903,25 @@ func (x *indexSession) applyEvents(ctx context.Context, batch indexBatch) (searc
 	if len(fetch) == 0 {
 		return done, nil
 	}
-	// A message the feed reports twice is fetched once: the last word about it
-	// is the one that is true.
-	fetched, err := x.fetchBodies(ctx, newest(fetch), progress.Nop{})
+	fetched, err := x.fetchBodies(ctx, fetch, progress.Nop{})
 	return search.Total(done, fetched), err
 }
 
-// newest keeps the last event about each message, in the order they arrived.
-func newest(msgs []stored) []stored {
-	at := make(map[string]int, len(msgs))
-	out := make([]stored, 0, len(msgs))
-	for _, m := range msgs {
-		if i, ok := at[m.ID]; ok {
-			out[i] = m
+// latest keeps the last event about each message, in the order they arrived: a
+// message the feed reports twice is applied once, and the last word about it is
+// the one that is true.
+func latest(events []indexEvent) []indexEvent {
+	at := make(map[string]int, len(events))
+	out := make([]indexEvent, 0, len(events))
+	for _, e := range events {
+		if i, ok := at[e.ID]; ok {
+			out[i] = e
 			continue
 		}
-		at[m.ID] = len(out)
-		out = append(out, m)
+		at[e.ID] = len(out)
+		out = append(out, e)
 	}
 	return out
-}
-
-// noteLostRecords says when the end of a log did not read back, which is what an
-// interrupted write leaves behind.
-func (s *Service) noteLostRecords(ctx context.Context, log *search.Log) {
-	if log.Lost == 0 {
-		return
-	}
-	// Recorded and not counted: the records are written again by the run that
-	// carries on, and what is in the index is what `index list` reports.
-	slog.DebugContext(ctx, "mail: the end of the index did not read back",
-		"kind", string(skip.KindMessage), "reason", string(skip.Malformed), "bytes", log.Lost)
 }
 
 // Indexed reports whether this app has an index to answer from.

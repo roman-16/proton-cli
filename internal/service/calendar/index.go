@@ -411,9 +411,6 @@ func (x *indexSession) syncCalendar(ctx context.Context, calendarID, cursor stri
 			done.Refreshed = true
 			return done, nil
 		}
-		cursor = batch.CalendarModelEventID
-		log.State.Cursors[calendarID] = cursor
-
 		var records []search.Record
 		for _, e := range batch.CalendarEvents {
 			if e.Action == eventDeleted || e.Event == nil {
@@ -440,6 +437,11 @@ func (x *indexSession) syncCalendar(ctx context.Context, calendarID, cursor stri
 		if err := log.Append(records...); err != nil {
 			return done, err
 		}
+		// The cursor moves once the page is in the index, so a page that could not
+		// be applied is asked for again rather than skipped - by the next run, or by
+		// the next poll of a watch that keeps this session open.
+		cursor = batch.CalendarModelEventID
+		log.State.Cursors[calendarID] = cursor
 		if batch.More == 0 {
 			break
 		}
@@ -504,6 +506,12 @@ func (s *Service) indexedEvents(ctx context.Context, calendarIDs []string) ([]st
 		return nil, false
 	}
 	x.syncBeforeRead(ctx)
+	// What the catch-up found out about the index counts as much as what the file
+	// said before it: one that has just been told it owes a reading of the
+	// calendars answers for nothing.
+	if !x.log.State.Complete || x.log.State.Stale {
+		return nil, false
+	}
 
 	wanted := map[string]bool{}
 	for _, id := range calendarIDs {

@@ -151,12 +151,13 @@ func storedFrom(t *testing.T, data []byte) stored {
 	return in.event()
 }
 
-// A calendar that is in the account and will not open for it.
+// A calendar that is in the account and will not open for it, and the Proton
+// that answers for it.
 //
 // It is the state a calendar shared from another account, or one whose key a
 // password reset left shut, is in: Proton hands over the events and nothing
 // here can read a word of them.
-func sealedCalendar(t *testing.T, events string) *Service {
+func sealedCalendar(t *testing.T, events string) (*Service, *routeDoer) {
 	t.Helper()
 	d := &routeDoer{handler: func(r proton.Request) ([]byte, error) {
 		switch {
@@ -180,7 +181,18 @@ func sealedCalendar(t *testing.T, events string) *Service {
 		func(context.Context) (search.Keys, error) {
 			return search.Keys{Seal: kr, Open: kr}, nil
 		}))
-	return s
+	return s, d
+}
+
+// feed puts one page of the calendar's history in front of the next sync.
+func feed(d *routeDoer, page string) {
+	inner := d.handler
+	d.handler = func(r proton.Request) ([]byte, error) {
+		if strings.HasSuffix(r.Path, "/modelevents/cursor-0") {
+			return []byte(page), nil
+		}
+		return inner(r)
+	}
 }
 
 // indexKeyRing is the account key an index is sealed to.
@@ -201,7 +213,7 @@ func indexKeyRing(t *testing.T) *pgp.KeyRing {
 // clear beside each event, so a search covers the days it holds and says nothing
 // about what is on them.
 func TestACalendarThatWillNotOpenIsIndexedByItsFrames(t *testing.T) {
-	s := sealedCalendar(t, `{"Events":[
+	s, _ := sealedCalendar(t, `{"Events":[
 		{"ID":"ev1","CalendarID":"cal1","StartTime":1700000000,"EndTime":1700003600},
 		{"ID":"ev2","CalendarID":"cal1","StartTime":1700090000,"EndTime":1700093600}
 	]}`)
@@ -226,7 +238,7 @@ func TestACalendarThatWillNotOpenIsIndexedByItsFrames(t *testing.T) {
 // cursor: a catch-up from a moment nothing was ever read at would report a
 // calendar as current that has never been indexed.
 func TestACalendarThatWouldNotBeReadLeavesTheBuildUnfinished(t *testing.T) {
-	s := sealedCalendar(t, "")
+	s, _ := sealedCalendar(t, "")
 	x, err := s.openIndex(t.Context())
 	if err != nil {
 		t.Fatalf("open the index: %v", err)
@@ -245,7 +257,7 @@ func TestACalendarThatWouldNotBeReadLeavesTheBuildUnfinished(t *testing.T) {
 // What a calendar no longer has leaves the index, and so does everything of a
 // calendar the account no longer has.
 func TestWhatACalendarNoLongerHasLeavesTheIndex(t *testing.T) {
-	s := sealedCalendar(t, `{"Events":[{"ID":"ev1","CalendarID":"cal1","StartTime":1700000000,"EndTime":1700003600}]}`)
+	s, _ := sealedCalendar(t, `{"Events":[{"ID":"ev1","CalendarID":"cal1","StartTime":1700000000,"EndTime":1700003600}]}`)
 	x, err := s.openIndex(t.Context())
 	if err != nil {
 		t.Fatalf("open the index: %v", err)
@@ -284,5 +296,48 @@ func TestWhatACalendarNoLongerHasLeavesTheIndex(t *testing.T) {
 	}
 	if !held["ev1"] {
 		t.Error("the event the calendar does hold is not in the index")
+	}
+}
+
+// A page of a calendar's history that could not be applied is asked for again
+// rather than skipped: the cursor stays where the index last caught up, in the
+// open session and on disk alike.
+func TestAPageACalendarCouldNotApplyIsAskedForAgain(t *testing.T) {
+	s, d := sealedCalendar(t, `{"Events":[{"ID":"ev1","CalendarID":"cal1","StartTime":1700000000,"EndTime":1700003600}]}`)
+	x, err := s.openIndex(t.Context())
+	if err != nil {
+		t.Fatalf("open the index: %v", err)
+	}
+	if _, err := x.Build(t.Context(), progress.Nop{}); err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	feed(d, `{"CalendarModelEventID":"cursor-1","More":0,"CalendarEvents":[
+		{"ID":"ev2","Action":1,"Event":{"ID":"ev2","CalendarID":"cal1","StartTime":1700090000,"EndTime":1700093600}}
+	]}`)
+
+	for range 2 {
+		if _, err := x.Sync(t.Context()); err != nil {
+			t.Fatalf("sync: %v", err)
+		}
+		if cursor := x.log.State.Cursors["cal1"]; cursor != "cursor-0" {
+			t.Fatalf("cursor = %q after a page the calendar's key would not open for, want it left at cursor-0", cursor)
+		}
+	}
+	asked := 0
+	for _, r := range d.reqs {
+		if strings.HasSuffix(r.Path, "/modelevents/cursor-0") {
+			asked++
+		}
+	}
+	if asked != 2 {
+		t.Errorf("the page was asked for %d times over two catch-ups, want both to ask for it", asked)
+	}
+
+	reopened, err := s.openIndex(t.Context())
+	if err != nil {
+		t.Fatalf("reopen the index: %v", err)
+	}
+	if cursor := reopened.log.State.Cursors["cal1"]; cursor != "cursor-0" {
+		t.Errorf("cursor = %q on disk, want the page the index has yet to apply", cursor)
 	}
 }

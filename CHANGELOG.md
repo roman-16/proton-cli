@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 Adding a version section here is what publishes a release, so this file is the one place a version is decided: see [Releases](CONTRIBUTING.md#releases). Versions that shipped before this file existed are on the [releases page](https://github.com/roman-16/proton-cli/releases).
 
+## [4.2.2] - 2026-09-17
+
+### Fixed
+
+- A message that arrived or was edited while its body could not be fetched was missing from every indexed listing until the mailbox was read again. It is indexed by its envelope, and the next run fetches the body.
+- A page of changes the index could not apply was skipped for good - by `index watch`, and on disk by `index update` for a calendar. It is asked for again.
+- A Drive index whose files a password reset had moved to a new volume read the whole tree on every run and never caught up. It follows the files to the new volume.
+- A damaged record in an index took every record after it along, without a word, and the index still called itself complete. What survives is kept, and the app is read again for the rest.
+- `index list` said `0 bodies` for a mail index built before 4.2.1 until `index create` or `index update` ran. Any command that opens the index puts the count right, a search included.
+- A Drive or calendar listing answered from an index that its own catch-up had just found wanting. It reads Proton until the index is brought up to date.
+- Contact writes - `contacts update`, `contacts merge`, `contacts keys pin` and `unpin` - failed about two in five times when run back to back, as though the card had been wrong. Proton was refusing the pace; they wait it out.
+- `mail messages empty` and `mail settings filters apply` were refused while Proton was still finishing an earlier job on the mailbox. They wait for it, up to a minute.
+- `mail messages empty` reported emptying one message, a number it never had. It names the folder or label, and `--output json` carries `folder` or `label` as `kind` rather than `message`.
+
 ## [4.2.1] - 2026-09-17
 
 ### Changed

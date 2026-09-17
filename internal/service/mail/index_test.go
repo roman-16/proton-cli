@@ -2,8 +2,11 @@ package mail
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -554,6 +557,171 @@ func TestAnEditedMessageIsIndexedAgain(t *testing.T) {
 	}
 	if len(msgs) != 1 {
 		t.Errorf("searching what the message now says found %d messages", len(msgs))
+	}
+}
+
+// A message the feed reports whose body could not be fetched is in the index by
+// its envelope, and the next run fetches the body.
+//
+// The feed is followed from a cursor that moves on once a page is applied, so
+// nothing ever asks about the page again: a message the sync did not write down
+// is a message no filtered listing shows until the mailbox is read whole.
+func TestAMessageWhoseBodyCouldNotBeFetchedIsIndexedByItsEnvelope(t *testing.T) {
+	m := newMailbox(t, 2)
+	s := indexService(t, m)
+	build(t, s)
+
+	m.newest(t, rawListMessage{
+		ID: "msg-new", ConversationID: "thread-new", Subject: "Subject msg-new",
+		Time: 2000, LabelIDs: []string{labelInbox, labelAllMail},
+	}, "the body of msg-new")
+	m.events["cursor-0"] = `{"EventID":"cursor-1","More":0,"Messages":[
+		{"ID":"msg-new","Action":1,"Message":{"ID":"msg-new","ConversationID":"thread-new","Subject":"Subject msg-new","Time":2000,"LabelIDs":["0","5"]}}
+	]}`
+	sealed := m.bodies["msg-new"]
+	delete(m.bodies, "msg-new")
+	catchUp(t, s)
+
+	fresh, there := inTheIndex(t, s)["msg-new"]
+	if !there {
+		t.Fatal("a message whose body could not be fetched is not in the index at all")
+	}
+	if fresh.settled() {
+		t.Error("a body that was never fetched was settled as though it had been")
+	}
+	msgs, _, _, err := s.Search(t.Context(), ListOptions{Subject: "msg-new", Folder: "inbox"})
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if len(msgs) != 1 {
+		t.Errorf("a filtered listing found %d messages, want the one by its envelope", len(msgs))
+	}
+	if st := status(t, s); st.Indexed != 3 || st.Bodies != 2 {
+		t.Errorf("status = %+v, want 3 messages of which 2 have their body", st)
+	}
+
+	m.bodies["msg-new"] = sealed
+	if got := build(t, s); got.Indexed != 1 {
+		t.Errorf("the next run = %+v, want the owed body fetched", got)
+	}
+	if fresh := inTheIndex(t, s)["msg-new"]; !strings.Contains(fresh.Body, "body of msg-new") {
+		t.Errorf("the index holds %q, want the body the next run fetched", fresh.Body)
+	}
+}
+
+// A page of the feed that could not be applied is asked for again, by the same
+// session: a watch keeps its index open between polls, and a poll that failed
+// partway must not move the cursor past what it never wrote down.
+func TestAKeptOpenSessionAsksAgainForAPageItCouldNotApply(t *testing.T) {
+	m := newMailbox(t, 2)
+	s := indexService(t, m)
+	build(t, s)
+	x := indexing(t, s)
+
+	m.newest(t, rawListMessage{
+		ID: "msg-new", ConversationID: "thread-new", Subject: "Subject msg-new",
+		Time: 2000, LabelIDs: []string{labelInbox, labelAllMail},
+	}, "the body of msg-new")
+	m.events["cursor-0"] = `{"EventID":"cursor-1","More":0,"Messages":[
+		{"ID":"msg-new","Action":1,"Message":{"ID":"msg-new","ConversationID":"thread-new","Subject":"Subject msg-new","Time":2000,"LabelIDs":["0","5"]}}
+	]}`
+
+	opens := s.keys
+	s.keys = testKeys(nil)
+	if _, err := x.Sync(t.Context()); err == nil {
+		t.Fatal("a sync whose keys would not open reported success")
+	}
+	if x.log.State.Cursor != "cursor-0" {
+		t.Fatalf("cursor = %q after a failed page, want it left at cursor-0", x.log.State.Cursor)
+	}
+
+	s.keys = opens
+	poll(t, x)
+	if fresh := inTheIndex(t, s)["msg-new"]; !strings.Contains(fresh.Body, "body of msg-new") {
+		t.Errorf("the index holds %q after the next poll, want the message with its body", fresh.Body)
+	}
+	if x.log.State.Cursor != "cursor-1" {
+		t.Errorf("cursor = %q, want the page applied and moved past", x.log.State.Cursor)
+	}
+}
+
+// poll is what one poll of a watch does to an open index: finishes what is
+// owed, then applies what changed.
+func poll(t *testing.T, x *indexSession) {
+	t.Helper()
+	if _, err := x.Build(t.Context(), progress.Nop{}); err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	if _, err := x.Sync(t.Context()); err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+}
+
+// A record that went bad on disk costs the index that one message until the
+// mailbox is read again, which the next run does - rather than the index
+// quietly holding one message fewer and calling itself complete.
+func TestARecordThatWentBadIsReadFromTheMailboxAgain(t *testing.T) {
+	m := newMailbox(t, 3)
+	s := indexService(t, m)
+	build(t, s)
+
+	// The walk wrote three envelopes and the bodies wrote three more; the fourth
+	// frame is the first body, and the message it belongs to is left with its
+	// envelope alone.
+	path := filepath.Join(s.index.Dir(), "mail.bin")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	at := 0
+	for range 3 {
+		at += 4 + int(binary.BigEndian.Uint32(data[at:at+4]))
+	}
+	data[at+4+8] ^= 0xff
+	if err := os.WriteFile(path, data, 0600); err != nil {
+		t.Fatalf("spoil: %v", err)
+	}
+
+	if held := inTheIndex(t, s); len(held) != 3 {
+		t.Fatalf("the index holds %d messages after one record went bad, want all 3 by their envelopes", len(held))
+	}
+	pages, fetched := m.pages.Load(), m.fetched.Load()
+	if got := build(t, s); got.Indexed != 1 {
+		t.Errorf("the next run = %+v, want the one message whose record went bad fetched again", got)
+	}
+	if m.pages.Load() == pages {
+		t.Error("the next run did not read the mailbox again")
+	}
+	if m.fetched.Load() != fetched+1 {
+		t.Errorf("the next run fetched %d bodies, want only the one that was lost", m.fetched.Load()-fetched)
+	}
+	if st := status(t, s); st.Stale || !st.Complete || st.Indexed != 3 || st.Bodies != 3 {
+		t.Errorf("status = %+v, want a whole index of 3 messages with every body", st)
+	}
+}
+
+// The summary beside the log says how many bodies it holds, and a run that
+// stopped between writing bodies and writing the summary leaves it behind. Any
+// run that touches the index afterwards - a search included - puts it right,
+// so `index list` does not go on saying nothing was downloaded.
+func TestASearchLeavesTheSummarySayingWhatTheLogHolds(t *testing.T) {
+	m := newMailbox(t, 4)
+	s := indexService(t, m)
+	stop, cancel := context.WithCancel(t.Context())
+	s.C = &cancelAfter{n: 2, cancel: cancel, to: m}
+	if _, err := indexing(t, s).Build(stop, progress.Nop{}); err == nil {
+		t.Fatal("a cancelled build reported success")
+	}
+	if st := status(t, s); st.Bodies != 0 {
+		t.Fatalf("status = %+v, want a summary the interrupted run never got to write", st)
+	}
+
+	s.C = m
+	if _, _, _, err := s.Search(t.Context(), ListOptions{Subject: "msg", Folder: "all"}); err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if st := status(t, s); st.Bodies != 2 {
+		t.Errorf("status = %+v after a search, want the 2 bodies the log holds", st)
 	}
 }
 
