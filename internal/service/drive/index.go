@@ -22,18 +22,20 @@ import (
 // what a filtered listing does today - one request per folder, every time - and
 // what an index turns into one request that asks what has changed.
 //
-// What it holds is the shape of the tree: names, paths, sizes and times. Not the
-// contents of a file, which are what Drive is mostly made of, and not the keys
-// that open them - a run that has to decrypt a name fetches the folder's key
+// What it holds is the shape of the tree: names, sizes, times, and which folder
+// each thing hangs in. Not where it sits, which is the folders' to say and is
+// worked out when the tree is read - a folder that is renamed, moved or trashed
+// takes everything under it with it, and the feed reports the folder alone. Not
+// the contents of a file, which are what Drive is mostly made of, and not the
+// keys that open them: a run that has to decrypt a name fetches the folder's key
 // again rather than keeping it.
 
 // stored is one link as the index holds it: what a listing shows, and the
-// parent it hangs from so a move can be applied without walking again.
+// parent it hangs from.
 type stored struct {
 	LinkID     string `json:"link_id"`
 	ParentID   string `json:"parent_id,omitempty"`
 	Name       string `json:"name"`
-	Path       string `json:"path"`
 	Type       string `json:"type"`
 	Size       int64  `json:"size,omitempty"`
 	CreateTime int64  `json:"create_time,omitempty"`
@@ -41,12 +43,15 @@ type stored struct {
 	// Trashed is when the item was put in the trash. A trashed item is in the
 	// account but not in the tree, so it is held and left out of a listing.
 	Trashed int64 `json:"trashed,omitempty"`
+	// Unreadable says the name would not decrypt with this account's keys, so
+	// the item is held by everything else it says about itself.
+	Unreadable bool `json:"unreadable,omitempty"`
 }
 
-func (in stored) child() Child {
+func (in stored) child(path string) Child {
 	return Child{
-		LinkID: in.LinkID, Name: in.Name, Path: in.Path, Type: in.Type,
-		Size: in.Size, CreateTime: in.CreateTime, ModifyTime: in.ModifyTime,
+		LinkID: in.LinkID, Name: displayName(in.Name, in.Unreadable), Path: path,
+		Type: in.Type, Size: in.Size, CreateTime: in.CreateTime, ModifyTime: in.ModifyTime,
 	}
 }
 
@@ -61,7 +66,7 @@ type indexPart struct{ s *Service }
 func (indexPart) App() search.App { return search.AppDrive }
 func (indexPart) Noun() string    { return "items" }
 
-func (p indexPart) Status() (search.Status, error) { return p.s.index.Status(search.AppDrive) }
+func (p indexPart) Open(ctx context.Context) (search.Session, error) { return p.s.openIndex(ctx) }
 
 // Count is how many items a build would index, which is the walk it would do.
 //
@@ -74,71 +79,107 @@ func (p indexPart) Count(ctx context.Context) (int, error) {
 		return 0, err
 	}
 	count := 0
-	err = p.s.walkFiles(ctx, dc, func(Link, string, string) error {
+	_, err = p.s.walkFiles(ctx, dc, func(found) error {
 		count++
 		return nil
 	})
 	return count, err
 }
 
-// Build walks the whole tree once and writes it down.
+// indexSession is the Drive index, open.
+type indexSession struct {
+	s   *Service
+	log *search.Log
+	dc  *Context
+}
+
+func (s *Service) openIndex(ctx context.Context) (*indexSession, error) {
+	log, err := s.index.Load(ctx, search.AppDrive)
+	if err != nil {
+		return nil, err
+	}
+	return &indexSession{s: s, log: log}, nil
+}
+
+func (x *indexSession) Status() search.Status { return x.log.Status() }
+
+// context is the account's own volume and share, looked up once a run needs it.
+func (x *indexSession) context(ctx context.Context) (*Context, error) {
+	if x.dc != nil {
+		return x.dc, nil
+	}
+	dc, err := x.s.Resolve(ctx)
+	if err != nil {
+		return nil, err
+	}
+	x.dc = dc
+	return dc, nil
+}
+
+func (x *indexSession) save() error { return x.log.Save(time.Now().Unix()) }
+
+// Build walks the whole tree and writes down what it found.
 //
 // It is one pass rather than a resumable one: a walk is depth-first through
 // folders whose keys are opened on the way, so there is no anchor to carry on
 // from that is cheaper than starting again. What it costs is one request per
 // folder, which is what a single filtered listing costs today.
-func (p indexPart) Build(ctx context.Context, sink progress.Sink) (search.Result, error) {
-	return p.s.buildIndex(ctx, progress.Of(sink))
-}
-
-// Sync applies what has happened to the volume since the last run.
-func (p indexPart) Sync(ctx context.Context) (search.Result, error) {
-	return p.s.syncIndex(ctx)
-}
-
-func (s *Service) buildIndex(ctx context.Context, sink progress.Sink) (search.Result, error) {
-	log, err := s.index.Load(ctx, search.AppDrive)
-	if err != nil {
-		return search.Result{}, err
-	}
-	if log.State.Complete {
+//
+// It runs again when Proton says it cannot describe what has happened to the
+// volume. Then the walk is the answer: what came back is the tree, what did not
+// is no longer in it, and neither is a thing the feed could have said.
+func (x *indexSession) Build(ctx context.Context, sink progress.Sink) (search.Result, error) {
+	log := x.log
+	if log.State.Complete && !log.State.Stale {
 		return search.Result{}, nil
 	}
-	dc, err := s.Resolve(ctx)
+	dc, err := x.context(ctx)
 	if err != nil {
 		return search.Result{}, err
 	}
 	// The cursor is taken before the walk, so a file uploaded while it runs is
 	// caught by the first sync rather than missed by both.
 	if log.State.Cursor == "" {
-		cursor, err := s.latestVolumeEvent(ctx, dc.VolumeID)
+		cursor, err := x.s.latestVolumeEvent(ctx, dc.VolumeID)
 		if err != nil {
 			return search.Result{}, err
 		}
 		log.State.Cursor = cursor
 		log.State.Volume = dc.VolumeID
-		if err := log.Save(time.Now().Unix()); err != nil {
+		if err := x.save(); err != nil {
 			return search.Result{}, err
 		}
 	}
 
 	// How many there are is what the walk is finding out, so the bar counts up
 	// rather than towards anything and closes when the walk ends.
+	progress.Counting(sink, "items")
 	sink.Start(0, "Indexing drive")
+	var done search.Result
 	var records []search.Record
-	done := search.Result{}
-	err = s.walkFiles(ctx, dc, func(l Link, name, path string) error {
-		rec, err := record(stored{
-			LinkID: l.LinkID, ParentID: l.ParentLinkID, Name: name, Path: path,
-			Type: linkType(l.Type), Size: l.Size, CreateTime: l.CreateTime,
-			ModifyTime: l.ModifyTime, Trashed: l.Trashed,
-		})
+	seen := make(map[string]bool, log.State.Indexed)
+	unreadable := 0
+	tally, err := x.s.walkFiles(ctx, dc, func(f found) error {
+		seen[f.Link.LinkID] = true
+		if f.Unreadable {
+			unreadable++
+		}
+		sink.Add(1)
+		before, had := held(log, f.Link.LinkID)
+		in := stored{
+			LinkID: f.Link.LinkID, ParentID: f.Link.ParentLinkID, Name: f.Name,
+			Type: linkType(f.Link.Type), Size: f.Link.Size, CreateTime: f.Link.CreateTime,
+			ModifyTime: f.Link.ModifyTime, Trashed: f.Link.Trashed, Unreadable: f.Unreadable,
+		}
+		if had && before == in {
+			return nil
+		}
+		rec, err := record(in)
 		if err != nil {
 			return err
 		}
 		records = append(records, rec)
 		done.Indexed++
-		sink.Add(1)
 		if len(records) < indexBatch {
 			return nil
 		}
@@ -146,7 +187,7 @@ func (s *Service) buildIndex(ctx context.Context, sink progress.Sink) (search.Re
 			return err
 		}
 		records = records[:0]
-		return log.Save(time.Now().Unix())
+		return x.save()
 	})
 	if err != nil {
 		return done, err
@@ -155,9 +196,40 @@ func (s *Service) buildIndex(ctx context.Context, sink progress.Sink) (search.Re
 		return done, err
 	}
 	sink.Done()
+
+	// A walk that could not read part of the tree has not established that what
+	// it did not see is gone, so the index keeps it and says it is unfinished.
+	if tally.whole() {
+		gone, err := x.tombstoneUnseen(ctx, seen)
+		done = search.Total(done, gone)
+		if err != nil {
+			return done, err
+		}
+	}
+	done.Unreadable = unreadable + tally.Sealed
+	log.State.Unreadable = done.Unreadable
 	log.State.Total = log.State.Indexed
-	log.State.Complete = true
-	return done, log.Save(time.Now().Unix())
+	log.State.Complete = tally.whole()
+	log.State.Stale = !tally.whole()
+	return done, x.save()
+}
+
+// tombstoneUnseen takes out what a whole walk did not come across.
+func (x *indexSession) tombstoneUnseen(ctx context.Context, seen map[string]bool) (search.Result, error) {
+	var done search.Result
+	var records []search.Record
+	for _, rec := range x.log.Records() {
+		if seen[rec.ID] {
+			continue
+		}
+		records = append(records, search.Record{ID: rec.ID, Gone: true})
+		done.Removed++
+	}
+	if len(records) > 0 {
+		slog.DebugContext(ctx, "drive: items left the volume while nothing was following it",
+			"kind", string(skip.KindVolume), "reason", string(skip.Unreadable), "count", len(records))
+	}
+	return done, x.log.Append(records...)
 }
 
 // indexBatch is how many records one write carries. A build of a large tree
@@ -166,29 +238,26 @@ func (s *Service) buildIndex(ctx context.Context, sink progress.Sink) (search.Re
 const indexBatch = 200
 
 // walkFiles walks the account's own file tree from its root.
-func (s *Service) walkFiles(ctx context.Context, dc *Context, visit func(l Link, name, path string) error) error {
+func (s *Service) walkFiles(ctx context.Context, dc *Context, visit func(found) error) (walked, error) {
 	res, err := s.ResolvePath(ctx, dc, "/")
 	if err != nil {
-		return err
+		return walked{}, err
 	}
 	return s.walkTree(ctx, dc, res.LinkID, res.NodeKR, "", visit)
 }
 
-// syncIndex applies the volume's change feed.
+// Sync applies the volume's change feed.
 //
 // Proton reports a link as it now is, so a file that was renamed, moved,
 // trashed or restored arrives as the whole record and is written down again.
 // What the event cannot carry is the name in the clear, so the folder it hangs
 // in is opened to read it - the one place indexing Drive costs keys.
-func (s *Service) syncIndex(ctx context.Context) (search.Result, error) {
-	log, err := s.index.Load(ctx, search.AppDrive)
-	if err != nil {
-		return search.Result{}, err
-	}
+func (x *indexSession) Sync(ctx context.Context) (search.Result, error) {
+	log := x.log
 	if log.State.Cursor == "" {
 		return search.Result{}, nil
 	}
-	dc, err := s.Resolve(ctx)
+	dc, err := x.context(ctx)
 	if err != nil {
 		return search.Result{}, err
 	}
@@ -196,32 +265,33 @@ func (s *Service) syncIndex(ctx context.Context) (search.Result, error) {
 	// altogether, so what is indexed says nothing about it.
 	if log.State.Volume != "" && log.State.Volume != dc.VolumeID {
 		log.State.Complete = false
-		return search.Result{}, log.Save(time.Now().Unix())
+		return search.Result{}, x.save()
 	}
 
-	names := &naming{s: s, dc: dc, keys: map[string]*pgp.KeyRing{}}
+	names := &naming{s: x.s, dc: dc, keys: map[string]*pgp.KeyRing{}}
 	var done search.Result
 	for page := 0; page < maxDrain; page++ {
 		var batch volumeEvents
-		if err := s.C.Decode(ctx, proton.Request{
+		if err := x.s.C.Decode(ctx, proton.Request{
 			Method: "GET",
 			Path:   fmt.Sprintf("/drive/volumes/%s/events/%s", dc.VolumeID, log.State.Cursor),
 		}, &batch); err != nil {
 			return done, err
 		}
 		if batch.Refresh != 0 {
-			slog.WarnContext(ctx, "The Drive index missed part of the volume's history and will be built again.",
+			slog.WarnContext(ctx, "The Drive index missed part of the volume's history and will be read from Proton again.",
 				"kind", string(skip.KindVolume), "reason", string(skip.Unreadable))
-			log.State.Complete = false
-			cursor, err := s.latestVolumeEvent(ctx, dc.VolumeID)
+			log.State.Stale = true
+			cursor, err := x.s.latestVolumeEvent(ctx, dc.VolumeID)
 			if err != nil {
 				return done, err
 			}
 			log.State.Cursor = cursor
-			return done, log.Save(time.Now().Unix())
+			done.Refreshed = true
+			return done, x.save()
 		}
 		log.State.Cursor = batch.EventID
-		applied, err := s.applyEvents(ctx, log, names, batch)
+		applied, err := x.applyEvents(ctx, names, batch)
 		done = search.Total(done, applied)
 		if err != nil {
 			return done, err
@@ -230,7 +300,7 @@ func (s *Service) syncIndex(ctx context.Context) (search.Result, error) {
 			break
 		}
 	}
-	return done, log.Save(time.Now().Unix())
+	return done, x.save()
 }
 
 // maxDrain caps how many pages one catch-up follows, so a long backlog cannot
@@ -266,52 +336,100 @@ func (s *Service) latestVolumeEvent(ctx context.Context, volumeID string) (strin
 }
 
 // applyEvents writes one page of changes into the index.
-func (s *Service) applyEvents(ctx context.Context, log *search.Log, names *naming, batch volumeEvents) (search.Result, error) {
+func (x *indexSession) applyEvents(ctx context.Context, names *naming, batch volumeEvents) (search.Result, error) {
+	log := x.log
 	var done search.Result
 	var records []search.Record
-	moved := false
+	var below *descendants
 	for _, e := range batch.Events {
+		before, had := held(log, e.Link.LinkID)
 		if e.EventType == eventDelete {
 			records = append(records, search.Record{ID: e.Link.LinkID, Gone: true})
 			done.Removed++
+			if had && before.Unreadable {
+				log.State.Unreadable--
+			}
+			// Proton reports the item that was deleted and says nothing about what
+			// was inside it, so a folder takes its contents out of the index here
+			// or they stay in it for good.
+			if before.Type == TypeFolder {
+				if below == nil {
+					below = childrenOf(ctx, log)
+				}
+				for _, id := range below.under(e.Link.LinkID) {
+					records = append(records, search.Record{ID: id, Gone: true})
+					done.Removed++
+				}
+			}
 			continue
 		}
 		if e.EventType != eventCreate && e.EventType != eventUpdate && e.EventType != eventRename {
 			continue
 		}
-		name, err := names.name(ctx, e.Link)
-		if err != nil {
-			// Recorded and counted: the item is in the account and not in the
-			// index, so a listing drawn from the index is short by it and says so.
-			skip.Record(ctx, skip.KindFolder, e.Link.ParentLinkID, skip.Unlockable, err)
-			continue
-		}
-		before, had := held(log, e.Link.LinkID)
-		rec, err := record(stored{
-			LinkID: e.Link.LinkID, ParentID: e.Link.ParentLinkID, Name: name,
-			Path: pathOf(log, e.Link.ParentLinkID, name), Type: linkType(e.Link.Type),
+		in := stored{
+			LinkID: e.Link.LinkID, ParentID: e.Link.ParentLinkID, Type: linkType(e.Link.Type),
 			Size: e.Link.Size, CreateTime: e.Link.CreateTime, ModifyTime: e.Link.ModifyTime,
 			Trashed: e.Link.Trashed,
-		})
+		}
+		name, err := names.name(ctx, e.Link)
+		if err != nil {
+			// Recorded and counted where it shows: the item goes into the index by
+			// everything but its name, which is what a walk would have shown as
+			// well, and `index list` counts it under what it could not read.
+			slog.DebugContext(ctx, "drive: a changed item's name could not be read",
+				"kind", string(skip.KindFolder), "reason", string(skip.Unlockable),
+				"link", e.Link.LinkID, "parent", e.Link.ParentLinkID, "error", err)
+			in.Unreadable = true
+		}
+		in.Name = name
+		if had && before == in {
+			continue
+		}
+		rec, err := record(in)
 		if err != nil {
 			return done, err
 		}
 		records = append(records, rec)
 		done.Indexed++
-		// A folder that moved or was renamed takes every path under it with it,
-		// which the feed does not report item by item.
-		if had && e.Link.Type == protonFolder && (before.Name != name || before.ParentID != e.Link.ParentLinkID) {
-			moved = true
+		wasUnreadable := had && before.Unreadable
+		switch {
+		case in.Unreadable && !wasUnreadable:
+			log.State.Unreadable++
+		case !in.Unreadable && wasUnreadable:
+			log.State.Unreadable--
 		}
 	}
-	if err := log.Append(records...); err != nil {
-		return done, err
-	}
-	if moved {
-		return done, repath(ctx, log)
-	}
-	return done, nil
+	return done, log.Append(records...)
 }
+
+// descendants is which links hang under which, for the one question the feed
+// cannot answer: what was inside a folder that is gone.
+type descendants struct{ byParent map[string][]string }
+
+func childrenOf(ctx context.Context, log *search.Log) *descendants {
+	d := &descendants{byParent: map[string][]string{}}
+	for _, in := range indexedItems(ctx, log) {
+		d.byParent[in.ParentID] = append(d.byParent[in.ParentID], in.LinkID)
+	}
+	return d
+}
+
+// under is every link below one, however deep.
+func (d *descendants) under(linkID string) []string {
+	var out []string
+	queue := append([]string{}, d.byParent[linkID]...)
+	for len(queue) > 0 && len(out) <= maxTree {
+		id := queue[0]
+		queue = queue[1:]
+		out = append(out, id)
+		queue = append(queue, d.byParent[id]...)
+	}
+	return out
+}
+
+// maxTree is more items than a folder anybody keeps holds, and a bound on a
+// cascade that a cycle in the records could otherwise spin in.
+const maxTree = 1 << 20
 
 // naming opens the folders a run has to read a name out of, once each.
 type naming struct {
@@ -395,49 +513,35 @@ func held(log *search.Log, linkID string) (stored, bool) {
 	return in, true
 }
 
-// pathOf is where an item sits, worked out from the folder it hangs in. An item
-// whose parent is not indexed is left at its own name, which is what a tree
-// built from an incomplete index can honestly say about it.
-func pathOf(log *search.Log, parentID, name string) string {
-	parent, ok := held(log, parentID)
-	if !ok {
-		return "/" + name
-	}
-	return parent.Path + "/" + name
-}
-
-// repath rewrites the paths under a folder that moved or was renamed.
+// pathTo is where an item sits, and whether it is in the tree at all.
 //
-// The feed reports the folder and says nothing about what is inside it, so the
-// tree is put back together here: every item is given the path its parents now
-// make, and the ones whose path changed are written down again.
-func repath(ctx context.Context, log *search.Log) error {
-	held := indexedItems(ctx, log)
-	var rewritten []search.Record
-	for id, in := range held {
-		path := pathIn(held, in, 0)
-		if path == in.Path {
-			continue
-		}
-		in.Path = path
-		rec, err := record(in)
-		if err != nil {
-			return err
-		}
-		rewritten = append(rewritten, rec)
-		held[id] = in
+// The path is the parents': a folder that is renamed or moved changes the path
+// of everything under it, and the feed reports the folder alone - so working it
+// out here is what makes one event about one folder true of the whole subtree,
+// with nothing to rewrite and nothing to get out of step.
+//
+// The trash is the same shape. An item in it is in the account and not in the
+// tree, and so is everything under it, which no event ever says.
+func pathTo(held map[string]stored, memo map[string]string, linkID, rootID string, depth int) (string, bool) {
+	if path, worked := memo[linkID]; worked {
+		return path, path != ""
 	}
-	return log.Append(rewritten...)
-}
-
-// pathIn is where an item sits according to the records around it. The depth is
-// bounded so a parent that somehow names itself cannot spin.
-func pathIn(held map[string]stored, in stored, depth int) string {
-	parent, ok := held[in.ParentID]
-	if !ok || depth > maxDepth {
-		return "/" + in.Name
+	in, ok := held[linkID]
+	if !ok || depth > maxDepth || in.Trashed != 0 {
+		return "", false
 	}
-	return pathIn(held, parent, depth+1) + "/" + in.Name
+	above := ""
+	if in.ParentID != rootID {
+		parent, ok := pathTo(held, memo, in.ParentID, rootID, depth+1)
+		if !ok {
+			memo[linkID] = ""
+			return "", false
+		}
+		above = parent
+	}
+	path := above + "/" + displayName(in.Name, in.Unreadable)
+	memo[linkID] = path
+	return path, true
 }
 
 // maxDepth is deeper than any tree a person keeps and shallow enough to stop a
@@ -466,28 +570,32 @@ func (s *Service) indexedTree(ctx context.Context, dc *Context, prefix string) (
 		return nil, false
 	}
 	status, err := s.index.Status(search.AppDrive)
-	if err != nil || !status.Complete || status.Volume != dc.VolumeID {
+	if err != nil || !status.Complete || status.Stale || status.Volume != dc.VolumeID {
 		if err != nil {
 			slog.DebugContext(ctx, "drive: the index could not be read, so the tree was walked",
 				"kind", string(skip.KindVolume), "reason", string(skip.Unreadable), "error", err)
 		}
 		return nil, false
 	}
-	s.syncBeforeRead(ctx)
-
-	log, err := s.index.Load(ctx, search.AppDrive)
+	x, err := s.openIndex(ctx)
 	if err != nil {
 		slog.DebugContext(ctx, "drive: the index could not be opened, so the tree was walked",
 			"kind", string(skip.KindVolume), "reason", string(skip.Unreadable), "error", err)
 		return nil, false
 	}
+	x.dc = dc
+	x.syncBeforeRead(ctx)
+
+	items := indexedItems(ctx, x.log)
+	paths := make(map[string]string, len(items))
 	under := strings.TrimRight(prefix, "/")
-	out := make([]Child, 0, len(log.Records()))
-	for _, in := range indexedItems(ctx, log) {
-		if in.Trashed != 0 || !strings.HasPrefix(in.Path, under+"/") {
+	out := make([]Child, 0, len(items))
+	for linkID, in := range items {
+		path, there := pathTo(items, paths, linkID, dc.RootLinkID, 0)
+		if !there || !strings.HasPrefix(path, under+"/") {
 			continue
 		}
-		out = append(out, in.child())
+		out = append(out, in.child(path))
 	}
 	return out, true
 }
@@ -495,15 +603,15 @@ func (s *Service) indexedTree(ctx context.Context, dc *Context, prefix string) (
 // syncBeforeRead brings the index up to date before it is read, so an answer is
 // never older than the command that asked for it. A directory another run is
 // writing to is left alone: whatever holds it is keeping the index current.
-func (s *Service) syncBeforeRead(ctx context.Context) {
-	lock, err := s.index.Claim()
+func (x *indexSession) syncBeforeRead(ctx context.Context) {
+	lock, err := x.s.index.Claim()
 	if err != nil {
 		slog.DebugContext(ctx, "drive: the index was busy, so it was read as it stands",
 			"kind", string(skip.KindVolume), "reason", string(skip.Unreadable), "error", err)
 		return
 	}
 	defer lock.Release()
-	if _, err := s.syncIndex(ctx); err != nil {
+	if _, err := x.Sync(ctx); err != nil {
 		// Recorded and not counted: what the index holds is still every item the
 		// last catch-up saw, and the tree it answers with says as much as it did
 		// before this run started.

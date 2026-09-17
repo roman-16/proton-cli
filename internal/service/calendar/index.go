@@ -97,7 +97,7 @@ type indexPart struct{ s *Service }
 func (indexPart) App() search.App { return search.AppCalendar }
 func (indexPart) Noun() string    { return "events" }
 
-func (p indexPart) Status() (search.Status, error) { return p.s.index.Status(search.AppCalendar) }
+func (p indexPart) Open(ctx context.Context) (search.Session, error) { return p.s.openIndex(ctx) }
 
 // Count is how many events a build would index, which is every event of every
 // calendar. Reading them is the build's own work, so a preview reads them and
@@ -119,75 +119,115 @@ func (p indexPart) Count(ctx context.Context) (int, error) {
 	return count, nil
 }
 
-func (p indexPart) Build(ctx context.Context, sink progress.Sink) (search.Result, error) {
-	return p.s.buildIndex(ctx, progress.Of(sink))
+// indexSession is the calendar index, open.
+type indexSession struct {
+	s   *Service
+	log *search.Log
 }
 
-func (p indexPart) Sync(ctx context.Context) (search.Result, error) { return p.s.syncIndex(ctx) }
-
-// buildIndex reads every event of every calendar and writes it down.
-//
-// A calendar is read whole rather than in windows: there is no anchor to carry
-// on from, and the point of the index is that no date range is named.
-func (s *Service) buildIndex(ctx context.Context, sink progress.Sink) (search.Result, error) {
+func (s *Service) openIndex(ctx context.Context) (*indexSession, error) {
 	log, err := s.index.Load(ctx, search.AppCalendar)
 	if err != nil {
-		return search.Result{}, err
-	}
-	if log.State.Complete {
-		return search.Result{}, nil
-	}
-	calendars, err := s.CalendarsList(ctx)
-	if err != nil {
-		return search.Result{}, err
+		return nil, err
 	}
 	if log.State.Cursors == nil {
 		log.State.Cursors = map[string]string{}
 	}
+	return &indexSession{s: s, log: log}, nil
+}
+
+func (x *indexSession) Status() search.Status { return x.log.Status() }
+
+func (x *indexSession) save() error { return x.log.Save(time.Now().Unix()) }
+
+// Build reads every event of every calendar and writes it down.
+//
+// A calendar is read whole rather than in windows: there is no anchor to carry
+// on from, and the point of the index is that no date range is named. Reading it
+// whole is also what settles what is no longer in it, which is why the same pass
+// answers a feed that could not say what changed.
+func (x *indexSession) Build(ctx context.Context, sink progress.Sink) (search.Result, error) {
+	log := x.log
+	if log.State.Complete && !log.State.Stale {
+		return search.Result{}, nil
+	}
+	calendars, err := x.s.CalendarsList(ctx)
+	if err != nil {
+		return search.Result{}, err
+	}
 
 	var done search.Result
+	progress.Counting(sink, "events")
 	sink.Start(0, "Indexing calendar")
+	whole := true
+	listed := make(map[string]bool, len(calendars))
 	for _, cal := range calendars {
+		listed[cal.ID] = true
 		// The cursor is taken before the calendar is read, so an event created
 		// while it is being read is caught by the first sync rather than missed.
 		if log.State.Cursors[cal.ID] == "" {
-			cursor, err := s.latestCalendarEvent(ctx, cal.ID)
+			cursor, err := x.s.latestCalendarEvent(ctx, cal.ID)
 			if err != nil {
 				skip.Record(ctx, skip.KindCalendar, cal.ID, skip.Unreadable, err)
+				whole = false
 				continue
 			}
 			log.State.Cursors[cal.ID] = cursor
 		}
-		indexed, err := s.indexCalendar(ctx, log, cal.ID, sink)
+		indexed, err := x.indexCalendar(ctx, cal.ID, sink)
 		done = search.Total(done, indexed)
 		if err != nil {
 			if ctx.Err() != nil {
 				return done, err
 			}
+			// A calendar that was not read is not one this index can answer for, and
+			// the cursor goes with it: keeping it would have the next catch-up carry
+			// on from a moment nothing was ever read at.
 			skip.Record(ctx, skip.KindCalendar, cal.ID, skip.Unreadable, err)
+			delete(log.State.Cursors, cal.ID)
+			whole = false
 			continue
 		}
 	}
+	left, err := x.forgetCalendars(ctx, listed)
+	done = search.Total(done, left)
+	if err != nil {
+		return done, err
+	}
 	sink.Done()
 	log.State.Total = log.State.Indexed
-	log.State.Complete = true
-	return done, log.Save(time.Now().Unix())
+	log.State.Complete = whole
+	log.State.Stale = !whole
+	return done, x.save()
 }
 
 // indexCalendar reads one calendar whole.
-func (s *Service) indexCalendar(ctx context.Context, log *search.Log, calendarID string, sink progress.Sink) (search.Result, error) {
-	ck, err := s.unlockCalendar(ctx, calendarID)
-	if err != nil {
-		return search.Result{}, err
+//
+// A calendar whose key will not open is read anyway. Proton keeps the times of
+// an event beside it in the clear, so what goes in is an event on the right day
+// that says nothing it cannot read - which is what a listing shows for one too,
+// and is the difference between a calendar that is missing from a search and one
+// that answers as much of itself as this account can see.
+func (x *indexSession) indexCalendar(ctx context.Context, calendarID string, sink progress.Sink) (search.Result, error) {
+	ck, keyErr := x.s.unlockCalendar(ctx, calendarID)
+	if keyErr != nil {
+		// Recorded and not counted: nothing is missing from the answer that the
+		// answer does not show. Every event of the calendar goes in by its frame,
+		// and how many are in that state is what `index list` counts as unreadable.
+		slog.DebugContext(ctx, "calendar: a calendar's key would not open for the index",
+			"kind", string(skip.KindCalendar), "reason", string(skip.Unlockable),
+			"calendar", calendarID, "error", keyErr)
 	}
-	raws, err := s.everyEvent(ctx, calendarID)
+	raws, err := x.s.everyEvent(ctx, calendarID)
 	if err != nil {
 		return search.Result{}, err
 	}
 	var done search.Result
+	seen := make(map[string]bool, len(raws))
 	records := make([]search.Record, 0, len(raws))
 	for _, raw := range raws {
-		rec, readable, err := record(s.decrypt(ctx, ck, raw))
+		seen[raw.ID] = true
+		rec, readable, err := record(x.read(ctx, ck, raw))
 		if err != nil {
 			return done, err
 		}
@@ -198,11 +238,64 @@ func (s *Service) indexCalendar(ctx context.Context, log *search.Log, calendarID
 		done.Indexed++
 		sink.Add(1)
 	}
-	log.State.Unreadable += done.Unreadable
-	if err := log.Append(records...); err != nil {
+	// The calendar was read whole, so an indexed event it did not carry is one
+	// the calendar no longer has.
+	for _, in := range x.eventsOf(ctx, calendarID) {
+		if seen[in.ID] {
+			continue
+		}
+		records = append(records, search.Record{ID: in.ID, Gone: true})
+		done.Removed++
+	}
+	x.log.State.Unreadable += done.Unreadable
+	if err := x.log.Append(records...); err != nil {
 		return done, err
 	}
-	return done, log.Save(time.Now().Unix())
+	return done, x.save()
+}
+
+// read is one event as the index will hold it, decrypted when there is a key to
+// decrypt it with.
+func (x *indexSession) read(ctx context.Context, ck *calKeys, raw rawEvent) stored {
+	if ck == nil {
+		return stored{raw: raw, readErr: errUnreadable}
+	}
+	return x.s.decrypt(ctx, ck, raw)
+}
+
+// eventsOf is what the index holds for one calendar.
+func (x *indexSession) eventsOf(ctx context.Context, calendarID string) []indexed {
+	var out []indexed
+	for _, rec := range x.log.Records() {
+		var in indexed
+		if err := json.Unmarshal(rec.Data, &in); err != nil {
+			skip.Record(ctx, skip.KindEvent, rec.ID, skip.Malformed, err)
+			continue
+		}
+		if in.CalendarID == calendarID {
+			out = append(out, in)
+		}
+	}
+	return out
+}
+
+// forgetCalendars takes out what belonged to a calendar the account no longer
+// has. Nothing in the feed says a calendar was removed - the calendar's feed is
+// what would have said it.
+func (x *indexSession) forgetCalendars(ctx context.Context, listed map[string]bool) (search.Result, error) {
+	var done search.Result
+	var records []search.Record
+	for calendarID := range x.log.State.Cursors {
+		if listed[calendarID] {
+			continue
+		}
+		for _, in := range x.eventsOf(ctx, calendarID) {
+			records = append(records, search.Record{ID: in.ID, Gone: true})
+			done.Removed++
+		}
+		delete(x.log.State.Cursors, calendarID)
+	}
+	return done, x.log.Append(records...)
 }
 
 // everyEvent is every event a calendar holds, page by page.
@@ -263,16 +356,13 @@ func reminders(raw rawEvent) []reminder {
 	return out
 }
 
-// syncIndex applies each calendar's change feed.
-func (s *Service) syncIndex(ctx context.Context) (search.Result, error) {
-	log, err := s.index.Load(ctx, search.AppCalendar)
-	if err != nil {
-		return search.Result{}, err
-	}
+// Sync applies each calendar's change feed.
+func (x *indexSession) Sync(ctx context.Context) (search.Result, error) {
+	log := x.log
 	if len(log.State.Cursors) == 0 {
 		return search.Result{}, nil
 	}
-	calendars, err := s.CalendarsList(ctx)
+	calendars, err := x.s.CalendarsList(ctx)
 	if err != nil {
 		return search.Result{}, err
 	}
@@ -285,7 +375,7 @@ func (s *Service) syncIndex(ctx context.Context) (search.Result, error) {
 			log.State.Complete = false
 			continue
 		}
-		applied, err := s.syncCalendar(ctx, log, cal.ID, cursor)
+		applied, err := x.syncCalendar(ctx, cal.ID, cursor)
 		done = search.Total(done, applied)
 		if err != nil {
 			// Recorded and counted: a calendar that did not catch up is one whose
@@ -294,29 +384,31 @@ func (s *Service) syncIndex(ctx context.Context) (search.Result, error) {
 			skip.Record(ctx, skip.KindCalendar, cal.ID, skip.Unreadable, err)
 		}
 	}
-	return done, log.Save(time.Now().Unix())
+	return done, x.save()
 }
 
 // syncCalendar follows one calendar's feed from where the index left off.
-func (s *Service) syncCalendar(ctx context.Context, log *search.Log, calendarID, cursor string) (search.Result, error) {
+func (x *indexSession) syncCalendar(ctx context.Context, calendarID, cursor string) (search.Result, error) {
+	log := x.log
 	var done search.Result
 	var ck *calKeys
 	for page := 0; page < maxDrain; page++ {
 		var batch calendarEventBatch
-		if err := s.C.Decode(ctx, proton.Request{
+		if err := x.s.C.Decode(ctx, proton.Request{
 			Method: "GET", Path: "/calendar/v1/" + calendarID + "/modelevents/" + cursor,
 		}, &batch); err != nil {
 			return done, err
 		}
 		if batch.Refresh != 0 {
-			slog.WarnContext(ctx, "A calendar changed more than its history describes, so the index will be built again.",
+			slog.WarnContext(ctx, "A calendar changed more than its history describes, so it will be read from Proton again.",
 				"kind", string(skip.KindCalendar), "reason", string(skip.Unreadable))
-			log.State.Complete = false
-			fresh, err := s.latestCalendarEvent(ctx, calendarID)
+			log.State.Stale = true
+			fresh, err := x.s.latestCalendarEvent(ctx, calendarID)
 			if err != nil {
 				return done, err
 			}
 			log.State.Cursors[calendarID] = fresh
+			done.Refreshed = true
 			return done, nil
 		}
 		cursor = batch.CalendarModelEventID
@@ -331,11 +423,11 @@ func (s *Service) syncCalendar(ctx context.Context, log *search.Log, calendarID,
 			}
 			if ck == nil {
 				var err error
-				if ck, err = s.unlockCalendar(ctx, calendarID); err != nil {
+				if ck, err = x.s.unlockCalendar(ctx, calendarID); err != nil {
 					return done, err
 				}
 			}
-			rec, readable, err := record(s.decrypt(ctx, ck, *e.Event))
+			rec, readable, err := record(x.s.decrypt(ctx, ck, *e.Event))
 			if err != nil {
 				return done, err
 			}
@@ -398,27 +490,27 @@ func (s *Service) indexedEvents(ctx context.Context, calendarIDs []string) ([]st
 		return nil, false
 	}
 	status, err := s.index.Status(search.AppCalendar)
-	if err != nil || !status.Complete {
+	if err != nil || !status.Complete || status.Stale {
 		if err != nil {
 			slog.DebugContext(ctx, "calendar: the index could not be read, so Proton answered",
 				"kind", string(skip.KindCalendar), "reason", string(skip.Unreadable), "error", err)
 		}
 		return nil, false
 	}
-	s.syncBeforeRead(ctx)
-
-	log, err := s.index.Load(ctx, search.AppCalendar)
+	x, err := s.openIndex(ctx)
 	if err != nil {
 		slog.DebugContext(ctx, "calendar: the index could not be opened, so Proton answered",
 			"kind", string(skip.KindCalendar), "reason", string(skip.Unreadable), "error", err)
 		return nil, false
 	}
+	x.syncBeforeRead(ctx)
+
 	wanted := map[string]bool{}
 	for _, id := range calendarIDs {
 		wanted[id] = true
 	}
-	out := make([]stored, 0, len(log.Records()))
-	for _, rec := range log.Records() {
+	out := make([]stored, 0, len(x.log.Records()))
+	for _, rec := range x.log.Records() {
 		var in indexed
 		if err := json.Unmarshal(rec.Data, &in); err != nil {
 			skip.Record(ctx, skip.KindEvent, rec.ID, skip.Malformed, err)
@@ -434,15 +526,15 @@ func (s *Service) indexedEvents(ctx context.Context, calendarIDs []string) ([]st
 
 // syncBeforeRead brings the index up to date before it is read. A directory
 // another run is writing to is left alone.
-func (s *Service) syncBeforeRead(ctx context.Context) {
-	lock, err := s.index.Claim()
+func (x *indexSession) syncBeforeRead(ctx context.Context) {
+	lock, err := x.s.index.Claim()
 	if err != nil {
 		slog.DebugContext(ctx, "calendar: the index was busy, so it was read as it stands",
 			"kind", string(skip.KindCalendar), "reason", string(skip.Unreadable), "error", err)
 		return
 	}
 	defer lock.Release()
-	if _, err := s.syncIndex(ctx); err != nil {
+	if _, err := x.Sync(ctx); err != nil {
 		// Recorded and not counted: what is indexed is still every event the last
 		// catch-up saw, and the answer covers what it covered before.
 		slog.DebugContext(ctx, "calendar: the index could not be brought up to date",

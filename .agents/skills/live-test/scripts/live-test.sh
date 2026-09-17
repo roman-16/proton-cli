@@ -241,7 +241,68 @@ cmd_tests() {
     '
 }
 
-cmd_start() {
+progress() {
+    local total passed failed skipped running code ran percent elapsed idle line
+    total=$(plan_get total)
+    eval "$(tally | grep --invert-match '^failure=')"
+    ran=$((passed + failed + skipped))
+    percent=$((ran * 100 / total))
+    elapsed=$(duration $(($(date +%s) - $(plan_get started))))
+    idle=$(($(date +%s) - $(stat --format=%Y "$log")))
+    if [ "$ran" -eq 0 ] && [ -z "$running" ]; then
+        printf '0%% · 0 of %s · preparing (build, sign-in, paid photograph) · %s elapsed\n' "$total" "$elapsed"
+    else
+        line="$percent% · $passed passed · $failed failed"
+        if [ "$skipped" -gt 0 ]; then
+            line="$line · $skipped skipped"
+        fi
+        line="$line · $ran of $total"
+        if [ -n "$running" ]; then
+            line="$line · running $running · last output $(duration "$idle") ago"
+        else
+            line="$line · finishing (paid photograph, coverage merge)"
+        fi
+        printf '%s · %s elapsed\n' "$line" "$elapsed"
+    fi
+    if [ "$idle" -ge 300 ]; then
+        printf 'no output for %s - %s may be stuck; stop it with live-test.sh stop in another terminal\n' \
+            "$(duration "$idle")" "${running:-the run}"
+    fi
+}
+
+report() {
+    local mux
+    mux=$(plan_get mux)
+    if session_exists "$mux"; then
+        session_remove "$mux"
+        verdict
+        printf 'log: %s · session %s removed\n' "$log" "$session"
+    else
+        verdict
+        printf 'log: %s · session already removed\n' "$log"
+    fi
+}
+
+follow() {
+    local due mux
+    mux=$(plan_get mux)
+    due=$(($(date +%s) + 60))
+    while ! over; do
+        if [ "$(date +%s)" -ge "$due" ]; then
+            progress
+            if ! session_exists "$mux"; then
+                printf 'the session is gone and the log has no ending - something stopped the run from outside\n'
+                printf 'STOPPED\n' >> "$log"
+                break
+            fi
+            due=$(($(date +%s) + 60))
+        fi
+        sleep 2
+    done
+    report
+}
+
+cmd_run() {
     local recipe=${1:-} pattern=${2:-} selected total mux
     case $recipe in
         coverage | test)
@@ -275,6 +336,17 @@ cmd_start() {
 
     printf 'started just %s (%s) in %s session %s\n' "$recipe" "$(counted "$total" test)" "$mux" "$session"
     printf 'watch: tail --follow %s · or attach: %s\n' "$log" "$(attach_command "$mux")"
+    follow
+}
+
+cmd_watch() {
+    [ -f "$plan" ] || die "no run started"
+    if over; then
+        report
+        return
+    fi
+    progress
+    follow
 }
 
 cmd_pane() {
@@ -295,40 +367,11 @@ cmd_pane() {
 
 cmd_check() {
     [ -f "$plan" ] || die "no run started"
-    local total passed failed skipped running code ran percent elapsed idle line mux
-    total=$(plan_get total)
     if over; then
-        mux=$(plan_get mux)
-        if session_exists "$mux"; then
-            session_remove "$mux"
-            verdict
-            printf 'log: %s · session %s removed\n' "$log" "$session"
-        else
-            verdict
-            printf 'log: %s · session already removed\n' "$log"
-        fi
-        return
-    fi
-    eval "$(tally | grep --invert-match '^failure=')"
-    ran=$((passed + failed + skipped))
-    percent=$((ran * 100 / total))
-    elapsed=$(duration $(($(date +%s) - $(plan_get started))))
-    idle=$(duration $(($(date +%s) - $(stat --format=%Y "$log"))))
-    if [ "$ran" -eq 0 ] && [ -z "$running" ]; then
-        printf '0%% · 0 of %s · preparing (build, sign-in, paid photograph) · %s elapsed\n' "$total" "$elapsed"
-        return
-    fi
-    line="$percent% · $passed passed · $failed failed"
-    if [ "$skipped" -gt 0 ]; then
-        line="$line · $skipped skipped"
-    fi
-    line="$line · $ran of $total"
-    if [ -n "$running" ]; then
-        line="$line · running $running · last output $idle ago"
+        report
     else
-        line="$line · finishing (paid photograph, coverage merge)"
+        progress
     fi
-    printf '%s · %s elapsed\n' "$line" "$elapsed"
 }
 
 cmd_stop() {
@@ -343,8 +386,9 @@ cmd_stop() {
 case ${1:-} in
     check) cmd_check ;;
     pane) cmd_pane ;;
-    start) cmd_start "${2:-}" "${3:-}" ;;
+    run) cmd_run "${2:-}" "${3:-}" ;;
     stop) cmd_stop ;;
     tests) cmd_tests "${2:-}" ;;
-    *) die "usage: live-test.sh tests PATTERN | start RECIPE [PATTERN] | check | stop" ;;
+    watch) cmd_watch ;;
+    *) die "usage: live-test.sh tests PATTERN | run RECIPE [PATTERN] | watch | check | stop" ;;
 esac

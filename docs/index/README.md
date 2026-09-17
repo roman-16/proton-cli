@@ -16,12 +16,15 @@ proton index create mail
 
 ```console
 $ proton index create mail
-Indexing mail  ━━━━━━━───────────────────────   26%  12400 / 48213 messages  8.2/s  1h12m left
+Indexing mail         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  100%  48213 / 48213 messages  in 3m
+Indexing mail bodies  ━━━━━━━───────────────────────   26%  12400 / 48213 bodies  8.2/s  1h12m left
 ```
 
-A first build of a large mailbox takes hours. Stopping it with Ctrl+C is safe: it works newest first, and running it again carries on where it stopped.
+Mail is indexed in two passes. The first takes minutes and holds every message; from then on a filtered listing such as `--unread`, `--from` or `--after` is answered from this machine. The second downloads the bodies newest first, and for a large mailbox takes hours.
 
-Afterwards `--keyword` searches bodies as well, everywhere it is taken:
+Stopping it with Ctrl+C is safe: running it again carries on where it stopped.
+
+Once a body is indexed `--keyword` searches it, everywhere the flag is taken:
 
 ```bash
 proton mail messages list --keyword "parking permit" --folder all
@@ -31,12 +34,14 @@ proton mail messages export --keyword "parking permit" --folder all --all --dest
 
 With an index, `--from` and `--to` match display names as well as addresses. Proton's search operators - `invoice | receipt`, `book*`, `!word` - stop applying: every term is matched literally, and a quoted phrase is one term.
 
-While a build is unfinished, a search says what it did not reach:
+A quoted reply is indexed without the history it quotes, so a keyword matches the message that says it rather than every later message in the thread.
+
+While bodies are still downloading, a keyword search says what it did not read:
 
 ```console
 $ proton mail messages list --keyword "parking permit" --folder all
 No messages match.
-! Only 12400 of 48213 messages are indexed, newest first, so older mail was not searched. `proton index create mail` continues the download.
+! Only 12400 of 48213 message bodies are indexed, newest first, so older mail was searched by everything but its text. `proton index create mail` continues the download.
 ```
 
 ## Find a file without a walk
@@ -65,13 +70,15 @@ It works without an index by reading your calendars first, which takes a moment.
 
 ```console
 $ proton index list
-APP       INDEXED                  UNREADABLE  UPDATED           SIZE
-────────  ───────────────────────  ──────────  ────────────────  ───────
-calendar  1342 events                          2026-04-15 14:30  812.0 KB
-drive     8120 items                           2026-04-15 14:31  1.9 MB
-mail      12400 of 48213 messages  31          2026-04-15 14:32  36.2 MB
+APP       INDEXED                        UNREADABLE  UPDATED           SIZE
+────────  ─────────────────────────────  ──────────  ────────────────  ───────
+calendar  1342 events                                2026-04-15 14:30  812.0 KB
+drive     8120 items                                 2026-04-15 14:31  1.9 MB
+mail      48213 messages, 12400 bodies   31          2026-04-15 14:32  36.2 MB
 3 indexes.
 ```
+
+For mail, INDEXED names both passes: every message is indexed, and 12400 of them hold the body a keyword reads. A first pass that has not finished reads `12400 of 48213 messages` instead.
 
 `UNREADABLE` counts things whose contents would not open - a message body, an event's text. They are searchable by everything else they carry.
 
@@ -79,14 +86,21 @@ This reads files, so it works signed out.
 
 ## Keep it current
 
-A search brings the index up to date before it answers, so an answer is never older than the command. Two ways to have that done already:
+A search brings the index up to date before it answers. Two ways to have that done already:
 
 ```bash
 proton index update
 proton index watch
 ```
 
-`update` catches up once, for cron or a systemd timer. `watch` stays attached and applies changes as they land. Neither indexes an app that has no index; `create` does that. For running `watch` unattended, see [Scripting](../using/scripting.md#run-a-watch-under-systemd).
+`update` catches up once, for cron or a systemd timer. `watch` stays attached and applies changes as they land; while it runs, a search reads the copy as of the last poll, at most 30 seconds old. Prefer `watch` when searches are frequent, and `update` on a timer when they are not. Both finish a build that was interrupted, and neither indexes an app that has no index; `create` does that. For running `watch` unattended, see [Scripting](../using/scripting.md#run-a-watch-under-systemd).
+
+When Proton cannot say what has changed since the last catch-up - after a long gap, or a change across the whole account - the next `create` or `update` reads the app again and settles it. Until then a search says so:
+
+```console
+$ proton mail messages list --unread --folder all
+! The mail index has fallen behind Proton and was searched as it stands. `proton index update` catches it up.
+```
 
 ## Remove it
 

@@ -24,6 +24,7 @@ type indexedTree struct {
 	tr   *tree
 	doer *stubDoer
 	dc   *Context
+	root *cannedFolder
 }
 
 // newIndexed builds a small tree: two files at the top, a folder, and a file
@@ -51,12 +52,26 @@ func newIndexedTree(t *testing.T) *indexedTree {
 	}
 	d.dc = dc
 
-	root := d.folder(t, testRootID, d.rootKey(t))
-	reports := d.add(t, root, "folder-1", "Reports", protonFolder, 0)
-	d.add(t, root, "invoice.pdf", "invoice.pdf", protonFile, 312)
-	d.add(t, root, "notes.txt", "notes.txt", protonFile, 12)
+	d.root = d.folder(t, testRootID, d.rootKey(t))
+	reports := d.add(t, d.root, "folder-1", "Reports", protonFolder, 0)
+	d.add(t, d.root, "invoice.pdf", "invoice.pdf", protonFile, 312)
+	d.add(t, d.root, "notes.txt", "notes.txt", protonFile, 12)
 	d.add(t, reports, "q1.pdf", "Q1 report.pdf", protonFile, 1200)
 	return d
+}
+
+// remove takes a link out of a folder's listing, the way something deleted
+// elsewhere leaves it: no event, and nothing but its absence to go on.
+func (d *indexedTree) remove(t *testing.T, parent *cannedFolder, linkID string) {
+	t.Helper()
+	kept := parent.children[:0]
+	for _, child := range parent.children {
+		if child.(map[string]any)["LinkID"] != linkID {
+			kept = append(kept, child)
+		}
+	}
+	parent.children = kept
+	d.publish(t, parent)
 }
 
 // protonFile is Proton's number for a file link, beside protonFolder.
@@ -130,11 +145,31 @@ func (d *indexedTree) rootKey(t *testing.T) *pgp.KeyRing {
 	return res.NodeKR
 }
 
-func (d *indexedTree) build(t *testing.T) {
+func (d *indexedTree) build(t *testing.T) search.Result {
 	t.Helper()
-	if _, err := d.s.buildIndex(t.Context(), progress.Nop{}); err != nil {
+	got, err := d.indexing(t).Build(t.Context(), progress.Nop{})
+	if err != nil {
 		t.Fatalf("build: %v", err)
 	}
+	return got
+}
+
+func (d *indexedTree) catchUp(t *testing.T) search.Result {
+	t.Helper()
+	got, err := d.indexing(t).Sync(t.Context())
+	if err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	return got
+}
+
+func (d *indexedTree) indexing(t *testing.T) *indexSession {
+	t.Helper()
+	x, err := d.s.openIndex(t.Context())
+	if err != nil {
+		t.Fatalf("open the index: %v", err)
+	}
+	return x
 }
 
 func (d *indexedTree) tree(t *testing.T) []Child {
@@ -195,9 +230,7 @@ func TestARenamedFolderTakesItsContentsWithIt(t *testing.T) {
 			"Name": renamed, "ModifyTime": 1700000001,
 		},
 	})
-	if _, err := d.s.syncIndex(t.Context()); err != nil {
-		t.Fatalf("sync: %v", err)
-	}
+	d.catchUp(t)
 
 	paths := pathsOf(d.tree(t))
 	if paths["folder-1"] != "/Archive" {
@@ -225,11 +258,7 @@ func TestWhatLeavesTheAccountLeavesTheTree(t *testing.T) {
 			"Name": trashed, "Size": 312, "Trashed": 1700000002,
 		}},
 	)
-	got, err := d.s.syncIndex(t.Context())
-	if err != nil {
-		t.Fatalf("sync: %v", err)
-	}
-	if got.Removed != 1 || got.Indexed != 1 {
+	if got := d.catchUp(t); got.Removed != 1 || got.Indexed != 1 {
 		t.Errorf("sync = %+v, want one removed and one rewritten", got)
 	}
 
@@ -288,7 +317,7 @@ func TestATreeThatIsNotTheAccountsIsWalked(t *testing.T) {
 
 // What is written down reads back as the item it was.
 func TestWhatIsIndexedReadsBackAsTheItemItWas(t *testing.T) {
-	in := stored{LinkID: "a", ParentID: "b", Name: "invoice.pdf", Path: "/invoice.pdf", Type: TypeFile, Size: 312}
+	in := stored{LinkID: "a", ParentID: "b", Name: "invoice.pdf", Type: TypeFile, Size: 312}
 	rec, err := record(in)
 	if err != nil {
 		t.Fatalf("record: %v", err)
@@ -300,7 +329,122 @@ func TestWhatIsIndexedReadsBackAsTheItemItWas(t *testing.T) {
 	if back != in {
 		t.Errorf("read back %+v, want %+v", back, in)
 	}
-	if got := back.child(); got.Path != in.Path || got.Size != in.Size || got.Type != in.Type {
+	got := back.child("/invoice.pdf")
+	if got.Path != "/invoice.pdf" || got.Name != in.Name || got.Size != in.Size || got.Type != in.Type {
 		t.Errorf("as a listing row = %+v", got)
+	}
+}
+
+// A file that arrives in the same batch as the folder it is in is in that
+// folder, which is what uploading a directory produces.
+func TestAFileCreatedWithItsFolderIsInIt(t *testing.T) {
+	d := newIndexedTree(t)
+	d.build(t)
+
+	photos := d.add(t, d.root, "folder-2", "Photos", protonFolder, 0)
+	d.add(t, photos, "cat.jpg", "cat.jpg", protonFile, 4096)
+	folderLink := d.root.children[len(d.root.children)-1]
+	fileLink := photos.children[len(photos.children)-1]
+	d.doer.routes["GET /drive/shares/"+testShareID+"/links/folder-2"] =
+		object(t, map[string]any{"Link": folderLink})
+
+	d.says(t,
+		map[string]any{"EventType": eventCreate, "Link": folderLink},
+		map[string]any{"EventType": eventCreate, "Link": fileLink},
+	)
+	d.catchUp(t)
+
+	paths := pathsOf(d.tree(t))
+	if paths["cat.jpg"] != "/Photos/cat.jpg" {
+		t.Errorf("the file is at %q, want it inside the folder it arrived with", paths["cat.jpg"])
+	}
+}
+
+// A folder in the trash takes everything under it out of the tree, and so does
+// one that is deleted outright. Proton reports the folder and nothing else.
+func TestWhatHappensToAFolderHappensToWhatIsInIt(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		event map[string]any
+	}{
+		{name: "trashed"},
+		{name: "deleted", event: map[string]any{
+			"EventType": eventDelete, "Link": map[string]any{"LinkID": "folder-1"},
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			d := newIndexedTree(t)
+			d.build(t)
+			event := tc.event
+			if event == nil {
+				name, err := encryptName("Reports", d.rootKey(t), d.tr.addrKR)
+				if err != nil {
+					t.Fatalf("encrypt: %v", err)
+				}
+				event = map[string]any{"EventType": eventUpdate, "Link": map[string]any{
+					"LinkID": "folder-1", "ParentLinkID": testRootID, "Type": protonFolder,
+					"Name": name, "Trashed": 1700000002,
+				}}
+			}
+			d.says(t, event)
+			d.catchUp(t)
+
+			paths := pathsOf(d.tree(t))
+			if _, there := paths["folder-1"]; there {
+				t.Error("the folder is still in the tree")
+			}
+			if _, there := paths["q1.pdf"]; there {
+				t.Errorf("the file inside it is still in the tree, at %q", paths["q1.pdf"])
+			}
+			if _, there := paths["invoice.pdf"]; !there {
+				t.Error("the rest of the tree went with it")
+			}
+		})
+	}
+}
+
+// A build over an unchanged tree writes nothing: what is in the index is what
+// the walk found, item by item.
+func TestReadingTheTreeAgainWritesOnlyWhatChanged(t *testing.T) {
+	d := newIndexedTree(t)
+	if got := d.build(t); got.Indexed != 4 {
+		t.Fatalf("the first build = %+v, want the 4 items of the tree", got)
+	}
+
+	// What a feed that gave up leaves behind: the index is read against the
+	// account again rather than followed.
+	x := d.indexing(t)
+	x.log.State.Stale = true
+	got, err := x.Build(t.Context(), progress.Nop{})
+	if err != nil {
+		t.Fatalf("read again: %v", err)
+	}
+	if got.Indexed != 0 || got.Removed != 0 {
+		t.Errorf("reading an unchanged tree again = %+v, want nothing written", got)
+	}
+	if st := x.Status(); st.Stale || !st.Complete || st.Indexed != 4 {
+		t.Errorf("status = %+v, want a whole index of 4 items", st)
+	}
+}
+
+// A file that left the volume while nothing was following it leaves the index
+// too: reading the tree is what establishes that it is gone.
+func TestWhatALaterReadingDoesNotFindLeavesTheIndex(t *testing.T) {
+	d := newIndexedTree(t)
+	d.build(t)
+
+	d.remove(t, d.root, "notes.txt")
+
+	x := d.indexing(t)
+	x.log.State.Stale = true
+	got, err := x.Build(t.Context(), progress.Nop{})
+	if err != nil {
+		t.Fatalf("read again: %v", err)
+	}
+	if got.Removed != 1 {
+		t.Errorf("reading the tree again = %+v, want the file that is gone removed", got)
+	}
+	if _, there := pathsOf(d.tree(t))["notes.txt"]; there {
+		t.Error("a file the account no longer has is still in the tree")
 	}
 }

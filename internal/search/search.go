@@ -10,9 +10,8 @@
 // A command lives for one invocation, so the copy lives on disk: one directory
 // per profile, one key, one append-only log per app. What is in the log is the
 // account's, so nothing about a thing is written outside its ciphertext - not an
-// ID, not a time, not the anchor a half-finished build carries on from. The
-// files beside it hold counts and cursors, which describe a shape and name
-// nothing.
+// ID, not a time, not a word of what it says. The files beside it hold counts
+// and cursors, which describe a shape and name nothing.
 package search
 
 import (
@@ -124,9 +123,17 @@ type Status struct {
 	// Unreadable is how many things went in without their content, because the
 	// content would not open.
 	Unreadable int `json:"unreadable,omitempty"`
+	// Bodies is how many of the indexed things hold the text a search reads,
+	// where holding it is a request of its own. Mail is the app that is: a
+	// message is indexed by its envelope first and by its body afterwards, so a
+	// count short of Indexed is bodies still being downloaded.
+	Bodies int `json:"bodies"`
 	// Complete says the first build finished, so nothing is missing but what has
 	// happened since.
 	Complete bool `json:"complete"`
+	// Stale says Proton could not say what has changed, so the index is owed a
+	// reading of the account rather than of its change feed.
+	Stale bool `json:"stale,omitempty"`
 	// Oldest is the far end of what has been indexed, which is what says how far
 	// back a search over a half-built index reaches.
 	Oldest  int64 `json:"oldest,omitempty"`
@@ -162,11 +169,17 @@ func (s *Store) Status(app App) (Status, error) {
 	if err != nil {
 		return Status{}, err
 	}
+	return statusOf(app, st, s.bytes(app)), nil
+}
+
+// statusOf is one index's state as it is reported, whether it was read off the
+// file beside the log or off the log a run has open.
+func statusOf(app App, st State, bytes int64) Status {
 	return Status{
 		App: app, Indexed: st.Indexed, Total: st.Total, Unreadable: st.Unreadable,
-		Complete: st.Complete, Oldest: st.Oldest, Updated: st.Updated,
-		Bytes: s.bytes(app), Volume: st.Volume,
-	}, nil
+		Bodies: st.Bodies, Complete: st.Complete, Stale: st.Stale,
+		Oldest: st.Oldest, Updated: st.Updated, Bytes: bytes, Volume: st.Volume,
+	}
 }
 
 // bytes is how much disk one index takes, which is what a removal is worth

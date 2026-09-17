@@ -244,6 +244,9 @@ func (s *Service) unlockShare(ctx context.Context, shareID, rootLinkID, volumeID
 type author struct {
 	kr    *pgp.KeyRing
 	email string
+	// id is the address the write is made from, for the endpoints that name an
+	// address by ID rather than by email.
+	id string
 }
 
 // key is what a write is signed with.
@@ -259,14 +262,20 @@ func (a author) key(fallback *pgp.KeyRing) *pgp.KeyRing {
 	return a.kr
 }
 
-// attribute names the author in a request body, under whichever name the
-// endpoints serving this tree call it. A write nobody is behind names nobody.
-func (a author) attribute(body map[string]any, dc *Context) {
-	if a.email == "" {
-		return
+// address is the ID of the address a write is made from, and nothing at all for
+// a write nobody is behind - which is what an endpoint asking for one expects
+// where a link was opened without an account.
+func (a author) address() any {
+	if a.id == "" {
+		return nil
 	}
-	if dc.Public() {
-		body["SignatureEmail"] = a.email
+	return a.id
+}
+
+// attribute names the author in a request body. A write nobody is behind names
+// nobody, which is what a link opened without an account writes as.
+func (a author) attribute(body map[string]any) {
+	if a.email == "" {
 		return
 	}
 	body["SignatureAddress"] = a.email
@@ -280,7 +289,7 @@ func (a author) attribute(body map[string]any, dc *Context) {
 // clients use there - and a caller with no account writes as nobody.
 func (s *Service) author(ctx context.Context, dc *Context) (author, error) {
 	if !dc.Public() {
-		return author{kr: dc.Addr.Write, email: dc.AddrEmail}, nil
+		return author{kr: dc.Addr.Write, email: dc.AddrEmail, id: dc.AddrID}, nil
 	}
 	if dc.Anonymous {
 		return author{}, nil
@@ -293,7 +302,7 @@ func (s *Service) author(ctx context.Context, dc *Context) (author, error) {
 	if err != nil {
 		return author{}, err
 	}
-	return author{kr: rings.Write, email: addr.Email}, nil
+	return author{kr: rings.Write, email: addr.Email, id: addr.ID}, nil
 }
 
 // rootName reads what a tree is called.
@@ -627,15 +636,11 @@ func (s *Service) linkChildren(ctx context.Context, dc *Context, linkID string) 
 	}
 	out := make([]Link, 0, len(ids))
 	for _, batch := range chunk(ids, linkDetailsBatch) {
-		var r struct{ Links []linkDetails }
-		if err := s.C.Decode(ctx, proton.Request{
-			Method: "POST", Reads: true,
-			Path: fmt.Sprintf("/drive/unauth/v2/volumes/%s/links", dc.VolumeID),
-			Body: map[string]any{"LinkIDs": batch},
-		}, &r); err != nil {
+		found, err := s.linkDetails(ctx, dc, batch)
+		if err != nil {
 			return nil, err
 		}
-		for _, details := range r.Links {
+		for _, details := range found {
 			link, finished := details.link()
 			if !finished {
 				// Recorded and not counted: an upload nobody finished is not an item,
@@ -648,6 +653,22 @@ func (s *Service) linkChildren(ctx context.Context, dc *Context, linkID string) 
 		}
 	}
 	return out, nil
+}
+
+// linkDetails reads what a public link's items are, by ID.
+//
+// It is the answer that carries the address of whoever uploaded each item and
+// the version a file holds now, neither of which the tree says anywhere else.
+func (s *Service) linkDetails(ctx context.Context, dc *Context, linkIDs []string) ([]linkDetails, error) {
+	var r struct{ Links []linkDetails }
+	if err := s.C.Decode(ctx, proton.Request{
+		Method: "POST", Reads: true,
+		Path: fmt.Sprintf("/drive/unauth/v2/volumes/%s/links", dc.VolumeID),
+		Body: map[string]any{"LinkIDs": linkIDs},
+	}, &r); err != nil {
+		return nil, err
+	}
+	return r.Links, nil
 }
 
 // linkChildIDs names what is in a folder behind a public link, a page at a time.

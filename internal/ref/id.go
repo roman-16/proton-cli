@@ -67,9 +67,14 @@ func Shorten(reference string) string {
 
 // Matches reports whether short names full: what Shorten writes for an ID is a
 // prefix of that ID once its leading dashes are skipped, and so is any longer
-// run the user types instead.
+// run the user types instead - the whole ID included.
+//
+// The dashes are skipped on both sides, because they are not part of what
+// identifies an ID: a listing prints the ID whole, dash and all, so an ID that
+// begins with one has to answer to itself as it was printed as well as to the
+// shell-safe run Shorten writes.
 func Matches(full, short string) bool {
-	return strings.HasPrefix(body(full), short)
+	return strings.HasPrefix(body(full), body(short))
 }
 
 // Full reports whether s is a complete ID as Proton issues them.

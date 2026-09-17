@@ -15,10 +15,10 @@ import (
 // A log is a sequence of sealed records, each framed by its own length.
 //
 // Appending is the whole of how one is written: a build that stops halfway has
-// written every record it got to, and the next run carries on from the mark it
-// left rather than from the beginning. A record that supersedes an earlier one
-// is appended too, which is what makes a change one write rather than a rewrite
-// of the file - and what makes compaction a thing that happens later, once the
+// written every record it got to, and what it did not get to is what the next
+// run works out from what is there. A record that supersedes an earlier one is
+// appended too, which is what makes a change one write rather than a rewrite of
+// the file - and what makes compaction a thing that happens later, once the
 // superseded records outweigh what is live.
 //
 // Nothing outside the sealed part of a record says anything: two records of the
@@ -36,7 +36,7 @@ const (
 	compactAtWaste = 0.5
 )
 
-// Record is one thing in a log, or the mark a build left behind.
+// Record is one thing in a log.
 type Record struct {
 	// ID is the thing this record is about. Records of the same ID supersede one
 	// another, newest last.
@@ -44,10 +44,6 @@ type Record struct {
 	// Gone says the thing is no longer in the account, which a search has to
 	// know and a log cannot express by leaving something out.
 	Gone bool `json:"gone,omitempty"`
-	// Mark is how far a build had got. It belongs to the build rather than to
-	// anything in the account, and it is sealed with everything else because
-	// what it names is a message.
-	Mark string `json:"mark,omitempty"`
 	// Data is the app's own shape for the thing.
 	Data json.RawMessage `json:"data,omitempty"`
 }
@@ -73,8 +69,17 @@ type State struct {
 	Indexed    int `json:"indexed"`
 	Total      int `json:"total"`
 	Unreadable int `json:"unreadable,omitempty"`
+	// Bodies is how many of the things in the log hold the text that has to be
+	// fetched one at a time, which is what a mailbox is indexed in two passes
+	// for: an envelope is a row of a listing, a body is a request of its own.
+	Bodies int `json:"bodies,omitempty"`
 	// Complete says the first build reached the end.
 	Complete bool `json:"complete"`
+	// Stale says Proton could not describe what has happened since the index was
+	// last brought up to date, so what is in it can no longer be trusted to be
+	// what the account holds. It is settled by reading the account again rather
+	// than by following the feed, which is why it is the build that clears it.
+	Stale bool `json:"stale,omitempty"`
 	// Oldest is the far end of what is indexed, which is what a search over a
 	// half-built index has to say about what it did not cover.
 	Oldest  int64 `json:"oldest,omitempty"`
@@ -92,7 +97,6 @@ type Log struct {
 
 	recs []Record
 	at   map[string]int
-	mark string
 	// parsed is how much of the file read back whole, so a torn tail is written
 	// over rather than left in front of everything appended after it.
 	parsed int64
@@ -131,8 +135,8 @@ func (s *Store) Load(ctx context.Context, app App) (*Log, error) {
 // Records is what the index holds, in the order it was written.
 func (l *Log) Records() []Record { return l.recs }
 
-// Mark is how far the build had got, empty before it has got anywhere.
-func (l *Log) Mark() string { return l.mark }
+// Status is what the open index holds, as a listing of indexes reports it.
+func (l *Log) Status() Status { return statusOf(l.app, l.State, l.store.bytes(l.app)) }
 
 // Has reports whether the index already holds something.
 func (l *Log) Has(id string) bool { _, ok := l.at[id]; return ok }
@@ -214,9 +218,6 @@ func (l *Log) Save(now int64) error {
 
 // remember files a record where the next read of the same thing will find it.
 func (l *Log) remember(r Record) {
-	if r.Mark != "" {
-		l.mark = r.Mark
-	}
 	if r.ID == "" {
 		return
 	}
@@ -314,9 +315,6 @@ func (l *Log) worthCompacting() bool {
 // nonces, and swaps it in. A crash partway leaves the old file in place.
 func (l *Log) compact() error {
 	recs := append([]Record{}, l.recs...)
-	if l.mark != "" {
-		recs = append(recs, Record{Mark: l.mark})
-	}
 	var buf []byte
 	for _, r := range recs {
 		sealed, err := l.seal(r)

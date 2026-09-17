@@ -128,6 +128,13 @@ PROTON_CONFIRM='mutations, drive:default'
 PROTON_CONFIRM='reads, mail messages list:default'
 ```
 
+An exception to a `deny` is written as a `deny` of its own, since `default` only takes a command out of an `ask`:
+
+```bash
+# nothing in the index may be changed, except listing what is there
+PROTON_CONFIRM='index:all=deny, index list:default=deny'
+```
+
 That holds **within** one place a policy is written. Between the file, the variable and the flag it does not: each is weighed on its own and the strictest wins. An exception written in one of them cannot stand down a rule written in another.
 
 ## Ask

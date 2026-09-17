@@ -84,13 +84,16 @@ func Listing(names []string) string {
 }
 
 // Singular derives the singular of a collection noun. Collection names in this
-// CLI are ordinary English plurals, so two suffix rules cover all of them:
-// "addresses"/"aliases" lose "es", everything else loses "s".
+// CLI are ordinary English plurals, so three suffix rules cover all of them:
+// "addresses"/"aliases" lose "es", "entries"/"bodies" trade "ies" for "y", and
+// everything else loses "s".
 func Singular(plural string) string {
 	switch {
 	case strings.HasSuffix(plural, "ses"), strings.HasSuffix(plural, "xes"),
 		strings.HasSuffix(plural, "ches"), strings.HasSuffix(plural, "shes"):
 		return strings.TrimSuffix(plural, "es")
+	case strings.HasSuffix(plural, "ies"):
+		return strings.TrimSuffix(plural, "ies") + "y"
 	case strings.HasSuffix(plural, "s"):
 		return strings.TrimSuffix(plural, "s")
 	}

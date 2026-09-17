@@ -37,7 +37,8 @@ func listCmd() *cobra.Command {
 		Long: "List what is indexed on this machine.\n\n" +
 			"Reads the files and nothing else, so it works signed out. INDEXED counts\n" +
 			"what a search would look through; a build that has not finished says how\n" +
-			"much of the app it has reached.",
+			"much of the app it has reached, and mail says how many message bodies it\n" +
+			"holds while they are still downloading.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			indexes, err := c.App.Index.List()
 			if err != nil {
@@ -66,15 +67,25 @@ func listCmd() *cobra.Command {
 	}
 }
 
-// indexedCell says how much of an app is in the index, in the app's own noun. A
-// build that has not finished says so by naming both numbers.
+// indexedCell says how much of an app is in the index, in the app's own noun.
+//
+// A build that has not finished says so by naming both numbers, and a mailbox
+// whose bodies are still arriving says how many it has: every message is in the
+// index by then, and what a keyword reaches is the part that has its text.
 func indexedCell(s search.Status) string {
 	noun := ui.Quantity(s.Indexed, nounOf(s.App))
-	if s.Complete || s.Total <= s.Indexed {
-		return noun
+	switch {
+	case !s.Complete && s.Total > s.Indexed:
+		return fmt.Sprintf("%d of %s", s.Indexed, ui.Quantity(s.Total, nounOf(s.App)))
+	case owesBodies(s):
+		return fmt.Sprintf("%s, %s", noun, ui.Quantity(s.Bodies, "bodies"))
 	}
-	return fmt.Sprintf("%d of %s", s.Indexed, ui.Quantity(s.Total, nounOf(s.App)))
+	return noun
 }
+
+// owesBodies reports that an index holds things whose text it has still to
+// download, which is the state a mailbox is in between its two passes.
+func owesBodies(s search.Status) bool { return s.App == search.AppMail && s.Bodies < s.Indexed }
 
 // blankAtZero leaves a column empty rather than writing a nought in it: what
 // the column reports is an exception, and a table of noughts reads as a table of
@@ -87,9 +98,11 @@ func blankAtZero(n int) string {
 }
 
 // continues points at the command that finishes what an interrupted build
-// started, which is the one thing a half-built index leaves to be done.
+// started, which is the one thing a half-built index leaves to be done. An
+// index Proton could not describe the changes to is in the same position: what
+// finishes it is a reading of the account, which is what a build is.
 func continues(c *kit.Invocation, index search.Status) {
-	if index.Complete {
+	if index.Complete && !index.Stale && !owesBodies(index) {
 		return
 	}
 	c.UI().Hint("`" + kit.Program + " index create " + string(index.App) + "` continues the download.")
@@ -100,9 +113,10 @@ func createCmd() *cobra.Command {
 		Use:   "create [REF...]",
 		Short: "Index an app so its contents can be searched",
 		Long: "Index an app so its contents can be searched.\n\n" +
-			"Name the apps to index, or none for every app that can be. A first build\n" +
-			"of a large mailbox takes hours; stopping it and running it again carries\n" +
-			"on where it left off, newest first.\n\n" +
+			"Name the apps to index, or none for every app that can be. Mail is indexed\n" +
+			"in two passes: every message first, which takes minutes and answers a\n" +
+			"filtered listing, then the bodies newest first, which for a large mailbox\n" +
+			"takes hours. Stopping it and running it again carries on where it left off.\n\n" +
 			"What it writes is encrypted to your account's keys, under\n" +
 			"~/.config/" + kit.Alias + "/index.",
 		ValidArgsFunction: completeApps,
@@ -121,8 +135,9 @@ func updateCmd() *cobra.Command {
 		Use:   "update",
 		Short: "Bring every index up to date",
 		Long: "Bring every index up to date.\n\n" +
-			"Applies what has happened since the last run, and carries on a build that\n" +
-			"was interrupted. It creates nothing: an app with no index is left alone.\n\n" +
+			"Applies what has happened since the last run, carries on a build that was\n" +
+			"interrupted, and reads an app again where Proton could not say what\n" +
+			"changed. It creates nothing: an app with no index is left alone.\n\n" +
 			"A search catches up by itself, so this is for having it done already:\n" +
 			"run it from cron, or leave `index watch` attached.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
@@ -163,12 +178,16 @@ func bring(c *kit.Invocation, apps []search.App) error {
 	var done search.Result
 	per := map[string]any{}
 	for i, part := range parts {
+		session, err := part.Open(c.Ctx)
+		if err != nil {
+			return refusal(err)
+		}
 		sink := ui.Batch(ui.NewCounter(c.UI(), part.Noun()), i+1, len(parts))
-		got, err := run(c.Ctx, part, sink)
+		got, err := run(c.Ctx, session, sink)
 		done = search.Total(done, got)
 		per[string(part.App())] = got.Indexed
 		if err != nil {
-			return stopped(c, part, err)
+			return stopped(c, session, part, err)
 		}
 		unreadable(c, part, got)
 	}
@@ -180,24 +199,47 @@ func bring(c *kit.Invocation, apps []search.App) error {
 
 // run builds what is not built and then applies what has changed, which is what
 // "bring this app's index up to date" means whichever command asked for it.
-func run(ctx context.Context, part search.Part, sink progress.Sink) (search.Result, error) {
-	built, err := part.Build(ctx, sink)
-	if err != nil {
-		return built, err
+//
+// A catch-up that comes back saying Proton could not describe what happened is
+// answered here rather than left for the next run: reading the account is what
+// settles it, and reading the account is what a build does.
+func run(ctx context.Context, session search.Session, sink progress.Sink) (search.Result, error) {
+	var done search.Result
+	for range reconciles {
+		built, err := session.Build(ctx, sink)
+		done = search.Total(done, built)
+		if err != nil {
+			return done, err
+		}
+		synced, err := session.Sync(ctx)
+		done = search.Total(done, synced)
+		if err != nil || !synced.Refreshed {
+			return done, err
+		}
 	}
-	synced, err := part.Sync(ctx)
-	return search.Total(built, synced), err
+	return done, nil
 }
+
+// reconciles is how many times one run reads an app again because its feed said
+// it could not say what had happened. Twice is a reading, and a reading of what
+// arrived during it; a third would be a feed refreshing faster than the account
+// can be read, which is the next run's to carry on with.
+const reconciles = 2
 
 // stopped says what a run that was interrupted got through, so the person who
 // pressed Ctrl+C knows whether running it again is minutes or hours.
-func stopped(c *kit.Invocation, part search.Part, err error) error {
+func stopped(c *kit.Invocation, session search.Session, part search.Part, err error) error {
 	if !errors.Is(err, context.Canceled) {
 		return err
 	}
-	if status, sErr := part.Status(); sErr == nil && !status.Complete {
+	status := session.Status()
+	switch {
+	case !status.Complete:
 		c.Note("Indexed %d of %s so far. Run it again to continue.",
 			status.Indexed, ui.Quantity(status.Total, part.Noun()))
+	case owesBodies(status):
+		c.Note("Downloaded %d of %s so far. Run it again to continue.",
+			status.Bodies, ui.Quantity(status.Indexed, contentsOf(part.App())))
 	}
 	return err
 }
@@ -237,9 +279,12 @@ func watchCmd() *cobra.Command {
 		Use:   "watch",
 		Short: "Keep every index current until you stop it",
 		Long: "Keep every index current until you stop it.\n\n" +
-			"Applies changes as they land, one line per batch, so a search answers\n" +
-			"without catching up first.\n\n" +
-			"It indexes nothing that is not indexed already; `index create` does that.",
+			"Applies changes as they land, one line per batch, and finishes a build\n" +
+			"that was interrupted. It creates nothing: an app with no index is left\n" +
+			"alone.\n\n" +
+			"While it runs, a search reads the copy as of the last poll, at most 30\n" +
+			"seconds old. Prefer it when searches are frequent; run `index update` on a\n" +
+			"timer when they are not.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			indexes, err := c.App.Index.List()
 			if err != nil {
@@ -289,18 +334,29 @@ const pollEvery = 30 * time.Second
 
 // follow keeps the indexes current until the reader stops watching.
 //
+// Each app's index is opened once and kept open, so a poll that finds nothing is
+// one request rather than a decryption of the whole file every half-minute.
+//
 // A failed poll is reported and the loop carries on: a network that dropped for
 // a minute is not a reason to stop watching, and the next poll asks from the
 // same cursor, so nothing is lost by having missed one.
 func follow(c *kit.Invocation, parts []search.Part, emit func(change) error) error {
+	sessions := make([]search.Session, 0, len(parts))
+	for _, part := range parts {
+		session, err := part.Open(c.Ctx)
+		if err != nil {
+			return refusal(err)
+		}
+		sessions = append(sessions, session)
+	}
 	for {
 		select {
 		case <-c.Ctx.Done():
 			return nil
 		case <-time.After(pollEvery):
 		}
-		for _, part := range parts {
-			got, err := part.Sync(c.Ctx)
+		for i, part := range parts {
+			got, err := run(c.Ctx, sessions[i], progress.Nop{})
 			switch {
 			case c.Ctx.Err() != nil:
 				return nil

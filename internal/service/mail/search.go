@@ -31,6 +31,14 @@ type Coverage struct {
 	// the oldest, so a search over it is short at the far end.
 	Partial     bool
 	Have, Total int
+	// Bodies is how many of them the index holds the text of. An envelope is
+	// indexed in one page of a hundred and fifty and a body is a request of its
+	// own, so a mailbox is searchable by its senders and dates long before it is
+	// searchable by what it says.
+	Bodies int
+	// Stale says Proton could not describe what has happened to the mailbox, so
+	// the copy answered as it stands and nothing knows what it is missing.
+	Stale bool
 }
 
 // Search answers a question about messages: from the index when there is one,
@@ -79,7 +87,7 @@ func (s *Service) searchable(ctx context.Context, opts ListOptions) ([]stored, C
 	if !opts.Narrowed() || !s.Indexed() {
 		return nil, Coverage{}, false
 	}
-	status, err := s.index.Status(search.AppMail)
+	x, err := s.openIndex(ctx)
 	if err != nil {
 		// Recorded and not counted: nothing is missing from the answer, because
 		// Proton answers the same question. What the reader loses is bodies, and
@@ -88,18 +96,28 @@ func (s *Service) searchable(ctx context.Context, opts ListOptions) ([]stored, C
 			"kind", string(skip.KindMessage), "reason", string(skip.Unreadable), "error", err)
 		return nil, Coverage{}, false
 	}
-	s.syncBeforeSearch(ctx)
-	in, err := s.indexRecords(ctx)
-	if err != nil {
-		slog.DebugContext(ctx, "mail: the index could not be opened, so Proton answered",
-			"kind", string(skip.KindMessage), "reason", string(skip.Unreadable), "error", err)
-		return nil, Coverage{}, false
-	}
+	x.syncBeforeSearch(ctx)
+	in := x.records(ctx)
+	status := x.Status()
 	cover := Coverage{
 		Indexed: true, Have: len(in), Total: max(status.Total, len(in)),
-		Partial: !status.Complete,
+		Partial: !status.Complete, Bodies: bodiesIn(in), Stale: status.Stale,
 	}
 	return in, cover, true
+}
+
+// bodiesIn is how many of the messages a search just read hold their text, which
+// is counted off the records rather than taken from the summary beside them: it
+// is what the answer was drawn from, and the one number a caveat about the
+// answer must not be wrong about.
+func bodiesIn(in []stored) int {
+	bodies := 0
+	for _, m := range in {
+		if m.settled() {
+			bodies++
+		}
+	}
+	return bodies
 }
 
 // syncBeforeSearch brings the index up to date with the account before it is
@@ -108,20 +126,20 @@ func (s *Service) searchable(ctx context.Context, opts ListOptions) ([]stored, C
 //
 // Nothing else keeps it current: there is no background process, and a run of
 // `index update` is the same catch-up done deliberately. What it costs when
-// nothing has happened is one request.
+// nothing has happened is one request and no reading of the index at all.
 //
 // A directory somebody else is writing to is left alone - whatever holds it is
 // keeping the index current anyway, and waiting for a build that takes hours
 // would make a search take hours.
-func (s *Service) syncBeforeSearch(ctx context.Context) {
-	lock, err := s.index.Claim()
+func (x *indexSession) syncBeforeSearch(ctx context.Context) {
+	lock, err := x.s.index.Claim()
 	if err != nil {
 		slog.DebugContext(ctx, "mail: the index was busy, so the search read it as it stands",
 			"kind", string(skip.KindMessage), "reason", string(skip.Unreadable), "error", err)
 		return
 	}
 	defer lock.Release()
-	if _, err := s.syncIndex(ctx); err != nil {
+	if _, err := x.syncIndex(ctx); err != nil {
 		// Recorded and not counted: the index is a copy, so a catch-up that
 		// failed costs whatever changed since the last one and nothing that was
 		// there before. The answer says how much of the mailbox it covers.

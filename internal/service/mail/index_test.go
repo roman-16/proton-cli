@@ -20,14 +20,17 @@ import (
 // A mailbox to index, and a Proton that answers for it.
 //
 // The build is a walk anchored to the oldest message of the page before, a body
-// fetched per message, and a cursor into the change feed taken before any of it.
-// Each of those is a thing that can be got wrong in a way no unit of it would
-// show, so what is tested here is the loop rather than its parts.
+// fetched per message afterwards, and a cursor into the change feed taken before
+// any of it. Each of those is a thing that can be got wrong in a way no unit of
+// it would show, so what is tested here is the loop rather than its parts.
 type mailbox struct {
 	kr       *pgp.KeyRing
 	messages []rawListMessage
 	bodies   map[string]string
 	events   map[string]string
+	// latest is what the feed answers when asked where "from now on" is, which a
+	// mailbox that has been refreshed hands out again.
+	latest string
 
 	// A build fetches bodies ten at a time, so both counters are written from
 	// several goroutines at once.
@@ -41,30 +44,67 @@ type mailbox struct {
 
 func newMailbox(t *testing.T, count int) *mailbox {
 	t.Helper()
-	m := &mailbox{kr: genMailKeyRing(t), bodies: map[string]string{}, events: map[string]string{}}
+	m := newEmptyMailbox(t)
 	for i := range count {
 		id := fmt.Sprintf("msg-%02d", i)
 		m.add(t, rawListMessage{
 			ID: id, ConversationID: "thread-" + id, Subject: "Subject " + id,
 			Time: int64(1000 - i), LabelIDs: []string{labelInbox, labelAllMail},
 			Sender: struct{ Name, Address string }{Name: "Jane Roe", Address: "jane@example.com"},
+			ToList: []map[string]any{{"Name": "Me", "Address": "me@proton.me"}},
 		}, "the body of "+id)
 	}
 	return m
 }
 
+func newEmptyMailbox(t *testing.T) *mailbox {
+	t.Helper()
+	return &mailbox{
+		kr: genMailKeyRing(t), bodies: map[string]string{},
+		events: map[string]string{}, latest: "cursor-0",
+	}
+}
+
+// forget takes a message out of the mailbox, the way deleting one elsewhere
+// does: no event, and nothing left but its absence from a listing.
+func (m *mailbox) forget(id string) {
+	kept := m.messages[:0]
+	for _, msg := range m.messages {
+		if msg.ID != id {
+			kept = append(kept, msg)
+		}
+	}
+	m.messages = kept
+	delete(m.bodies, id)
+}
+
+// newest puts a message at the top of the mailbox, which is where the walk
+// starts and where an arrival belongs.
+func (m *mailbox) newest(t *testing.T, raw rawListMessage, body string) {
+	t.Helper()
+	m.add(t, raw, body)
+	last := len(m.messages) - 1
+	m.messages = append([]rawListMessage{m.messages[last]}, m.messages[:last]...)
+}
+
 func (m *mailbox) add(t *testing.T, raw rawListMessage, body string) {
 	t.Helper()
-	enc, err := m.kr.Encrypt(pgp.NewPlainMessageFromString(body), nil)
+	m.messages = append(m.messages, raw)
+	m.bodies[raw.ID] = armored(t, m.kr, body)
+}
+
+// armored is a body as Proton hands one over: sealed to the account's key.
+func armored(t *testing.T, kr *pgp.KeyRing, body string) string {
+	t.Helper()
+	enc, err := kr.Encrypt(pgp.NewPlainMessageFromString(body), nil)
 	if err != nil {
 		t.Fatalf("encrypt: %v", err)
 	}
-	armored, err := enc.GetArmored()
+	sealed, err := enc.GetArmored()
 	if err != nil {
 		t.Fatalf("armor: %v", err)
 	}
-	m.messages = append(m.messages, raw)
-	m.bodies[raw.ID] = armored
+	return sealed
 }
 
 func (m *mailbox) Do(context.Context, proton.Request) (*proton.Response, error) {
@@ -94,7 +134,7 @@ func (m *mailbox) Decode(_ context.Context, r proton.Request, out any) error {
 			"ToList": []map[string]any{{"Name": "Me", "Address": "me@proton.me"}},
 		}})
 	case r.Path == "/core/v4/events/latest":
-		return encodeInto(out, map[string]any{"EventID": "cursor-0"})
+		return encodeInto(out, map[string]any{"EventID": m.latest})
 	case strings.HasPrefix(r.Path, "/core/v5/events/"):
 		return encodeInto(out, m.event(strings.TrimPrefix(r.Path, "/core/v5/events/")))
 	}
@@ -140,6 +180,56 @@ func encodeInto(out any, v map[string]any) error {
 	return json.Unmarshal(data, out)
 }
 
+// build brings the index to everything the mailbox holds, which is what
+// `index create` does: the envelopes, and then the bodies they are owed.
+func build(t *testing.T, s *Service) search.Result {
+	t.Helper()
+	got, err := indexing(t, s).Build(t.Context(), progress.Nop{})
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	return got
+}
+
+// catchUp applies what the feed reports, which is what every command that reads
+// the index does before it answers.
+func catchUp(t *testing.T, s *Service) search.Result {
+	t.Helper()
+	got, err := indexing(t, s).Sync(t.Context())
+	if err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	return got
+}
+
+func indexing(t *testing.T, s *Service) *indexSession {
+	t.Helper()
+	x, err := s.openIndex(t.Context())
+	if err != nil {
+		t.Fatalf("open the index: %v", err)
+	}
+	return x
+}
+
+// inTheIndex is what the index holds, by message.
+func inTheIndex(t *testing.T, s *Service) map[string]stored {
+	t.Helper()
+	out := map[string]stored{}
+	for _, in := range indexing(t, s).records(t.Context()) {
+		out[in.ID] = in
+	}
+	return out
+}
+
+func status(t *testing.T, s *Service) search.Status {
+	t.Helper()
+	st, err := s.index.Status(search.AppMail)
+	if err != nil {
+		t.Fatalf("status: %v", err)
+	}
+	return st
+}
+
 // indexService is a mail service whose index is a directory of its own and
 // whose keys open the mailbox it is given.
 func indexService(t *testing.T, m *mailbox) *Service {
@@ -162,26 +252,19 @@ func TestABuildIndexesEveryMessageAndItsBody(t *testing.T) {
 	m := newMailbox(t, 5)
 	s := indexService(t, m)
 
-	got, err := s.buildIndex(t.Context(), progress.Nop{})
-	if err != nil {
-		t.Fatalf("build: %v", err)
-	}
-	if got.Indexed != 5 {
+	if got := build(t, s); got.Indexed != 5 {
 		t.Errorf("indexed %d, want 5", got.Indexed)
 	}
-	status, err := s.index.Status(search.AppMail)
-	if err != nil {
-		t.Fatalf("status: %v", err)
-	}
-	if !status.Complete || status.Indexed != 5 || status.Total != 5 {
-		t.Errorf("status = %+v, want a complete index of 5", status)
+	st := status(t, s)
+	if !st.Complete || st.Indexed != 5 || st.Total != 5 || st.Bodies != 5 {
+		t.Errorf("status = %+v, want a complete index of 5 with every body", st)
 	}
 
 	msgs, total, cover, err := s.Search(t.Context(), ListOptions{Keyword: "body of msg-03", Folder: "all"})
 	if err != nil {
 		t.Fatalf("search: %v", err)
 	}
-	if !cover.Indexed || cover.Partial {
+	if !cover.Indexed || cover.Partial || cover.Bodies != 5 {
 		t.Errorf("coverage = %+v, want a whole index answering", cover)
 	}
 	if total != 1 || len(msgs) != 1 || msgs[0].ID != "msg-03" {
@@ -189,6 +272,79 @@ func TestABuildIndexesEveryMessageAndItsBody(t *testing.T) {
 	}
 	if msgs[0].Subject != "Subject msg-03" || msgs[0].FromAddress != "jane@example.com" {
 		t.Errorf("row = %+v, want what a listing shows", msgs[0])
+	}
+}
+
+// The envelopes come first and the bodies after, so a mailbox answers a filtered
+// listing long before it answers a keyword.
+//
+// It is the whole reason the walk is separate: metadata is a hundred and fifty
+// messages a request and a body is one, so a build that fetched as it walked
+// would leave --unread waiting on hours of downloads.
+func TestEveryMessageIsIndexedBeforeAnyBodyIsFetched(t *testing.T) {
+	m := newMailbox(t, 4)
+	s := indexService(t, m)
+	x := indexing(t, s)
+
+	if _, err := x.walkMailbox(t.Context(), progress.Nop{}); err != nil {
+		t.Fatalf("walk: %v", err)
+	}
+	if fetched := m.fetched.Load(); fetched != 0 {
+		t.Errorf("the walk fetched %d bodies; it is metadata only", fetched)
+	}
+	st := status(t, s)
+	if !st.Complete || st.Indexed != 4 || st.Bodies != 0 {
+		t.Fatalf("after the walk status = %+v, want 4 messages and no bodies", st)
+	}
+
+	// Everything but the text answers already.
+	msgs, _, cover, err := s.Search(t.Context(), ListOptions{From: "jane@example.com", Folder: "all"})
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if !cover.Indexed || len(msgs) != 4 {
+		t.Errorf("a filtered listing found %d of 4 from the envelopes alone", len(msgs))
+	}
+
+	if _, err := x.fetchOwedBodies(t.Context(), progress.Nop{}); err != nil {
+		t.Fatalf("fetch bodies: %v", err)
+	}
+	if st := status(t, s); st.Bodies != 4 {
+		t.Errorf("bodies = %d of 4 after the second pass", st.Bodies)
+	}
+	if fetched := m.fetched.Load(); fetched != 4 {
+		t.Errorf("bodies fetched = %d, want one request each", fetched)
+	}
+}
+
+// A reply's quoted history is left out when the thread it quotes is in the
+// index, so a word in one message matches that message and not the thread.
+//
+// The envelopes settle this before a single body is read: which threads the
+// mailbox holds and from when is what says whether a quote is covered
+// elsewhere, and a walk that fetched as it went would never know in time.
+func TestAQuotedReplyIsIndexedWithoutWhatItQuotes(t *testing.T) {
+	m := newEmptyMailbox(t)
+	m.add(t, rawListMessage{
+		ID: "reply", ConversationID: "thread", Subject: "Re: agenda", Time: 2000,
+		LabelIDs: []string{labelInbox, labelAllMail},
+	}, "Thanks!\n\nOn Monday, Jane Roe <jane@example.com> wrote:\n\n> pineapple on the agenda\n")
+	m.add(t, rawListMessage{
+		ID: "original", ConversationID: "thread", Subject: "agenda", Time: 1000,
+		LabelIDs: []string{labelInbox, labelAllMail},
+	}, "pineapple on the agenda")
+	s := indexService(t, m)
+	build(t, s)
+
+	if body := inTheIndex(t, s)["reply"].Body; strings.Contains(body, "pineapple") {
+		t.Errorf("the reply was indexed with the quote it carries: %q", body)
+	}
+	msgs, _, _, err := s.Search(t.Context(), ListOptions{Keyword: "pineapple", Folder: "all"})
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if len(msgs) != 1 || msgs[0].ID != "original" {
+		t.Errorf("a word in one message matched %d messages %v", len(msgs), msgs)
 	}
 }
 
@@ -202,23 +358,17 @@ func TestABuildCountsTheMailboxRatherThanThePageItIsOn(t *testing.T) {
 	m := newMailbox(t, indexPage+10)
 	s := indexService(t, m)
 
-	if _, err := s.buildIndex(t.Context(), progress.Nop{}); err != nil {
-		t.Fatalf("build: %v", err)
-	}
+	build(t, s)
 	if pages := m.pages.Load(); pages < 3 {
 		t.Fatalf("the walk took %d metadata requests; it has to span pages for this to mean anything", pages)
 	}
-	status, err := s.index.Status(search.AppMail)
-	if err != nil {
-		t.Fatalf("status: %v", err)
-	}
-	if status.Total != indexPage+10 || status.Indexed != indexPage+10 {
-		t.Errorf("status = %+v, want %d of %d", status, indexPage+10, indexPage+10)
+	if st := status(t, s); st.Total != indexPage+10 || st.Indexed != indexPage+10 {
+		t.Errorf("status = %+v, want %d of %d", st, indexPage+10, indexPage+10)
 	}
 }
 
-// A build that stopped carries on from its mark: the metadata it already has is
-// walked again, and the bodies it already has are not fetched again.
+// A build that stopped carries on from what is missing: the bodies it already
+// has are not fetched again, and the ones it never got to are.
 func TestAnInterruptedBuildCarriesOnWhereItStopped(t *testing.T) {
 	m := newMailbox(t, 6)
 	s := indexService(t, m)
@@ -226,28 +376,19 @@ func TestAnInterruptedBuildCarriesOnWhereItStopped(t *testing.T) {
 	stop, cancel := context.WithCancel(t.Context())
 	s.C = &cancelAfter{n: 2, cancel: cancel, to: m}
 
-	if _, err := s.buildIndex(stop, progress.Nop{}); err == nil {
+	if _, err := indexing(t, s).Build(stop, progress.Nop{}); err == nil {
 		t.Fatal("a cancelled build reported success")
 	}
-	partial, err := s.index.Status(search.AppMail)
-	if err != nil {
-		t.Fatalf("status: %v", err)
-	}
-	if partial.Complete {
-		t.Fatal("a cancelled build marked the index complete")
+	partial := status(t, s)
+	if partial.Bodies >= partial.Indexed {
+		t.Fatalf("a cancelled build left %+v, want bodies still owed", partial)
 	}
 	firstPass := m.fetched.Load()
 
 	s.C = m
-	if _, err := s.buildIndex(t.Context(), progress.Nop{}); err != nil {
-		t.Fatalf("resume: %v", err)
-	}
-	status, err := s.index.Status(search.AppMail)
-	if err != nil {
-		t.Fatalf("status: %v", err)
-	}
-	if !status.Complete || status.Indexed != 6 {
-		t.Errorf("status = %+v, want all 6 indexed", status)
+	build(t, s)
+	if st := status(t, s); !st.Complete || st.Indexed != 6 || st.Bodies != 6 {
+		t.Errorf("status = %+v, want all 6 indexed with their bodies", st)
 	}
 	if fetched := m.fetched.Load(); fetched != 6 {
 		t.Errorf("bodies fetched = %d after %d before the interruption, want each fetched once",
@@ -261,12 +402,10 @@ func TestAnInterruptedBuildCarriesOnWhereItStopped(t *testing.T) {
 func TestASyncAppliesWhatTheFeedReports(t *testing.T) {
 	m := newMailbox(t, 3)
 	s := indexService(t, m)
-	if _, err := s.buildIndex(t.Context(), progress.Nop{}); err != nil {
-		t.Fatalf("build: %v", err)
-	}
+	build(t, s)
 	afterBuild := m.fetched.Load()
 
-	m.add(t, rawListMessage{
+	m.newest(t, rawListMessage{
 		ID: "msg-new", ConversationID: "thread-new", Subject: "Subject msg-new",
 		Time: 2000, LabelIDs: []string{labelInbox, labelAllMail},
 	}, "the body of msg-new")
@@ -276,10 +415,7 @@ func TestASyncAppliesWhatTheFeedReports(t *testing.T) {
 		{"ID":"msg-02","Action":0}
 	]}`
 
-	got, err := s.syncIndex(t.Context())
-	if err != nil {
-		t.Fatalf("sync: %v", err)
-	}
+	got := catchUp(t, s)
 	if got.Indexed != 2 || got.Removed != 1 {
 		t.Errorf("sync = %+v, want 2 indexed and 1 removed", got)
 	}
@@ -287,14 +423,7 @@ func TestASyncAppliesWhatTheFeedReports(t *testing.T) {
 		t.Errorf("bodies fetched = %d, want only the new message's", fetched-afterBuild)
 	}
 
-	in, err := s.indexRecords(t.Context())
-	if err != nil {
-		t.Fatalf("records: %v", err)
-	}
-	held := map[string]stored{}
-	for _, rec := range in {
-		held[rec.ID] = rec
-	}
+	held := inTheIndex(t, s)
 	if _, gone := held["msg-02"]; gone {
 		t.Error("a deleted message is still in the index")
 	}
@@ -319,14 +448,14 @@ func TestASyncAppliesWhatTheFeedReports(t *testing.T) {
 	}
 }
 
-// An index that does not hold the whole mailbox yet says so, so a search over
-// it is not read as a search over everything.
-func TestAPartialIndexSaysHowMuchItCovers(t *testing.T) {
+// An index whose bodies are still arriving says so, so a keyword over it is not
+// read as a keyword over everything.
+func TestAnIndexStillDownloadingBodiesSaysHowMuchItCovers(t *testing.T) {
 	m := newMailbox(t, 4)
 	s := indexService(t, m)
 	stop, cancel := context.WithCancel(t.Context())
 	s.C = &cancelAfter{n: 1, cancel: cancel, to: m}
-	if _, err := s.buildIndex(stop, progress.Nop{}); err == nil {
+	if _, err := indexing(t, s).Build(stop, progress.Nop{}); err == nil {
 		t.Fatal("a cancelled build reported success")
 	}
 
@@ -335,11 +464,128 @@ func TestAPartialIndexSaysHowMuchItCovers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("search: %v", err)
 	}
-	if !cover.Indexed || !cover.Partial {
-		t.Errorf("coverage = %+v, want an index that says it is short", cover)
+	if !cover.Indexed || cover.Have != 4 {
+		t.Errorf("coverage = %+v, want every message of the mailbox indexed", cover)
 	}
-	if cover.Total != 4 || cover.Have >= cover.Total {
-		t.Errorf("coverage = %+v, want fewer than the mailbox's 4", cover)
+	if cover.Bodies >= cover.Have {
+		t.Errorf("coverage = %+v, want fewer bodies than messages", cover)
+	}
+}
+
+// A message the feed cannot account for still leaves the index, and one that
+// arrived while nothing was watching still enters it.
+//
+// Proton says outright when its history no longer covers the gap. Nothing after
+// that says what happened in it, so the mailbox is read again and compared:
+// what is not there any more is what nothing came back for.
+func TestARefreshedFeedIsAnsweredByReadingTheMailboxAgain(t *testing.T) {
+	m := newMailbox(t, 3)
+	s := indexService(t, m)
+	build(t, s)
+
+	// What happens in the gap: one message arrives, one is deleted, and the feed
+	// gives up rather than describing either.
+	m.newest(t, rawListMessage{
+		ID: "msg-new", ConversationID: "thread-new", Subject: "Subject msg-new",
+		Time: 2000, LabelIDs: []string{labelInbox, labelAllMail},
+	}, "the body of msg-new")
+	m.forget("msg-01")
+	m.events["cursor-0"] = `{"EventID":"cursor-0","More":0,"Refresh":1}`
+	m.latest = "cursor-1"
+
+	got := catchUp(t, s)
+	if !got.Refreshed {
+		t.Fatalf("sync = %+v, want a refresh the run can answer", got)
+	}
+	if st := status(t, s); !st.Stale {
+		t.Errorf("status = %+v, want an index that says it owes a reading", st)
+	}
+
+	after, err := indexing(t, s).Build(t.Context(), progress.Nop{})
+	if err != nil {
+		t.Fatalf("rebuild: %v", err)
+	}
+	if after.Indexed != 1 || after.Removed != 1 {
+		t.Errorf("the reading = %+v, want the arrival indexed and the deletion removed", after)
+	}
+	held := inTheIndex(t, s)
+	if _, there := held["msg-new"]; !there {
+		t.Error("mail that arrived during the gap is not in the index")
+	}
+	if _, there := held["msg-01"]; there {
+		t.Error("mail deleted during the gap is still in the index")
+	}
+	if st := status(t, s); st.Stale || !st.Complete || st.Indexed != 3 || st.Bodies != 3 {
+		t.Errorf("status = %+v, want a whole index of the 3 messages there are now", st)
+	}
+
+	// And the reading is not a rebuild: what was already indexed and unchanged is
+	// not fetched again.
+	if fetched := m.fetched.Load(); fetched != 4 {
+		t.Errorf("bodies fetched = %d, want the 3 of the build and the 1 that arrived", fetched)
+	}
+}
+
+// A message that was edited is fetched again, because what changed is the text.
+//
+// It is the one event that means the body in the index is wrong rather than
+// merely filed somewhere else, and a draft being written is the commonest thing
+// it happens to.
+func TestAnEditedMessageIsIndexedAgain(t *testing.T) {
+	m := newMailbox(t, 2)
+	s := indexService(t, m)
+	build(t, s)
+
+	m.bodies["msg-01"] = armored(t, m.kr, "Meeting moved to Thursday.")
+	m.events["cursor-0"] = `{"EventID":"cursor-1","More":0,"Messages":[
+		{"ID":"msg-01","Action":2,"Message":{"ID":"msg-01","ConversationID":"thread-msg-01","Subject":"Notes","Time":999,"LabelIDs":["8","5"]}}
+	]}`
+	if got := catchUp(t, s); got.Indexed != 1 {
+		t.Errorf("sync = %+v, want the edit indexed", got)
+	}
+
+	edited := inTheIndex(t, s)["msg-01"]
+	if edited.Subject != "Notes" || !strings.Contains(edited.Body, "Thursday") {
+		t.Errorf("the index holds %q / %q, want what the message says now", edited.Subject, edited.Body)
+	}
+	msgs, _, _, err := s.Search(t.Context(), ListOptions{Keyword: "Thursday", Folder: "all"})
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if len(msgs) != 1 {
+		t.Errorf("searching what the message now says found %d messages", len(msgs))
+	}
+}
+
+// A body that would not open is settled rather than retried: the message is in
+// the index by everything else, and the count says how many are in that state.
+func TestABodyThatWillNotOpenIsIndexedByEverythingElse(t *testing.T) {
+	m := newMailbox(t, 2)
+	m.bodies["msg-00"] = "not a message anybody can open"
+	s := indexService(t, m)
+
+	if got := build(t, s); got.Unreadable != 1 {
+		t.Errorf("build = %+v, want one body that would not open", got)
+	}
+	st := status(t, s)
+	if st.Unreadable != 1 || st.Bodies != 2 {
+		t.Errorf("status = %+v, want 2 settled bodies of which 1 unreadable", st)
+	}
+
+	// An index that owes nothing asks for nothing: neither the mailbox it has
+	// already read nor a body it has already established will not open.
+	fetched, pages := m.fetched.Load(), m.pages.Load()
+	build(t, s)
+	if again, walked := m.fetched.Load(), m.pages.Load(); again != fetched || walked != pages {
+		t.Errorf("a second build made %d requests again, want it to ask for nothing",
+			(again-fetched)+(walked-pages))
+	}
+	msgs, _, _, err := s.Search(t.Context(), ListOptions{Subject: "msg-00", Folder: "all"})
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if len(msgs) != 1 {
+		t.Errorf("a message whose body would not open is not searchable by its subject")
 	}
 }
 
@@ -349,6 +595,9 @@ func TestAPartialIndexSaysHowMuchItCovers(t *testing.T) {
 func TestWithoutAnIndexProtonAnswers(t *testing.T) {
 	m := newMailbox(t, 2)
 	s := indexService(t, m)
+	if m.pages.Load() != 0 {
+		t.Fatal("a service with no index read the mailbox before it was asked anything")
+	}
 
 	_, _, cover, err := s.Search(t.Context(), ListOptions{Keyword: "body of msg-00", Folder: "all"})
 	if err != nil {

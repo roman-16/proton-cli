@@ -134,14 +134,20 @@ func Batch(s progress.Sink, index, total int) progress.Sink {
 	return p
 }
 
+// Start opens a line for a stretch of work. Work that happens in stages draws
+// one line each, so the stage that finished stays on the screen above the one
+// that is running.
 func (p *Progress) Start(total int64, label string) {
 	p.total, p.label, p.current = total, label, 0
-	p.finished = false
+	p.active, p.finished = true, false
 	p.started = time.Now()
 	p.lastDraw = time.Time{}
 	p.samples = p.samples[:0]
 	p.draw(true)
 }
+
+// Counting says what the count on the line is of.
+func (p *Progress) Counting(noun string) { p.noun = noun }
 
 func (p *Progress) Add(n int64) {
 	p.current += n

@@ -104,6 +104,37 @@ func TestProgressCountsThingsWhereThereAreNoBytes(t *testing.T) {
 	}
 }
 
+// Work that happens in stages draws one line each, and each line names what it
+// is counting.
+//
+// A mailbox is read for its messages and then downloaded body by body, and the
+// second stage is where the hours go: a line that stayed on the first stage's
+// label and its noun would report the wrong work at the wrong scale.
+func TestProgressDrawsALinePerStage(t *testing.T) {
+	p, buf := bar(80)
+	p.noun = "messages"
+	p.Start(10887, "Indexing mail")
+	p.Add(10887)
+	p.Done()
+	progress.Counting(p, "bodies")
+	p.Start(10887, "Indexing mail bodies")
+	progress.Resume(p, 2830)
+	p.Done()
+
+	lines := strings.Split(strings.TrimSuffix(buf.String(), "\n"), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("want a line per stage, got %d: %q", len(lines), buf.String())
+	}
+	if walked := lines[0]; !strings.Contains(walked, "Indexing mail") ||
+		!strings.Contains(walked, "100%") || !strings.Contains(walked, "10887 / 10887 messages") {
+		t.Errorf("the first stage closed as %q", walked)
+	}
+	if fetched := lines[1]; !strings.Contains(fetched, "Indexing mail bodies") ||
+		!strings.Contains(fetched, " 26%") || !strings.Contains(fetched, "2830 / 10887 bodies") {
+		t.Errorf("the second stage drew %q", fetched)
+	}
+}
+
 // Work whose size is not known until it ends closes at 100%: a walk that has
 // finished is a walk that covered all of it, whatever the number turned out to
 // be.

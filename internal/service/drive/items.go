@@ -88,14 +88,58 @@ func (s *Service) Walk(ctx context.Context, dc *Context, path string) ([]Child, 
 
 func (s *Service) walk(ctx context.Context, dc *Context, linkID string, parentKR *pgp.KeyRing, prefix string) ([]Child, error) {
 	var out []Child
-	err := s.walkTree(ctx, dc, linkID, parentKR, prefix, func(l Link, name, path string) error {
+	_, err := s.walkTree(ctx, dc, linkID, parentKR, prefix, func(f found) error {
 		out = append(out, Child{
-			LinkID: l.LinkID, Name: name, Path: path, Type: linkType(l.Type),
-			Size: l.Size, CreateTime: l.CreateTime, ModifyTime: l.ModifyTime,
+			LinkID: f.Link.LinkID, Name: f.label(), Path: f.Path, Type: linkType(f.Link.Type),
+			Size: f.Link.Size, CreateTime: f.Link.CreateTime, ModifyTime: f.Link.ModifyTime,
 		})
 		return nil
 	})
 	return out, err
+}
+
+// found is one link a walk reached: what it is called, where it sits, and what
+// about it could not be read.
+type found struct {
+	Link Link
+	Path string
+	// Name is what the account calls it, and Unreadable says the name would not
+	// decrypt - in which case there is no name, and what stands in its place is
+	// the same placeholder wherever the item is shown.
+	Name       string
+	Unreadable bool
+	// Sealed says this is a folder whose key would not open, so nothing inside it
+	// was reached by this walk.
+	Sealed bool
+}
+
+// label is what a reader sees where the name goes.
+func (f found) label() string { return displayName(f.Name, f.Unreadable) }
+
+// displayName stands in for a name that would not decrypt, which is a thing the
+// account holds and this session cannot read - so the row is shown, and what it
+// is called says what happened instead of claiming a name.
+func displayName(name string, unreadable bool) string {
+	if unreadable {
+		return "(decrypt failed)"
+	}
+	return name
+}
+
+// walked is what a walk could not reach.
+//
+// Sealed is a folder whose key would not open, which is a permanent state of
+// this account and what a listing shows as an empty folder. Unread is a folder
+// whose contents Proton would not hand over, which is a failure of this run -
+// and the difference decides whether the walk may be treated as the whole tree.
+type walked struct{ Sealed, Unread int }
+
+// whole reports that the walk reached everything there was to reach, so what it
+// did not come across is not in the account rather than merely unread.
+func (w walked) whole() bool { return w.Unread == 0 }
+
+func (w walked) with(other walked) walked {
+	return walked{Sealed: w.Sealed + other.Sealed, Unread: w.Unread + other.Unread}
 }
 
 // walkTree reads a folder and everything under it, depth-first, and hands each
@@ -105,40 +149,52 @@ func (s *Service) walk(ctx context.Context, dc *Context, linkID string, parentKR
 // right - a name decrypted with its parent's key, a folder opened with its own,
 // a subtree that would not open recorded rather than dropped - is the same
 // whether the answer is a listing on the screen or a record in the index.
-func (s *Service) walkTree(ctx context.Context, dc *Context, linkID string, parentKR *pgp.KeyRing, prefix string, visit func(l Link, name, path string) error) error {
+func (s *Service) walkTree(ctx context.Context, dc *Context, linkID string, parentKR *pgp.KeyRing, prefix string, visit func(found) error) (walked, error) {
+	var tally walked
 	raw, err := s.listRawChildren(ctx, dc, linkID)
 	if err != nil {
-		return err
+		return tally, err
 	}
 	for _, r := range raw {
-		name, err := decryptName(r.Name, parentKR)
-		if err != nil {
-			// The row stays, so nothing has gone missing from the answer and there
-			// is nothing to count: the name on the screen says what happened.
+		f := found{Link: r}
+		name, nameErr := decryptName(r.Name, parentKR)
+		if nameErr != nil {
+			// The row stays, so nothing has gone missing from the answer: the name
+			// on the screen says what happened, and an index counts it as one thing
+			// it holds without all of what the account says about it.
 			slog.DebugContext(ctx, "drive: a child's name could not be decrypted",
-				"link", r.LinkID, "parent", linkID, "error", err)
-			name = "(decrypt failed)"
+				"link", r.LinkID, "parent", linkID, "error", nameErr)
+			f.Unreadable = true
 		}
-		full := prefix + "/" + name
-		if err := visit(r, name, full); err != nil {
-			return err
+		f.Name = name
+		f.Path = prefix + "/" + f.label()
+
+		var childKR *pgp.KeyRing
+		if r.Type == protonFolder {
+			var keyErr error
+			if childKR, keyErr = unlockNode(&r, parentKR, nil); keyErr != nil {
+				skip.Record(ctx, skip.KindFolder, r.LinkID, skip.Unlockable, keyErr)
+				f.Sealed = true
+				tally.Sealed++
+			}
 		}
-		if r.Type != protonFolder {
+		if err := visit(f); err != nil {
+			return tally, err
+		}
+		if r.Type != protonFolder || f.Sealed {
 			continue
 		}
-		childKR, err := unlockNode(&r, parentKR, nil)
+		under, err := s.walkTree(ctx, dc, r.LinkID, childKR, f.Path, visit)
+		tally = tally.with(under)
 		if err != nil {
-			skip.Record(ctx, skip.KindFolder, r.LinkID, skip.Unlockable, err)
-			continue
-		}
-		if err := s.walkTree(ctx, dc, r.LinkID, childKR, full, visit); err != nil {
 			if ctx.Err() != nil {
-				return err
+				return tally, err
 			}
 			skip.Record(ctx, skip.KindFolder, r.LinkID, skip.Unreadable, err)
+			tally.Unread++
 		}
 	}
-	return nil
+	return tally, nil
 }
 
 // PlanFolders lists the folders that making a path exist would create, the
@@ -246,7 +302,7 @@ func (s *Service) createFolder(ctx context.Context, dc *Context, by author, pare
 		"NodeKey":                 nodeKey,
 		"NodeHashKey":             hashKeyEnc,
 	}
-	by.attribute(body, dc)
+	by.attribute(body)
 	var r struct{ Folder struct{ ID string } }
 	err = s.C.Decode(ctx, folderRequest(dc, body), &r)
 	if proton.AlreadyExists(err) {
@@ -266,7 +322,8 @@ func (s *Service) createFolder(ctx context.Context, dc *Context, by author, pare
 func folderRequest(dc *Context, body map[string]any) proton.Request {
 	if dc.Public() {
 		return proton.Request{
-			Method: "POST", Path: fmt.Sprintf("/drive/urls/%s/folders", dc.Token), Body: body,
+			Method: "POST", Body: body,
+			Path: fmt.Sprintf("/drive/unauth/v2/volumes/%s/folders", dc.VolumeID),
 		}
 	}
 	return proton.Request{

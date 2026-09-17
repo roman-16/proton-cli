@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 Adding a version section here is what publishes a release, so this file is the one place a version is decided: see [Releases](CONTRIBUTING.md#releases). Versions that shipped before this file existed are on the [releases page](https://github.com/roman-16/proton-cli/releases).
 
+## [4.2.1] - 2026-09-17
+
+### Changed
+
+- Mail is indexed in two passes: every message first, then the bodies newest first. A filtered listing such as `--unread`, `--from` or `--after` is answered from the index minutes into a build rather than after the hours the bodies take, and a `--keyword` search says how many bodies it has read while the rest arrive. `index list` names both counts, and `--output json` carries `bodies`.
+- `index watch` finishes a build that was interrupted, and reads an app again where Proton could not say what changed. It still indexes nothing that has no index.
+
+### Fixed
+
+- Downloading from or uploading into a share link failed with `Path not found`. Proton retired the endpoints behind `--link` and `--shared`.
+- An index went on reporting itself complete after Proton could not describe what had changed, silently missing whatever happened in the gap. `index create` and `index update` read the app again and take out what is gone, and a search says the index has fallen behind until they do.
+- A message whose text changed, a draft being written among them, kept its old text in the index.
+- A file uploaded together with its folder was indexed at the top of Drive rather than inside it, and stayed there.
+- Items inside a trashed or deleted folder stayed in an indexed listing.
+- A calendar this account cannot open was missing from an indexed search without a word. Its events go in by their times and are counted under UNREADABLE, and a calendar that could not be read leaves the build unfinished rather than claiming to hold it.
+- A `--keyword` matched every message of a thread when one of them quoted the word.
+- A reference beginning with `-`, which about one ID in sixty-four does, was refused by the command that had just printed it.
+- `index update --output json` called one entry an `entrie`.
+
 ## [4.2.0] - 2026-09-17
 
 ### Added

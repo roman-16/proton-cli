@@ -115,7 +115,7 @@ func (s *Service) Upload(ctx context.Context, dc *Context, plan *UploadPlan, r i
 		return err
 	}
 	commit := map[string]any{"ManifestSignature": manifestSig, "XAttr": xattr}
-	by.attribute(commit, dc)
+	by.attribute(commit)
 	if opts.Photo != nil {
 		commit["Photo"] = opts.Photo
 	}
@@ -128,7 +128,8 @@ func verificationRequest(dc *Context, linkID, revisionID string) proton.Request 
 	if dc.Public() {
 		return proton.Request{
 			Method: "GET",
-			Path:   fmt.Sprintf("/drive/urls/%s/links/%s/revisions/%s/verification", dc.Token, linkID, revisionID),
+			Path: fmt.Sprintf("/drive/unauth/v2/volumes/%s/links/%s/revisions/%s/verification",
+				dc.VolumeID, linkID, revisionID),
 		}
 	}
 	return proton.Request{
@@ -148,7 +149,8 @@ func commitRequest(dc *Context, linkID, revisionID string, body map[string]any) 
 	if dc.Public() {
 		return proton.Request{
 			Method: "PUT", Body: body,
-			Path: fmt.Sprintf("/drive/urls/%s/files/%s/revisions/%s", dc.Token, linkID, revisionID),
+			Path: fmt.Sprintf("/drive/unauth/v2/volumes/%s/files/%s/revisions/%s",
+				dc.VolumeID, linkID, revisionID),
 		}
 	}
 	return proton.Request{

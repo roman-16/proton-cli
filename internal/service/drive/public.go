@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"strings"
 
@@ -11,6 +12,7 @@ import (
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
+	"github.com/roman-16/proton-cli/internal/skip"
 )
 
 // A public link is a tree like any other, reached by a URL instead of by being
@@ -104,8 +106,32 @@ func (s *Service) openLink(ctx context.Context, token, urlPassword, customPasswo
 		Permissions: share.PublicPermissions, Anonymous: share.Anonymous,
 		Type: shareTypeStandard,
 	}
+	s.noteLinkRevision(ctx, dc, root)
 	dc.RootName = rootName(ctx, token, dc.Type, root, shareKR)
 	return dc, nil
+}
+
+// noteLinkRevision fills in the version a link that points at a file points at.
+//
+// The answer that opens a link names the file, its keys and its size, and says
+// nothing about its versions - so the one a download reads is asked for
+// separately, from where the link's items are served. A folder's contents
+// arrive with theirs, so this is the one item a link leaves half-known.
+func (s *Service) noteLinkRevision(ctx context.Context, dc *Context, root *Link) {
+	if root.FileProperties == nil || root.FileProperties.ActiveRevision.ID != "" {
+		return
+	}
+	details, err := s.linkDetails(ctx, dc, []string{root.LinkID})
+	if err != nil || len(details) == 0 || details[0].File == nil || details[0].File.ActiveRevision == nil {
+		// Recorded and not counted: nothing is missing from a listing, which is
+		// what a link that points at a file mostly answers. What is missing is the
+		// version a download would read, and the download says so itself.
+		slog.DebugContext(ctx, "drive: the version a link points at could not be read",
+			"kind", string(skip.KindItem), "reason", string(skip.Unreadable),
+			"link", root.LinkID, "error", err)
+		return
+	}
+	root.FileProperties.ActiveRevision.ID = details[0].File.ActiveRevision.RevisionID
 }
 
 // composeLinkPassword builds what the link is proved with.

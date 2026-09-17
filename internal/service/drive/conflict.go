@@ -340,7 +340,7 @@ func hashesRequest(dc *Context, parentLinkID string, hashes []string) proton.Req
 	if dc.Public() {
 		return proton.Request{
 			Method: "POST", Reads: true, Body: body,
-			Path: fmt.Sprintf("/drive/urls/%s/files/%s/checkAvailableHashes", dc.Token, parentLinkID),
+			Path: fmt.Sprintf("/drive/unauth/v2/volumes/%s/links/%s/checkAvailableHashes", dc.VolumeID, parentLinkID),
 		}
 	}
 	return proton.Request{
@@ -354,7 +354,8 @@ func hashesRequest(dc *Context, parentLinkID string, hashes []string) proton.Req
 func fileRequest(dc *Context, body map[string]any) proton.Request {
 	if dc.Public() {
 		return proton.Request{
-			Method: "POST", Path: fmt.Sprintf("/drive/urls/%s/files", dc.Token), Body: body,
+			Method: "POST", Body: body,
+			Path: fmt.Sprintf("/drive/unauth/v2/volumes/%s/files", dc.VolumeID),
 		}
 	}
 	return proton.Request{
@@ -452,7 +453,7 @@ func (s *Service) startRevision(ctx context.Context, dc *Context, plan *UploadPl
 		"ContentKeyPacket":          contentKP,
 		"ContentKeyPacketSignature": contentKPSig,
 	}
-	by.attribute(body, dc)
+	by.attribute(body)
 	var created struct {
 		File struct{ ID, RevisionID string }
 	}

@@ -35,7 +35,7 @@ These are the listings that can be narrowed, and what narrows them. The same fla
 {{.Filters}}
 Mail looks in the inbox unless told otherwise, and `--folder all` is what a question about "my mail" usually means.
 
-Mail's `--keyword` searches subjects, names and addresses. It searches message bodies too, but only once this machine holds an index: `{{.Program}} index list --output json` says which apps have one, and `indexed` short of `total` means a build that has not finished, which covers the newest mail and not the oldest. Without one, a keyword that finds nothing has established nothing about bodies - say so rather than reporting that the user has no such mail.
+Mail's `--keyword` searches subjects, names and addresses. It searches message bodies too, but only once this machine holds an index: `{{.Program}} index list --output json` says which apps have one. For mail, `indexed` short of `total` is a first pass that has not finished, which covers the newest mail and not the oldest, and `bodies` short of `indexed` means every message is there and the text of the older ones is still downloading. Without an index, a keyword that finds nothing has established nothing about bodies - say so rather than reporting that the user has no such mail.
 
 `{{.Program}} calendar events list --keyword` searches what an event says, at any date, with or without an index. A Drive filter such as `--pattern` opens every folder in its scope, which is slow over a large tree; an index answers it without the walk.
 

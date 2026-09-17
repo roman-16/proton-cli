@@ -198,7 +198,7 @@ func TestNothingAboutAThingIsWrittenInTheClear(t *testing.T) {
 	}
 	if err := log.Append(
 		record(t, "message-id-in-the-clear", "a body nobody else may read"),
-		Record{Mark: "1700000000|message-id-in-the-clear"},
+		Record{ID: "deleted-message-id", Gone: true},
 	); err != nil {
 		t.Fatalf("append: %v", err)
 	}
@@ -212,7 +212,7 @@ func TestNothingAboutAThingIsWrittenInTheClear(t *testing.T) {
 		if err != nil {
 			t.Fatalf("read %s: %v", name, err)
 		}
-		for _, secret := range []string{"message-id-in-the-clear", "a body nobody else may read", "1700000000"} {
+		for _, secret := range []string{"message-id-in-the-clear", "deleted-message-id", "a body nobody else may read"} {
 			if bytes.Contains(data, []byte(secret)) {
 				t.Errorf("%s holds %q in the clear", name, secret)
 			}

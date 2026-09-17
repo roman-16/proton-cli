@@ -70,9 +70,22 @@ func TestMatchesFindsWhatShortenWrote(t *testing.T) {
 	if !Matches(realVault, "x76EpiVSJf2") {
 		t.Error("a longer run of an ID's body should still match it")
 	}
-	// The dash belongs to the ID, not to the short form, so it is not typed back.
-	if Matches(realVault, "-x76EpiV") {
-		t.Error("a short ID never carries the leading dash")
+	// An ID that begins with a dash is printed whole by a listing asked for one,
+	// so it has to answer to itself: about one ID in sixty-four starts with a
+	// dash, and a command that refused the ID it had just printed would fail that
+	// often and look random.
+	for _, id := range []string{realVault, realDriveLink} {
+		if !Matches(id, id) {
+			t.Errorf("%q does not answer to itself", id)
+		}
+		if !Matches(id, Shorten(id)) {
+			t.Errorf("%q does not answer to the short form %q", id, Shorten(id))
+		}
+	}
+	// The dash is not part of what identifies an ID, so a run of it names the same
+	// thing whether or not the dash was copied along with it.
+	if !Matches(realVault, "-x76EpiV") {
+		t.Error("a run of an ID's characters should name it with the dash as without")
 	}
 }
 

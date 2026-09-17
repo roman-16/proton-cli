@@ -21,6 +21,12 @@ type rawListMessage struct {
 	Unread         int
 	Time           int64
 	Sender         struct{ Name, Address string }
+	// The addressees, which a listing does not show and an index is searched by:
+	// --to matches a display name as well as an address, and the row carries both
+	// without the message having to be fetched.
+	ToList         []map[string]any
+	CCList         []map[string]any
+	BCCList        []map[string]any
 	NumAttachments int
 	LabelIDs       []string
 	Flags          int64

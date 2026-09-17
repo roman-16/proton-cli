@@ -336,9 +336,9 @@ func (s *Service) requestBlockLinks(ctx context.Context, dc *Context, linkID, re
 // blockLinksRequest asks for somewhere to put a batch of blocks, of whichever
 // endpoint serves the tree the file is in.
 //
-// A share is named along with the address the blocks are written by; a link is
-// the name, and carries whoever wrote them the way everything else about it
-// does.
+// A share is named along with the address the blocks are written by. A link
+// names the volume its items live on instead, and the address is nobody's where
+// the link was opened without an account.
 //
 // Repeatable: asking a second time hands back a second set of links and changes
 // nothing else, so a request whose answer was lost is worth making again rather
@@ -346,10 +346,9 @@ func (s *Service) requestBlockLinks(ctx context.Context, dc *Context, linkID, re
 func blockLinksRequest(dc *Context, linkID, revisionID string, by author, blockList []map[string]any) proton.Request {
 	body := map[string]any{"LinkID": linkID, "RevisionID": revisionID, "BlockList": blockList}
 	if dc.Public() {
-		by.attribute(body, dc)
+		body["VolumeID"], body["AddressID"] = dc.VolumeID, by.address()
 		return proton.Request{
-			Method: "POST", Path: fmt.Sprintf("/drive/urls/%s/blocks", dc.Token),
-			Repeatable: true, Body: body,
+			Method: "POST", Path: "/drive/unauth/blocks", Repeatable: true, Body: body,
 		}
 	}
 	body["AddressID"], body["ShareID"] = dc.AddrID, dc.ShareID

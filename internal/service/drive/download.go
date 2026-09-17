@@ -255,9 +255,17 @@ func (s *Service) revision(ctx context.Context, dc *Context, linkID, revID strin
 
 // revisionRequest asks for one version of a file, of whichever endpoint serves
 // the tree it is in.
+//
+// A tree of your own is addressed by the share it hangs from. A tree somebody
+// published is addressed by the volume its items live on, and answered for
+// whoever holds the link - which is what a reader with no account has instead
+// of a share. What hangs below either is the same request.
 func revisionRequest(dc *Context, linkID, revID string) proton.Request {
 	if dc.Public() {
-		return proton.Request{Method: "GET", Path: fmt.Sprintf("/drive/urls/%s/files/%s", dc.Token, linkID)}
+		return proton.Request{
+			Method: "GET",
+			Path:   fmt.Sprintf("/drive/unauth/v2/volumes/%s/files/%s/revisions/%s", dc.VolumeID, linkID, revID),
+		}
 	}
 	return proton.Request{
 		Method: "GET", Path: fmt.Sprintf("/drive/shares/%s/files/%s/revisions/%s", dc.ShareID, linkID, revID),

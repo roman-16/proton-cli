@@ -674,12 +674,13 @@ func linkUpload(t *testing.T, tree *publicTree, u *keys.Unlocked) (*Service, *st
 	verification := object(t, map[string]any{
 		"VerificationCode": base64.StdEncoding.EncodeToString([]byte("verify-these-bytes")),
 	})
+	volume := "/drive/unauth/v2/volumes/" + testVolumeID
 	return publicService(t, tree, proton.PublicLinkGeneratedPassword, u, map[string]string{
-		"POST /drive/urls/" + testToken + "/files":                                         `{"File":{"ID":"file-1","RevisionID":"rev-1"}}`,
-		"GET /drive/urls/" + testToken + "/links/file-1/revisions/rev-1/verification":      verification,
-		"POST /drive/urls/" + testToken + "/blocks":                                        object(t, map[string]any{"UploadLinks": []any{map[string]any{"Token": "block-token", "BareURL": storage.URL}}}),
-		"PUT /drive/urls/" + testToken + "/files/file-1/revisions/rev-1":                   `{}`,
-		"POST /drive/urls/" + testToken + "/files/" + testRootID + "/checkAvailableHashes": `{"AvailableHashes":[]}`,
+		"POST " + volume + "/files":                                         `{"File":{"ID":"file-1","RevisionID":"rev-1"}}`,
+		"GET " + volume + "/links/file-1/revisions/rev-1/verification":      verification,
+		"POST /drive/unauth/blocks":                                         object(t, map[string]any{"UploadLinks": []any{map[string]any{"Token": "block-token", "BareURL": storage.URL}}}),
+		"PUT " + volume + "/files/file-1/revisions/rev-1":                   `{}`,
+		"POST " + volume + "/links/" + testRootID + "/checkAvailableHashes": `{"AvailableHashes":[]}`,
 	})
 }
 
@@ -700,7 +701,7 @@ func uploadInto(t *testing.T, s *Service, doer *stubDoer, dc *Context, name stri
 			continue
 		}
 		switch {
-		case req.Path == "/drive/urls/"+testToken+"/files":
+		case req.Path == "/drive/unauth/v2/volumes/"+testVolumeID+"/files":
 			draft = body
 		case req.Method == "PUT":
 			commit = body
@@ -713,8 +714,9 @@ func uploadInto(t *testing.T, s *Service, doer *stubDoer, dc *Context, name stri
 }
 
 // A link that allows editing takes a file, and every request that puts it there
-// goes to the endpoints Proton serves a token under.
-func TestALinkIsWrittenThroughItsToken(t *testing.T) {
+// goes to the endpoints Proton serves a link's items under - the volume they
+// live on, since a reader holding a link has no share to name.
+func TestALinkIsWrittenThroughTheVolumeItsItemsLiveOn(t *testing.T) {
 	tree := newPublicTree(t, testURLPassword, "Project", protonFolder)
 	s, doer := linkUpload(t, tree, nil)
 
@@ -731,11 +733,12 @@ func TestALinkIsWrittenThroughItsToken(t *testing.T) {
 	for _, req := range doer.reqs {
 		paths = append(paths, req.Method+" "+req.Path)
 	}
+	volume := "/drive/unauth/v2/volumes/" + testVolumeID
 	for _, want := range []string{
-		"POST /drive/urls/" + testToken + "/files",
-		"GET /drive/urls/" + testToken + "/links/file-1/revisions/rev-1/verification",
-		"POST /drive/urls/" + testToken + "/blocks",
-		"PUT /drive/urls/" + testToken + "/files/file-1/revisions/rev-1",
+		"POST " + volume + "/files",
+		"GET " + volume + "/links/file-1/revisions/rev-1/verification",
+		"POST /drive/unauth/blocks",
+		"PUT " + volume + "/files/file-1/revisions/rev-1",
 	} {
 		if !containsString(paths, want) {
 			t.Errorf("%s was never sent; sent %v", want, paths)
@@ -778,10 +781,8 @@ func TestWritingIntoALinkAsNobodySignsWithTheParentKey(t *testing.T) {
 	draft, commit := uploadInto(t, s, doer, dc, "photo.jpg")
 
 	for _, body := range []map[string]any{draft, commit} {
-		for _, named := range []string{"SignatureEmail", "SignatureAddress"} {
-			if _, ok := body[named]; ok {
-				t.Errorf("a write nobody is behind named somebody in %s", named)
-			}
+		if _, ok := body["SignatureAddress"]; ok {
+			t.Error("a write nobody is behind named somebody")
 		}
 	}
 	passphrase, ok := draft["NodePassphrase"].(string)
@@ -834,11 +835,11 @@ func TestWritingIntoALinkSignedInNamesYourAddress(t *testing.T) {
 	draft, commit := uploadInto(t, s, doer, dc, "photo.jpg")
 
 	for what, body := range map[string]map[string]any{"draft": draft, "commit": commit} {
-		if body["SignatureEmail"] != testAddrMail {
-			t.Errorf("the %s names %v as the author, want %s", what, body["SignatureEmail"], testAddrMail)
+		if body["SignatureAddress"] != testAddrMail {
+			t.Errorf("the %s names %v as the author, want %s", what, body["SignatureAddress"], testAddrMail)
 		}
-		if _, ok := body["SignatureAddress"]; ok {
-			t.Errorf("the %s names the author under SignatureAddress, which a link's endpoints do not read", what)
+		if _, ok := body["SignatureEmail"]; ok {
+			t.Errorf("the %s names the author twice, under a name no endpoint reads", what)
 		}
 	}
 }
@@ -866,5 +867,89 @@ func TestSplitLinkPassword(t *testing.T) {
 	}
 	if url, custom := splitLinkPassword(testURLPassword); url != testURLPassword || custom != "" {
 		t.Errorf("a link with no password of its own split into %q, %q", url, custom)
+	}
+}
+
+// A link that points straight at a file knows which version of it to read.
+//
+// What opens a link names the file, its keys and its size, and says nothing
+// about its versions - so the version is asked for from where the link's items
+// are served, and a download has it without looking anything up.
+func TestALinkToAFileCarriesTheVersionItPointsAt(t *testing.T) {
+	tree := newPublicTree(t, testURLPassword, "Q3-report.pdf", 2)
+	tree.items[testRootID] = map[string]any{
+		"Link": map[string]any{"LinkID": testRootID, "Type": 2},
+		"File": map[string]any{
+			"ContentKeyPacket": "", "MediaType": "application/pdf",
+			"ActiveRevision": map[string]any{"RevisionID": "rev-7", "EncryptedSize": 4096},
+		},
+	}
+	s, doer := publicService(t, tree, proton.PublicLinkGeneratedPassword, nil, nil)
+
+	dc, err := s.OpenLink(context.Background(), LinkURL(testToken, testURLPassword), "")
+	if err != nil {
+		t.Fatalf("OpenLink: %v", err)
+	}
+	if got := activeRevisionID(dc.rootLink); got != "rev-7" {
+		t.Errorf("the link points at revision %q, want the one the file holds", got)
+	}
+	if !doer.sent("POST", "/drive/unauth/v2/volumes/"+testVolumeID+"/links") {
+		t.Error("the version was never asked for")
+	}
+
+	// A folder link holds its items' versions already, so it asks for nothing.
+	folders := newPublicTree(t, testURLPassword, "Project", protonFolder)
+	only, doerFolder := publicService(t, folders, proton.PublicLinkGeneratedPassword, nil, nil)
+	if _, err := only.OpenLink(context.Background(), LinkURL(testToken, testURLPassword), ""); err != nil {
+		t.Fatalf("OpenLink: %v", err)
+	}
+	if doerFolder.sent("POST", "/drive/unauth/v2/volumes/"+testVolumeID+"/links") {
+		t.Error("opening a folder link asked for a version it has no file to read")
+	}
+}
+
+// Where the blocks of a file go is asked of the endpoint an account asks, so it
+// is told which tree they belong to and who is behind them.
+//
+// A link is opened without a share to name, and often without an account at
+// all: the volume the items live on is what says where the blocks go, and the
+// address is nobody's when nobody is behind the upload.
+func TestBlockLinksInsideALinkNameTheVolumeAndWhoeverIsBehindThem(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		signer *keys.Unlocked
+		want   any
+	}{
+		{name: "nobody is behind it", want: nil},
+		{name: "somebody signed in", signer: signedInAs(t, testAddrMail), want: testAddrID},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tree := newPublicTree(t, testURLPassword, "Project", protonFolder)
+			s, doer := linkUpload(t, tree, tc.signer)
+			dc, err := s.OpenLink(context.Background(), LinkURL(testToken, testURLPassword), "")
+			if err != nil {
+				t.Fatalf("OpenLink: %v", err)
+			}
+			uploadInto(t, s, doer, dc, "photo.jpg")
+
+			var asked map[string]any
+			for _, req := range doer.reqs {
+				if req.Path == "/drive/unauth/blocks" {
+					asked, _ = req.Body.(map[string]any)
+				}
+			}
+			if asked == nil {
+				t.Fatalf("no block links were asked for: %v", doer.reqs)
+			}
+			if asked["VolumeID"] != testVolumeID {
+				t.Errorf("the request names volume %v, want %s", asked["VolumeID"], testVolumeID)
+			}
+			if asked["AddressID"] != tc.want {
+				t.Errorf("the request names address %v, want %v", asked["AddressID"], tc.want)
+			}
+			if _, ok := asked["ShareID"]; ok {
+				t.Error("the request names a share a link has no ID for")
+			}
+		})
 	}
 }

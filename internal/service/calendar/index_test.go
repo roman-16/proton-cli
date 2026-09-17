@@ -1,11 +1,19 @@
 package calendar
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
+	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	"github.com/roman-16/proton-cli/internal/account/keys"
 	"github.com/roman-16/proton-cli/internal/ical"
+	"github.com/roman-16/proton-cli/internal/progress"
+	"github.com/roman-16/proton-cli/internal/proton"
+	"github.com/roman-16/proton-cli/internal/search"
 )
 
 // What the index holds has to be the event the account holds: a record goes in
@@ -141,4 +149,140 @@ func storedFrom(t *testing.T, data []byte) stored {
 		t.Fatalf("unmarshal: %v", err)
 	}
 	return in.event()
+}
+
+// A calendar that is in the account and will not open for it.
+//
+// It is the state a calendar shared from another account, or one whose key a
+// password reset left shut, is in: Proton hands over the events and nothing
+// here can read a word of them.
+func sealedCalendar(t *testing.T, events string) *Service {
+	t.Helper()
+	d := &routeDoer{handler: func(r proton.Request) ([]byte, error) {
+		switch {
+		case r.Path == "/calendar/v1":
+			return []byte(`{"Calendars":[{"ID":"cal1","Type":0,"Members":[{"Name":"Personal"}]}]}`), nil
+		case strings.HasSuffix(r.Path, "/modelevents/latest"):
+			return []byte(`{"CalendarModelEventID":"cursor-0"}`), nil
+		case strings.HasSuffix(r.Path, "/events"):
+			if events == "" {
+				return nil, fmt.Errorf("the calendar would not be read")
+			}
+			return []byte(events), nil
+		case strings.HasSuffix(r.Path, "/bootstrap"):
+			return nil, fmt.Errorf("the calendar's keys would not open")
+		}
+		return []byte(`{}`), nil
+	}}
+	s := New(d, testKeys(&keys.Unlocked{Addresses: []keys.Address{{ID: "a1", Email: "me@proton.me"}}}))
+	kr := indexKeyRing(t)
+	s.SetIndex(search.New(t.TempDir(), func() string { return "user-1" },
+		func(context.Context) (search.Keys, error) {
+			return search.Keys{Seal: kr, Open: kr}, nil
+		}))
+	return s
+}
+
+// indexKeyRing is the account key an index is sealed to.
+func indexKeyRing(t *testing.T) *pgp.KeyRing {
+	t.Helper()
+	key, err := pgp.GenerateKey("test", "test@example.invalid", "x25519", 0)
+	if err != nil {
+		t.Fatalf("generate a key: %v", err)
+	}
+	kr, err := pgp.NewKeyRing(key)
+	if err != nil {
+		t.Fatalf("key ring: %v", err)
+	}
+	return kr
+}
+
+// A calendar whose key will not open is indexed by the times Proton keeps in the
+// clear beside each event, so a search covers the days it holds and says nothing
+// about what is on them.
+func TestACalendarThatWillNotOpenIsIndexedByItsFrames(t *testing.T) {
+	s := sealedCalendar(t, `{"Events":[
+		{"ID":"ev1","CalendarID":"cal1","StartTime":1700000000,"EndTime":1700003600},
+		{"ID":"ev2","CalendarID":"cal1","StartTime":1700090000,"EndTime":1700093600}
+	]}`)
+	x, err := s.openIndex(t.Context())
+	if err != nil {
+		t.Fatalf("open the index: %v", err)
+	}
+	got, err := x.Build(t.Context(), progress.Nop{})
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	if got.Indexed != 2 || got.Unreadable != 2 {
+		t.Errorf("build = %+v, want both events indexed and both unreadable", got)
+	}
+	st := x.Status()
+	if !st.Complete || st.Unreadable != 2 {
+		t.Errorf("status = %+v, want a complete index that says what it could not read", st)
+	}
+}
+
+// A calendar that could not be read leaves the build unfinished, and keeps no
+// cursor: a catch-up from a moment nothing was ever read at would report a
+// calendar as current that has never been indexed.
+func TestACalendarThatWouldNotBeReadLeavesTheBuildUnfinished(t *testing.T) {
+	s := sealedCalendar(t, "")
+	x, err := s.openIndex(t.Context())
+	if err != nil {
+		t.Fatalf("open the index: %v", err)
+	}
+	if _, err := x.Build(t.Context(), progress.Nop{}); err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	if st := x.Status(); st.Complete {
+		t.Errorf("status = %+v, want a build that says it did not finish", st)
+	}
+	if cursor, kept := x.log.State.Cursors["cal1"]; kept {
+		t.Errorf("the calendar kept the cursor %q it was never read at", cursor)
+	}
+}
+
+// What a calendar no longer has leaves the index, and so does everything of a
+// calendar the account no longer has.
+func TestWhatACalendarNoLongerHasLeavesTheIndex(t *testing.T) {
+	s := sealedCalendar(t, `{"Events":[{"ID":"ev1","CalendarID":"cal1","StartTime":1700000000,"EndTime":1700003600}]}`)
+	x, err := s.openIndex(t.Context())
+	if err != nil {
+		t.Fatalf("open the index: %v", err)
+	}
+	// Two events of a calendar that is gone, and one of a calendar that is not.
+	for _, in := range []indexed{
+		{ID: "old1", CalendarID: "cal-gone"},
+		{ID: "old2", CalendarID: "cal-gone"},
+		{ID: "ev-stale", CalendarID: "cal1"},
+	} {
+		data, err := json.Marshal(in)
+		if err != nil {
+			t.Fatalf("marshal: %v", err)
+		}
+		if err := x.log.Append(search.Record{ID: in.ID, Data: data}); err != nil {
+			t.Fatalf("append: %v", err)
+		}
+	}
+	x.log.State.Cursors["cal-gone"] = "cursor-gone"
+
+	if _, err := x.Build(t.Context(), progress.Nop{}); err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	held := map[string]bool{}
+	for _, rec := range x.log.Records() {
+		held[rec.ID] = true
+	}
+	if held["old1"] || held["old2"] {
+		t.Error("events of a calendar the account no longer has are still in the index")
+	}
+	if _, kept := x.log.State.Cursors["cal-gone"]; kept {
+		t.Error("a calendar the account no longer has kept its place in the feed")
+	}
+	if held["ev-stale"] {
+		t.Error("an event the calendar no longer holds is still in the index")
+	}
+	if !held["ev1"] {
+		t.Error("the event the calendar does hold is not in the index")
+	}
 }

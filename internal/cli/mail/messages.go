@@ -67,7 +67,7 @@ func listCmd() *cobra.Command {
 				unsearchedBodies(c, cover, opts)
 				addressOnlyHint(c, cover, opts)
 			}
-			shortIndex(c, cover)
+			shortIndex(c, cover, opts)
 			return nil
 		}),
 	}

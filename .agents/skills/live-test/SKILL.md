@@ -1,6 +1,6 @@
 ---
 name: live-test
-description: Runs proton-cli's live suite the one way an agent may - works out which live tests the working tree and the conversation point at, asks with the questionnaire (full test, full coverage, and the matching subset run when the context names tests), starts the pick in a detached zellij or tmux session, reports one progress line a minute, then prints the verdict and removes the session. Use when the user asks for a live run, a test run or a coverage run, wants a change confirmed against Proton, or names this skill. Not for `just test-fast`, which any agent runs directly.
+description: Runs proton-cli's live suite the one way an agent may - works out which live tests the working tree and the conversation point at, asks with the questionnaire (full test, full coverage, and the matching subset run when the context names tests), then hands the pick to one script call that runs it in a detached zellij or tmux session, prints a progress line a minute, and returns with the verdict the moment it ends. Use when the user asks for a live run, a test run or a coverage run, wants a change confirmed against Proton, or names this skill. Not for `just test-fast`, which any agent runs directly.
 ---
 
 # Live test
@@ -10,10 +10,11 @@ A live run signs three accounts in, acts on real data and spends an allowance Pr
 `scripts/live-test.sh` does the mechanics. From the repository root:
 
 ```bash
-.agents/skills/live-test/scripts/live-test.sh tests PATTERN     # what a pattern matches, and what each test proves
-.agents/skills/live-test/scripts/live-test.sh start RECIPE [PATTERN]
-.agents/skills/live-test/scripts/live-test.sh check             # one line: where the run is, or the verdict
-.agents/skills/live-test/scripts/live-test.sh stop              # abort, keep the log
+.agents/skills/live-test/scripts/live-test.sh tests PATTERN         # what a pattern matches, and what each test proves
+.agents/skills/live-test/scripts/live-test.sh run RECIPE [PATTERN]  # start it, report every minute, return with the verdict
+.agents/skills/live-test/scripts/live-test.sh watch                 # rejoin a run that is already going
+.agents/skills/live-test/scripts/live-test.sh check                 # one line: where it is, or the verdict
+.agents/skills/live-test/scripts/live-test.sh stop                  # end it, keep the log
 ```
 
 The run inherits the shell that starts it, so the nine `PROTON_CLI_TEST_*` variables and the devbox toolchain have to be in it.
@@ -55,23 +56,29 @@ Leave `allowOther` on. Free text is a correction to the selection: apply it and 
 
 ## 3. Run it
 
-```bash
-.agents/skills/live-test/scripts/live-test.sh start coverage-one 'TestContactsMatchingPinStillDelivers|TestPassExportAndImportRoundTrip'
-```
-
-Then, once a minute until it says `finished` or `stopped`:
+One call, and it lasts as long as the run does:
 
 ```bash
-sleep 60 && .agents/skills/live-test/scripts/live-test.sh check
+.agents/skills/live-test/scripts/live-test.sh run coverage-one 'TestContactsMatchingPinStillDelivers|TestPassExportAndImportRoundTrip'
 ```
 
-Each check is one line and needs no comment from you: `23% · 26 passed · 2 failed · 28 of 121 · running TestDriveItemsUpload · last output 8s ago · 4m31s elapsed`. Say nothing between checks. A question from the user gets a one-line answer, then the polling resumes.
+```
+started just coverage-one (2 tests) in zellij session proton-cli-live
+watch: tail --follow /tmp/proton-cli-live/log · or attach: zellij attach proton-cli-live
+50% · 1 passed · 0 failed · 1 of 2 · running TestPassExportAndImportRoundTrip · last output 4s ago · 1m00s elapsed
+finished · exit 0 · 2 passed · 0 failed · of 2 · 1m48s
+log: /tmp/proton-cli-live/log · session proton-cli-live removed
+```
 
-**Stuck:** the same test `running` with `last output` past five minutes. Say which test and how long, and offer `stop`. The user can watch the run themselves at any time - `start` prints the `tail --follow` command and the attach command for their multiplexer.
+A line a minute, the verdict the moment the run ends, and nothing owed from you in between. A run that finishes inside the first minute prints no progress line at all.
+
+The run lives in its own session, so an interrupted call costs nothing: `watch` rejoins it, prints where it is and follows it the same way. `check` answers in one line without waiting, and `stop` ends the run and keeps the log.
+
+**Stuck:** after five silent minutes the script says so beside the progress line and names the test. The user can end it with `stop` from their own terminal, or attach with the command the first line printed.
 
 ## 4. Report, then stop
 
-`check` prints the verdict, tears the session down and leaves the log at `/tmp/proton-cli-live/log`:
+The call's last lines are the verdict; the session is already gone and the log stays at `/tmp/proton-cli-live/log`:
 
 ```
 finished · exit 1 · 3 passed · 1 failed · of 4 · 2m41s
@@ -96,5 +103,6 @@ Then stop. Reading the failures and fixing them is the next thing the user asks 
 
 - Start a run without a picked option in the questionnaire.
 - Run `just test`, `just coverage`, `just test-one`, `just coverage-one` or `go test ./tests/live/…` any other way.
+- Poll `check` in a loop. `run` and `watch` already report once a minute.
 - Touch a multiplexer session other than `proton-cli-live`.
 - Start a second run while one is going.

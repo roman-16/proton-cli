@@ -10,7 +10,7 @@ Holds `create`, `delete`, `list`, `update` and `watch`.
 
 Index an app so its contents can be searched.
 
-Name the apps to index, or none for every app that can be. A first build of a large mailbox takes hours; stopping it and running it again carries on where it left off, newest first.
+Name the apps to index, or none for every app that can be. Mail is indexed in two passes: every message first, which takes minutes and answers a filtered listing, then the bodies newest first, which for a large mailbox takes hours. Stopping it and running it again carries on where it left off.
 
 What it writes is encrypted to your account's keys, under ~/.config/proton-cli/index.
 
@@ -46,7 +46,7 @@ proton index delete --yes mail
 
 List what is indexed on this machine.
 
-Reads the files and nothing else, so it works signed out. INDEXED counts what a search would look through; a build that has not finished says how much of the app it has reached.
+Reads the files and nothing else, so it works signed out. INDEXED counts what a search would look through; a build that has not finished says how much of the app it has reached, and mail says how many message bodies it holds while they are still downloading.
 
 ```
 proton index list
@@ -61,7 +61,7 @@ proton index list --output json
 
 Bring every index up to date.
 
-Applies what has happened since the last run, and carries on a build that was interrupted. It creates nothing: an app with no index is left alone.
+Applies what has happened since the last run, carries on a build that was interrupted, and reads an app again where Proton could not say what changed. It creates nothing: an app with no index is left alone.
 
 A search catches up by itself, so this is for having it done already: run it from cron, or leave `index watch` attached.
 
@@ -78,9 +78,9 @@ proton index update --quiet
 
 Keep every index current until you stop it.
 
-Applies changes as they land, one line per batch, so a search answers without catching up first.
+Applies changes as they land, one line per batch, and finishes a build that was interrupted. It creates nothing: an app with no index is left alone.
 
-It indexes nothing that is not indexed already; `index create` does that.
+While it runs, a search reads the copy as of the last poll, at most 30 seconds old. Prefer it when searches are frequent; run `index update` on a timer when they are not.
 
 ```
 proton index watch

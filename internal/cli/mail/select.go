@@ -182,7 +182,7 @@ func selectMessages(c *kit.Invocation, f *filters) (kit.Selection[mailsvc.Messag
 			if err != nil {
 				return nil, err
 			}
-			shortIndex(c, cover)
+			shortIndex(c, cover, opts)
 			return msgs, nil
 		}
 	}
@@ -215,24 +215,38 @@ func selectConversations(c *kit.Invocation, f *filters) (kit.Selection[mailsvc.C
 			if err != nil {
 				return nil, err
 			}
-			shortIndex(c, cover)
+			shortIndex(c, cover, opts)
 			return convs, nil
 		}
 	}
 	return kit.Select(c, sel)
 }
 
-// shortIndex says when a search read an index that does not hold the whole
-// mailbox yet.
+// shortIndex says when a search read an index that is not the whole mailbox.
 //
-// A half-built index holds the newest mail, so an answer from it is right about
-// everything it covers and silent about the rest. Left unsaid, that is a wrong
-// answer with a plausible shape: nothing on the screen distinguishes "there is
-// no such message" from "the part of your mailbox that has it is not indexed".
-func shortIndex(c *kit.Invocation, cover mailsvc.Coverage) {
-	if !cover.Indexed || !cover.Partial {
-		return
+// An answer from an index is right about everything it covers and silent about
+// the rest. Left unsaid, that is a wrong answer with a plausible shape: nothing
+// on the screen distinguishes "there is no such message" from "the part of your
+// mailbox that has it is not indexed".
+//
+// There are three ways it is short, and they are not the same thing to do
+// something about. A mailbox still being read is missing older mail outright. A
+// mailbox whose bodies are still arriving holds every message and can be
+// searched by everything except what the ones at the far end say. An index
+// Proton could not describe the changes to is missing nothing anybody can name,
+// which is exactly why it has to be said.
+func shortIndex(c *kit.Invocation, cover mailsvc.Coverage, opts mailsvc.ListOptions) {
+	switch {
+	case !cover.Indexed:
+	case cover.Stale:
+		c.Warn("The mail index has fallen behind Proton and was searched as it stands. "+
+			"`%s index update` catches it up.", kit.Program)
+	case cover.Partial:
+		c.Warn("Only %d of %d messages are indexed, newest first, so older mail was not searched. "+
+			"`%s index create mail` continues the download.", cover.Have, cover.Total, kit.Program)
+	case opts.Keyword != "" && cover.Bodies < cover.Have:
+		c.Warn("Only %d of %d message bodies are indexed, newest first, so older mail was searched "+
+			"by everything but its text. `%s index create mail` continues the download.",
+			cover.Bodies, cover.Have, kit.Program)
 	}
-	c.Warn("Only %d of %d messages are indexed, newest first, so older mail was not searched. "+
-		"`%s index create mail` continues the download.", cover.Have, cover.Total, kit.Program)
 }
