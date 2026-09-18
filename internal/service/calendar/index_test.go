@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -232,6 +234,58 @@ func TestACalendarThatWillNotOpenIsIndexedByItsFrames(t *testing.T) {
 	if !st.Complete || st.Unreadable != 2 {
 		t.Errorf("status = %+v, want a complete index that says what it could not read", st)
 	}
+
+	// What is says it could not read is what it holds, so reading the calendar
+	// again says the same thing rather than twice as much.
+	x.log.State.Stale = true
+	if _, err := x.Build(t.Context(), progress.Nop{}); err != nil {
+		t.Fatalf("build again: %v", err)
+	}
+	if st := x.Status(); st.Unreadable != 2 {
+		t.Errorf("status = %+v after reading the calendar again, want the same 2 events unread", st)
+	}
+}
+
+// A calendar whose key will not open still follows its history: what changed
+// goes in by the frame Proton keeps in the clear, the way reading the calendar
+// whole puts it in, and the catch-up moves past it.
+func TestACalendarThatWillNotOpenFollowsItsHistory(t *testing.T) {
+	s, d := sealedCalendar(t, `{"Events":[{"ID":"ev1","CalendarID":"cal1","StartTime":1700000000,"EndTime":1700003600}]}`)
+	x, err := s.openIndex(t.Context())
+	if err != nil {
+		t.Fatalf("open the index: %v", err)
+	}
+	if _, err := x.Build(t.Context(), progress.Nop{}); err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	feed(d, `{"CalendarModelEventID":"cursor-1","More":0,"CalendarEvents":[
+		{"ID":"ev2","Action":1,"Event":{"ID":"ev2","CalendarID":"cal1","StartTime":1700090000,"EndTime":1700093600}}
+	]}`)
+
+	got, err := x.Sync(t.Context())
+	if err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	if got.Indexed != 1 || got.Unreadable != 1 {
+		t.Errorf("sync = %+v, want the event that changed indexed by its frame", got)
+	}
+	if cursor := x.log.State.Cursors["cal1"]; cursor != "cursor-1" {
+		t.Errorf("cursor = %q, want the applied page moved past", cursor)
+	}
+	rec, held := x.log.Get("ev2")
+	if !held {
+		t.Fatal("the event the feed carried is not in the index")
+	}
+	in := storedFrom(t, rec.Data)
+	if in.readErr == nil {
+		t.Error("an event of a calendar that will not open went in as though it had been read")
+	}
+	if in.raw.StartTime != 1700090000 {
+		t.Errorf("the event is indexed at %d, want the day Proton keeps beside it", in.raw.StartTime)
+	}
+	if st := x.Status(); st.Unreadable != 2 {
+		t.Errorf("status = %+v, want both the built and the caught-up event counted as unread", st)
+	}
 }
 
 // A calendar that could not be read leaves the build unfinished, and keeps no
@@ -299,10 +353,10 @@ func TestWhatACalendarNoLongerHasLeavesTheIndex(t *testing.T) {
 	}
 }
 
-// A page of a calendar's history that could not be applied is asked for again
-// rather than skipped: the cursor stays where the index last caught up, in the
-// open session and on disk alike.
-func TestAPageACalendarCouldNotApplyIsAskedForAgain(t *testing.T) {
+// A page of a calendar's history that could not be written down is asked for
+// again rather than skipped: the cursor stays where the index last caught up,
+// in the open session and on disk alike, and the next catch-up applies it.
+func TestAPageACalendarCouldNotWriteDownIsAskedForAgain(t *testing.T) {
 	s, d := sealedCalendar(t, `{"Events":[{"ID":"ev1","CalendarID":"cal1","StartTime":1700000000,"EndTime":1700003600}]}`)
 	x, err := s.openIndex(t.Context())
 	if err != nil {
@@ -314,13 +368,14 @@ func TestAPageACalendarCouldNotApplyIsAskedForAgain(t *testing.T) {
 	feed(d, `{"CalendarModelEventID":"cursor-1","More":0,"CalendarEvents":[
 		{"ID":"ev2","Action":1,"Event":{"ID":"ev2","CalendarID":"cal1","StartTime":1700090000,"EndTime":1700093600}}
 	]}`)
+	restore := unwritable(t, filepath.Join(s.index.Dir(), "calendar.bin"))
 
 	for range 2 {
 		if _, err := x.Sync(t.Context()); err != nil {
 			t.Fatalf("sync: %v", err)
 		}
 		if cursor := x.log.State.Cursors["cal1"]; cursor != "cursor-0" {
-			t.Fatalf("cursor = %q after a page the calendar's key would not open for, want it left at cursor-0", cursor)
+			t.Fatalf("cursor = %q after a page that was never written down, want it left at cursor-0", cursor)
 		}
 	}
 	asked := 0
@@ -333,11 +388,46 @@ func TestAPageACalendarCouldNotApplyIsAskedForAgain(t *testing.T) {
 		t.Errorf("the page was asked for %d times over two catch-ups, want both to ask for it", asked)
 	}
 
+	restore()
 	reopened, err := s.openIndex(t.Context())
 	if err != nil {
 		t.Fatalf("reopen the index: %v", err)
 	}
 	if cursor := reopened.log.State.Cursors["cal1"]; cursor != "cursor-0" {
 		t.Errorf("cursor = %q on disk, want the page the index has yet to apply", cursor)
+	}
+	if _, err := reopened.Sync(t.Context()); err != nil {
+		t.Fatalf("sync once the index could be written: %v", err)
+	}
+	if !reopened.log.Has("ev2") {
+		t.Error("the page was never applied")
+	}
+	if cursor := reopened.log.State.Cursors["cal1"]; cursor != "cursor-1" {
+		t.Errorf("cursor = %q, want the page applied and moved past", cursor)
+	}
+}
+
+// unwritable puts something no write can get past in the way of the index's
+// log, and gives back what puts the log back as it was.
+func unwritable(t *testing.T, path string) func() {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read the log: %v", err)
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatalf("take the log out of the way: %v", err)
+	}
+	if err := os.Mkdir(path, 0700); err != nil {
+		t.Fatalf("put a directory where the log was: %v", err)
+	}
+	return func() {
+		t.Helper()
+		if err := os.Remove(path); err != nil {
+			t.Fatalf("take the directory away: %v", err)
+		}
+		if err := os.WriteFile(path, data, 0600); err != nil {
+			t.Fatalf("put the log back: %v", err)
+		}
 	}
 }

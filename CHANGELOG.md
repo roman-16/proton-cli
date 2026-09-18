@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 Adding a version section here is what publishes a release, so this file is the one place a version is decided: see [Releases](CONTRIBUTING.md#releases). Versions that shipped before this file existed are on the [releases page](https://github.com/roman-16/proton-cli/releases).
 
+## [4.2.3] - 2026-09-18
+
+### Fixed
+
+- A calendar this account cannot open stopped taking in changes after the first one, so a search over it answered as of the build. It keeps up now, each event indexed by the day and time Proton keeps in the clear.
+- `index list` counted a calendar's unreadable events again every time the calendar was read, so the number grew past what the index holds. It counts what is in the index.
+
 ## [4.2.2] - 2026-09-17
 
 ### Fixed

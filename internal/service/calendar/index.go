@@ -138,7 +138,38 @@ func (s *Service) openIndex(ctx context.Context) (*indexSession, error) {
 
 func (x *indexSession) Status() search.Status { return x.log.Status() }
 
-func (x *indexSession) save() error { return x.log.Save(time.Now().Unix()) }
+// save writes the state file, with how much of the index went in unread counted
+// off the records it holds.
+func (x *indexSession) save(ctx context.Context) error {
+	x.log.State.Unreadable = x.unreadable(ctx)
+	return x.log.Save(time.Now().Unix())
+}
+
+// unreadable is how many of the events the index holds went in without their
+// contents.
+//
+// It is counted off the records rather than added up as they are written: an
+// event written twice is one event, one that has been read since is no longer
+// among them, and one the calendar no longer has is gone.
+func (x *indexSession) unreadable(ctx context.Context) int {
+	count := 0
+	for _, rec := range x.log.Records() {
+		var in indexed
+		if err := json.Unmarshal(rec.Data, &in); err != nil {
+			// Recorded and not counted: nothing is hidden, because the record is
+			// counted here as one that went in unread, which is what `index list`
+			// reports and what a reading of it says too.
+			slog.DebugContext(ctx, "calendar: an index record would not read back",
+				"kind", string(skip.KindEvent), "reason", string(skip.Malformed), "ref", rec.ID)
+			count++
+			continue
+		}
+		if in.ICS == "" {
+			count++
+		}
+	}
+	return count
+}
 
 // Build reads every event of every calendar and writes it down.
 //
@@ -198,7 +229,7 @@ func (x *indexSession) Build(ctx context.Context, sink progress.Sink) (search.Re
 	log.State.Total = log.State.Indexed
 	log.State.Complete = whole
 	log.State.Stale = !whole
-	return done, x.save()
+	return done, x.save(ctx)
 }
 
 // indexCalendar reads one calendar whole.
@@ -247,11 +278,10 @@ func (x *indexSession) indexCalendar(ctx context.Context, calendarID string, sin
 		records = append(records, search.Record{ID: in.ID, Gone: true})
 		done.Removed++
 	}
-	x.log.State.Unreadable += done.Unreadable
 	if err := x.log.Append(records...); err != nil {
 		return done, err
 	}
-	return done, x.save()
+	return done, x.save(ctx)
 }
 
 // read is one event as the index will hold it, decrypted when there is a key to
@@ -261,6 +291,32 @@ func (x *indexSession) read(ctx context.Context, ck *calKeys, raw rawEvent) stor
 		return stored{raw: raw, readErr: errUnreadable}
 	}
 	return x.s.decrypt(ctx, ck, raw)
+}
+
+// calendarKeys reaches a calendar's keys the first time an event needs them,
+// and is nil when they will not open for this account.
+//
+// A catch-up that finds nothing changed asks for no keys at all, which is what
+// most of them find.
+func (x *indexSession) calendarKeys(ctx context.Context, calendarID string) func() *calKeys {
+	var ck *calKeys
+	asked := false
+	return func() *calKeys {
+		if asked {
+			return ck
+		}
+		asked = true
+		var err error
+		if ck, err = x.s.unlockCalendar(ctx, calendarID); err != nil {
+			// Recorded and not counted: nothing is missing from the answer that the
+			// answer does not show. What changed goes in by its frame, and how many
+			// events are in that state is what `index list` counts as unreadable.
+			slog.DebugContext(ctx, "calendar: a calendar's key would not open for the catch-up",
+				"kind", string(skip.KindCalendar), "reason", string(skip.Unlockable),
+				"calendar", calendarID, "error", err)
+		}
+		return ck
+	}
 }
 
 // eventsOf is what the index holds for one calendar.
@@ -384,14 +440,19 @@ func (x *indexSession) Sync(ctx context.Context) (search.Result, error) {
 			skip.Record(ctx, skip.KindCalendar, cal.ID, skip.Unreadable, err)
 		}
 	}
-	return done, x.save()
+	return done, x.save(ctx)
 }
 
 // syncCalendar follows one calendar's feed from where the index left off.
+//
+// A calendar whose key will not open is followed anyway, by the frame Proton
+// keeps in the clear beside each event: it is what reading the calendar whole
+// writes down, and the difference between a calendar that stops at the moment
+// it was sealed and one that stays current.
 func (x *indexSession) syncCalendar(ctx context.Context, calendarID, cursor string) (search.Result, error) {
 	log := x.log
 	var done search.Result
-	var ck *calKeys
+	keys := x.calendarKeys(ctx, calendarID)
 	for page := 0; page < maxDrain; page++ {
 		var batch calendarEventBatch
 		if err := x.s.C.Decode(ctx, proton.Request{
@@ -418,13 +479,7 @@ func (x *indexSession) syncCalendar(ctx context.Context, calendarID, cursor stri
 				done.Removed++
 				continue
 			}
-			if ck == nil {
-				var err error
-				if ck, err = x.s.unlockCalendar(ctx, calendarID); err != nil {
-					return done, err
-				}
-			}
-			rec, readable, err := record(x.s.decrypt(ctx, ck, *e.Event))
+			rec, readable, err := record(x.read(ctx, keys(), *e.Event))
 			if err != nil {
 				return done, err
 			}
