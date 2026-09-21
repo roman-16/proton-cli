@@ -255,6 +255,10 @@ type srpExchange struct {
 	hvToken string
 	hvType  string
 
+	// accountHost sends the proof through Proton's account host. See
+	// Request.AccountHost.
+	accountHost bool
+
 	// opensLink marks the exchange that proves a public link, which Proton answers
 	// whether or not anybody is behind it. See Request.opensLink.
 	opensLink bool
@@ -277,7 +281,7 @@ func (x srpExchange) repeatable() bool {
 // attempt, so a second attempt needs a second set. That is exactly what a person
 // does on seeing the error, and it has the same consequence.
 func (c *Client) exchange(ctx context.Context, x srpExchange) (*Response, error) {
-	return c.retrying(ctx,
+	resp, err := c.retrying(ctx,
 		Request{Method: x.method, Path: x.path, Repeatable: x.repeatable()},
 		func() (*Response, error) {
 			info, err := x.parameters(ctx)
@@ -286,6 +290,22 @@ func (c *Client) exchange(ctx context.Context, x srpExchange) (*Response, error)
 			}
 			return c.srpCall(ctx, x, info)
 		})
+	return resp, refusedSecondFactor(err)
+}
+
+// refusedSecondFactor phrases the one thing an exchange can be refused for that
+// the person can put right themselves.
+//
+// The code was asked for by this package, through its own resolver, so the
+// answer to it is this package's to explain. Left bare it reaches the screen as
+// a number under an invitation to file a bug, for a thirty-second code that had
+// simply turned over.
+func refusedSecondFactor(err error) error {
+	if !WrongTwoFactorCode(err) {
+		return err
+	}
+	return errs.Problemf("Proton did not accept that two-factor code.").
+		Hint("a code lasts thirty seconds - run this again with the next one").Exit(2)
 }
 
 // srpCall proves the password against info and validates the server's proof.
@@ -327,7 +347,8 @@ func (c *Client) srpCall(ctx context.Context, x srpExchange, info *authInfo) (*R
 
 	resp, err := c.authCall(ctx, Request{
 		Method: x.method, Path: x.path, Body: payload,
-		HVToken: x.hvToken, HVType: x.hvType, opensLink: x.opensLink,
+		AccountHost: x.accountHost,
+		HVToken:     x.hvToken, HVType: x.hvType, opensLink: x.opensLink,
 	})
 	if err != nil {
 		return nil, err
@@ -367,9 +388,13 @@ func (c *Client) createSession(ctx context.Context) (*authResp, error) {
 
 // accountParameters asks Proton what an account password is proved against, for
 // the scope the exchange is for.
-func (c *Client) accountParameters(username string, scope Scope) func(context.Context) (*authInfo, error) {
+//
+// accountHost sends the question through the same door as the proof that
+// follows. They are two halves of one conversation - the second spends the
+// SRPSession the first issued - so they are never split across hosts.
+func (c *Client) accountParameters(username string, scope Scope, accountHost bool) func(context.Context) (*authInfo, error) {
 	return func(ctx context.Context) (*authInfo, error) {
-		return c.getAuthInfo(ctx, username, scope)
+		return c.getAuthInfo(ctx, username, scope, accountHost)
 	}
 }
 
@@ -383,7 +408,7 @@ func (c *Client) accountParameters(username string, scope Scope) func(context.Co
 // It is not marked repeatable, though asking twice spends nothing: it is only
 // ever one half of an exchange, and the exchange is what gets another go. Two
 // budgets over the same failure would multiply into minutes of waiting.
-func (c *Client) getAuthInfo(ctx context.Context, username string, reauthScope Scope) (*authInfo, error) {
+func (c *Client) getAuthInfo(ctx context.Context, username string, reauthScope Scope, accountHost bool) (*authInfo, error) {
 	payload := map[string]any{"Intent": "Proton"}
 	if username != "" {
 		payload["Username"] = username
@@ -391,7 +416,9 @@ func (c *Client) getAuthInfo(ctx context.Context, username string, reauthScope S
 	if reauthScope != "" {
 		payload["ReauthScope"] = string(reauthScope)
 	}
-	resp, err := c.authCall(ctx, Request{Method: "POST", Path: "/core/v4/auth/info", Body: payload})
+	resp, err := c.authCall(ctx, Request{
+		Method: "POST", Path: "/core/v4/auth/info", Body: payload, AccountHost: accountHost,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -406,7 +433,7 @@ func (c *Client) getAuthInfo(ctx context.Context, username string, reauthScope S
 // When hvToken/hvType are non-empty they're attached as HV headers on the proof.
 func (c *Client) loginSRP(ctx context.Context, username string, password []byte, hvToken, hvType string) (*authResp, error) {
 	resp, err := c.exchange(ctx, srpExchange{
-		parameters: c.accountParameters(username, ""),
+		parameters: c.accountParameters(username, "", false),
 		method:     "POST", path: "/core/v4/auth",
 		username: username, password: password,
 		extra:   map[string]any{"Username": username},
@@ -422,6 +449,52 @@ func (c *Client) loginSRP(ctx context.Context, username string, password []byte,
 	return &r, nil
 }
 
+// prove sends a request whose body carries the SRP proof of the account
+// password. See Request.Proves.
+//
+// The credentials come from the same resolver an elevation asks, so the person
+// is asked the same question whichever way Proton guards an endpoint, and a
+// second factor is answered where every other exchange answers it: once the
+// parameters have said Proton wants one. The parameters are asked for without a
+// scope, because this proof buys none - it authorises the one request it is
+// part of, which is what the web clients do here too (srpAuth in
+// packages/shared/lib/srp.ts).
+func (c *Client) prove(ctx context.Context, req Request) (*Response, error) {
+	resolver := c.getScopeResolver()
+	if resolver == nil {
+		return nil, fmt.Errorf("%w: nothing can supply the password this request has to carry", ErrScopeUnavailable)
+	}
+	extra, err := provenBody(req.Body)
+	if err != nil {
+		return nil, err
+	}
+	cr, err := resolver(ctx, ScopePassword)
+	if err != nil {
+		return nil, err
+	}
+	return c.exchange(ctx, srpExchange{
+		parameters: c.accountParameters(cr.Username, "", req.AccountHost),
+		method:     req.Method, path: req.Path, accountHost: req.AccountHost,
+		username: cr.Username, password: cr.Password,
+		extra:        extra,
+		secondFactor: c.answerSecondFactor(ctx),
+	})
+}
+
+// provenBody is what a proving request wants sent alongside its proof. The
+// proof is a JSON object, so anything the endpoint wants with it has to be one
+// too - which is a fact about the request rather than about this run, so it is
+// a programming error rather than something to phrase for a person.
+func provenBody(body any) (map[string]any, error) {
+	switch b := body.(type) {
+	case nil:
+		return nil, nil
+	case map[string]any:
+		return b, nil
+	}
+	return nil, fmt.Errorf("a request carrying its own proof needs a map body, got %T", body)
+}
+
 func (c *Client) auth2FA(ctx context.Context, offer SecondFactorOffer, answer SecondFactorAnswer) error {
 	body, err := offer.answer(answer)
 	if err != nil {
@@ -435,7 +508,7 @@ func (c *Client) auth2FA(ctx context.Context, offer SecondFactorOffer, answer Se
 	_, err = c.authCall(ctx, Request{
 		Method: "POST", Path: "/core/v4/auth/2fa", Body: body,
 	})
-	return err
+	return refusedSecondFactor(err)
 }
 
 // authCall sends one request of the auth flow and returns the answer to it.

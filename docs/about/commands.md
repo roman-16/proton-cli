@@ -20,7 +20,29 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton account sessions revoke`](../account/sessions.md#revoke) | Invalidate sessions at Proton |
 | [`proton account settings get`](../account/settings.md#get) | Show the account settings now in effect |
 | [`proton account settings list`](../account/settings.md#list) | List the account settings that can be changed |
+| [`proton account settings password set`](../account/settings.md#password-set) | Change your password |
+| [`proton account settings recovery-email disable`](../account/settings.md#recovery-email-disable) | Stop allowing password resets by email |
+| [`proton account settings recovery-email enable`](../account/settings.md#recovery-email-enable) | Allow password resets by email |
+| [`proton account settings recovery-email get`](../account/settings.md#recovery-email-get) | Show the recovery address and what it may do |
+| [`proton account settings recovery-email set`](../account/settings.md#recovery-email-set) | Set the recovery address |
+| [`proton account settings recovery-email verify`](../account/settings.md#recovery-email-verify) | Send a verification email to the recovery address |
+| [`proton account settings recovery-phone disable`](../account/settings.md#recovery-phone-disable) | Stop allowing password resets by SMS |
+| [`proton account settings recovery-phone enable`](../account/settings.md#recovery-phone-enable) | Allow password resets by SMS |
+| [`proton account settings recovery-phone get`](../account/settings.md#recovery-phone-get) | Show the recovery number and what it may do |
+| [`proton account settings recovery-phone set`](../account/settings.md#recovery-phone-set) | Set the recovery number |
+| [`proton account settings recovery-phone verify`](../account/settings.md#recovery-phone-verify) | Confirm the recovery number with a code sent by SMS |
+| [`proton account settings recovery-phrase disable`](../account/settings.md#recovery-phrase-disable) | Remove the recovery phrase |
+| [`proton account settings recovery-phrase get`](../account/settings.md#recovery-phrase-get) | Show whether a recovery phrase is set |
+| [`proton account settings recovery-phrase set`](../account/settings.md#recovery-phrase-set) | Make a recovery phrase and print it |
+| [`proton account settings second-password disable`](../account/settings.md#second-password-disable) | Leave two-password mode |
+| [`proton account settings second-password enable`](../account/settings.md#second-password-enable) | Lock your keys with a second password |
+| [`proton account settings second-password get`](../account/settings.md#second-password-get) | Show whether this account uses two-password mode |
+| [`proton account settings second-password set`](../account/settings.md#second-password-set) | Change your second password |
 | [`proton account settings set`](../account/settings.md#set) | Change one account setting |
+| [`proton account settings two-factor disable`](../account/settings.md#two-factor-disable) | Stop asking for an authenticator app code |
+| [`proton account settings two-factor enable`](../account/settings.md#two-factor-enable) | Ask for an authenticator app code at every sign-in |
+| [`proton account settings two-factor generate`](../account/settings.md#two-factor-generate) | Make a two-factor secret for an authenticator app |
+| [`proton account settings two-factor get`](../account/settings.md#two-factor-get) | Show what this account is asked for at sign-in |
 | [`proton api`](../api/api.md) | Send a raw authenticated request to the Proton API |
 | [`proton calendar events create`](../calendar/events.md#create) | Create an event |
 | [`proton calendar events delete`](../calendar/events.md#delete) | Delete events |

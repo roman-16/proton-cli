@@ -1,6 +1,7 @@
 package bip39
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -31,6 +32,67 @@ func TestEntropyReadsTheReferenceVectors(t *testing.T) {
 		}
 		if hex.EncodeToString(got) != tc.entropy {
 			t.Errorf("%q: read %x, want %s", tc.phrase, got, tc.entropy)
+		}
+	}
+}
+
+// The same vectors the other way: what Proton writes down for these bytes.
+func TestWordsWritesTheReferenceVectors(t *testing.T) {
+	for _, tc := range []struct{ entropy, phrase string }{
+		{"00000000000000000000000000000000",
+			"abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"},
+		{"7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f",
+			"legal winner thank year wave sausage worth useful legal winner thank yellow"},
+		{"80808080808080808080808080808080",
+			"letter advice cage absurd amount doctor acoustic avoid letter advice cage above"},
+		{"ffffffffffffffffffffffffffffffff",
+			"zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo wrong"},
+		{"0000000000000000000000000000000000000000000000000000000000000000",
+			strings.Repeat("abandon ", 23) + "art"},
+	} {
+		entropy, err := hex.DecodeString(tc.entropy)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := Words(entropy)
+		if err != nil {
+			t.Errorf("%s: %v", tc.entropy, err)
+			continue
+		}
+		if got != tc.phrase {
+			t.Errorf("%s: wrote %q, want %q", tc.entropy, got, tc.phrase)
+		}
+	}
+}
+
+// What is written is read back: the phrase a recovery phrase is set with has to
+// be one the same account can recover with.
+func TestWordsAndEntropyAreInverses(t *testing.T) {
+	entropy := make([]byte, 16)
+	for i := range 256 {
+		sum := sha256.Sum256([]byte{byte(i)})
+		copy(entropy, sum[:])
+		phrase, err := Words(entropy)
+		if err != nil {
+			t.Fatalf("%x: %v", entropy, err)
+		}
+		back, err := Entropy(phrase)
+		if err != nil {
+			t.Fatalf("%q: %v", phrase, err)
+		}
+		if !bytes.Equal(back, entropy) {
+			t.Fatalf("%x became %q, which reads back as %x", entropy, phrase, back)
+		}
+		if n := len(strings.Fields(phrase)); n != 12 {
+			t.Fatalf("%x became %d words, want 12", entropy, n)
+		}
+	}
+}
+
+func TestWordsRefusesALengthTheSchemeHasNoPhraseFor(t *testing.T) {
+	for _, n := range []int{0, 8, 15, 17, 33} {
+		if _, err := Words(make([]byte, n)); !errors.Is(err, ErrLength) {
+			t.Errorf("%d bytes: got %v, want %v", n, err, ErrLength)
 		}
 	}
 }

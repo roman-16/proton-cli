@@ -8,6 +8,8 @@ A refusal that comes from Proton rather than from proton-cli belongs to [Trouble
 
 **An update cannot be verified offline.** `proton update` checks the download against `checksums.txt` from the same release, and neither is signed. An install from a package manager is verified by the package manager.
 
+**Security keys are listed, not registered.** `proton account settings two-factor get` names the keys on the account, and `disable` leaves them in place. Registering or removing one is done in [Proton's own settings](https://account.proton.me).
+
 **Post-quantum keys are read, never generated.** An account that opted in during Proton's rollout signs in, and mail and shares reach others who opted in. Turning the setting on is done in Proton's own settings, and adding an address to such an account is refused.
 
 **A recurring event needs a zone that can be named.** proton reads one from `TZ`, `/etc/localtime` or `/etc/timezone`, then from your Proton calendar settings. Where none of those answers, a recurring event drifts by an hour when the clocks change. Pass `--zone Europe/Vienna` to be sure.

@@ -1,4 +1,4 @@
-// Package bip39 reads a recovery phrase back into the bytes it stands for.
+// Package bip39 turns a recovery phrase into the bytes it stands for, and back.
 //
 // A Proton recovery phrase is twelve words from the BIP39 English list, which
 // encode sixteen random bytes and a checksum over them. The bytes are what the
@@ -41,6 +41,34 @@ var (
 
 // Each word carries this many bits of the phrase.
 const bitsPerWord = 11
+
+// Words is the phrase that stands for these bytes: the bytes and a checksum
+// over them, read eleven bits at a time as positions in the list.
+//
+// Sixteen bytes make the twelve words Proton hands out. Any length the scheme
+// allows works, because the arithmetic is the same one Entropy undoes and
+// writing it for one length would only make the pair harder to read together.
+func Words(entropy []byte) (string, error) {
+	bits := len(entropy) * 8
+	if bits < 128 || bits > 256 || bits%32 != 0 {
+		return "", ErrLength
+	}
+	checksumBits := uint(bits / 32)
+	sum := sha256.Sum256(entropy)
+	acc := new(big.Int).SetBytes(entropy)
+	acc.Lsh(acc, checksumBits)
+	acc.Or(acc, big.NewInt(int64(sum[0]>>(8-checksumBits))))
+
+	n := (bits + int(checksumBits)) / bitsPerWord
+	out := make([]string, n)
+	mask := big.NewInt(int64(1)<<bitsPerWord - 1)
+	pick := new(big.Int)
+	for i := n - 1; i >= 0; i-- {
+		out[i] = words[pick.And(acc, mask).Int64()]
+		acc.Rsh(acc, bitsPerWord)
+	}
+	return strings.Join(out, " "), nil
+}
 
 // Entropy turns a phrase back into the bytes it encodes, checking it on the way.
 //

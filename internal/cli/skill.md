@@ -75,9 +75,9 @@ A bulk verb acts on at most `--limit` things, 150 by default; `--limit 0` lifts 
 
 ## Secrets
 
-`{{.Program}} pass items get` and `{{.Program}} pass items totp` print secrets in full.
+`{{.Program}} pass items get` and `{{.Program}} pass items totp` print secrets in full. So do `{{.Program}} account settings two-factor generate` and `{{.Program}} account settings recovery-phrase set`, which print a two-factor secret and twelve recovery words that are shown once and kept nowhere.
 
-Secrets go in the same way they come out. `pass items create` and `pass items update` read them from `--secret-file NAME=FILE`, never from a flag value, because a flag value is in the shell history; `-` as the file reads standard input.
+Secrets go in the same way they come out. `pass items create` and `pass items update` read them from `--secret-file NAME=FILE`, never from a flag value, because a flag value is in the shell history; `-` as the file reads standard input. The commands that change a credential read it from `--password-file` and `--new-password-file` the same way.
 
 ## Exit codes
 

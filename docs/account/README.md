@@ -126,6 +126,12 @@ proton account login --user alice@proton.me \
 These commands ask for your password again even when you are signed in:
 
 - `account keys reactivate`
+- `account settings password set`
+- `account settings recovery-email set` · `account settings recovery-email enable` · `account settings recovery-email disable`
+- `account settings recovery-phone set` · `account settings recovery-phone enable` · `account settings recovery-phone disable`
+- `account settings recovery-phrase set` · `account settings recovery-phrase disable`
+- `account settings second-password set` · `account settings second-password disable`
+- `account settings two-factor enable` · `account settings two-factor disable`
 - `calendar settings calendars delete`
 - `mail messages update`
 - `mail settings addresses create`
@@ -309,6 +315,111 @@ proton account settings set locale de_AT
 
 Values can be given by name or by number, and mistakes are caught before anything is sent.
 
-`get` shows more than `set` can change. Proton Sentinel, two-factor state, whether the account is in two-password mode, and recovery addresses are readable here but can only be changed at [account.proton.me](https://account.proton.me), along with your password, recovery secrets, billing and account deletion.
+`get` shows more than `set` can change. Proton Sentinel and Dark Web Monitoring are readable here and turned on at [account.proton.me](https://account.proton.me), along with billing and account deletion. Your password, your second factor and the ways back into the account have collections of their own, below.
 
 Mail, Calendar and Drive each have settings of their own, under `proton mail settings` and so on. Pass and Contacts have none.
+
+## Change your password
+
+```bash
+proton account settings password set
+```
+
+Your current password is asked for first, then the new one, twice. It needs at least eight characters and cannot be the one it replaces.
+
+With nobody to ask, both come from files:
+
+```bash
+proton account settings password set \
+  --password-file /run/secrets/proton --new-password-file /run/secrets/proton-new
+```
+
+This session goes on working. Another machine signed in to this account asks for the new password the next time it opens your keys.
+
+## Turn two-password mode on or off
+
+In two-password mode one password signs you in and a second one opens your keys.
+
+```console
+$ proton account settings second-password get
+Status:  on
+```
+
+```bash
+proton account settings second-password enable   # start using a second password
+proton account settings second-password set      # change the second password
+proton account settings second-password disable  # go back to one password
+```
+
+`enable` keeps the password you sign in with and asks for the second one, which then opens your keys. `disable` locks your keys with the password you sign in with again, and the second password stops working.
+
+Signing in then takes both. Pass the second one with `--second-password-file`, or answer the prompt that follows your password.
+
+In two-password mode, `account settings password set` changes the password you sign in with and leaves your keys alone.
+
+## Ask for a code at every sign-in
+
+```console
+$ proton account settings two-factor get
+Authenticator App:  off
+Security Keys:      none
+```
+
+```bash
+proton account settings two-factor enable
+```
+
+A secret is printed for your authenticator app, and a code from it confirms the app has it. Proton then prints recovery codes, once: each signs you in a single time if you lose the app.
+
+With nobody to ask, it is two runs - one to make the secret, one to confirm it:
+
+```bash
+proton account settings two-factor generate --output json
+proton account settings two-factor enable --totp 123456 --password-file /run/secrets/proton
+```
+
+`proton account settings two-factor disable` turns it off again, asking for your password and a current code. A recovery code works in place of the code.
+
+Security keys are registered at [account.proton.me](https://account.proton.me). `get` lists the ones you have, and a key goes on being asked for after the authenticator app is turned off.
+
+## Set a recovery email or phone
+
+```console
+$ proton account settings recovery-email get
+Address:         jane.roe@example.com
+Verified:        yes
+Allow Recovery:  on
+```
+
+```bash
+proton account settings recovery-email set jane.roe@example.com
+proton account settings recovery-email verify
+```
+
+`verify` mails the address a link; open it to finish. Until then Proton will not reset your password by email.
+
+The phone works the same way, with the code arriving by SMS in two steps:
+
+```bash
+proton account settings recovery-phone set '+43 660 1234567'
+proton account settings recovery-phone verify              # Proton texts a code
+proton account settings recovery-phone verify --code 482913
+```
+
+`enable` and `disable` are whether Proton may reset your password through the address or number. Turning one off keeps it for security notices. `set none` removes it altogether.
+
+## Set a recovery phrase
+
+```bash
+proton account settings recovery-phrase set
+```
+
+Twelve words are printed once and kept nowhere. Write them down: anyone holding them can open the account, and you recover with [`proton account keys reactivate --recovery-phrase`](#after-a-password-reset).
+
+```console
+$ proton account settings recovery-phrase get
+Status:   on
+Changed:  2026-04-16 09:12
+```
+
+The status is one of `on`, `outdated`, `not set` and `off`. An outdated phrase was set before your keys were replaced: it still opens the data it was made for, and it will not get you back into the account. Setting a new phrase replaces the old one, and `disable` removes it.

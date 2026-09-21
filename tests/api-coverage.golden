@@ -55,6 +55,7 @@ GET /core/v4/keys/all
 GET /core/v4/labels
 GET /core/v4/members/me
 GET /core/v4/settings
+GET /core/v4/settings/2fa/totp/secret
 GET /core/v4/users
 GET /core/v5/events/{id}
 GET /domains
@@ -134,6 +135,9 @@ POST /contacts/v4/contacts
 POST /core/v4/auth/info
 POST /core/v4/keys/address
 POST /core/v4/labels
+POST /core/v4/settings/2fa/totp
+POST /core/v4/settings/mnemonic/disable
+POST /core/v4/verify/send
 POST /domains
 POST /drive/blocks
 POST /drive/photos/volumes/{id}/albums
@@ -194,6 +198,7 @@ POST /pass/v1/user/alias/mailbox
 POST /pass/v1/user/srp
 POST /pass/v1/user/srp/auth
 POST /pass/v1/vault
+PUT /auth/v4/sessions/local/key
 PUT /calendar/v1/{id}/events/sync
 PUT /calendar/v1/{id}/events/{id}/attendees/{id}
 PUT /calendar/v1/{id}/invitations/{id}
@@ -211,9 +216,18 @@ PUT /core/v4/addresses/{id}
 PUT /core/v4/addresses/{id}/disable
 PUT /core/v4/addresses/{id}/enable
 PUT /core/v4/addresses/{id}/encryption
+PUT /core/v4/keys/private
 PUT /core/v4/labels/{id}
+PUT /core/v4/settings/2fa/totp
+PUT /core/v4/settings/email
+PUT /core/v4/settings/email/reset
+PUT /core/v4/settings/mnemonic
+PUT /core/v4/settings/password
+PUT /core/v4/settings/phone
+PUT /core/v4/settings/phone/reset
 PUT /core/v4/settings/weekstart
 PUT /core/v4/users/lock
+PUT /core/v4/users/password
 PUT /core/v4/users/unlock
 PUT /domains/{id}/catchall
 PUT /drive/photos/volumes/{id}/albums/{id}

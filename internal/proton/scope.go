@@ -157,7 +157,7 @@ func (c *Client) Elevate(ctx context.Context, s Scope, cr ScopeCredentials) erro
 		return c.unlockPass(ctx, cr.Password)
 	}
 	if _, err := c.exchange(ctx, srpExchange{
-		parameters: c.accountParameters(cr.Username, s),
+		parameters: c.accountParameters(cr.Username, s, false),
 		method:     "PUT", path: s.endpoint(),
 		username: cr.Username, password: cr.Password,
 		secondFactor: c.answerSecondFactor(ctx),

@@ -60,6 +60,11 @@ type Unlocked struct {
 	// recoveryPhrase says whether the account has a recovery phrase to recover
 	// with, which is asked before a phrase is taken from anybody.
 	recoveryPhrase bool
+	// private says the keys are the account's alone, and role is the part it
+	// plays in an organization. Both decide what re-locking the keys would take
+	// with it, which is why they are held beside them.
+	private bool
+	role    int
 	// lockedID is the PGP key IDs the locked keys hold, so that a message which
 	// will not open can be asked whether one of them is the reason. It is the one
 	// thing about them that cannot be read off a record.
@@ -184,9 +189,17 @@ func (get Get) Alongside(ctx context.Context, request func(context.Context) erro
 }
 
 type User struct {
-	ID   string
-	Name string
-	Keys []Key
+	ID    string
+	Name  string
+	Email string
+	Keys  []Key
+	// Private says whether the account's keys are the account's alone. An
+	// organization can hold the keys of a member it created, and such an account
+	// has no secret of its own to hand out.
+	Private int
+	// Role is the part the account plays in an organization, as Proton numbers
+	// it. Mirrors USER_ROLES in WebClients (packages/shared/lib/constants.ts).
+	Role int
 	// Subscribed is which products the account's plan covers, one bit each.
 	Subscribed int
 	// MnemonicStatus is where the account stands with its recovery phrase, as
@@ -194,6 +207,10 @@ type User struct {
 	// (packages/shared/lib/interfaces/User.ts).
 	MnemonicStatus int
 }
+
+// adminRole is the account that administers an organization, which is the one
+// account whose password also locks the organization's key.
+const adminRole = 2
 
 // The two states in which a recovery phrase exists to recover with: set and
 // current, or set before the keys it opens were replaced - which still opens
@@ -441,7 +458,8 @@ func open(ctx context.Context, now func() time.Time, user *User, addrs []Address
 		UserKR: userKR, AddrKRs: addrKRs, Addresses: addrs, UserKeys: user.Keys,
 		PaidMail: user.paidMail(), Username: user.Name, Now: now,
 		recoveryPhrase: user.hasRecoveryPhrase(),
-		keyPass:        []byte(skp), lockedID: map[uint64]bool{},
+		private:        user.Private == 1, role: user.Role,
+		keyPass: []byte(skp), lockedID: map[uint64]bool{},
 	}
 	locked := u.Locked()
 	for _, k := range locked {

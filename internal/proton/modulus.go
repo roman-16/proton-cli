@@ -66,6 +66,31 @@ type Verifier struct {
 	Version int
 }
 
+// AuthFor is a new password in the shape the endpoints that take one under the
+// name Auth want it: the account's own password, and the bytes behind a
+// recovery phrase.
+//
+// The three endpoints that take it spell it the same way, which is why this is
+// written once; the ones that carry a verifier under names of their own - a
+// public link, the Pass extra password, a message to somebody outside Proton -
+// each spell their own, and there is nothing shared to borrow.
+func AuthFor(ctx context.Context, c Doer, password string) (map[string]any, error) {
+	modulus, err := FetchModulus(ctx, c)
+	if err != nil {
+		return nil, err
+	}
+	v, err := modulus.Verifier([]byte(password))
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{
+		"ModulusID": v.ModulusID,
+		"Salt":      v.Salt,
+		"Verifier":  v.Value,
+		"Version":   v.Version,
+	}, nil
+}
+
 // Verifier derives one from a password, under a salt made here.
 func (m Modulus) Verifier(password []byte) (Verifier, error) {
 	salt := make([]byte, srpSaltBytes)

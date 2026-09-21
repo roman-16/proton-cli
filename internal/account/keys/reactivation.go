@@ -323,7 +323,9 @@ func (p RecoveryPhrase) open(ctx context.Context, c proton.Doer, u *Unlocked, lo
 		return nil, err
 	}
 	var r struct{ MnemonicUserKeys []mnemonicKey }
-	if err := c.Decode(ctx, proton.Request{Method: "GET", Path: "/core/v4/settings/mnemonic"}, &r); err != nil {
+	if err := c.Decode(ctx, proton.Request{
+		Method: "GET", Path: "/core/v4/settings/mnemonic", AccountHost: true,
+	}, &r); err != nil {
 		return nil, fmt.Errorf("get the keys the recovery phrase holds: %w", err)
 	}
 	secret := base64.StdEncoding.EncodeToString(entropy)

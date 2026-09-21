@@ -1,26 +1,34 @@
 package account
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/roman-16/proton-cli/internal/account/keys"
 	"github.com/roman-16/proton-cli/internal/cli/kit"
+	"github.com/roman-16/proton-cli/internal/fetch"
 	"github.com/roman-16/proton-cli/internal/proton"
+	acctsvc "github.com/roman-16/proton-cli/internal/service/account"
 	"github.com/roman-16/proton-cli/internal/ui"
 	"github.com/spf13/cobra"
 )
 
 const settingsPath = "/core/v4/settings"
 
-// specs covers the account-level pages the CLI can write: "Language and time",
-// and the privacy half of "Security and privacy".
+// specs covers the account-level settings that are one value written once:
+// "Language and time", and the privacy half of "Security and privacy".
 //
-// Password, two-factor, account deletion, recovery secrets and billing are
-// deliberately absent: none of them is a thing a script should change in one
-// line. Proton Sentinel and Dark Web Monitoring are absent too, because Proton
-// stores them by calling enable and disable endpoints rather than writing a
-// value, and silently downgrading a security feature does not belong behind
-// `set`. Both are still reported by `get`.
+// The credentials are not among them, and not because they are too dangerous
+// to script: they are collections beside this table, with verbs of their own.
+// None of them is a value. Changing a password proves the old one and re-locks
+// the keys, a second factor is minted and then confirmed, a recovery address is
+// set and then verified later - so `set KEY VALUE`, which sends one field in
+// one request, is the one shape none of them has.
+//
+// Proton Sentinel and Dark Web Monitoring are absent for a different reason:
+// Proton stores them by calling enable and disable endpoints rather than
+// writing a value, and silently downgrading a security feature does not belong
+// behind `set`. Both are still reported by `get`.
 var specs = map[string]kit.Setting{
 	"crash-reports": {
 		Path: settingsPath + "/crashreports", Field: "CrashReports",
@@ -77,12 +85,30 @@ type settingsView struct {
 	Sentinel        string `json:"sentinel"`
 	TwoPasswordMode string `json:"two_password_mode"`
 	TwoFactor       string `json:"two_factor"`
+	RecoveryPhrase  string `json:"recovery_phrase"`
 }
 
 func settingsCmd() *cobra.Command {
-	return kit.Settings("account", "Account-wide preferences", specs, func(c *kit.Invocation) error {
-		resp, err := c.App.API.Do(c.Ctx, proton.Request{Method: "GET", Path: settingsPath})
-		if err != nil {
+	c := kit.Settings("account", "Account-wide preferences", specs, func(c *kit.Invocation) error {
+		var (
+			resp *proton.Response
+			user struct {
+				User struct{ MnemonicStatus int }
+			}
+		)
+		// The recovery phrase is the one credential Proton keeps with the account
+		// rather than with the settings, and neither answer is needed to ask for
+		// the other.
+		if err := fetch.Together(c.Ctx,
+			func(ctx context.Context) error {
+				var err error
+				resp, err = c.App.API.Do(ctx, proton.Request{Method: "GET", Path: settingsPath})
+				return err
+			},
+			func(ctx context.Context) error {
+				return c.App.API.Decode(ctx, proton.Request{Method: "GET", Path: "/core/v4/users"}, &user)
+			},
+		); err != nil {
 			return err
 		}
 		var env struct {
@@ -121,6 +147,7 @@ func settingsCmd() *cobra.Command {
 			Sentinel:        kit.OnOffText(kit.IntOf(s.HighSecurity.Value)),
 			TwoPasswordMode: kit.OnOffText(twoPasswordOn(kit.IntOf(s.Password.Mode))),
 			TwoFactor:       twoFactorText(kit.IntOf(s.TwoFactor.Enabled)),
+			RecoveryPhrase:  acctsvc.PhraseStatus(user.User.MnemonicStatus),
 		}
 
 		return kit.Show(c, ui.RecordSpec{
@@ -137,9 +164,13 @@ func settingsCmd() *cobra.Command {
 				{Label: "Sentinel", Value: view.Sentinel, Always: true},
 				{Label: "Two-Password Mode", Value: view.TwoPasswordMode, Always: true},
 				{Label: "Two-Factor", Value: view.TwoFactor, Always: true},
+				{Label: "Recovery Phrase", Value: view.RecoveryPhrase, Always: true},
 			},
 		})
 	})
+	c.AddCommand(passwordCmd(), recoveryEmailCmd(), recoveryPhoneCmd(), recoveryPhraseCmd(),
+		secondPasswordCmd(), twoFactorCmd())
+	return c
 }
 
 // twoPasswordOn turns Proton's numbered password mode into the on and off this

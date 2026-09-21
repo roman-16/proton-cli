@@ -66,20 +66,22 @@ func (c *Client) verifyOrigin(webURL string) (*url.URL, error) {
 	if err != nil {
 		return nil, fmt.Errorf("verify url: unusable api base %q: %w", c.base, err)
 	}
-	host, ok := verifyHost(u.Hostname())
+	host, ok := siblingHost(u.Hostname(), verifySubdomain)
 	if !ok {
 		return nil, fmt.Errorf("verify url: %s serves no verification page", u.Host)
 	}
 	return &url.URL{Scheme: u.Scheme, Host: host, Path: "/"}, nil
 }
 
-// verifyHost moves a host to its verification sibling: mail.proton.me and
-// mail-api.proton.me both become verify.proton.me.
+// siblingHost moves a host to another of Proton's under the same root domain:
+// mail.proton.me and mail-api.proton.me both have verify.proton.me for a
+// verification page and account.proton.me for the account app's endpoints.
 //
 // It reports false for anything that is not a name under a root domain, by
 // Proton's own rule for addresses: no top-level domain ends in a digit, and an
-// IPv6 hostname contains a colon.
-func verifyHost(hostname string) (string, bool) {
+// IPv6 hostname contains a colon. Such a host has no siblings, and whatever the
+// CLI was pointed at is the only door there is.
+func siblingHost(hostname, subdomain string) (string, bool) {
 	if hostname == "" || strings.Contains(hostname, ":") || strings.HasSuffix(hostname, dohDomain) {
 		return "", false
 	}
@@ -90,5 +92,5 @@ func verifyHost(hostname string) (string, bool) {
 	if dot < 0 {
 		return "", false
 	}
-	return verifySubdomain + "." + hostname[dot+1:], true
+	return subdomain + "." + hostname[dot+1:], true
 }

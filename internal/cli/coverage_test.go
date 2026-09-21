@@ -53,11 +53,16 @@ var unreachable = map[string]string{
 	"DELETE /auth/v4/sessions":      "revoking every other session would end the run",
 	"DELETE /auth/v4/sessions/{id}": "the only session there is to revoke is the one running",
 
-	"GET /core/v4/keys/salts":         "only a first unlock derives the key password, and the suite resumes a session",
-	"PUT /auth/v4/sessions/local/key": "written once, at the first unlock, before the suite runs",
+	"GET /core/v4/keys/salts": "only a first unlock derives the key password, and the suite resumes a session",
 
 	"POST /auth/v4/sessions": "only a first sign-in creates one, and no test signs out to force another",
-	"POST /core/v4/auth/2fa": "no test account has two-factor enabled, so nothing is ever asked for a code",
+	"POST /core/v4/auth/2fa": "only a sign-in answers a second factor there, and no test signs in from nothing",
+
+	// The organization's key, asked about only when an administrator changes a
+	// password - to refuse the change if that key is locked with it. The one test
+	// account with an organization is somebody's own, and it refuses every
+	// command that would change a credential.
+	"GET /core/v4/organizations/keys": "only an administrator's password change asks, and the account with an organization refuses that command",
 
 	// Everything a password reset leaves behind. Only a reset locks a key or a
 	// volume, and a run that reset a test account's password would lock that
@@ -157,6 +162,14 @@ var untested = map[string]string{
 	// the only run that reaches this is the first one on an account that has not
 	// got the fixture yet, and every test account has had it for a while.
 	"POST /core/v4/addresses": "the fixture address is minted once in an account's life, and every test account is past that moment",
+
+	// Both halves of verifying a recovery phone. Proton texts a code to a real
+	// number, and no test account has one: a number a run can set is one nobody
+	// receives the code at, so the send is all there is and the code cannot come
+	// back. Setting and removing the number is tested; the flow was walked by
+	// hand against the live API with a real phone.
+	"POST /core/v4/users/code":   "Proton texts a code to a real phone, and no test account has one",
+	"POST /core/v4/verify/phone": "handing back a code that arrives on a phone no run can read",
 
 	// Handing the keys to somebody who was offered a vault before they had a
 	// Proton account. Reaching it needs the mailbox the offer went to to become a

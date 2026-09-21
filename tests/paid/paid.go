@@ -58,6 +58,61 @@ type Restriction struct {
 // Restrictions are the commands the paid account refuses.
 func Restrictions() []Restriction {
 	return []Restriction{{
+		Command: []string{"account", "settings", "password", "set"},
+		Why: "it would change the password somebody signs in with, and a run that stopped" +
+			" halfway would leave them locked out of their own account",
+	}, {
+		Command: []string{"account", "settings", "recovery-email", "disable"},
+		Why:     "it would take away the way back into somebody's real account",
+	}, {
+		Command: []string{"account", "settings", "recovery-email", "enable"},
+		Why:     "which recovery an account allows is the owner's decision about their own account",
+	}, {
+		Command: []string{"account", "settings", "recovery-email", "set"},
+		Why: "it would point the account's recovery at an address the owner did not choose," +
+			" and mail Proton's verification to it",
+	}, {
+		Command: []string{"account", "settings", "recovery-email", "verify"},
+		Why:     "it would mail somebody's real recovery address out of a test run",
+	}, {
+		Command: []string{"account", "settings", "recovery-phone", "disable"},
+		Why:     "it would take away the way back into somebody's real account",
+	}, {
+		Command: []string{"account", "settings", "recovery-phone", "enable"},
+		Why:     "which recovery an account allows is the owner's decision about their own account",
+	}, {
+		Command: []string{"account", "settings", "recovery-phone", "set"},
+		Why:     "it would point the account's recovery at a number the owner did not choose",
+	}, {
+		Command: []string{"account", "settings", "recovery-phone", "verify"},
+		Why:     "it would text somebody's real phone out of a test run",
+	}, {
+		Command: []string{"account", "settings", "recovery-phrase", "disable"},
+		Why: "the words the owner wrote down would stop working, and nothing here can hand" +
+			" them the new ones",
+	}, {
+		Command: []string{"account", "settings", "recovery-phrase", "set"},
+		Why: "it replaces the phrase the owner wrote down with one printed into a test log," +
+			" and the old one stops working",
+	}, {
+		Command: []string{"account", "settings", "second-password", "disable"},
+		Why:     "which passwords an account keeps is the owner's decision about their own account",
+	}, {
+		Command: []string{"account", "settings", "second-password", "enable"},
+		Why: "it would put a password only the run knows in front of somebody's keys, on" +
+			" every device they have",
+	}, {
+		Command: []string{"account", "settings", "second-password", "set"},
+		Why: "it would lock somebody's keys with a password only the run knows, on every" +
+			" device they have",
+	}, {
+		Command: []string{"account", "settings", "two-factor", "disable"},
+		Why:     "it would take a second factor off somebody's real account",
+	}, {
+		Command: []string{"account", "settings", "two-factor", "enable"},
+		Why: "it would ask for a code only the run can compute at every sign-in the owner" +
+			" makes",
+	}, {
 		Command: []string{"contacts", "merge"},
 		Why:     "it folds real contacts together across the whole address book, and nothing separates them again",
 	}, {

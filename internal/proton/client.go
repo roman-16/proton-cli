@@ -297,6 +297,30 @@ type Request struct {
 	HVToken string
 	HVType  string
 
+	// AccountHost sends this request to the host Proton serves its account app
+	// from, rather than the one the session was made against.
+	//
+	// The API is one gateway behind several front doors, and not every door
+	// routes every path: the recovery phrase answers only at account.proton.me
+	// and is Path not found everywhere else. Which door an endpoint is behind is
+	// a fact about the endpoint, so the caller that names one says so. The
+	// session is the same either way.
+	AccountHost bool
+
+	// Proves says that this endpoint wants the account password proved inside the
+	// request itself, rather than answered for beforehand.
+	//
+	// Proton guards the credentials two ways. Most of the endpoints that change one
+	// refuse an unelevated session and are answered by elevating and asking again,
+	// which is scope.go and which no caller has to know about. A few take the SRP
+	// proof in their own body instead - turning the authenticator app off, dropping
+	// the recovery phrase - and there is nothing in the answer to those to react to:
+	// the proof has to be there the first time. Which endpoints those are is
+	// Proton's to decide, so the caller that names one says so.
+	//
+	// Body is merged into the proof, so it has to be a map.
+	Proves bool
+
 	// Reads says that this request changes nothing, whatever its method says.
 	//
 	// Proton answers some questions with a POST - whether a name is free is one -
@@ -428,6 +452,11 @@ func (c *Client) Do(ctx context.Context, req Request) (*Response, error) {
 	if err := c.dryRunRefuses(req); err != nil {
 		return nil, err
 	}
+	// A proving request carries its answer to the guard with it, so it is sent
+	// through the exchange rather than sent and then reacted to.
+	if req.Proves {
+		return c.prove(ctx, req)
+	}
 	resp, err := c.send(ctx, req)
 	if err != nil {
 		return nil, err
@@ -470,6 +499,31 @@ func (c *Client) Do(ctx context.Context, req Request) (*Response, error) {
 	}
 	return resp, apiErr
 }
+
+// doorFor is the front door a request goes through. A base with no siblings -
+// a local API, an address rather than a name - is the only door there is, and
+// a request that wanted another gets this one and whatever it answers.
+func (c *Client) doorFor(req Request) string {
+	if !req.AccountHost {
+		return c.base
+	}
+	u, err := url.Parse(c.base)
+	if err != nil {
+		return c.base
+	}
+	host, ok := siblingHost(u.Hostname(), accountSubdomain)
+	if !ok {
+		return c.base
+	}
+	if port := u.Port(); port != "" {
+		host += ":" + port
+	}
+	u.Host = host
+	return u.String()
+}
+
+// accountSubdomain is where Proton serves what only its account app reaches.
+const accountSubdomain = "account"
 
 // guardRefuses asks the guard about a request that would go out as nobody.
 //
@@ -774,7 +828,7 @@ func (c *Client) doOnce(ctx context.Context, req Request) (*Response, error) {
 
 	cred := c.credentialFor(req)
 
-	u := c.base + req.Path
+	u := c.doorFor(req) + req.Path
 	if len(req.Query) > 0 {
 		u += "?" + req.Query.Encode()
 	}

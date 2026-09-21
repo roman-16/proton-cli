@@ -77,6 +77,7 @@ func (c *Credentials) from(src *passwordSource, flag, file string) error {
 //	extra     --extra-password-file, else a prompt
 //	previous  --previous-password-file, else a prompt
 //	phrase    --recovery-phrase-file, else a prompt
+//	chosen    --new-password-file, else a prompt asked twice
 //	code      --totp, else a prompt
 //
 // Each file flag reads standard input when its value is `-`.
@@ -130,6 +131,14 @@ type Credentials struct {
 		value  string
 		have   bool
 	}
+	// chosen is a password this run is setting rather than proving: the account's
+	// new one, or the second password of an account that keeps two. It is the one
+	// secret nothing can check, so a typed one is asked for twice.
+	chosen struct {
+		source passwordSource
+		value  string
+		have   bool
+	}
 	// stdinOwner is set once the App exists, so Supply can claim standard input.
 	stdinOwner func(claim string) (io.Reader, error)
 
@@ -160,7 +169,7 @@ const (
 	labelConfirm = "Confirm"
 	// labelPreviousPassword is the password from before a reset, under the name
 	// Proton's own recovery dialog gives it. labelCurrentPassword is what the
-	// account password is called in the one run that asks for both, so that
+	// account password is called in a run that asks for two of them, so that
 	// neither prompt can be taken for the other.
 	labelPreviousPassword = "Previous password"
 	labelCurrentPassword  = "Current password"
@@ -336,9 +345,83 @@ func (c *Credentials) Password(reason string) (string, error) {
 	return v, nil
 }
 
+// PasswordKind is which password a command is setting: what its prompt calls
+// it, and what a run with nobody to ask is told it was for.
+//
+// The three are separate because the account keeps up to two secrets and a
+// prompt saying only "New password" in the middle of changing the second one is
+// a prompt somebody answers with the wrong secret.
+type PasswordKind struct{ label, purpose string }
+
+var (
+	// AccountPassword is the password that signs in, for an account where it
+	// opens the keys too.
+	AccountPassword = PasswordKind{"New password", "change your password"}
+	// LoginPassword is the same secret for an account in two-password mode, where
+	// it signs in and opens nothing.
+	LoginPassword = PasswordKind{"New login password", "change your login password"}
+	// SecondPassword is what opens the keys of an account in two-password mode.
+	SecondPassword = PasswordKind{"New second password", "change your second password"}
+)
+
+// SupplyNewPassword records where the password being set may be read from.
+//
+// Only the commands that change one declare it. It is a second file beside
+// --password-file on purpose: the one that proves who this is and the one being
+// written are different secrets for the length of the command, and a single
+// flag for both could only ever set the password to itself.
+func (c *Credentials) SupplyNewPassword(file string) error {
+	return c.from(&c.chosen.source, "--new-password-file", file)
+}
+
+// NewPasswordOffered reports whether one arrived on the command line, which is
+// what lets a command judge it before it asks Proton anything.
+func (c *Credentials) NewPasswordOffered() bool {
+	return c.chosen.source.file != "" || c.chosen.source.stdin != nil
+}
+
+// ChoosePassword returns the password being set, asking for it if there is
+// somebody to ask.
+//
+// A typed one is asked for twice, as an extra password is: nothing echoes it,
+// and the next thing that happens is every other device asking for it.
+func (c *Credentials) ChoosePassword(kind PasswordKind) (string, error) {
+	if c.chosen.have {
+		return c.chosen.value, nil
+	}
+	missing := errs.Problemf("A new password is required to %s.", kind.purpose).
+		Hint("pass --new-password-file, or run this in a terminal")
+	typed := !c.NewPasswordOffered()
+	v, err := c.read(c.chosen.source, kind.label, missing)
+	if err != nil {
+		return "", err
+	}
+	if typed {
+		again, err := c.ask(labelConfirm, true, missing)
+		if err != nil {
+			return "", err
+		}
+		if again != v {
+			return "", errs.Problemf("The two passwords differ.")
+		}
+	}
+	c.chosen.value, c.chosen.have = v, true
+	return v, nil
+}
+
+// PasswordOffered reports whether the account password arrived on the command
+// line, so a command can judge what it was given against it without a prompt
+// to do it.
+func (c *Credentials) PasswordOffered() bool {
+	return c.source.file != "" || c.source.stdin != nil
+}
+
 func (c *Credentials) readPassword(reason string) (string, error) {
 	label := labelPassword
-	if c.previous.have {
+	// Two passwords in one run need telling apart, and which two they are differs:
+	// the one from before a reset and the one now, or the one now and the one
+	// replacing it.
+	if c.previous.have || c.chosen.source.declared {
 		label = labelCurrentPassword
 	}
 	return c.read(c.source, label,

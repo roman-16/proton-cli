@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime/debug"
+	"slices"
 	"strings"
 	"syscall"
 
@@ -437,7 +438,8 @@ func shortIDs(root *cobra.Command) bool {
 //
 // There are three ways to get here and they want different words. A verification
 // that was presented and refused is over: the challenge is spent and a fresh one
-// is what the next run will be given. A challenge nobody could be asked about
+// is what the next run will be given, and what to do about it depends on what
+// was offered - a CAPTCHA is solved on a page, a code is typed. A challenge nobody could be asked about
 // carries the two halves an unattended caller needs - the page, and the token to
 // repeat the command with - because the proof outlives the run that asked for it
 // even though the challenge does not. And a challenge offering no CAPTCHA cannot
@@ -445,7 +447,7 @@ func shortIDs(root *cobra.Command) bool {
 func hvFinalError(hv *proton.HumanVerificationError, a *app.App) error {
 	if hv.Refused {
 		return errs.Problemf("Proton did not accept the verification.").
-			Hint("solve the CAPTCHA fully, then run the command again").Exit(2)
+			Hint(retryVerification(hv.Methods)).Exit(2)
 	}
 	page, err := verificationPage(hv, a)
 	if err != nil {
@@ -455,6 +457,17 @@ func hvFinalError(hv *proton.HumanVerificationError, a *app.App) error {
 	}
 	return errs.Problemf("Proton wants to confirm you are human, and this run cannot wait while you do.").
 		Hint("solve "+page, "then run the same command again with --verified "+hv.Token).Exit(2)
+}
+
+// retryVerification says how to answer a challenge again. A CAPTCHA is the only
+// one this CLI carries through itself, so a challenge naming one is answered on
+// the page; anything else is a code somebody was sent and handed back, and
+// telling them to solve a CAPTCHA sends them to a page they never saw.
+func retryVerification(methods []string) string {
+	if len(methods) == 0 || slices.Contains(methods, proton.MethodCaptcha) {
+		return "solve the CAPTCHA fully, then run the command again"
+	}
+	return "check the code Proton sent, then run the command again"
 }
 
 // verificationPage is the address to send somebody to, from whichever client is

@@ -126,9 +126,9 @@ A bulk verb acts on at most `--limit` things, 150 by default; `--limit 0` lifts 
 
 ## Secrets
 
-`proton pass items get` and `proton pass items totp` print secrets in full.
+`proton pass items get` and `proton pass items totp` print secrets in full. So do `proton account settings two-factor generate` and `proton account settings recovery-phrase set`, which print a two-factor secret and twelve recovery words that are shown once and kept nowhere.
 
-Secrets go in the same way they come out. `pass items create` and `pass items update` read them from `--secret-file NAME=FILE`, never from a flag value, because a flag value is in the shell history; `-` as the file reads standard input.
+Secrets go in the same way they come out. `pass items create` and `pass items update` read them from `--secret-file NAME=FILE`, never from a flag value, because a flag value is in the shell history; `-` as the file reads standard input. The commands that change a credential read it from `--password-file` and `--new-password-file` the same way.
 
 ## Exit codes
 
@@ -229,6 +229,12 @@ One line per group, with the verbs under it. Arguments, flags and examples are i
 - `proton account profiles` - Accounts signed in on this machine: delete, list
 - `proton account sessions` - Sessions Proton holds for this account: list, revoke
 - `proton account settings` - Account-wide preferences: get, list, set
+- `proton account settings password` - The password you sign in with: set
+- `proton account settings recovery-email` - The address Proton writes to if you lose access: disable, enable, get, set, verify
+- `proton account settings recovery-phone` - The number Proton texts if you lose access: disable, enable, get, set, verify
+- `proton account settings recovery-phrase` - The twelve words that open your account without your password: disable, get, set
+- `proton account settings second-password` - The second password your keys can be locked with: disable, enable, get, set
+- `proton account settings two-factor` - What you are asked for at sign-in besides your password: disable, enable, generate, get
 
 ### index - An encrypted, searchable copy of your mail, files and events on this machine
 

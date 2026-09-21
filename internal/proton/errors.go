@@ -63,6 +63,11 @@ const (
 // for both (PASSWORD_WRONG_ERROR, packages/shared/lib/api/auth.ts).
 const invalidLoginCode = 8002
 
+// wrongTOTPCode is what Proton answers when a two-factor code does not check
+// out, wherever one is asked for (TOTP_WRONG_ERROR,
+// packages/shared/lib/api/settings.ts).
+const wrongTOTPCode = 12060
+
 // wrongLinkPasswordCode is what a public link answers when the password proved
 // against it is not the one it was made with (ERROR_CODE_INVALID_SRP_PARAMS,
 // packages/drive-store/store/_api/usePublicSession.tsx).
@@ -123,6 +128,16 @@ func DoesNotExist(err error) bool {
 	return apiErr.HTTPStatus == 404
 }
 
+// WrongTwoFactorCode reports whether err is Proton refusing a two-factor code.
+//
+// It is the one refusal in these flows that the next code would fix, and what
+// to say about it depends on which code was asked for: one proving the person
+// is there, or one confirming a secret they have just been shown.
+func WrongTwoFactorCode(err error) bool {
+	var apiErr *APIError
+	return errors.As(err, &apiErr) && apiErr.Code == wrongTOTPCode
+}
+
 // WrongLinkPassword reports whether err is a public link refusing the password
 // it was opened with, which is the one failure a different password would fix.
 func WrongLinkPassword(err error) bool {
@@ -154,7 +169,7 @@ func (e *APIError) ExitCode() int {
 	switch e.Code {
 	case invalidIDCode, notFoundCode, conversationNotFoundCode:
 		return 3
-	case invalidLoginCode:
+	case invalidLoginCode, wrongTOTPCode:
 		return 2
 	}
 	switch e.HTTPStatus {

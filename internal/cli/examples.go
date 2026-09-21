@@ -61,6 +61,58 @@ var examples = map[string][]string{
 		"proton account settings set locale de_AT",
 		"proton account settings set week-start monday",
 	},
+	"proton account settings password set": {
+		"proton account settings password set",
+		"proton account settings password set --password-file /run/secrets/proton --new-password-file /run/secrets/proton-new",
+	},
+	"proton account settings recovery-email get": {"proton account settings recovery-email get"},
+	"proton account settings recovery-email set": {
+		"proton account settings recovery-email set jane.roe@example.com",
+		"proton account settings recovery-email set none",
+	},
+	"proton account settings recovery-email verify":  {"proton account settings recovery-email verify"},
+	"proton account settings recovery-email enable":  {"proton account settings recovery-email enable"},
+	"proton account settings recovery-email disable": {"proton account settings recovery-email disable"},
+	"proton account settings recovery-phone get":     {"proton account settings recovery-phone get"},
+	"proton account settings recovery-phone set": {
+		"proton account settings recovery-phone set '+43 660 1234567'",
+		"proton account settings recovery-phone set none",
+	},
+	"proton account settings recovery-phone verify": {
+		"proton account settings recovery-phone verify",
+		"proton account settings recovery-phone verify --code 482913",
+	},
+	"proton account settings recovery-phone enable":  {"proton account settings recovery-phone enable"},
+	"proton account settings recovery-phone disable": {"proton account settings recovery-phone disable"},
+	"proton account settings recovery-phrase get":    {"proton account settings recovery-phrase get"},
+	"proton account settings recovery-phrase set": {
+		"proton account settings recovery-phrase set",
+		"proton account settings recovery-phrase set --output json",
+	},
+	"proton account settings recovery-phrase disable": {"proton account settings recovery-phrase disable"},
+	"proton account settings second-password get":     {"proton account settings second-password get"},
+	"proton account settings second-password enable": {
+		"proton account settings second-password enable",
+		"proton account settings second-password enable --password-file /run/secrets/proton --new-password-file /run/secrets/proton-second",
+	},
+	"proton account settings second-password set": {
+		"proton account settings second-password set",
+		"proton account settings second-password set --password-file /run/secrets/proton --new-password-file /run/secrets/proton-second",
+	},
+	"proton account settings second-password disable": {"proton account settings second-password disable"},
+	"proton account settings two-factor get":          {"proton account settings two-factor get"},
+	"proton account settings two-factor generate": {
+		"proton account settings two-factor generate",
+		"proton account settings two-factor generate --output json",
+	},
+	"proton account settings two-factor enable": {
+		"proton account settings two-factor enable",
+		"proton account settings two-factor enable --totp 123456 --password-file /run/secrets/proton",
+	},
+	"proton account settings two-factor disable": {
+		"proton account settings two-factor disable",
+		"proton account settings two-factor disable --totp 123456 --password-file /run/secrets/proton",
+	},
 	"proton api": {
 		"proton api GET /core/v4/users",
 		"proton api GET /mail/v4/messages --query 'PageSize=5'",
