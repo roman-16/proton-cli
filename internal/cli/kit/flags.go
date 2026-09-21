@@ -74,6 +74,7 @@ var Flags = map[string]Flag{
 	"delete-photos":          {Means: "also remove the photos an album held"},
 	"desc":                   {Means: "reverse the order a listing is in"},
 	"description":            {Means: "free-text description"},
+	"detailed":               {Means: "also record the IP address of each event"},
 	"dest":                   {Means: "the local path to write the payload to; - is stdout"},
 	"dest-dir":               {Means: "a local directory to fill, keeping each item's own name"},
 	"detach":                 {Means: "an attachment to remove"},

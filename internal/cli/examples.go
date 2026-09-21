@@ -50,7 +50,25 @@ var examples = map[string][]string{
 	},
 	"proton account profiles list":   {"proton account profiles list"},
 	"proton account profiles delete": {"proton account profiles delete work"},
-	"proton account sessions list":   {"proton account sessions list"},
+	"proton account security-log list": {
+		"proton account security-log list",
+		"proton account security-log list --limit 0 --output json",
+	},
+	"proton account security-log get": {"proton account security-log get"},
+	"proton account security-log enable": {
+		"proton account security-log enable",
+		"proton account security-log enable --detailed",
+		"proton account security-log enable --detailed --password-file /run/secrets/proton",
+	},
+	"proton account security-log disable": {
+		"proton account security-log disable --detailed",
+		"proton account security-log disable",
+	},
+	"proton account security-log delete": {
+		"proton account security-log delete",
+		"proton account security-log delete --yes --password-file /run/secrets/proton",
+	},
+	"proton account sessions list": {"proton account sessions list"},
 	"proton account sessions revoke": {
 		"proton account sessions revoke 5bH2mQxK",
 		"proton account sessions revoke --others",

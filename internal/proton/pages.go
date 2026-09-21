@@ -71,3 +71,44 @@ func All[T any](ctx context.Context, fetch func(ctx context.Context, page int) (
 // costs one request and is the only way to be sure when the count is a multiple
 // of the page size.
 func Full[T any](rows []T, size int) bool { return size > 0 && len(rows) >= size }
+
+// Window reads the page a caller asked for out of however many of Proton's it
+// spans, and reports how many rows the whole result has.
+//
+// max is the widest page the endpoint serves, which each one declares for
+// itself. A page no wider than that is one request, which is every ordinary
+// listing. A wider one, and the whole result asked for with a size of zero, are
+// read at the endpoint's width and cut down to what was asked for. That is what
+// keeps --limit the reader's number: how many requests it costs is this layer's
+// business, and 150 never reaches a screen.
+func Window[T any](ctx context.Context, page, size, max int, fetch func(ctx context.Context, page, size int) ([]T, int, error)) ([]T, int, error) {
+	if size > 0 && size <= max {
+		return fetch(ctx, page, size)
+	}
+
+	from := page * size
+	start := from - from%max
+	var rows []T
+	total := 0
+	err := Pages(ctx, func(ctx context.Context, i int) (bool, error) {
+		got, count, err := fetch(ctx, start/max+i, max)
+		if err != nil {
+			return false, err
+		}
+		rows = append(rows, got...)
+		total = count
+		if !Full(got, max) {
+			return false, nil
+		}
+		return size == 0 || start+len(rows) < from+size, nil
+	})
+	if err != nil {
+		return nil, 0, err
+	}
+
+	rows = rows[min(from-start, len(rows)):]
+	if size > 0 {
+		rows = rows[:min(size, len(rows))]
+	}
+	return rows, total, nil
+}

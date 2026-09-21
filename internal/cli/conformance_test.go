@@ -811,6 +811,9 @@ func TestReauthCommandsAreDeclared(t *testing.T) {
 	want := []string{
 		"proton account keys reactivate",
 		"proton account login",
+		"proton account security-log delete",
+		"proton account security-log disable",
+		"proton account security-log enable",
 		"proton account settings password set",
 		"proton account settings recovery-email disable",
 		"proton account settings recovery-email enable",

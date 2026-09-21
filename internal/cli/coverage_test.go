@@ -135,6 +135,13 @@ var untested = map[string]string{
 	// and not the state, which is not the same thing.
 	"PUT /mail/v4/settings/autoresponder": "writing an auto-reply cannot be undone, and only a real account has the plan for one",
 
+	// Wiping the security log. The events in it are the only ones the accounts
+	// have - Proton records a sign-in from a named client and never one from this
+	// CLI, so nothing a run does puts an event back, and a run that wiped once
+	// would leave the listing with nothing to be checked against for good. What is
+	// tested is the listing, the state, both toggles and the preview of the wipe.
+	"DELETE /core/v4/logs/auth": "the events it removes are ones no run can cause Proton to record again",
+
 	// Reporting phishing hands the message, decrypted, to the people at Proton
 	// who read reports. A suite that ran it every run would file its own test mail
 	// as an attack on somebody's desk, over and over, and no run could take one

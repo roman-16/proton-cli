@@ -84,6 +84,7 @@ These are the listings that can be narrowed, and what narrows them. The same fla
 - `proton pass trash list --desc --limit int --page int --sort string`
 - `proton pass vaults list --desc --limit int --page int --sort string`
 - `proton account profiles list --desc --limit int --page int --sort string`
+- `proton account security-log list --limit int --page int`
 - `proton account sessions list --desc --limit int --page int --sort string`
 - `proton account settings security-keys list --desc --limit int --page int --sort string`
 
@@ -234,6 +235,7 @@ One line per group, with the verbs under it. Arguments, flags and examples are i
 - `proton account` - get, login, logout
 - `proton account keys` - The keys your data is encrypted with: reactivate
 - `proton account profiles` - Accounts signed in on this machine: delete, list
+- `proton account security-log` - Sign-ins and credential changes Proton recorded: delete, disable, enable, get, list
 - `proton account sessions` - Sessions Proton holds for this account: list, revoke
 - `proton account settings` - Account-wide preferences: get, list, set
 - `proton account settings password` - The password you sign in with: set

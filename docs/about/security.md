@@ -47,6 +47,7 @@ proton-cli is **unaudited**. To limit what that costs you:
 - Verify release checksums against the [releases page](https://github.com/roman-16/proton-cli/releases) before installing a downloaded binary.
 - Keep it up to date with `proton update`, or your package manager.
 - Revoke the session on any machine you lose control of, with `proton account sessions revoke` or Proton's own session settings.
+- Read `proton account security-log list` for sign-ins you do not recognise, once `proton account security-log enable` is on.
 - Keep automated use plausible. Proton reacts to volume and rate, and an account flagged for that is an account problem rather than a bug here.
 
 Found a vulnerability? [`SECURITY.md`](https://github.com/roman-16/proton-cli/blob/main/SECURITY.md) has the private reporting channels. Please do not open a public issue.

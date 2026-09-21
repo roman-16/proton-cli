@@ -16,6 +16,11 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton account keys reactivate`](../account/keys.md#reactivate) | Bring back the keys a password reset locked |
 | [`proton account profiles delete`](../account/profiles.md#delete) | Remove a profile and everything it keeps on this machine |
 | [`proton account profiles list`](../account/profiles.md#list) | List the profiles with a saved session |
+| [`proton account security-log delete`](../account/security-log.md#delete) | Remove every event the log holds |
+| [`proton account security-log disable`](../account/security-log.md#disable) | Stop recording sign-ins and credential changes |
+| [`proton account security-log enable`](../account/security-log.md#enable) | Record sign-ins and credential changes |
+| [`proton account security-log get`](../account/security-log.md#get) | Show what is being recorded, and how much of it there is |
+| [`proton account security-log list`](../account/security-log.md#list) | List what Proton recorded, newest first |
 | [`proton account sessions list`](../account/sessions.md#list) | List every signed-in session |
 | [`proton account sessions revoke`](../account/sessions.md#revoke) | Invalidate sessions at Proton |
 | [`proton account settings get`](../account/settings.md#get) | Show the account settings now in effect |

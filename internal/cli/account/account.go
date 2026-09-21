@@ -26,7 +26,8 @@ func New() *cobra.Command {
 		Use:   "account",
 		Short: "Your Proton account, its settings and your session",
 	}
-	c.AddCommand(getCmd(), keysCmd(), loginCmd(), logoutCmd(), profilesCmd(), sessionsCmd(), settingsCmd())
+	c.AddCommand(getCmd(), keysCmd(), loginCmd(), logoutCmd(), profilesCmd(),
+		securityLogCmd(), sessionsCmd(), settingsCmd())
 	return c
 }
 

@@ -36,7 +36,7 @@ func (s *Service) ConversationsList(ctx context.Context, opts ListOptions) ([]Co
 		return starredOnly(ctx, opts, s.ConversationsList, func(c Conversation) []string { return c.Labels })
 	}
 	q := listQuery(opts, true)
-	return window(ctx, opts.Page, opts.PageSize, func(ctx context.Context, page, size int) ([]Conversation, int, error) {
+	return proton.Window(ctx, opts.Page, opts.PageSize, pageMax, func(ctx context.Context, page, size int) ([]Conversation, int, error) {
 		q.Set("Page", fmt.Sprintf("%d", page))
 		q.Set("PageSize", fmt.Sprintf("%d", size))
 		var r struct {

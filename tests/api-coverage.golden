@@ -57,6 +57,7 @@ GET /core/v4/auth/scopes
 GET /core/v4/events/latest
 GET /core/v4/keys/all
 GET /core/v4/labels
+GET /core/v4/logs/auth
 GET /core/v4/members/me
 GET /core/v4/settings
 GET /core/v4/settings/2fa/totp/secret
@@ -232,6 +233,7 @@ PUT /core/v4/labels/{id}
 PUT /core/v4/settings/2fa/totp
 PUT /core/v4/settings/email
 PUT /core/v4/settings/email/reset
+PUT /core/v4/settings/logauth
 PUT /core/v4/settings/mnemonic
 PUT /core/v4/settings/password
 PUT /core/v4/settings/phone

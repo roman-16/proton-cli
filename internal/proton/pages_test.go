@@ -3,8 +3,13 @@ package proton
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 )
+
+// width stands for the widest page an endpoint serves, which is what every
+// listing Proton caps is capped at.
+const width = 150
 
 func TestAllReadsEveryPageInOrder(t *testing.T) {
 	pages := [][]int{{0, 1, 2}, {3, 4, 5}, {6}}
@@ -141,6 +146,117 @@ func TestFullReadsAFilledPageAsMore(t *testing.T) {
 	if Full([]int{1}, 0) != false {
 		t.Error("no page size means nothing was paged")
 	}
+}
+
+// server stands in for a collection of that many rows, answering a page the way
+// Proton does: never more than width rows, and the total whatever the page
+// holds.
+type server struct {
+	rows  int
+	asked [][2]int
+}
+
+func (s *server) fetch(_ context.Context, page, size int) ([]int, int, error) {
+	s.asked = append(s.asked, [2]int{page, size})
+	size = min(size, width)
+	start := min(page*size, s.rows)
+	out := make([]int, 0, min(size, s.rows-start))
+	for i := start; i < min(start+size, s.rows); i++ {
+		out = append(out, i)
+	}
+	return out, s.rows, nil
+}
+
+func TestWindowReadsTheReadersPageNotProtons(t *testing.T) {
+	for _, c := range []struct {
+		name       string
+		rows       int
+		page, size int
+		want       []int
+		requests   int
+	}{
+		// An ordinary page is one page Proton can cut itself, so it stays one
+		// request however many rows are behind it.
+		{"a page Proton serves", 4812, 0, 25, seq(0, 25), 1},
+		{"a later page Proton serves", 4812, 3, 25, seq(75, 100), 1},
+		{"exactly Proton's width", 4812, 1, width, seq(150, 300), 1},
+		// Wider than Proton serves: composed from its pages and cut down, so
+		// the reader gets the number they asked for.
+		{"wider than Proton serves", 4812, 0, 500, seq(0, 500), 4},
+		{"a later wide page", 4812, 1, 200, seq(200, 400), 2},
+		// The whole collection, which is what a size of zero means.
+		{"everything", 380, 0, 0, seq(0, 380), 3},
+		{"everything, exactly filling Proton's pages", 300, 0, 0, seq(0, 300), 3},
+		{"everything of nothing", 0, 0, 0, nil, 1},
+		// A page past the end is empty rather than short of what came before.
+		{"past the end", 380, 2, 500, nil, 1},
+		{"a short last page", 380, 1, 200, seq(200, 380), 2},
+	} {
+		srv := &server{rows: c.rows}
+		got, total, err := Window(context.Background(), c.page, c.size, width, srv.fetch)
+		if err != nil {
+			t.Errorf("%s: %v", c.name, err)
+			continue
+		}
+		if total != c.rows {
+			t.Errorf("%s: total = %d, want %d", c.name, total, c.rows)
+		}
+		if !equal(got, c.want) {
+			t.Errorf("%s: rows = %v, want %v", c.name, brief(got), brief(c.want))
+		}
+		if len(srv.asked) != c.requests {
+			t.Errorf("%s: %d requests %v, want %d", c.name, len(srv.asked), srv.asked, c.requests)
+		}
+	}
+}
+
+// An endpoint narrower than another's is read at its own width, so a listing
+// capped at ten costs ten requests for a hundred rows rather than one that the
+// server would refuse.
+func TestWindowAsksAtTheEndpointsOwnWidth(t *testing.T) {
+	srv := &server{rows: 25}
+	got, _, err := Window(context.Background(), 0, 0, 10, srv.fetch)
+	if err != nil {
+		t.Fatalf("window: %v", err)
+	}
+	if !equal(got, seq(0, 25)) {
+		t.Errorf("rows = %v, want all 25", brief(got))
+	}
+	for _, asked := range srv.asked {
+		if asked[1] != 10 {
+			t.Errorf("asked for a page of %d, want 10", asked[1])
+		}
+	}
+}
+
+// Half a listing presented as a whole one is a wrong answer, so a page that
+// fails fails the call.
+func TestWindowFailsWholeWhenAPageFails(t *testing.T) {
+	boom := errors.New("boom")
+	_, _, err := Window(context.Background(), 0, 0, width, func(_ context.Context, page, _ int) ([]int, int, error) {
+		if page == 1 {
+			return nil, 0, boom
+		}
+		return seq(0, width), 400, nil
+	})
+	if !errors.Is(err, boom) {
+		t.Fatalf("err = %v, want boom", err)
+	}
+}
+
+func seq(from, to int) []int {
+	out := make([]int, 0, to-from)
+	for i := from; i < to; i++ {
+		out = append(out, i)
+	}
+	return out
+}
+
+func brief(rows []int) string {
+	if len(rows) == 0 {
+		return "nothing"
+	}
+	return fmt.Sprintf("%d rows %d..%d", len(rows), rows[0], rows[len(rows)-1])
 }
 
 func equal(a, b []int) bool {

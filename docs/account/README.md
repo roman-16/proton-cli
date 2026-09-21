@@ -4,7 +4,7 @@ Sign in once and your password is never asked for again on that machine.
 
 This page covers signing in and out, unattended and two-password sign-in, running several Proton accounts side by side, the sessions Proton holds across your devices, unlocking data after a password reset, and your account settings.
 
-For every command and flag, see the reference: [account](account.md), [keys](keys.md), [sessions](sessions.md), [profiles](profiles.md), [settings](settings.md).
+For every command and flag, see the reference: [account](account.md), [keys](keys.md), [security-log](security-log.md), [sessions](sessions.md), [profiles](profiles.md), [settings](settings.md).
 
 ## Check who you are signed in as
 
@@ -128,6 +128,7 @@ proton account login --user alice@proton.me \
 These commands ask for your password again even when you are signed in:
 
 - `account keys reactivate`
+- `account security-log delete` · `account security-log disable` · `account security-log enable`
 - `account settings password set`
 - `account settings recovery-email set` · `account settings recovery-email enable` · `account settings recovery-email disable`
 - `account settings recovery-phone set` · `account settings recovery-phone enable` · `account settings recovery-phone disable`
@@ -295,6 +296,57 @@ proton account sessions revoke --others     # everything but this one
 ```
 
 **If you lose a device, revoke its session.** That also makes the credentials saved on it useless, even to someone who already copied the file.
+
+## Check the security log
+
+Every sign-in and credential change Proton recorded for your account. This is the "Account monitor" section of Proton's account settings.
+
+```console
+$ proton account security-log list
+TIME              EVENT            APP
+────────────────  ───────────────  ─────────────────────
+2026-08-13 15:09  Sign in success  web-account@5.0.407.1
+2026-07-02 17:00  Sign in success  web-account@5.0.395.0
+2026-06-24 11:33  Sign in success  web-account@5.0.391.1
+2026-06-24 11:33  Sign in success  web-account@5.0.391.1
+2026-06-24 11:33  Sign out         web-mail@5.0.119.4
+2026-06-24 11:32  Sign in success  web-account@5.0.391.1
+6 events.
+```
+
+A failed sign-in is drawn in red and an attempt in yellow. **Sign-ins and changes made with `proton` are not recorded.**
+
+```console
+$ proton account security-log get
+Status:    on
+Detailed:  off
+Events:    6
+```
+
+```bash
+proton account security-log enable
+proton account security-log enable --detailed   # also record the IP address of each event
+```
+
+With `--detailed` an IP column appears in the listing. Device, location, provider and protection are filled in for an account Proton Sentinel watches.
+
+`enable`, `disable` and `delete` ask for your password again, or take it from `--password-file`.
+
+To keep the log somewhere of your own:
+
+```bash
+proton account security-log list --limit 0 --output json > events.json
+```
+
+Turning recording off deletes the events with it. While there are any, `disable` refuses:
+
+```console
+$ proton account security-log disable
+Error: Turning the security log off deletes the 6 events it holds.
+Try:   proton account security-log delete, then run this again
+```
+
+`proton account security-log delete` removes every event and goes on recording. `disable --detailed` stops the IP addresses being recorded and leaves the events alone.
 
 ## Where the session lives
 
