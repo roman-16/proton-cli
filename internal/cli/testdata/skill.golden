@@ -68,6 +68,7 @@ These are the listings that can be narrowed, and what narrows them. The same fla
 - `proton mail settings forwarding list --desc --limit int --page int --sort string`
 - `proton mail settings labels list --limit int --page int`
 - `proton mail settings senders list --desc --limit int --page int --sort string`
+- `proton mail settings smtp-tokens list --desc --limit int --page int --sort string`
 - `proton pass aliases contacts list REF --desc --limit int --page int --sort string`
 - `proton pass aliases list --desc --limit int --page int --sort string --vault string`
 - `proton pass breaches list --desc --limit int --page int --sort string`
@@ -130,7 +131,7 @@ A bulk verb acts on at most `--limit` things, 150 by default; `--limit 0` lifts 
 
 ## Secrets
 
-`proton pass items get` and `proton pass items totp` print secrets in full. So do `proton account settings two-factor generate`, `proton account settings recovery-phrase set` and `proton pass settings access-tokens create`, which print a two-factor secret, twelve recovery words and an access token that are shown once and kept nowhere.
+`proton pass items get` and `proton pass items totp` print secrets in full. So do `proton account settings two-factor generate`, `proton account settings recovery-phrase set`, `proton pass settings access-tokens create` and `proton mail settings smtp-tokens create`, which print a two-factor secret, twelve recovery words, an access token and an SMTP token that are shown once and kept nowhere.
 
 Secrets go in the same way they come out. `pass items create` and `pass items update` read them from `--secret-file NAME=FILE`, never from a flag value, because a flag value is in the shell history; `-` as the file reads standard input. The commands that change a credential read it from `--password-file` and `--new-password-file` the same way.
 
@@ -205,6 +206,7 @@ One line per group, with the verbs under it. Arguments, flags and examples are i
 - `proton mail settings forwarding` - Mail forwarded to and from your addresses: accept, create, decline, delete, disable, enable, get, list, resend
 - `proton mail settings labels` - Labels, which a message carries: create, delete, list, update
 - `proton mail settings senders` - Who always reaches the inbox, and who never does: allow, block, list, remove, spam
+- `proton mail settings smtp-tokens` - Tokens that let a device send from your address: create, delete, get, list
 
 ### pass - Vaults, logins and secrets
 

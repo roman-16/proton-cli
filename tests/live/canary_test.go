@@ -70,6 +70,7 @@ var collections = []struct {
 	// changed where somebody's real mail goes, and the domain is still there.
 	{"domains", []string{"mail", "settings", "domains", "list"}, "id", []string{"domain", "catch_all"}},
 	{"forwardings", []string{"mail", "settings", "forwarding", "list"}, "id", []string{"to"}},
+	{"smtp tokens", []string{"mail", "settings", "smtp-tokens", "list"}, "id", []string{"name"}},
 	{"contacts", []string{"contacts", "list"}, "id", []string{"name"}},
 	{"contact groups", []string{"contacts", "groups", "list"}, "id", []string{"name"}},
 	{"alias mailboxes", []string{"pass", "settings", "mailboxes", "list"}, "id", []string{"email"}},

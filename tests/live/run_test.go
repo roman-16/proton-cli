@@ -110,6 +110,8 @@ var reauthCommands = [][]string{
 	{"mail", "settings", "autoreply", "disable"},
 	{"mail", "settings", "autoreply", "enable"},
 	{"mail", "settings", "autoreply", "set"},
+	{"mail", "settings", "smtp-tokens", "create"},
+	{"mail", "settings", "smtp-tokens", "delete"},
 }
 
 // withPassword hands such a command the profile's password file.

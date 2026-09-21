@@ -18,6 +18,7 @@ DELETE /mail/v4/attachments/{id}
 DELETE /mail/v4/filters/{id}
 DELETE /mail/v4/forwardings/{id}
 DELETE /mail/v4/messages/empty
+DELETE /mail/v4/smtptokens/{id}
 DELETE /pass/v1/breach/custom_email/{id}
 DELETE /pass/v1/invite/{id}
 DELETE /pass/v1/personal-access-token/{id}/access/{id}
@@ -105,6 +106,7 @@ GET /mail/v4/incomingdefaults
 GET /mail/v4/messages
 GET /mail/v4/messages/{id}
 GET /mail/v4/settings
+GET /mail/v4/smtptokens
 GET /pass/v1/breach
 GET /pass/v1/breach/address/{id}/breaches
 GET /pass/v1/invite
@@ -186,6 +188,7 @@ POST /mail/v4/messages
 POST /mail/v4/messages/apply-filters
 POST /mail/v4/messages/{id}
 POST /mail/v4/messages/{id}/cancel_send
+POST /mail/v4/smtptokens
 POST /pass/v1/breach/custom_email
 POST /pass/v1/file
 POST /pass/v1/file/{id}/chunk

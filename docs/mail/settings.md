@@ -4,7 +4,7 @@ How Mail behaves.
 
 Every command under `proton mail settings`, with the arguments and flags it takes. For these commands in use, see [the mail guide](README.md).
 
-Holds `addresses`, `autoreply`, `domains`, `filters`, `folders`, `forwarding`, `get`, `labels`, `list`, `senders` and `set`.
+Holds `addresses`, `autoreply`, `domains`, `filters`, `folders`, `forwarding`, `get`, `labels`, `list`, `senders`, `set` and `smtp-tokens`.
 
 ## `addresses`
 
@@ -961,6 +961,97 @@ proton mail settings set KEY VALUE
 proton mail settings set pm-signature off
 proton mail settings set view-mode conversations
 ```
+
+## `smtp-tokens`
+
+Tokens that let a device or a service send mail from your address.
+
+A token sends from one custom domain address and nothing else. The address is the SMTP username and the token is the password, at smtp.protonmail.ch on port 587 with TLS.
+
+The token is shown once, when it is made.
+
+Holds `create`, `delete`, `get` and `list`.
+
+### `smtp-tokens create`
+
+Make a token for a device or a service to send with.
+
+REF is one of your custom domain addresses, and --name is required. The token sends from that address and nothing else.
+
+The token is shown once and never again. Under --output json it is the `token` field.
+
+Asks for your password even when you are signed in. With no terminal to ask, pass --password-file, which takes - for stdin.
+
+```
+proton mail settings smtp-tokens create REF
+```
+
+```bash
+proton mail settings smtp-tokens create billing@example.com --name 'Office printer'
+proton mail settings smtp-tokens create billing@example.com --name 'Office printer' --output json
+```
+
+| Flag | Description |
+| --- | --- |
+| `--name string` | Name for the new token |
+| `--password-file string` | Read the account password from a file, or - for stdin |
+| `--totp string` | Two-factor code |
+
+### `smtp-tokens delete`
+
+Stop a token working, for good.
+
+The device or the service holding it cannot send from then on. Nothing brings a token back; make another and set the device up again.
+
+Asks for your password even when you are signed in. With no terminal to ask, pass --password-file, which takes - for stdin.
+
+```
+proton mail settings smtp-tokens delete REF...
+```
+
+```bash
+proton mail settings smtp-tokens delete 'Office printer'
+```
+
+| Flag | Description |
+| --- | --- |
+| `--password-file string` | Read the account password from a file, or - for stdin |
+| `--totp string` | Two-factor code |
+
+### `smtp-tokens get`
+
+Show a token and where the device it is for connects.
+
+The token itself is not here: it was shown once, when it was made. One you have lost is deleted and made again.
+
+```
+proton mail settings smtp-tokens get REF
+```
+
+```bash
+proton mail settings smtp-tokens get 'Office printer'
+```
+
+### `smtp-tokens list`
+
+List the tokens on the account, newest first.
+
+LAST USED is when something last sent with a token, and - where nothing ever has. The tokens themselves are never shown here.
+
+```
+proton mail settings smtp-tokens list
+```
+
+```bash
+proton mail settings smtp-tokens list
+```
+
+| Flag | Description |
+| --- | --- |
+| `--desc` | Reverse the order |
+| `--limit int` | How many smtp tokens per page; 0 for all of them |
+| `--page int` | Which page of results, counting from zero |
+| `--sort string` | Order by: created, name, address, last-used (default `created`) |
 
 ---
 

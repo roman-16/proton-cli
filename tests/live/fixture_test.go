@@ -255,6 +255,28 @@ func paidForwarder(t *testing.T) string {
 	return email
 }
 
+// paidCustomAddress is an enabled address on a domain the account added, which
+// is the only kind Proton lets a token send from.
+//
+// It is read rather than made, for the reason the custom domain itself is: an
+// address on a domain of somebody's own is theirs to add, and the suite mints
+// only the one fixture address it keeps.
+func paidCustomAddress(t *testing.T) string {
+	t.Helper()
+	// Proton's own ADDRESS_TYPE and ADDRESS_STATUS numbers, which a listing
+	// carries as they are: an address on a domain the account added, turned on.
+	const customDomain, enabled = "3", "1"
+	for _, row := range runJSONArrayPaid(t, "mail", "settings", "addresses", "list") {
+		a, _ := row.(map[string]interface{})
+		if fixture.Str(a["type"]) == customDomain && fixture.Str(a["status"]) == enabled {
+			return fixture.Str(a["email"])
+		}
+	}
+	t.Fatal("the paid account has no address on a domain it added, and the suite never " +
+		"makes one. Add one once, by hand, in Proton's Identity and addresses settings.")
+	return ""
+}
+
 // ── mail ──
 //
 // Most mail tests need *a* delivered message of a particular shape rather than a

@@ -759,6 +759,13 @@ var examples = map[string][]string{
 	"proton mail settings forwarding disable": {"proton mail settings forwarding disable jane@proton.me"},
 	"proton mail settings forwarding resend":  {"proton mail settings forwarding resend jane@proton.me"},
 	"proton mail settings forwarding delete":  {"proton mail settings forwarding delete jane@proton.me"},
+	"proton mail settings smtp-tokens list":   {"proton mail settings smtp-tokens list"},
+	"proton mail settings smtp-tokens get":    {"proton mail settings smtp-tokens get 'Office printer'"},
+	"proton mail settings smtp-tokens create": {
+		"proton mail settings smtp-tokens create billing@example.com --name 'Office printer'",
+		"proton mail settings smtp-tokens create billing@example.com --name 'Office printer' --output json",
+	},
+	"proton mail settings smtp-tokens delete": {"proton mail settings smtp-tokens delete 'Office printer'"},
 
 	// ── pass ──
 	"proton pass vaults share add": {

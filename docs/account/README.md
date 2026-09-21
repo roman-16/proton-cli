@@ -151,6 +151,8 @@ These commands ask for your password again even when you are signed in:
 - `mail settings autoreply disable`
 - `mail settings autoreply enable`
 - `mail settings autoreply set`
+- `mail settings smtp-tokens create`
+- `mail settings smtp-tokens delete`
 
 ```bash
 printf '%s' "$PW" | proton calendar settings calendars delete Work --password-file -

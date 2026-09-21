@@ -450,6 +450,38 @@ proton mail settings addresses reorder alice@pm.me work@example.com alice@proton
 
 The first address is the default: `addresses list` shows it first, and mail leaves from it when no `--from` is given. Name the addresses that should come first, in order; the rest keep the order they are in. A disabled or external address, or one that cannot send or receive, cannot be the default.
 
+## Send from a printer or another service
+
+```bash
+proton mail settings smtp-tokens create billing@example.com --name 'Office printer'
+proton mail settings smtp-tokens list
+proton mail settings smtp-tokens get 'Office printer'
+proton mail settings smtp-tokens delete 'Office printer'
+```
+
+A token lets a device or a service send mail as one of your addresses. It sends from one custom domain address and nothing else, and needs a paid Mail plan. An address on a Proton domain cannot hold one.
+
+**Making and deleting a token asks for your password**, even when you are signed in. With no terminal, pass `--password-file`, which takes `-` for standard input. The other commands that do this are listed in [Account](../account/README.md#commands-that-ask-for-the-password-again).
+
+**The token is shown once**, when it is made. Set the device up with what `create` answers: the address as the SMTP username, the token as the password, and TLS turned on.
+
+```console
+$ proton mail settings smtp-tokens create billing@example.com --name 'Office printer'
+Token:    9Kd2mQxT9wLpN4vRs8kZc
+Address:  billing@example.com
+Server:   smtp.protonmail.ch
+Port:     587
+Name:     Office printer
+```
+
+Under `--output json` the token is the `token` field:
+
+```bash
+TOKEN=$(proton mail settings smtp-tokens create billing@example.com --name 'Office printer' --output json | jq -r .token)
+```
+
+`get` shows everything but the token, so one you have lost is deleted and made again. `LAST USED` in the listing is when something last sent with a token, and `-` where nothing ever has. Deleting a token stops the device sending.
+
 ## Settings
 
 ```bash

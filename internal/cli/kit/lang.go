@@ -232,6 +232,7 @@ var SettingsPages = map[string]string{
 	"mail settings folders":            "Folders and labels",
 	"mail settings labels":             "Folders and labels",
 	"mail settings senders":            "Spam, block, and allow lists",
+	"mail settings smtp-tokens":        "IMAP/SMTP",
 	"pass settings access-tokens":      "Access tokens",
 	"pass settings domains":            "Aliases",
 	"pass settings extra-password":     "Security",

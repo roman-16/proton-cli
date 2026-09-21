@@ -256,6 +256,10 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton mail settings senders remove`](../mail/settings.md#senders-remove) | Drop a standing decision, letting the spam filter decide again |
 | [`proton mail settings senders spam`](../mail/settings.md#senders-spam) | Send someone's mail straight to spam |
 | [`proton mail settings set`](../mail/settings.md#set) | Change one mail setting |
+| [`proton mail settings smtp-tokens create`](../mail/settings.md#smtp-tokens-create) | Make a token for a device to send with |
+| [`proton mail settings smtp-tokens delete`](../mail/settings.md#smtp-tokens-delete) | Stop a token working |
+| [`proton mail settings smtp-tokens get`](../mail/settings.md#smtp-tokens-get) | Show a token and where the device it is for connects |
+| [`proton mail settings smtp-tokens list`](../mail/settings.md#smtp-tokens-list) | List the tokens on the account |
 | [`proton pass aliases contacts allow`](../pass/aliases.md#contacts-allow) | Let a contact's mail reach you again |
 | [`proton pass aliases contacts block`](../pass/aliases.md#contacts-block) | Stop a contact's mail reaching you |
 | [`proton pass aliases contacts create`](../pass/aliases.md#contacts-create) | Make an address that writes to somebody as the alias |

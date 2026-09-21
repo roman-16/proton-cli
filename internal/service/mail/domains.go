@@ -2,13 +2,10 @@ package mail
 
 import (
 	"context"
-	"errors"
-	"log/slog"
 	"net/url"
 	"sort"
 
 	"github.com/roman-16/proton-cli/internal/dns"
-	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
 )
 
@@ -132,7 +129,7 @@ func stateWord(words map[int]string, n int) string {
 func (s *Service) DomainsList(ctx context.Context) ([]Domain, error) {
 	var r struct{ Domains []rawDomain }
 	if err := s.C.Decode(ctx, proton.Request{Method: "GET", Path: "/domains"}, &r); err != nil {
-		return nil, s.orNoPlanForDomains(ctx, err)
+		return nil, s.orNoPlan(ctx, err, "Custom domains")
 	}
 	addrs, err := s.AddressesList(ctx)
 	if err != nil {
@@ -195,37 +192,6 @@ func (s *Service) DomainCatchAll(ctx context.Context, domainID string, addressID
 		Method: "PUT", Path: "/domains/" + domainID + "/catchall",
 		Body: map[string]any{"AddressID": addressID},
 	}, nil)
-}
-
-// noOrganization is Proton's answer for an account that is not in one, which is
-// every account without a plan.
-const noOrganization = 2501
-
-// orNoPlanForDomains replaces Proton's refusal when the account could not have
-// had a custom domain in the first place.
-//
-// A plan puts the account in an organization of its own and a free account in
-// none, so the question is asked only once a listing has already failed, and
-// only to say which kind of failure it was. Anything else is left to say what it
-// is: a refusal nobody can act on is worse than Proton's own sentence.
-func (s *Service) orNoPlanForDomains(ctx context.Context, refusal error) error {
-	var r struct {
-		Organization struct{ MaxDomains int }
-	}
-	err := s.C.Decode(ctx, proton.Request{
-		Method: "GET", Path: "/core/v4/organizations", Reads: true,
-	}, &r)
-	var api *proton.APIError
-	switch {
-	case err == nil && r.Organization.MaxDomains > 0:
-		return refusal
-	case err == nil, errors.As(err, &api) && api.Code == noOrganization:
-		return errs.Problemf("Custom domains need a paid Mail plan.")
-	}
-	// Recorded and not counted: Proton's own refusal is on the screen either way,
-	// and this line is what says why it was not improved on.
-	slog.DebugContext(ctx, "domains: the account's plan could not be read", "error", err.Error())
-	return refusal
 }
 
 // countAddresses fills in what the address listing says about a domain.
