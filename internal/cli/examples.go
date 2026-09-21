@@ -652,6 +652,24 @@ var examples = map[string][]string{
 	},
 	"proton mail drafts delete": {"proton mail drafts delete 5bH2mQxK"},
 
+	// ── mail: protected ──
+	"proton mail protected get": {
+		"proton mail protected get 9fK2pQ7xNv4mB8 --eo-password-file /run/secrets/jane",
+		"proton mail protected get 'https://mail.proton.me/eo/9fK2pQ7xNv4mB8' --eo-password-file -",
+		"proton mail protected get 9fK2pQ7xNv4mB8 --eo-password-file /run/secrets/jane --body-only",
+	},
+	"proton mail protected reply": {
+		"proton mail protected reply 9fK2pQ7xNv4mB8 --eo-password-file /run/secrets/jane --body 'Got them, thanks.'",
+		"proton mail protected reply 9fK2pQ7xNv4mB8 --eo-password-file /run/secrets/jane --body 'Signed copy attached.' --attach ./signed.pdf",
+	},
+	"proton mail protected attachments list": {
+		"proton mail protected attachments list 9fK2pQ7xNv4mB8 --eo-password-file /run/secrets/jane",
+	},
+	"proton mail protected attachments download": {
+		"proton mail protected attachments download 9fK2pQ7xNv4mB8 --eo-password-file /run/secrets/jane --dest-dir .",
+		"proton mail protected attachments download 9fK2pQ7xNv4mB8 q3-report.pdf --eo-password-file /run/secrets/jane --dest report.pdf",
+	},
+
 	// ── mail: settings ──
 	"proton mail settings get":  {"proton mail settings get"},
 	"proton mail settings list": {"proton mail settings list"},

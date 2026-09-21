@@ -90,6 +90,19 @@ var unreachable = map[string]string{
 
 	"POST /drive/volumes": "a volume is made once in an account's life, and every test account is long past that moment",
 
+	// Everything about reading a password-protected message. Proton seals a
+	// message to a password only for a recipient it has no keys for, so no address
+	// any test account holds can be sent one - and the link that names it arrives
+	// in that outside mailbox and nowhere else, which is a mailbox no run can
+	// read. A run can reach the first of these with an id nobody issued, and a
+	// refusal is not coverage. What is tested instead is the sending end, which is
+	// where these messages come from, and the decryption, against messages built
+	// the way Proton builds them.
+	"GET /mail/v4/eo/token/{id}":      "only a mailbox outside Proton is sent such a link, and no run can read one",
+	"GET /mail/v4/eo/message":         "the same: without a link there is no token to ask with",
+	"GET /mail/v4/eo/attachment/{id}": "the same",
+	"POST /mail/v4/eo/reply":          "the same, and an answer would go to a real mailbox",
+
 	// Asking what the account's plan allows. It is sent only once a listing of
 	// custom domains has already failed, and the only account whose listing fails
 	// is one with no organization - which answers this with a refusal rather than

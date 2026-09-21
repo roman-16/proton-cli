@@ -137,19 +137,25 @@ func (m Message) Flagged() bool {
 
 // Full carries a decrypted body, unlike the raw API envelope.
 type Full struct {
-	ID             string                 `json:"id"`
-	ConversationID string                 `json:"conversation_id,omitempty"`
-	Subject        string                 `json:"subject"`
-	Sender         map[string]any         `json:"from"`
-	ToList         []map[string]any       `json:"to"`
-	CCList         []map[string]any       `json:"cc"`
-	BCCList        []map[string]any       `json:"bcc"`
-	Time           int64                  `json:"time,omitempty"`
-	Body           string                 `json:"body"`
-	MIMEType       string                 `json:"mime_type"`
-	AddressID      string                 `json:"address_id"`
-	Attachments    []Attachment           `json:"attachments"`
-	Signature      pgphelper.VerifyResult `json:"signature,omitempty"`
+	// ID and AddressID are what a mailbox knows a message by. A message read from
+	// behind a link has neither: it is in no mailbox, and it arrived at no address
+	// of yours.
+	ID             string           `json:"id,omitempty"`
+	ConversationID string           `json:"conversation_id,omitempty"`
+	Subject        string           `json:"subject"`
+	Sender         map[string]any   `json:"from"`
+	ToList         []map[string]any `json:"to"`
+	CCList         []map[string]any `json:"cc"`
+	BCCList        []map[string]any `json:"bcc"`
+	Time           int64            `json:"time,omitempty"`
+	// Expires is when Proton throws the message away, for the ones that
+	// self-destruct. It is zero for a message that stays.
+	Expires     int64                  `json:"expires,omitempty"`
+	Body        string                 `json:"body"`
+	MIMEType    string                 `json:"mime_type"`
+	AddressID   string                 `json:"address_id,omitempty"`
+	Attachments []Attachment           `json:"attachments"`
+	Signature   pgphelper.VerifyResult `json:"signature,omitempty"`
 
 	DMARCFailed      bool `json:"dmarc_failed,omitempty"`
 	MarkedLegitimate bool `json:"marked_legitimate,omitempty"`

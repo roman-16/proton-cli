@@ -114,6 +114,15 @@ proton drive items download /report.pdf --shared Project --dest-dir .
 proton drive items list / --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL'
 ```
 
+## A message behind a password
+
+A password-protected message is in no mailbox, so it has no `REF`. Its usage shows `LINK`, and either the link you were sent or the id in it names it:
+
+```bash
+proton mail protected get 9fK2pQ7xNv4mB8 --eo-password-file /run/secrets/jane
+proton mail protected get 'https://mail.proton.me/eo/9fK2pQ7xNv4mB8' --eo-password-file -
+```
+
 ## Full IDs that start with a dash
 
 Proton's IDs are base64, and `-` is one of its characters, so about one ID in sixty-four starts with a dash. Paste them like any other reference:

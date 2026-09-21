@@ -2,7 +2,8 @@
 //
 // The mailbox is `messages`, `conversations`, `drafts` and their attachments;
 // everything you configure lives under `settings`, one subcommand per page of
-// Proton's own mail settings.
+// Proton's own mail settings. `protected` is the message that is in no mailbox:
+// one somebody sent behind a password, read by its link.
 package mail
 
 import (
@@ -18,7 +19,7 @@ func New() *cobra.Command {
 		Use:   "mail",
 		Short: "Read, write and organize mail",
 	}
-	c.AddCommand(messagesCmd(), conversationsCmd(), draftsCmd(), settingsCmd())
+	c.AddCommand(messagesCmd(), conversationsCmd(), draftsCmd(), protectedCmd(), settingsCmd())
 	return c
 }
 

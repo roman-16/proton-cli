@@ -102,6 +102,8 @@ The password a recipient outside Proton types comes from a file or from standard
 
 Such a message expires after 28 days whatever `--expires` says. `--eo-password-file -` takes the stream for itself, so it cannot be combined with `--body -`.
 
+To read one that was sent to you, see [Open a password-protected message somebody sent you](#open-a-password-protected-message-somebody-sent-you).
+
 A scheduled send sits in the `scheduled` folder until it goes. To pull it back to Drafts, run `proton mail messages unschedule REF`.
 
 ## Reply and forward
@@ -196,6 +198,50 @@ proton mail conversations attachments download REF --dest-dir ./thread/
 Naming an attachment downloads that one, by its own name or by its ID; naming none downloads them all.
 
 Existing files are never overwritten silently: names collide into `file (2).pdf`, or pass `--force`. `--include-inline` covers embedded images too.
+
+## Open a password-protected message somebody sent you
+
+A message sent to an address outside Proton arrives as a link, and the password comes to you some other way. Name it by the link or by the id in it:
+
+```bash
+proton mail protected get 9fK2pQ7xNv4mB8 --eo-password-file /run/secrets/jane
+proton mail protected get 'https://mail.proton.me/eo/9fK2pQ7xNv4mB8' --eo-password-file -
+proton mail protected attachments list 9fK2pQ7xNv4mB8 --eo-password-file /run/secrets/jane
+proton mail protected attachments download 9fK2pQ7xNv4mB8 --eo-password-file /run/secrets/jane --dest-dir .
+```
+
+Quote the link: a shell splits nothing in an id, and everything in a URL.
+
+The password is the one whoever sent the message gave you, not a Proton password, and it comes from a file or from standard input.
+
+```console
+$ proton mail protected get 9fK2pQ7xNv4mB8 --eo-password-file /run/secrets/jane
+Subject:  Q3 numbers
+From:     Jane Roe <jane@proton.me>
+To:       me@example.com
+Date:     2026-04-15 14:32
+Expires:  2026-05-13 14:32
+
+Here are the numbers we discussed.
+
+Attachments
+ID        NAME           SIZE
+────────  ─────────────  ───────
+kQ81mDx4  q3-report.pdf  84.2 KB
+```
+
+`get` takes the same `--render`, `--body-only` and `--strip-quotes` as `mail messages get`. The message is gone 28 days after it was sent.
+
+An answer goes to whoever sent it and nobody else:
+
+```bash
+proton mail protected reply 9fK2pQ7xNv4mB8 --eo-password-file /run/secrets/jane --body 'Got them, thanks.'
+proton mail protected reply 9fK2pQ7xNv4mB8 --eo-password-file /run/secrets/jane --body 'Signed copy attached.' --attach ./signed.pdf
+```
+
+Five answers can go back from behind one link, and a `Replies` line on `get` counts the ones already sent.
+
+**None of this needs an account.** Your own mail, `login` included, is untouched by it.
 
 ## Back it up
 

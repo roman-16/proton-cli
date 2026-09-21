@@ -181,6 +181,7 @@ type rawMessage struct {
 	MIMEType       string
 	AddressID      string
 	ExternalID     string
+	ExpirationTime int64
 	Flags          int64
 	// Header is the original message's raw RFC 822 header block, and
 	// ParsedHeaders the same thing keyed. Export reuses Header verbatim; reply
@@ -304,8 +305,8 @@ func asFull(m rawMessage, body string, sig pgphelper.VerifyResult) Full {
 	return Full{
 		ID: m.ID, ConversationID: m.ConversationID, Subject: m.Subject, Sender: m.Sender,
 		ToList: m.ToList, CCList: m.CCList, BCCList: m.BCCList,
-		Time: m.Time, Body: body, MIMEType: m.MIMEType, AddressID: m.AddressID,
-		Attachments: atts, Signature: sig,
+		Time: m.Time, Expires: m.ExpirationTime, Body: body, MIMEType: m.MIMEType,
+		AddressID: m.AddressID, Attachments: atts, Signature: sig,
 		DMARCFailed: v.dmarcFailed, MarkedLegitimate: v.markedLegitimate,
 		Phishing: v.phishing, Suspicious: v.suspicious,
 	}

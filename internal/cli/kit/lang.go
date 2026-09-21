@@ -287,6 +287,7 @@ var Placeholders = map[string]Placeholder{
 	"EMAIL":             {Means: "an email address"},
 	"ENDPOINT":          {Means: "a Proton API path"},
 	"KEY":               {Means: "a setting key"},
+	"LINK":              {Means: "a password-protected message, by the link you were sent or the id in it"},
 	"METHOD":            {Means: "an HTTP method"},
 	"NEW_NAME":          {Means: "the name to change something to"},
 	"PASSKEY_REF":       {Means: "a passkey stored against the addressed login", Picks: PicksHolding},

@@ -368,7 +368,20 @@ type Request struct {
 	// which is what lets a link be opened without an account, and what keeps a
 	// session being proved again from carrying the one it is replacing.
 	opensLink bool
+
+	// anonymous sends the request with no session on it at all, whoever is signed
+	// in. What answers for it is the secret it carries in its own headers, and an
+	// account's UID beside that would only claim for somebody a request that is
+	// not about them: a message sent to an address outside Proton is read by
+	// whoever holds its password, and Proton neither knows nor asks who that is.
+	anonymous bool
 }
+
+// authorisedWithoutASession reports that nobody has to be signed in for Proton
+// to answer this request: the two that open a public link prove its password,
+// and the ones about a password-protected message carry the token that
+// message's password unwrapped.
+func (r Request) authorisedWithoutASession() bool { return r.opensLink || r.anonymous }
 
 // Refusal is Proton declining to do something now that it is still going to do:
 // a lock it is holding over the account, a pace it wants writes kept to.
@@ -413,8 +426,13 @@ func (c credential) nobody() bool { return c.uid == "" && c.token == "" }
 // A request about an opened public link carries that link's session, which is
 // all Proton grants it and all Proton will answer it for. Everything else is
 // about the account, whether or not a link is open, so a run that opened one
-// still has to be signed in to save it.
+// still has to be signed in to save it - except the ones that bring their own
+// credential, which go out as nobody so that what they carry is the only thing
+// answering for them.
 func (c *Client) credentialFor(req Request) credential {
+	if req.anonymous {
+		return credential{}
+	}
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	if c.link != nil && !req.opensLink && c.link.covers(req) {
@@ -529,10 +547,10 @@ const accountSubdomain = "account"
 //
 // That is the whole of what the guard is for: putting a sentence to a command
 // that has nothing to act as. A request carrying a session has an answer to give
-// whatever the guard would have said, and a public link is opened by requests
-// Proton answers to nobody by design.
+// whatever the guard would have said, and one Proton answers to whoever holds a
+// secret needs no account for the guard to send somebody after.
 func (c *Client) guardRefuses(req Request) error {
-	if !c.credentialFor(req).nobody() || req.opensLink {
+	if !c.credentialFor(req).nobody() || req.authorisedWithoutASession() {
 		return nil
 	}
 	c.mu.RLock()

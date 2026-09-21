@@ -84,6 +84,19 @@ func EOPassword() *Password {
 	}
 }
 
+// EOPasswordToOpen is the same password from the other end: what somebody who
+// was sent such a message types to read it.
+//
+// Nothing bounds it here. The eight characters are what a sender may choose,
+// and a message already sent has whatever password it has - refusing a short
+// one would refuse a message Proton opens.
+func EOPasswordToOpen() *Password {
+	return &Password{
+		name: "eo-password", label: "The message's password",
+		fileUsage: EOPasswordFileUsage,
+	}
+}
+
 // Declare adds the flags to a command. Call Supply from its steps.
 func (p *Password) Declare(c *cobra.Command) {
 	f := c.Flags()

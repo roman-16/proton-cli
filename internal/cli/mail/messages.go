@@ -91,6 +91,9 @@ func getCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if err := protectedElsewhere(c.Args[0]); err != nil {
+				return err
+			}
 			id, err := c.App.Mail.Resolve(c.Ctx, c.Args[0])
 			if err != nil {
 				return wrongTable(err, "get")
@@ -123,6 +126,16 @@ func getCmd() *cobra.Command {
 // attachment table that make up one part of a document. A single message is one
 // part; a thread is several.
 func messagePart(msg *mailsvc.Full, shape string, stripQuotes, includeInline bool) ui.Part {
+	return bodyPart(msg, messageHeader(msg), shape, stripQuotes, includeInline)
+}
+
+// bodyPart is a message laid out for reading: the header block it was given,
+// the body in the shape that was asked for, and what it carries underneath.
+//
+// The header is passed in because what belongs above a body depends on where
+// the message came from - one in the mailbox has an ID and a signature verdict,
+// and one behind a password has neither.
+func bodyPart(msg *mailsvc.Full, header []ui.Field, shape string, stripQuotes, includeInline bool) ui.Part {
 	body := msg.Body
 	if stripQuotes {
 		if mailtext.IsHTML(msg.MIMEType) {
@@ -135,7 +148,7 @@ func messagePart(msg *mailsvc.Full, shape string, stripQuotes, includeInline boo
 		body = mailtext.HTMLToText(body)
 	}
 
-	part := ui.Part{Header: messageHeader(msg), Body: body}
+	part := ui.Part{Header: header, Body: body}
 	visible := msg.Attachments
 	if !includeInline {
 		visible = mailsvc.FilterInline(visible)
@@ -164,10 +177,11 @@ func messageHeader(msg *mailsvc.Full) []ui.Field {
 			fields = append(fields, ui.Field{Label: group.label, Value: addressLine(a)})
 		}
 	}
-	fields = append(fields,
-		ui.Field{Label: "Date", Value: units.Time(msg.Time)},
-		kit.SignatureField(string(msg.Signature)),
-	)
+	fields = append(fields, ui.Field{Label: "Date", Value: units.Time(msg.Time)})
+	if msg.Expires > 0 {
+		fields = append(fields, ui.Field{Label: "Expires", Value: units.Time(msg.Expires)})
+	}
+	fields = append(fields, kit.SignatureField(string(msg.Signature)))
 	if msg.DMARCFailed {
 		fields = append(fields, ui.Field{Label: "DMARC", Value: "failed", Role: ui.Danger})
 	}

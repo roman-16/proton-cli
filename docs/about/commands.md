@@ -205,6 +205,10 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton mail messages unsubscribe`](../mail/messages.md#unsubscribe) | Ask a mailing list to stop |
 | [`proton mail messages update`](../mail/messages.md#update) | Change when messages delete themselves |
 | [`proton mail messages watch`](../mail/messages.md#watch) | Print each message as it arrives |
+| [`proton mail protected attachments download`](../mail/protected.md#attachments-download) | Download and decrypt attachments |
+| [`proton mail protected attachments list`](../mail/protected.md#attachments-list) | List a password-protected message's attachments |
+| [`proton mail protected get`](../mail/protected.md#get) | Show a password-protected message, decrypted |
+| [`proton mail protected reply`](../mail/protected.md#reply) | Reply to a password-protected message |
 | [`proton mail settings addresses create`](../mail/settings.md#addresses-create) | Add an address to the account |
 | [`proton mail settings addresses delete`](../mail/settings.md#addresses-delete) | Delete addresses |
 | [`proton mail settings addresses disable`](../mail/settings.md#addresses-disable) | Stop an address sending and receiving |

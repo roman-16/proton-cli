@@ -61,6 +61,7 @@ These are the listings that can be narrowed, and what narrows them. The same fla
 - `proton mail drafts list --limit int --page int`
 - `proton mail messages attachments list REF --include-inline`
 - `proton mail messages list --after string --before string --folder string --from string --keyword string --limit int --newer-than string --older-than string --page int --starred --subject string --to string --unread`
+- `proton mail protected attachments list LINK --eo-password-file string --include-inline`
 - `proton mail settings addresses list --limit int --page int`
 - `proton mail settings domains list --desc --limit int --page int --sort string`
 - `proton mail settings filters list --limit int --page int`
@@ -197,6 +198,8 @@ One line per group, with the verbs under it. Arguments, flags and examples are i
 - `proton mail messages` - Individual messages: delete, empty, export, forward, get, label, list, move, reply, send, star, trash, unlabel, unschedule, unstar, unsubscribe, update, watch
 - `proton mail messages attachments` - Files attached to a message: download, list
 - `proton mail messages mark` - Set what messages count as: legitimate, phishing, read, unread
+- `proton mail protected` - Messages somebody sent you behind a password: get, reply
+- `proton mail protected attachments` - Files attached to a password-protected message: download, list
 - `proton mail settings` - How Mail behaves: get, list, set
 - `proton mail settings addresses` - Your addresses, display names and signatures: create, delete, disable, enable, get, list, reorder, update
 - `proton mail settings autoreply` - The automatic reply and its schedule: disable, enable, get, set

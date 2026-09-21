@@ -80,8 +80,8 @@ func (s *Service) AttachmentsList(ctx context.Context, msgID string, includeInli
 // sealedAttachment is one attachment as a message carries it, with the key
 // packets that open its contents.
 type sealedAttachment struct {
-	ID, Name, KeyPackets string
-	Size                 int64
+	ID, Name, MIMEType, Disposition, KeyPackets string
+	Size                                        int64
 }
 
 // MatchAttachment finds the attachment a reference names: the ID outright, or
@@ -265,15 +265,15 @@ func (s *Service) uploadAttachment(ctx context.Context, addrKR *pgp.KeyRing, mes
 	if mimeType == "" {
 		mimeType = "application/octet-stream"
 	}
-	body, contentType, err := buildAttachmentForm(map[string]string{
-		"Filename":  a.Filename,
-		"MessageID": messageID,
-		"ContentID": a.ContentID,
-		"MIMEType":  mimeType,
-	}, map[string][]byte{
-		"KeyPackets": keyPacket,
-		"DataPacket": dataPacket,
-		"Signature":  sig.GetBinary(),
+	body, contentType, err := buildAttachmentForm([]formField{
+		{Name: "Filename", Value: a.Filename},
+		{Name: "MessageID", Value: messageID},
+		{Name: "ContentID", Value: a.ContentID},
+		{Name: "MIMEType", Value: mimeType},
+	}, []formFile{
+		{Name: "KeyPackets", Filename: "KeyPackets", Data: keyPacket},
+		{Name: "DataPacket", Filename: "DataPacket", Data: dataPacket},
+		{Name: "Signature", Filename: "Signature", Data: sig.GetBinary()},
 	})
 	if err != nil {
 		return nil, err
@@ -293,20 +293,31 @@ func (s *Service) uploadAttachment(ctx context.Context, addrKR *pgp.KeyRing, mes
 	}, nil
 }
 
-func buildAttachmentForm(fields map[string]string, files map[string][]byte) (body []byte, contentType string, err error) {
+// formField and formFile are one part of a multipart body each. They are given
+// in order rather than keyed, because a form can carry the same name more than
+// once: an answer to a password-protected message names each of its
+// attachments under Filename[], and the packets line up with that order.
+type formField struct{ Name, Value string }
+
+type formFile struct {
+	Name, Filename string
+	Data           []byte
+}
+
+func buildAttachmentForm(fields []formField, files []formFile) (body []byte, contentType string, err error) {
 	var buf bytes.Buffer
 	w := multipart.NewWriter(&buf)
-	for k, v := range fields {
-		if err := w.WriteField(k, v); err != nil {
+	for _, f := range fields {
+		if err := w.WriteField(f.Name, f.Value); err != nil {
 			return nil, "", err
 		}
 	}
-	for name, data := range files {
-		part, err := w.CreateFormFile(name, name)
+	for _, f := range files {
+		part, err := w.CreateFormFile(f.Name, f.Filename)
 		if err != nil {
 			return nil, "", err
 		}
-		if _, err := part.Write(data); err != nil {
+		if _, err := part.Write(f.Data); err != nil {
 			return nil, "", err
 		}
 	}
