@@ -74,7 +74,7 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton drive items copy`](../drive/items.md#copy) | Copy files into another folder |
 | [`proton drive items create`](../drive/items.md#create) | Create a folder, and any missing folder above it |
 | [`proton drive items delete`](../drive/items.md#delete) | Delete files or folders permanently |
-| [`proton drive items download`](../drive/items.md#download) | Download a file |
+| [`proton drive items download`](../drive/items.md#download) | Download a file or folder |
 | [`proton drive items get`](../drive/items.md#get) | Show a file or folder's details |
 | [`proton drive items list`](../drive/items.md#list) | List what is in a folder |
 | [`proton drive items move`](../drive/items.md#move) | Move files or folders into another folder |

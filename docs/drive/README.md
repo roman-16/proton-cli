@@ -10,10 +10,13 @@ This page is what people actually do. For every command and flag, see the refere
 proton drive items list                       # the root
 proton drive items list /Documents
 proton drive items list /Build --pattern "*.tmp" --recursive
+proton drive items list /Notes --keyword "parking permit" --recursive
 proton drive items get /Documents/report.pdf  # type, size, checksum, sharing state
 ```
 
-A filter such as `--pattern` opens every folder in its scope, which takes a while over a large tree. `proton index create drive` keeps a copy of the tree on this machine and answers from it instead: [Local index](../index/README.md).
+A filtered listing shows each item's full path.
+
+A filter such as `--pattern` opens every folder in its scope, which takes a while over a large tree. `proton index create drive` keeps a copy of the tree on this machine and answers from it instead, and `--keyword` then matches what your text files say as well as what they are called: [Local index](../index/README.md).
 
 ## Upload and download
 
@@ -23,10 +26,13 @@ proton drive items upload --recursive ./project /Backup
 pg_dump mydb | proton drive items upload - /Backups/db.sql
 
 proton drive items download /Documents/report.pdf --dest-dir ./downloads/
+proton drive items download /Documents --recursive --dest-dir ./downloads/
 proton drive items download /Documents/report.pdf --dest - | less
 ```
 
-Uploads show progress on stderr.
+A folder needs `--recursive`, and lands as a directory of its own name inside `--dest-dir`. `--dest` names one file, so it is refused for a folder.
+
+Transfers show progress on stderr.
 
 **A name already taken is refused.** `--if-exists` answers instead:
 
@@ -74,7 +80,7 @@ The trash is one list however many volumes it is spread over. Photos are kept on
 
 `trash list` pages and sorts like any other listing, and says how many items there are in total. `trash empty` deletes exactly that many.
 
-`trash`, `delete`, `move` and `copy` all take filters instead of paths: `--pattern`, `--larger-than`, `--smaller-than`, `--older-than`, `--newer-than`, `--scope`, `--recursive` and `--all`. Try them with `list` or `--dry-run` first:
+`trash`, `delete`, `move` and `copy` all take filters instead of paths: `--keyword`, `--pattern`, `--larger-than`, `--smaller-than`, `--older-than`, `--newer-than`, `--scope`, `--recursive` and `--all`. Try them with `list` or `--dry-run` first:
 
 ```bash
 proton drive items list /Build --pattern "*.tmp" --recursive          # see what matches

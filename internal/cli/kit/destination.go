@@ -239,6 +239,46 @@ func (d *Destination) StreamDiscovered(c *Invocation, write func(io.Writer) (str
 	return target, nil
 }
 
+// StreamInto writes one payload to a path the caller worked out, on the same
+// collision policy as everything else here.
+//
+// A tree names its own files: where each one goes is decided by where it sits
+// in the tree rather than by a flag, so it cannot come through Reserve, which
+// answers for one payload landing in one directory. What --force means is the
+// same either way - a file already there is refused without it - and the bytes
+// are published by a rename, so a transfer that fails leaves nothing behind.
+func (d *Destination) StreamInto(path string, write func(io.Writer) error) error {
+	if err := d.free(path); err != nil {
+		return err
+	}
+	dir := filepath.Dir(path)
+	if err := EnsureDir(dir); err != nil {
+		return err
+	}
+	tmp, err := privateTemp(dir)
+	if err != nil {
+		return err
+	}
+	committed := false
+	defer func() {
+		_ = tmp.Close()
+		if !committed {
+			_ = os.Remove(tmp.Name())
+		}
+	}()
+	if err := write(tmp); err != nil {
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(tmp.Name(), path); err != nil {
+		return err
+	}
+	committed = true
+	return nil
+}
+
 // EnsureDir creates a directory if it is missing, and refuses a path that exists
 // as something else.
 func EnsureDir(dir string) error {

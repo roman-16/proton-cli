@@ -53,7 +53,39 @@ proton index create drive
 proton drive items list --pattern "*.pdf" --recursive
 ```
 
-The rows are the rows the walk gives, and a file uploaded since the build is in them. Your own files are indexed; a public link, a share somebody sent you and a computer's backup are read from Proton as before.
+The rows are the rows the walk gives, and a file uploaded since the build is in them. A filtered listing shows each item's full path. Your own files are indexed; a public link, a share somebody sent you and a computer's backup are read from Proton as before.
+
+## Search inside files
+
+Drive is indexed in two passes. The first takes the tree, which is minutes. The second downloads the text of your text files, most recently changed first:
+
+```console
+$ proton index create drive
+Indexing drive        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  100%  8120 items  in 41s
+Indexing drive texts  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  100%  1240 / 1240 texts  in 4m
+✓ Indexed 8120 items.
+```
+
+Text files are the ones Drive opens as text: `.txt`, `.md`, `.csv`, `.json`, `.html`, `.xml`, and source code, up to 1 MB each. A PDF, an image, an SVG, an archive and anything larger are indexed by name alone. Files in the trash are left out.
+
+`--keyword` then matches names and contents, everywhere the Drive filters are taken:
+
+```bash
+proton drive items list /Notes --keyword "parking permit" --recursive
+proton drive items trash --scope /Notes --keyword DRAFT --recursive --dry-run
+```
+
+Every term has to appear, case and accents are ignored, and a quoted phrase is one term.
+
+A keyword says what it was not able to read:
+
+```console
+$ proton drive items list /Notes --keyword "parking permit" --recursive
+No items match.
+! Only 512 of 1240 files have their text indexed, newest first, so the rest were searched by name alone. `proton index create drive` continues the download.
+```
+
+Without a drive index, and inside `--computer`, `--shared` or `--link`, a keyword matches names and says so.
 
 ## Find an event by what it says
 
@@ -70,17 +102,17 @@ It works without an index by reading your calendars first, which takes a moment.
 
 ```console
 $ proton index list
-APP       INDEXED                        UNREADABLE  UPDATED           SIZE
-────────  ─────────────────────────────  ──────────  ────────────────  ───────
-calendar  1342 events                                2026-04-15 14:30  812.0 KB
-drive     8120 items                                 2026-04-15 14:31  1.9 MB
-mail      48213 messages, 12400 bodies   31          2026-04-15 14:32  36.2 MB
+APP       INDEXED                         UNREADABLE  UPDATED           SIZE
+────────  ──────────────────────────────  ──────────  ────────────────  ───────
+calendar  1342 events                                 2026-04-15 14:30  812.0 KB
+drive     8120 items, 512 of 1240 texts               2026-04-15 14:31  3.4 MB
+mail      48213 messages, 12400 bodies    31          2026-04-15 14:32  36.2 MB
 3 indexes.
 ```
 
-For mail, INDEXED names both passes: every message is indexed, and 12400 of them hold the body a keyword reads. A first pass that has not finished reads `12400 of 48213 messages` instead.
+For mail and drive, INDEXED names both passes: every message is indexed, and 12400 of them hold the body a keyword reads; the whole tree is indexed, and 512 of the 1240 files that are text hold their text. A first pass that has not finished reads `12400 of 48213 messages` instead.
 
-`UNREADABLE` counts things whose contents would not open - a message body, an event's text. They are searchable by everything else they carry.
+`UNREADABLE` counts things whose contents would not open - a message body, an event's text, a file's name or bytes. They are searchable by everything else they carry.
 
 This reads files, so it works signed out.
 

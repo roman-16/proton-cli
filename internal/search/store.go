@@ -72,9 +72,11 @@ type State struct {
 	Total      int `json:"total"`
 	Unreadable int `json:"unreadable,omitempty"`
 	// Bodies is how many of the things in the log hold the text that has to be
-	// fetched one at a time, which is what a mailbox is indexed in two passes
-	// for: an envelope is a row of a listing, a body is a request of its own.
+	// fetched one at a time, and Texts how many of them have such text to fetch,
+	// which is what an app indexed in two passes keeps them for: a row of a
+	// listing arrives with a hundred and fifty others, its contents alone.
 	Bodies int `json:"bodies,omitempty"`
+	Texts  int `json:"texts,omitempty"`
 	// Complete says the first build reached the end.
 	Complete bool `json:"complete"`
 	// Stale says what is in the index can no longer be trusted to be what the

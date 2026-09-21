@@ -1,10 +1,15 @@
 package drive
 
 import (
+	"bytes"
+	stdctx "context"
+	"strings"
 	"testing"
 
+	"github.com/roman-16/proton-cli/internal/app"
 	"github.com/roman-16/proton-cli/internal/cli/kit"
 	drivesvc "github.com/roman-16/proton-cli/internal/service/drive"
+	"github.com/roman-16/proton-cli/internal/ui"
 )
 
 // Every verb this selection feeds acts on a folder as a whole, so a filter that
@@ -105,4 +110,69 @@ func paths(sel kit.Selection[drivesvc.Child]) []string {
 		out = append(out, row.Path)
 	}
 	return out
+}
+
+// A keyword that read less than the contents of everything it listed says so,
+// and the four ways it can be short are four different things to do about it.
+//
+// Nothing on the screen otherwise distinguishes "there is no such file" from
+// "what the files say was never read", which is what makes the caveat the
+// difference between an answer and a wrong answer.
+func TestAKeywordSaysWhatItDidNotRead(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		cover drivesvc.Coverage
+		f     filters
+		want  string
+	}{
+		{
+			name:  "the texts are still downloading",
+			cover: drivesvc.Coverage{Indexed: true, Texts: 1240, Read: 512},
+			f:     filters{keyword: "parking permit"},
+			want:  "Only 512 of 1240 files have their text indexed",
+		},
+		{
+			name: "nothing is indexed on this machine",
+			f:    filters{keyword: "parking permit"},
+			want: "There is no drive index on this machine",
+		},
+		{
+			name:  "somewhere an index does not cover",
+			cover: drivesvc.Coverage{Foreign: true},
+			f:     filters{keyword: "parking permit"},
+			want:  "Only your own files have their text indexed",
+		},
+		{
+			name:  "an index that does not answer for the tree yet",
+			cover: drivesvc.Coverage{Unfinished: true},
+			f:     filters{keyword: "parking permit"},
+			want:  "The drive index is not complete",
+		},
+		{
+			name:  "every text read",
+			cover: drivesvc.Coverage{Indexed: true, Texts: 1240, Read: 1240},
+			f:     filters{keyword: "parking permit"},
+		},
+		{
+			name:  "a filter that is not about what a file says",
+			cover: drivesvc.Coverage{Foreign: true},
+			f:     filters{pattern: "*.tmp"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var errb bytes.Buffer
+			c := &kit.Invocation{
+				Ctx: stdctx.Background(),
+				App: &app.App{UI: ui.New(ui.Options{Format: ui.FormatText, Out: &bytes.Buffer{}, Err: &errb})},
+			}
+			shortIndex(c, tc.cover, &tc.f)
+			got := errb.String()
+			switch {
+			case tc.want == "" && got != "":
+				t.Errorf("said %q, want nothing", got)
+			case tc.want != "" && !strings.Contains(got, tc.want):
+				t.Errorf("said %q, want it to carry %q", got, tc.want)
+			}
+		})
+	}
 }

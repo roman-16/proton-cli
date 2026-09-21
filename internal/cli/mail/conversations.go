@@ -60,7 +60,6 @@ func convListCmd() *cobra.Command {
 				return err
 			}
 			if len(convs) == 0 {
-				unsearchedBodies(c, cover, opts)
 				addressOnlyHint(c, cover, opts)
 			}
 			shortIndex(c, cover, opts)

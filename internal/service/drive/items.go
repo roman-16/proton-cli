@@ -11,6 +11,7 @@ import (
 	"github.com/roman-16/proton-cli/internal/account/keys"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
+	"github.com/roman-16/proton-cli/internal/search"
 	"github.com/roman-16/proton-cli/internal/skip"
 )
 
@@ -65,30 +66,62 @@ func (s *Service) List(ctx context.Context, dc *Context, path string) ([]Child, 
 	return out, nil
 }
 
-// Walk lists all descendants depth-first; each Child carries its full
-// decrypted Path.
+// Coverage says where a listing was answered from, and how much of what a
+// keyword reads was there to read.
+//
+// An answer from the index is right about everything it covers and silent about
+// the rest, which on the screen is the same empty listing as there being no
+// such file. So each way of being short is kept apart from the others: they are
+// not the same thing for the reader to do something about.
+type Coverage struct {
+	// Indexed says the copy on this machine answered, so a keyword read the text
+	// of every file whose text it holds.
+	Indexed bool
+	// Foreign says the tree is not the one an index covers - a computer, a share
+	// somebody sent, a public link - so only names were read.
+	Foreign bool
+	// Unfinished says this machine has an index that does not answer for the tree
+	// yet, so the tree was read from Proton and only names were read.
+	Unfinished bool
+	// Texts is how many files the index holds the text of when it is finished,
+	// and Read how many it holds now.
+	Texts, Read int
+}
+
+// Short reports that a keyword read less than every file's text.
+func (c Coverage) Short() bool { return !c.Indexed || c.Read < c.Texts }
+
+// Walk lists all descendants depth-first, keeping what a keyword matches; each
+// Child carries its full decrypted Path.
 //
 // A tree this machine holds an index of is answered from it, brought up to date
-// first. Everything else is read from Proton a folder at a time, which is every
-// tree that is not the account's own: a public link, somebody else's share, a
-// computer's backup.
-func (s *Service) Walk(ctx context.Context, dc *Context, path string) ([]Child, error) {
-	if indexed, ok := s.indexedTree(ctx, dc, path); ok {
-		return indexed, nil
+// first, and a keyword there reads what each file says as well as what it is
+// called. Everything else is read from Proton a folder at a time, which is
+// every tree that is not the account's own - a public link, somebody else's
+// share, a computer's backup - and a keyword reads the names.
+func (s *Service) Walk(ctx context.Context, dc *Context, path, keyword string) ([]Child, Coverage, error) {
+	terms := search.Terms(keyword)
+	indexed, cover, ok := s.indexedTree(ctx, dc, path, terms)
+	if ok {
+		return indexed, cover, nil
 	}
 	res, err := s.ResolvePath(ctx, dc, path)
 	if err != nil {
-		return nil, err
+		return nil, cover, err
 	}
 	if !res.IsFolder {
-		return nil, errs.Problemf("%s is not a folder.", res.Describe(path))
+		return nil, cover, errs.Problemf("%s is not a folder.", res.Describe(path))
 	}
-	return s.walk(ctx, dc, res.LinkID, res.NodeKR, strings.TrimRight(path, "/"))
+	out, err := s.walk(ctx, dc, res.LinkID, res.NodeKR, strings.TrimRight(path, "/"), terms)
+	return out, cover, err
 }
 
-func (s *Service) walk(ctx context.Context, dc *Context, linkID string, parentKR *pgp.KeyRing, prefix string) ([]Child, error) {
+func (s *Service) walk(ctx context.Context, dc *Context, linkID string, parentKR *pgp.KeyRing, prefix string, terms []string) ([]Child, error) {
 	var out []Child
 	_, err := s.walkTree(ctx, dc, linkID, parentKR, prefix, func(f found) error {
+		if !search.Matches(terms, f.label()) {
+			return nil
+		}
 		out = append(out, Child{
 			LinkID: f.Link.LinkID, Name: f.label(), Path: f.Path, Type: linkType(f.Link.Type),
 			Size: f.Link.Size, CreateTime: f.Link.CreateTime, ModifyTime: f.Link.ModifyTime,
@@ -98,11 +131,15 @@ func (s *Service) walk(ctx context.Context, dc *Context, linkID string, parentKR
 	return out, err
 }
 
-// found is one link a walk reached: what it is called, where it sits, and what
-// about it could not be read.
+// found is one link a walk reached: what it is called, where it sits, what
+// opens it, and what about it could not be read.
 type found struct {
 	Link Link
 	Path string
+	// ParentKR is the key of the folder it hangs in, which is what opens the item
+	// itself - a walk holds it already, and a caller that wants the bytes would
+	// otherwise read the whole way down to it again.
+	ParentKR *pgp.KeyRing
 	// Name is what the account calls it, and Unreadable says the name would not
 	// decrypt - in which case there is no name, and what stands in its place is
 	// the same placeholder wherever the item is shown.
@@ -156,7 +193,7 @@ func (s *Service) walkTree(ctx context.Context, dc *Context, linkID string, pare
 		return tally, err
 	}
 	for _, r := range raw {
-		f := found{Link: r}
+		f := found{Link: r, ParentKR: parentKR}
 		name, nameErr := decryptName(r.Name, parentKR)
 		if nameErr != nil {
 			// The row stays, so nothing has gone missing from the answer: the name

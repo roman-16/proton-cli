@@ -24,6 +24,7 @@ proton drive items copy --pattern '*.pdf' --scope /Documents --into /Backup
 | `--all` | Act on everything in scope, rather than a subset |
 | `--computer string` | Work inside this computer's files, by name or ID |
 | `--into string` | Destination folder |
+| `--keyword string` | Match text in the name, and in a file's contents once a drive index exists |
 | `--larger-than string` | Match files above SIZE (e.g. 100MB, 2GB) |
 | `--limit int` | Most items to affect; 0 for no cap (default `150`) |
 | `--newer-than string` | Match files newer than DURATION |
@@ -76,6 +77,7 @@ proton drive items delete /photo.jpg --link 'https://drive.proton.me/urls/7X2K9M
 | --- | --- |
 | `--all` | Act on everything in scope, rather than a subset |
 | `--computer string` | Work inside this computer's files, by name or ID |
+| `--keyword string` | Match text in the name, and in a file's contents once a drive index exists |
 | `--larger-than string` | Match files above SIZE (e.g. 100MB, 2GB) |
 | `--limit int` | Most items to affect; 0 for no cap (default `150`) |
 | `--link string` | Work inside a public link somebody sent you, by URL |
@@ -90,7 +92,9 @@ proton drive items delete /photo.jpg --link 'https://drive.proton.me/urls/7X2K9M
 
 ## `download`
 
-Download a file.
+Download a file or folder.
+
+A folder is refused without --recursive. With it, the folder lands as a directory of its own name inside --dest-dir, subfolders and all, and --dest is refused: one path cannot take a tree.
 
 Behind a public link, a file is / when the link points at the file itself, and a path inside the folder when it points at a folder. A link with a password takes it from --link-password-file, which takes - for stdin.
 
@@ -100,6 +104,7 @@ proton drive items download PATH
 
 ```bash
 proton drive items download /Documents/report.pdf --dest-dir .
+proton drive items download /Documents --recursive --dest-dir .
 proton drive items download /Documents/report.pdf --dest - > report.pdf
 proton drive items download /report.pdf --shared Project --dest-dir .
 proton drive items download / --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL' --dest-dir .
@@ -114,6 +119,7 @@ proton drive items download / --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ
 | `--force` | Overwrite a file that already exists |
 | `--link string` | Work inside a public link somebody sent you, by URL |
 | `--link-password-file string` | Read the public link's password from a file, or - for stdin |
+| `--recursive` | Download a folder and everything under it |
 | `--shared string` | Work inside an item shared with you, by name or ID |
 
 ## `get`
@@ -142,7 +148,9 @@ proton drive items get / --shared Q3-report.pdf
 
 List what is in a folder.
 
-Takes the same filters as move, copy, trash and delete, so you can preview a selection here before acting on it. What PATH is here, those commands call --scope.
+Takes the same filters as move, copy, trash and delete, so you can preview a selection here before acting on it. What PATH is here, those commands call --scope. A filtered listing shows each item's full path.
+
+--keyword matches names, and the contents of your text files once `proton index create drive` has downloaded them. Elsewhere - a computer, a share, a link - it matches names alone, and says so.
 
 PATH is in your own files. --computer REF lists inside a computer instead, --shared REF inside something somebody shared with you, and --link URL inside a public link somebody sent you. In the last two, / is the item itself.
 
@@ -153,6 +161,7 @@ proton drive items list [PATH]
 ```bash
 proton drive items list
 proton drive items list /Documents
+proton drive items list /Notes --keyword 'parking permit' --recursive
 proton drive items list / --computer 'Work laptop'
 proton drive items list / --shared Project
 proton drive items list / --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL'
@@ -162,6 +171,7 @@ proton drive items list / --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mD
 | --- | --- |
 | `--computer string` | Work inside this computer's files, by name or ID |
 | `--desc` | Reverse the order |
+| `--keyword string` | Match text in the name, and in a file's contents once a drive index exists |
 | `--larger-than string` | Match files above SIZE (e.g. 100MB, 2GB) |
 | `--limit int` | How many items per page; 0 for all of them (default `50`) |
 | `--link string` | Work inside a public link somebody sent you, by URL |
@@ -193,6 +203,7 @@ proton drive items move --pattern '*.log' --scope /Build --recursive --into /Arc
 | `--all` | Act on everything in scope, rather than a subset |
 | `--computer string` | Work inside this computer's files, by name or ID |
 | `--into string` | Destination folder |
+| `--keyword string` | Match text in the name, and in a file's contents once a drive index exists |
 | `--larger-than string` | Match files above SIZE (e.g. 100MB, 2GB) |
 | `--limit int` | Most items to affect; 0 for no cap (default `150`) |
 | `--newer-than string` | Match files newer than DURATION |
@@ -423,6 +434,7 @@ proton drive items trash --older-than 1y --scope /Downloads --dry-run
 | --- | --- |
 | `--all` | Act on everything in scope, rather than a subset |
 | `--computer string` | Work inside this computer's files, by name or ID |
+| `--keyword string` | Match text in the name, and in a file's contents once a drive index exists |
 | `--larger-than string` | Match files above SIZE (e.g. 100MB, 2GB) |
 | `--limit int` | Most items to affect; 0 for no cap (default `150`) |
 | `--newer-than string` | Match files newer than DURATION |

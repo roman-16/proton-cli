@@ -16,11 +16,14 @@ proton mail messages trash 5bH2mQxK --unread --folder spam                  # bo
 | `--older-than` · `--newer-than` | By age |
 | `--larger-than` · `--smaller-than` | By size |
 | `--pattern` | The name, against a glob |
+| `--keyword` | Text in what a thing says, as well as what it is called |
 | `--unread` · `--starred` · `--type` | By state or kind |
 | `--all` | Everything in scope, rather than a subset |
 | `--limit` | How many a bulk verb may affect, or a listing holds |
 
-Each command's own page lists the filters it takes. Mail adds `--from`, `--to`, `--subject`, `--keyword`, `--after` and `--before`.
+Each command's own page lists the filters it takes. Mail adds `--from`, `--to`, `--subject`, `--after` and `--before`.
+
+What `--keyword` reads inside things - a message body, a file's text - is what an index on this machine holds: [Local index](../index/README.md).
 
 ## Check a selection before acting on it
 
@@ -54,4 +57,6 @@ Bulk verbs act on the IDs the selection resolved to, in batches of fifty, and re
 
 A filter that matches a folder and the files inside it selects the folder alone.
 
-**Drive filters walk the tree.** `--pattern` and the size and age filters visit every folder under the scope, so over a large tree narrow it with `--scope`.
+**Drive filters walk the tree.** `--pattern`, `--keyword` and the size and age filters visit every folder under the scope, so over a large tree narrow it with `--scope`. With a drive index they are answered from this machine instead.
+
+A filtered Drive listing shows each item's full path.

@@ -47,7 +47,7 @@ These are the listings that can be narrowed, and what narrows them. The same fla
 - `proton contacts list --desc --keyword string --limit int --page int --sort string`
 - `proton drive computers list --desc --limit int --page int --sort string`
 - `proton drive invitations list --desc --limit int --page int --sort string`
-- `proton drive items list [PATH] --computer string --desc --larger-than string --limit int --link string --link-password-file string --newer-than string --older-than string --page int --pattern string --recursive --shared string --smaller-than string --sort string`
+- `proton drive items list [PATH] --computer string --desc --keyword string --larger-than string --limit int --link string --link-password-file string --newer-than string --older-than string --page int --pattern string --recursive --shared string --smaller-than string --sort string`
 - `proton drive items revisions list PATH --computer string --shared string`
 - `proton drive links list --desc --limit int --page int --sort string`
 - `proton drive photos albums list --desc --limit int --page int --sort string`
@@ -88,7 +88,7 @@ Mail looks in the inbox unless told otherwise, and `--folder all` is what a ques
 
 Mail's `--keyword` searches subjects, names and addresses. It searches message bodies too, but only once this machine holds an index: `proton index list --output json` says which apps have one. For mail, `indexed` short of `total` is a first pass that has not finished, which covers the newest mail and not the oldest, and `bodies` short of `indexed` means every message is there and the text of the older ones is still downloading. Without an index, a keyword that finds nothing has established nothing about bodies - say so rather than reporting that the user has no such mail.
 
-`proton calendar events list --keyword` searches what an event says, at any date, with or without an index. A Drive filter such as `--pattern` opens every folder in its scope, which is slow over a large tree; an index answers it without the walk.
+`proton calendar events list --keyword` searches what an event says, at any date, with or without an index. A Drive filter such as `--pattern` opens every folder in its scope, which is slow over a large tree; an index answers it without the walk. Drive's `--keyword` matches names, and the contents of the user's text files - markdown, source, CSV, JSON, HTML, up to 1 MB each - once a drive index holds them, where `bodies` short of `texts` means they are still downloading. A PDF, an image or an SVG is matched by name whatever an index holds. Without an index, and in a computer, a share or a link, a Drive keyword that finds nothing has established nothing about what the files say.
 
 Building an index is the user's decision to make: it downloads what it indexes, and for a large mailbox that takes hours. Suggest `proton index create` rather than running it.
 

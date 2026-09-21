@@ -37,8 +37,8 @@ func listCmd() *cobra.Command {
 		Long: "List what is indexed on this machine.\n\n" +
 			"Reads the files and nothing else, so it works signed out. INDEXED counts\n" +
 			"what a search would look through; a build that has not finished says how\n" +
-			"much of the app it has reached, and mail says how many message bodies it\n" +
-			"holds while they are still downloading.",
+			"much of the app it has reached, and mail and drive say how many bodies and\n" +
+			"file texts they hold while those are still downloading.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			indexes, err := c.App.Index.List()
 			if err != nil {
@@ -69,23 +69,27 @@ func listCmd() *cobra.Command {
 
 // indexedCell says how much of an app is in the index, in the app's own noun.
 //
-// A build that has not finished says so by naming both numbers, and a mailbox
-// whose bodies are still arriving says how many it has: every message is in the
+// A build that has not finished says so by naming both numbers, and an app
+// whose contents are still arriving says how many it has: everything is in the
 // index by then, and what a keyword reaches is the part that has its text.
+// Every message has a body, so a mailbox names the count alone; some of a drive
+// is text, so a drive names how many of those it has read.
 func indexedCell(s search.Status) string {
 	noun := ui.Quantity(s.Indexed, nounOf(s.App))
 	switch {
 	case !s.Complete && s.Total > s.Indexed:
 		return fmt.Sprintf("%d of %s", s.Indexed, ui.Quantity(s.Total, nounOf(s.App)))
-	case owesBodies(s):
-		return fmt.Sprintf("%s, %s", noun, ui.Quantity(s.Bodies, "bodies"))
+	case owesContents(s) && s.Texts != s.Indexed:
+		return fmt.Sprintf("%s, %d of %s", noun, s.Bodies, ui.Quantity(s.Texts, owedOf(s.App)))
+	case owesContents(s):
+		return fmt.Sprintf("%s, %s", noun, ui.Quantity(s.Bodies, owedOf(s.App)))
 	}
 	return noun
 }
 
-// owesBodies reports that an index holds things whose text it has still to
-// download, which is the state a mailbox is in between its two passes.
-func owesBodies(s search.Status) bool { return s.App == search.AppMail && s.Bodies < s.Indexed }
+// owesContents reports that an index holds things whose text it has still to
+// download, which is the state an app is in between its two passes.
+func owesContents(s search.Status) bool { return s.Bodies < s.Texts }
 
 // blankAtZero leaves a column empty rather than writing a nought in it: what
 // the column reports is an exception, and a table of noughts reads as a table of
@@ -102,7 +106,7 @@ func blankAtZero(n int) string {
 // index Proton could not describe the changes to is in the same position: what
 // finishes it is a reading of the account, which is what a build is.
 func continues(c *kit.Invocation, index search.Status) {
-	if index.Complete && !index.Stale && !owesBodies(index) {
+	if index.Complete && !index.Stale && !owesContents(index) {
 		return
 	}
 	c.UI().Hint("`" + kit.Program + " index create " + string(index.App) + "` continues the download.")
@@ -113,10 +117,13 @@ func createCmd() *cobra.Command {
 		Use:   "create [REF...]",
 		Short: "Index an app so its contents can be searched",
 		Long: "Index an app so its contents can be searched.\n\n" +
-			"Name the apps to index, or none for every app that can be. Mail is indexed\n" +
-			"in two passes: every message first, which takes minutes and answers a\n" +
-			"filtered listing, then the bodies newest first, which for a large mailbox\n" +
-			"takes hours. Stopping it and running it again carries on where it left off.\n\n" +
+			"Name the apps to index, or none for every app that can be. Mail and Drive\n" +
+			"are indexed in two passes. Mail takes every message first, which takes\n" +
+			"minutes and answers a filtered listing, then the bodies newest first, which\n" +
+			"for a large mailbox takes hours. Drive takes the tree first, then the text of\n" +
+			"your text files up to 1 MB each, most recently changed first; a PDF, an image\n" +
+			"or anything larger is indexed by name alone. Stopping it and running it again\n" +
+			"carries on where it left off.\n\n" +
 			"What it writes is encrypted to your account's keys, under\n" +
 			"~/.config/" + kit.Alias + "/index.",
 		ValidArgsFunction: completeApps,
@@ -237,9 +244,9 @@ func stopped(c *kit.Invocation, session search.Session, part search.Part, err er
 	case !status.Complete:
 		c.Note("Indexed %d of %s so far. Run it again to continue.",
 			status.Indexed, ui.Quantity(status.Total, part.Noun()))
-	case owesBodies(status):
+	case owesContents(status):
 		c.Note("Downloaded %d of %s so far. Run it again to continue.",
-			status.Bodies, ui.Quantity(status.Indexed, contentsOf(part.App())))
+			status.Bodies, ui.Quantity(status.Texts, owedOf(part.App())))
 	}
 	return err
 }
@@ -556,7 +563,9 @@ func nounOf(app search.App) string {
 }
 
 // contentsOf is what a build warns about when it could not open something: a
-// message is named by the body that would not open, an event by itself.
+// message is named by the body that would not open, an event and a file by
+// themselves - a file that would not open may be one whose name would not
+// decrypt as easily as one whose text would not read.
 func contentsOf(app search.App) string {
 	switch app {
 	case search.AppCalendar:
@@ -565,6 +574,15 @@ func contentsOf(app search.App) string {
 		return "message bodies"
 	}
 	return nounOf(app)
+}
+
+// owedOf is what an app's second pass downloads, counted beside the things
+// holding it: a mailbox's bodies, a drive's texts.
+func owedOf(app search.App) string {
+	if app == search.AppDrive {
+		return "texts"
+	}
+	return "bodies"
 }
 
 // refusal phrases what went wrong with the index itself, which is the one

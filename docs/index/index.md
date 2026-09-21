@@ -10,7 +10,7 @@ Holds `create`, `delete`, `list`, `update` and `watch`.
 
 Index an app so its contents can be searched.
 
-Name the apps to index, or none for every app that can be. Mail is indexed in two passes: every message first, which takes minutes and answers a filtered listing, then the bodies newest first, which for a large mailbox takes hours. Stopping it and running it again carries on where it left off.
+Name the apps to index, or none for every app that can be. Mail and Drive are indexed in two passes. Mail takes every message first, which takes minutes and answers a filtered listing, then the bodies newest first, which for a large mailbox takes hours. Drive takes the tree first, then the text of your text files up to 1 MB each, most recently changed first; a PDF, an image or anything larger is indexed by name alone. Stopping it and running it again carries on where it left off.
 
 What it writes is encrypted to your account's keys, under ~/.config/proton-cli/index.
 
@@ -46,7 +46,7 @@ proton index delete --yes mail
 
 List what is indexed on this machine.
 
-Reads the files and nothing else, so it works signed out. INDEXED counts what a search would look through; a build that has not finished says how much of the app it has reached, and mail says how many message bodies it holds while they are still downloading.
+Reads the files and nothing else, so it works signed out. INDEXED counts what a search would look through; a build that has not finished says how much of the app it has reached, and mail and drive say how many bodies and file texts they hold while those are still downloading.
 
 ```
 proton index list

@@ -229,14 +229,20 @@ func selectConversations(c *kit.Invocation, f *filters) (kit.Selection[mailsvc.C
 // on the screen distinguishes "there is no such message" from "the part of your
 // mailbox that has it is not indexed".
 //
-// There are three ways it is short, and they are not the same thing to do
-// something about. A mailbox still being read is missing older mail outright. A
-// mailbox whose bodies are still arriving holds every message and can be
-// searched by everything except what the ones at the far end say. An index
-// Proton could not describe the changes to is missing nothing anybody can name,
-// which is exactly why it has to be said.
+// There are four ways it is short, and they are not the same thing to do
+// something about. No index at all means Proton answered, which is subjects,
+// names and addresses and not a word of what any message says. A mailbox still
+// being read is missing older mail outright. A mailbox whose bodies are still
+// arriving holds every message and can be searched by everything except what
+// the ones at the far end say. An index Proton could not describe the changes
+// to is missing nothing anybody can name, which is exactly why it has to be
+// said.
 func shortIndex(c *kit.Invocation, cover mailsvc.Coverage, opts mailsvc.ListOptions) {
 	switch {
+	case !cover.Indexed && opts.Keyword != "":
+		c.Warn("There is no mail index on this machine, so Proton searched subjects, names "+
+			"and addresses and no bodies. `%s index create mail` makes bodies searchable.",
+			kit.Program)
 	case !cover.Indexed:
 	case cover.Stale:
 		c.Warn("The mail index has fallen behind Proton and was searched as it stands. "+

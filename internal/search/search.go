@@ -123,11 +123,14 @@ type Status struct {
 	// Unreadable is how many things went in without their content, because the
 	// content would not open.
 	Unreadable int `json:"unreadable,omitempty"`
-	// Bodies is how many of the indexed things hold the text a search reads,
-	// where holding it is a request of its own. Mail is the app that is: a
-	// message is indexed by its envelope first and by its body afterwards, so a
-	// count short of Indexed is bodies still being downloaded.
+	// Bodies is how many of the indexed things hold the text a search reads, and
+	// Texts how many of them have such text to hold at all - each of which is a
+	// request of its own. A mailbox is indexed by its envelopes first and by its
+	// bodies afterwards, so every message has a body to fetch; a drive holds the
+	// text of the files that are text, which is some of them. A Bodies short of
+	// Texts is contents still being downloaded.
 	Bodies int `json:"bodies"`
+	Texts  int `json:"texts"`
 	// Complete says the first build finished, so nothing is missing but what has
 	// happened since.
 	Complete bool `json:"complete"`
@@ -177,7 +180,7 @@ func (s *Store) Status(app App) (Status, error) {
 func statusOf(app App, st State, bytes int64) Status {
 	return Status{
 		App: app, Indexed: st.Indexed, Total: st.Total, Unreadable: st.Unreadable,
-		Bodies: st.Bodies, Complete: st.Complete, Stale: st.Stale,
+		Bodies: st.Bodies, Texts: st.Texts, Complete: st.Complete, Stale: st.Stale,
 		Oldest: st.Oldest, Updated: st.Updated, Bytes: bytes, Volume: st.Volume,
 	}
 }

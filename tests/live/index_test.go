@@ -196,6 +196,58 @@ func TestIndexDriveAnswersAFilteredListing(t *testing.T) {
 	}
 }
 
+// A keyword reads what a file says, which no Proton client can answer and
+// nothing but the copy on this machine can.
+//
+// The three things it has to get right are the three the design turns on: a
+// text file is found by a word inside it, a file that is not text is not
+// searched for words it does not have, and a file uploaded over is found by
+// what it says now rather than by what the version before it said.
+func TestIndexDriveSearchesFileText(t *testing.T) {
+	folder := "/" + testID() + "-texts"
+	phrase := testID() + "-parking-permit"
+	tmp := t.TempDir()
+	notes := filepath.Join(tmp, "notes.md")
+	if err := os.WriteFile(notes, []byte("# Car\n\nThe "+phrase+" is in the glovebox.\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	// A file whose bytes are not text, named so that only its contents could
+	// match: a keyword that finds it is one that indexed a photograph.
+	photo := filepath.Join(tmp, "holiday.png")
+	if err := os.WriteFile(photo, append([]byte("\x89PNG\r\n\x1a\n"), []byte(phrase)...), 0600); err != nil {
+		t.Fatal(err)
+	}
+	runOK(t, "drive", "items", "create", folder)
+	cleanupRun(t, "Delete folder: proton drive items delete "+folder,
+		"drive", "items", "delete", folder)
+	runOK(t, "drive", "items", "upload", notes, folder)
+	runOK(t, "drive", "items", "upload", photo, folder)
+
+	indexedDrive(t)
+
+	found := runJSONArray(t, "drive", "items", "list", "--keyword", phrase, "--recursive", folder)
+	if len(found) != 1 {
+		t.Fatalf("a keyword inside a file matched %d items, want the one text file that says it", len(found))
+	}
+	if name := found[0].(map[string]interface{})["name"].(string); !strings.HasSuffix(name, "notes.md") {
+		t.Errorf("a keyword inside a file matched %q, want notes.md", name)
+	}
+
+	// A new version is a new text: what the file said before is not what it says.
+	after := testID() + "-garage-code"
+	if err := os.WriteFile(notes, []byte("# Car\n\nThe "+after+" is 4417.\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	runOK(t, "drive", "items", "upload", "--if-exists", "replace", notes, folder)
+
+	if got := runJSONArray(t, "drive", "items", "list", "--keyword", after, "--recursive", folder); len(got) != 1 {
+		t.Errorf("a keyword inside the new version matched %d items, want the file it was uploaded over", len(got))
+	}
+	if got := runJSONArray(t, "drive", "items", "list", "--keyword", phrase, "--recursive", folder); len(got) != 0 {
+		t.Errorf("a keyword from the version before matched %d items, want none", len(got))
+	}
+}
+
 // A keyword search over events covers whatever is there rather than a range,
 // which is what makes "when was that" answerable at all.
 //

@@ -12,8 +12,8 @@ import (
 	"github.com/roman-16/proton-cli/internal/ui"
 )
 
-// An answer from the index says what it did not cover, and the three ways it
-// can be short are three different things to do about it.
+// An answer from the index says what it did not cover, and the four ways it
+// can be short are four different things to do about it.
 //
 // Every one of them looks the same on the screen without the caveat - an empty
 // listing, or a short one - so what is at stake is whether somebody reads "no
@@ -30,6 +30,12 @@ func TestAnIndexedSearchSaysWhatItDidNotCover(t *testing.T) {
 			cover: mailsvc.Coverage{Indexed: true, Partial: true, Have: 12400, Total: 48213},
 			opts:  mailsvc.ListOptions{Keyword: "permit"},
 			want:  "Only 12400 of 48213 messages are indexed",
+		},
+		{
+			name:  "a keyword with nothing indexed",
+			cover: mailsvc.Coverage{},
+			opts:  mailsvc.ListOptions{Keyword: "permit"},
+			want:  "There is no mail index on this machine",
 		},
 		{
 			name:  "the bodies are still arriving",
@@ -50,9 +56,9 @@ func TestAnIndexedSearchSaysWhatItDidNotCover(t *testing.T) {
 			want:  "The mail index has fallen behind Proton",
 		},
 		{
-			name:  "Proton answered",
+			name:  "Proton answered a question it can answer",
 			cover: mailsvc.Coverage{},
-			opts:  mailsvc.ListOptions{Keyword: "permit"},
+			opts:  mailsvc.ListOptions{Unread: true},
 			want:  "",
 		},
 		{

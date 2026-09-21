@@ -19,6 +19,7 @@ import (
 // trash.
 
 type filters struct {
+	keyword     string
 	pattern     string
 	largerThan  string
 	smallerThan string
@@ -42,6 +43,7 @@ const defaultLimit = 150
 // removes. A dry run is a preview of a change; `list` is where a filter is
 // worked out in the first place.
 func (f *filters) registerNarrowing(fl kit.FlagSet) {
+	fl.StringVar(&f.keyword, "keyword", "", "Match text in the name, and in a file's contents once a drive index exists")
 	fl.StringVar(&f.pattern, "pattern", "", "Match names against a shell glob, e.g. *.tmp")
 	fl.StringVar(&f.largerThan, "larger-than", "", "Match files above SIZE (e.g. 100MB, 2GB)")
 	fl.StringVar(&f.smallerThan, "smaller-than", "", "Match files below SIZE")
@@ -64,23 +66,23 @@ func (f *filters) register(c *cobra.Command) {
 // is the question `list` asks: it decides both whether to walk the tree and
 // whether an empty answer means an empty folder or an unmatched filter.
 func (f *filters) narrowed() bool {
-	return f.pattern != "" || f.largerThan != "" || f.smallerThan != "" ||
+	return f.keyword != "" || f.pattern != "" || f.largerThan != "" || f.smallerThan != "" ||
 		f.age.Set() || f.recursive
 }
 
 func (f *filters) set() bool {
-	return f.pattern != "" || f.largerThan != "" || f.smallerThan != "" ||
+	return f.keyword != "" || f.pattern != "" || f.largerThan != "" || f.smallerThan != "" ||
 		f.scope != "" || f.age.Set() || f.all
 }
 
 // unbounded reports whether --all was given with nothing to narrow it.
 func (f *filters) unbounded() bool {
-	return f.all && f.pattern == "" && f.largerThan == "" && f.smallerThan == "" &&
-		f.scope == "" && !f.age.Set()
+	return f.all && f.keyword == "" && f.pattern == "" && f.largerThan == "" &&
+		f.smallerThan == "" && f.scope == "" && !f.age.Set()
 }
 
 const (
-	filterHint = "--pattern, --larger-than, --older-than or --scope"
+	filterHint = "--keyword, --pattern, --larger-than, --older-than or --scope"
 	// itemScope is what --all covers when nothing narrows it.
 	itemScope = "a whole subtree"
 )
@@ -115,7 +117,12 @@ func selectItems(c *kit.Invocation, dc *drivesvc.Context, f *filters) (kit.Selec
 	}
 	if f.set() {
 		sel.ByFilter = func(ctx stdctx.Context) ([]drivesvc.Child, error) {
-			return matchItems(ctx, c, dc, f)
+			rows, cover, err := matchItems(ctx, c, dc, f)
+			if err != nil {
+				return nil, err
+			}
+			shortIndex(c, cover, f)
+			return rows, nil
 		}
 	}
 	chosen, err := kit.Select(c, sel)
@@ -192,8 +199,10 @@ func covered(path string, folders []string) bool {
 	return false
 }
 
-// matchItems walks the scope and keeps what every given filter accepts.
-func matchItems(ctx stdctx.Context, c *kit.Invocation, dc *drivesvc.Context, f *filters) ([]drivesvc.Child, error) {
+// matchItems walks the scope and keeps what every given filter accepts, and
+// says what a keyword was able to read.
+func matchItems(ctx stdctx.Context, c *kit.Invocation, dc *drivesvc.Context, f *filters) ([]drivesvc.Child, drivesvc.Coverage, error) {
+	var cover drivesvc.Coverage
 	root := f.scope
 	if root == "" {
 		root = "/"
@@ -203,14 +212,14 @@ func matchItems(ctx stdctx.Context, c *kit.Invocation, dc *drivesvc.Context, f *
 	if f.largerThan != "" {
 		n, err := units.ParseSize(f.largerThan)
 		if err != nil {
-			return nil, kit.Fail("--larger-than: %v", err)
+			return nil, cover, kit.Fail("--larger-than: %v", err)
 		}
 		minSize = n
 	}
 	if f.smallerThan != "" {
 		n, err := units.ParseSize(f.smallerThan)
 		if err != nil {
-			return nil, kit.Fail("--smaller-than: %v", err)
+			return nil, cover, kit.Fail("--smaller-than: %v", err)
 		}
 		maxSize = n
 	}
@@ -218,21 +227,21 @@ func matchItems(ctx stdctx.Context, c *kit.Invocation, dc *drivesvc.Context, f *
 	if f.age.OlderThan != "" {
 		d, err := units.ParseDuration(f.age.OlderThan)
 		if err != nil {
-			return nil, kit.Fail("--older-than: %v", err)
+			return nil, cover, kit.Fail("--older-than: %v", err)
 		}
 		olderThan = time.Now().Add(-d).Unix()
 	}
 	if f.age.NewerThan != "" {
 		d, err := units.ParseDuration(f.age.NewerThan)
 		if err != nil {
-			return nil, kit.Fail("--newer-than: %v", err)
+			return nil, cover, kit.Fail("--newer-than: %v", err)
 		}
 		newerThan = time.Now().Add(-d).Unix()
 	}
 
-	children, err := c.App.Drive.Walk(ctx, dc, root)
+	children, cover, err := c.App.Drive.Walk(ctx, dc, root, f.keyword)
 	if err != nil {
-		return nil, err
+		return nil, cover, err
 	}
 
 	// A size or age filter is a question about a file, so a folder cannot answer
@@ -265,7 +274,34 @@ func matchItems(ctx stdctx.Context, c *kit.Invocation, dc *drivesvc.Context, f *
 		}
 		out = append(out, ch)
 	}
-	return out, nil
+	return out, cover, nil
+}
+
+// shortIndex says when a keyword read less than the contents of every file it
+// listed.
+//
+// Proton cannot search what a file says, so a keyword that found nothing has
+// not established that nothing says it - which is exactly what an empty listing
+// looks like it has established. The four ways it falls short are four
+// different things to do about it, and only one of them is waiting.
+func shortIndex(c *kit.Invocation, cover drivesvc.Coverage, f *filters) {
+	if f.keyword == "" || !cover.Short() {
+		return
+	}
+	switch {
+	case cover.Indexed:
+		c.Warn("Only %d of %d files have their text indexed, newest first, so the rest were "+
+			"searched by name alone. `%s index create drive` continues the download.",
+			cover.Read, cover.Texts, kit.Program)
+	case cover.Foreign:
+		c.Warn("Only your own files have their text indexed, so names alone were searched here.")
+	case cover.Unfinished:
+		c.Warn("The drive index is not complete, so the tree was read from Proton and only names "+
+			"were searched. `%s index create drive` finishes it.", kit.Program)
+	default:
+		c.Warn("There is no drive index on this machine, so only names were searched. "+
+			"`%s index create drive` makes the text of your files searchable.", kit.Program)
+	}
 }
 
 // depthBelow counts how many path segments separate p from root, so a

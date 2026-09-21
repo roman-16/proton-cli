@@ -258,6 +258,7 @@ var examples = map[string][]string{
 	"proton drive items list": {
 		"proton drive items list",
 		"proton drive items list /Documents",
+		"proton drive items list /Notes --keyword 'parking permit' --recursive",
 		"proton drive items list / --computer 'Work laptop'",
 		"proton drive items list / --shared Project",
 		"proton drive items list / --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL'",
@@ -275,6 +276,7 @@ var examples = map[string][]string{
 	},
 	"proton drive items download": {
 		"proton drive items download /Documents/report.pdf --dest-dir .",
+		"proton drive items download /Documents --recursive --dest-dir .",
 		"proton drive items download /Documents/report.pdf --dest - > report.pdf",
 		"proton drive items download /report.pdf --shared Project --dest-dir .",
 		"proton drive items download / --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL' --dest-dir .",

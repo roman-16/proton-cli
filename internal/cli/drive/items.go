@@ -39,7 +39,16 @@ func childColumns() []ui.Column[drivesvc.Child] {
 			return units.Size(ch.Size)
 		}},
 		{Header: "MODIFIED", Cell: func(ch drivesvc.Child) string { return units.Time(ch.ModifyTime) }},
-		{Header: "NAME", Flex: true, Cell: func(ch drivesvc.Child) string { return ch.Name }},
+		// A row that came out of the tree says where it sits, because that is the
+		// answer: two files of the same name in different folders are one row each,
+		// and the path is what the next command takes. A plain listing of one folder
+		// is already somewhere, so it shows names.
+		{Header: "NAME", Flex: true, Cell: func(ch drivesvc.Child) string {
+			if ch.Path != "" {
+				return ch.Path
+			}
+			return ch.Name
+		}},
 	}
 }
 
@@ -54,7 +63,10 @@ func itemsListCmd() *cobra.Command {
 		Long: "List what is in a folder.\n\n" +
 			"Takes the same filters as move, copy, trash and delete, so you can preview a\n" +
 			"selection here before acting on it. What PATH is here, those commands call\n" +
-			"--scope.\n\n" +
+			"--scope. A filtered listing shows each item's full path.\n\n" +
+			"--keyword matches names, and the contents of your text files once\n" +
+			"`" + kit.Program + " index create drive` has downloaded them. Elsewhere - a computer, a\n" +
+			"share, a link - it matches names alone, and says so.\n\n" +
 			"PATH is in your own files. --computer REF lists inside a computer instead,\n" +
 			"--shared REF inside something somebody shared with you, and --link URL inside\n" +
 			"a public link somebody sent you. In the last two, / is the item itself.",
@@ -69,10 +81,11 @@ func itemsListCmd() *cobra.Command {
 			}
 			// A listing with no filter is the folder itself, which is one request;
 			// a filtered one is the same walk the bulk verbs do.
+			var cover drivesvc.Coverage
 			children, err := c.App.Drive.List(c.Ctx, dc, at)
 			if f.narrowed() {
 				f.scope = at
-				children, err = matchItems(c.Ctx, c, dc, &f)
+				children, cover, err = matchItems(c.Ctx, c, dc, &f)
 			}
 			if err != nil {
 				return err
@@ -81,11 +94,17 @@ func itemsListCmd() *cobra.Command {
 				return err
 			}
 			rows, total := kit.Slice(page, children)
-			return kit.List(c, ui.TableSpec[drivesvc.Child]{
+			if err := kit.List(c, ui.TableSpec[drivesvc.Child]{
 				Noun: "items", Columns: childColumns(),
 				Total: total, Page: page.Number, PageSize: page.Size,
 				Filtered: f.narrowed(),
-			}, rows)
+			}, rows); err != nil {
+				return err
+			}
+			// What the answer did not cover is said after the answer, so the rows and
+			// the count come first and the caveat reads as being about them.
+			shortIndex(c, cover, &f)
+			return nil
 		}),
 	}
 	f.registerNarrowing(c.Flags())
@@ -441,16 +460,20 @@ func uploadInto(c *kit.Invocation, dc *drivesvc.Context, plan *drivesvc.TreePlan
 
 func itemsDownloadCmd() *cobra.Command {
 	var dest kit.Destination
+	var recursive bool
 	var t tree
 	c := &cobra.Command{
 		Use:   "download PATH",
-		Short: "Download a file",
-		Long: "Download a file.\n\n" +
+		Short: "Download a file or folder",
+		Long: "Download a file or folder.\n\n" +
+			"A folder is refused without --recursive. With it, the folder lands as a\n" +
+			"directory of its own name inside --dest-dir, subfolders and all, and --dest is\n" +
+			"refused: one path cannot take a tree.\n\n" +
 			"Behind a public link, a file is / when the link points at the file itself, and\n" +
 			"a path inside the folder when it points at a folder. A link with a password\n" +
 			"takes it from --link-password-file, which takes - for stdin.",
 		RunE: kit.Run([]kit.Step{t.supply}, func(c *kit.Invocation) error {
-			if err := dest.Validate(true); err != nil {
+			if err := dest.Validate(!recursive); err != nil {
 				return err
 			}
 			dc, err := t.context(c)
@@ -458,12 +481,19 @@ func itemsDownloadCmd() *cobra.Command {
 				return err
 			}
 			src := c.Args[0]
+			if recursive {
+				return downloadTree(c, dc, &dest, src)
+			}
 			// The file is looked for before anything is promised about it, and
 			// what it is called comes off the item rather than off the path: a
 			// shared file is named by the tree it is the whole of.
-			file, err := c.App.Drive.ResolveFile(c.Ctx, dc, src)
+			file, err := c.App.Drive.ResolvePath(c.Ctx, dc, src)
 			if err != nil {
 				return err
+			}
+			if file.IsFolder {
+				return kit.Fail("%s is a folder.", file.Describe(src)).
+					Hint("--recursive to download it and its contents.")
 			}
 			name := file.Name
 			if name == "" {
@@ -494,9 +524,69 @@ func itemsDownloadCmd() *cobra.Command {
 			})
 		}),
 	}
+	c.Flags().BoolVar(&recursive, "recursive", false, "Download a folder and everything under it")
 	dest.Register(c)
 	t.register(c, reads)
 	return c
+}
+
+// downloadTree writes a folder and everything under it into a directory of its
+// own name.
+//
+// The tree is read before any of it is written, so the count is what will land,
+// a dry run promises the same, and the folders exist before the files that go
+// in them. Each file is published only once it is whole, which is what a
+// download of one does: a tree interrupted half way holds the files it finished
+// and nothing half-written.
+func downloadTree(c *kit.Invocation, dc *drivesvc.Context, dest *kit.Destination, src string) error {
+	plan, err := c.App.Drive.PlanDownload(c.Ctx, dc, src)
+	if err != nil {
+		return err
+	}
+	dir, err := dest.Dir()
+	if err != nil {
+		return err
+	}
+	top := filepath.Join(dir, kit.SafeFilename(plan.Top))
+	return kit.Mutate(c, ui.ResultSpec{
+		Action: ui.Downloaded, Kind: "items", Count: plan.Count(),
+		Detail: "to " + top,
+	}, func() error {
+		if err := kit.EnsureDir(top); err != nil {
+			return err
+		}
+		for _, folder := range plan.Folders {
+			if err := kit.EnsureDir(localPath(top, folder)); err != nil {
+				return err
+			}
+		}
+		for i, file := range plan.Files {
+			// Each file draws its own bar, so without saying where it sits in the
+			// tree a five-hundred-file download is five hundred identical lines and
+			// no sense of how far along it is.
+			err := dest.StreamInto(localPath(top, file.Path), func(w io.Writer) error {
+				return c.App.Drive.DownloadPlanned(c.Ctx, dc, file, w, drivesvc.DownloadOptions{
+					Label:            "Downloading " + file.Name,
+					Progress:         ui.Batch(ui.NewProgress(c.UI()), i+1, len(plan.Files)),
+					OnSignatureIssue: signatureIssue(c, file.Name),
+				})
+			})
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// localPath is where one thing of a tree lands, named the way this machine
+// names a path and with each part safe to write.
+func localPath(top, inTree string) string {
+	parts := strings.Split(strings.Trim(inTree, "/"), "/")
+	for i, part := range parts {
+		parts[i] = kit.SafeFilename(part)
+	}
+	return filepath.Join(append([]string{top}, parts...)...)
 }
 
 // signatureIssue reports a block whose author signature does not check out.

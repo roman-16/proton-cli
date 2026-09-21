@@ -28,7 +28,7 @@ The paths are listed under [Files on disk](../using/settings.md#files-on-disk). 
 
 **The diagnostic log**, mode `0600`, holds what each run did, written so it can be handed to a stranger: addresses, IDs, paths, tokens, subjects, filenames, search terms and flag values never enter it. `--no-log` or `PROTON_NO_LOG` stops it being written ([Settings](../using/settings.md#the-diagnostic-log)).
 
-**The local index**, mode `0600`, exists only after `proton index create` and holds a copy of what it indexed: for mail, every message with its subject, its addresses and its body as text. It is encrypted with AES-256-GCM under a key of its own, and that key is encrypted and signed to your account's keys, so **revoking the session** makes a leaked copy unreadable the same way it does the session file. `proton index delete` removes it ([Local index](../index/README.md)).
+**The local index**, mode `0600`, exists only after `proton index create` and holds a copy of what it indexed: for mail, every message with its subject, its addresses and its body as text; for Drive, the tree and the text of your text files up to 1 MB each. It is encrypted with AES-256-GCM under a key of its own, and that key is encrypted and signed to your account's keys, so **revoking the session** makes a leaked copy unreadable the same way it does the session file. `proton index delete` removes it ([Local index](../index/README.md)).
 
 ## A file downloaded from a public link
 

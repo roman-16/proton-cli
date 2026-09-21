@@ -64,7 +64,6 @@ func listCmd() *cobra.Command {
 			// What the answer did not cover is said after the answer, so the rows
 			// and the count come first and the caveat reads as being about them.
 			if len(msgs) == 0 {
-				unsearchedBodies(c, cover, opts)
 				addressOnlyHint(c, cover, opts)
 			}
 			shortIndex(c, cover, opts)
@@ -594,19 +593,6 @@ func addressOnlyHint(c *kit.Invocation, cover mailsvc.Coverage, opts mailsvc.Lis
 	}
 	c.UI().Hint(flag + " matches the address only. To search display names too, " +
 		"use --keyword " + term + ".")
-}
-
-// unsearchedBodies says what an empty answer did not look inside.
-//
-// Proton cannot search a body, so a keyword that found nothing has not
-// established that nothing says it - which is exactly what an empty listing
-// looks like it has established.
-func unsearchedBodies(c *kit.Invocation, cover mailsvc.Coverage, opts mailsvc.ListOptions) {
-	if cover.Indexed || opts.Keyword == "" {
-		return
-	}
-	c.UI().Hint("Subjects, names and addresses were searched, not message bodies. " +
-		"`" + kit.Program + " index create mail` makes bodies searchable too.")
 }
 
 func quoted(s string) string { return strconv.Quote(s) }

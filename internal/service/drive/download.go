@@ -12,8 +12,10 @@ import (
 
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
 	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
+	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/progress"
 	"github.com/roman-16/proton-cli/internal/proton"
+	"github.com/roman-16/proton-cli/internal/skip"
 )
 
 // A download is not finished when the bytes arrive; it is finished when the bytes
@@ -81,6 +83,83 @@ func (r revision) author() string {
 // a path always carries - the root of a shared file is `/`.
 func (s *Service) Download(ctx context.Context, res *Resolved, w io.Writer, opts DownloadOptions) error {
 	return s.downloadFile(ctx, res.dc, res.Link, res.NodeKR, activeRevisionID(res.Link), res.Link.Size, w, opts)
+}
+
+// DownloadPlan is what downloading a folder will write: the folders to make and
+// the files to fetch, each already opened enough to be fetched.
+//
+// It is worked out before any of it is written, so the count somebody is shown
+// is the number of things that will land, a dry run promises the same, and the
+// walk that finds them is done once rather than per file.
+type DownloadPlan struct {
+	// Top is what the folder is called, which is the directory everything lands
+	// in.
+	Top string
+	// Folders is every folder below it, outermost first, as paths relative to
+	// Top.
+	Folders []string
+	Files   []PlannedFile
+}
+
+// PlannedFile is one file of a folder download.
+type PlannedFile struct {
+	// Path is where it sits below Top, and Name what it is called.
+	Path string
+	Name string
+	Size int64
+
+	link   *Link
+	nodeKR *pgp.KeyRing
+}
+
+// Count is how many things a folder download writes: the files, and the folders
+// made to hold them. The folder asked for is the destination rather than
+// something landing in it, so it is not among them.
+func (p *DownloadPlan) Count() int { return len(p.Files) + len(p.Folders) }
+
+// PlanDownload reads a folder and everything under it, and keeps what opening
+// each file will need.
+//
+// A folder whose key will not open is recorded and passed over: what is inside
+// it cannot be fetched by anybody holding these keys, and refusing the whole
+// download over it would be refusing the files that can.
+func (s *Service) PlanDownload(ctx context.Context, dc *Context, path string) (*DownloadPlan, error) {
+	res, err := s.ResolvePath(ctx, dc, path)
+	if err != nil {
+		return nil, err
+	}
+	if !res.IsFolder {
+		return nil, errs.Problemf("%s is not a folder.", res.Describe(path))
+	}
+	plan := &DownloadPlan{Top: res.Describe(path)}
+	if base := baseOf(path); base != "" {
+		plan.Top = base
+	}
+	_, err = s.walkTree(ctx, dc, res.LinkID, res.NodeKR, "", func(f found) error {
+		if f.Link.Type == protonFolder {
+			plan.Folders = append(plan.Folders, f.Path)
+			return nil
+		}
+		link := f.Link
+		nodeKR, err := unlockNode(&link, f.ParentKR, nil)
+		if err != nil {
+			// Recorded and counted: the file is one the download will not write,
+			// and the count somebody is shown leaves it out rather than promising
+			// bytes these keys cannot produce.
+			skip.Record(ctx, skip.KindItem, f.Link.LinkID, skip.Unlockable, err)
+			return nil
+		}
+		plan.Files = append(plan.Files, PlannedFile{
+			Path: f.Path, Name: f.label(), Size: f.Link.Size, link: &link, nodeKR: nodeKR,
+		})
+		return nil
+	})
+	return plan, err
+}
+
+// DownloadPlanned streams and decrypts one file of a folder download.
+func (s *Service) DownloadPlanned(ctx context.Context, dc *Context, f PlannedFile, w io.Writer, opts DownloadOptions) error {
+	return s.downloadFile(ctx, dc, f.link, f.nodeKR, activeRevisionID(f.link), f.Size, w, opts)
 }
 
 // DownloadRevision streams and decrypts one earlier version of a file.

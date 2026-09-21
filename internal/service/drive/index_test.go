@@ -2,11 +2,17 @@ package drive
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
 	"github.com/roman-16/proton-cli/internal/progress"
+	"github.com/roman-16/proton-cli/internal/proton"
 	"github.com/roman-16/proton-cli/internal/search"
 )
 
@@ -25,7 +31,15 @@ type indexedTree struct {
 	doer *stubDoer
 	dc   *Context
 	root *cannedFolder
+	// storage serves the blocks of the files in the tree, the way Proton's
+	// storage hosts do: a URL of its own, outside the API.
+	storage *httptest.Server
+	blocks  map[string][]byte
 }
+
+// notesText is what the one text file in the canned tree says, for the tests
+// about what a keyword reads.
+const notesText = "Where to leave the car: the vienna parking permit is in the glovebox."
 
 // newIndexed builds a small tree: two files at the top, a folder, and a file
 // inside it - the shape a path has to survive.
@@ -45,7 +59,25 @@ func newIndexedTree(t *testing.T) *indexedTree {
 			return search.Keys{Seal: tr.addrKR, Open: tr.addrKR}, nil
 		}))
 
-	d := &indexedTree{s: s, tr: tr, doer: doer}
+	// Proton pages a revision's blocks and answers past the end with none of
+	// them, which is what tells a download it has them all.
+	doer.answers = func(r proton.Request) []byte {
+		if !strings.Contains(r.Path, "/revisions/") || r.Query.Get("FromBlockIndex") == "1" {
+			return nil
+		}
+		return []byte(`{"Revision":{"Blocks":[]}}`)
+	}
+
+	d := &indexedTree{s: s, tr: tr, doer: doer, blocks: map[string][]byte{}}
+	d.storage = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		block, ok := d.blocks[strings.TrimPrefix(r.URL.Path, "/")]
+		if !ok {
+			http.Error(w, "no such block", http.StatusNotFound)
+			return
+		}
+		_, _ = w.Write(block)
+	}))
+	t.Cleanup(d.storage.Close)
 	dc, err := s.Resolve(t.Context())
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
@@ -55,7 +87,7 @@ func newIndexedTree(t *testing.T) *indexedTree {
 	d.root = d.folder(t, testRootID, d.rootKey(t))
 	reports := d.add(t, d.root, "folder-1", "Reports", protonFolder, 0)
 	d.add(t, d.root, "invoice.pdf", "invoice.pdf", protonFile, 312)
-	d.add(t, d.root, "notes.txt", "notes.txt", protonFile, 12)
+	d.addFile(t, d.root, "notes.txt", "notes.txt", "text/plain", notesText)
 	d.add(t, reports, "q1.pdf", "Q1 report.pdf", protonFile, 1200)
 	return d
 }
@@ -93,7 +125,7 @@ func (d *indexedTree) folder(t *testing.T, id string, kr *pgp.KeyRing) *cannedFo
 }
 
 // add seals a child into a folder the way Proton seals one, and publishes the
-// folder's new listing.
+// folder's new listing and the child itself.
 func (d *indexedTree) add(t *testing.T, parent *cannedFolder, id, name string, kind int, size int64) *cannedFolder {
 	t.Helper()
 	nodeKey, pass, passSig, priv, err := genNodeKeys(parent.kr, d.tr.addrKR)
@@ -104,11 +136,14 @@ func (d *indexedTree) add(t *testing.T, parent *cannedFolder, id, name string, k
 	if err != nil {
 		t.Fatalf("encrypt a name: %v", err)
 	}
-	parent.children = append(parent.children, map[string]any{
+	link := map[string]any{
 		"LinkID": id, "ParentLinkID": parent.id, "Type": kind, "Name": encName, "Size": size,
 		"NodeKey": nodeKey, "NodePassphrase": pass, "NodePassphraseSignature": passSig,
 		"ModifyTime": 1700000000,
-	})
+	}
+	parent.children = append(parent.children, link)
+	d.doer.routes["GET /drive/shares/"+testShareID+"/links/"+id] =
+		object(t, map[string]any{"Link": link})
 	d.publish(t, parent)
 	kr, err := pgp.NewKeyRing(priv)
 	if err != nil {
@@ -119,6 +154,55 @@ func (d *indexedTree) add(t *testing.T, parent *cannedFolder, id, name string, k
 		d.publish(t, child)
 	}
 	return child
+}
+
+// addFile seals a file into a folder the way an upload leaves one: a session
+// key under the node key, one encrypted block behind a URL, and a manifest the
+// node key signed.
+//
+// It is what makes the second pass answerable here: what a keyword searches is
+// the bytes coming back and being read as text, and nothing short of a real
+// transfer proves that end of it.
+func (d *indexedTree) addFile(t *testing.T, parent *cannedFolder, id, name, mimeType, content string) {
+	t.Helper()
+	child := d.add(t, parent, id, name, protonFile, int64(len(content)))
+	sk, keyPacket, _, err := genFileKeys(child.kr)
+	if err != nil {
+		t.Fatalf("generate file keys: %v", err)
+	}
+	block, _, err := encryptBlock([]byte(content), sk, child.kr, child.kr)
+	if err != nil {
+		t.Fatalf("encrypt the block: %v", err)
+	}
+	hash := sha256.Sum256(block)
+	sig, err := child.kr.SignDetached(pgp.NewPlainMessage(hash[:]))
+	if err != nil {
+		t.Fatalf("sign the manifest: %v", err)
+	}
+	manifest, err := sig.GetArmored()
+	if err != nil {
+		t.Fatalf("armor the manifest signature: %v", err)
+	}
+
+	const revision = "rev-1"
+	d.blocks[id] = block
+	link := parent.children[len(parent.children)-1].(map[string]any)
+	link["MIMEType"] = mimeType
+	link["FileProperties"] = map[string]any{
+		"ContentKeyPacket": keyPacket,
+		"ActiveRevision":   map[string]any{"ID": revision},
+	}
+	d.publish(t, parent)
+	d.doer.routes["GET /drive/shares/"+testShareID+"/links/"+id] =
+		object(t, map[string]any{"Link": link})
+	d.doer.routes["GET /drive/shares/"+testShareID+"/files/"+id+"/revisions/"+revision] =
+		object(t, map[string]any{"Revision": map[string]any{
+			"ManifestSignature": manifest,
+			"Blocks": []any{map[string]any{
+				"Index": 1, "BareURL": d.storage.URL + "/" + id,
+				"Token": "token", "Hash": base64.StdEncoding.EncodeToString(hash[:]),
+			}},
+		}})
 }
 
 // publish is what Proton answers when a folder's children are asked for.
@@ -174,11 +258,27 @@ func (d *indexedTree) indexing(t *testing.T) *indexSession {
 
 func (d *indexedTree) tree(t *testing.T) []Child {
 	t.Helper()
-	items, err := d.s.Walk(t.Context(), d.dc, "/")
+	return d.matching(t, "")
+}
+
+// matching is what a keyword finds, wherever the tree was read from.
+func (d *indexedTree) matching(t *testing.T, keyword string) []Child {
+	t.Helper()
+	items, _, err := d.s.Walk(t.Context(), d.dc, "/", keyword)
 	if err != nil {
 		t.Fatalf("walk: %v", err)
 	}
 	return items
+}
+
+// coverage is what a listing says a keyword was able to read.
+func (d *indexedTree) coverage(t *testing.T, dc *Context) Coverage {
+	t.Helper()
+	_, cover, err := d.s.Walk(t.Context(), dc, "/", "anything")
+	if err != nil {
+		t.Fatalf("walk: %v", err)
+	}
+	return cover
 }
 
 func pathsOf(items []Child) map[string]string {
@@ -301,17 +401,26 @@ func TestAFileAddedAfterTheBuildIsInTheTree(t *testing.T) {
 // A tree that is not the account's own is walked whatever is indexed: the index
 // holds one volume, and answering for another from it would be answering about
 // the wrong tree.
+//
+// A keyword there reads names alone, and the listing is told so rather than
+// left looking like a search of what the files say.
 func TestATreeThatIsNotTheAccountsIsWalked(t *testing.T) {
 	d := newIndexedTree(t)
 	d.build(t)
 
 	elsewhere := *d.dc
 	elsewhere.VolumeID = "another-volume"
-	if _, ok := d.s.indexedTree(t.Context(), &elsewhere, "/"); ok {
+	if _, _, ok := d.s.indexedTree(t.Context(), &elsewhere, "/", nil); ok {
 		t.Error("the index answered for a volume it was not built from")
 	}
-	if _, ok := d.s.indexedTree(t.Context(), nil, "/"); ok {
+	if _, _, ok := d.s.indexedTree(t.Context(), nil, "/", nil); ok {
 		t.Error("the index answered for no tree at all")
+	}
+
+	computer := *d.dc
+	computer.Type = shareTypeDevice
+	if cover := d.coverage(t, &computer); cover.Indexed || !cover.Foreign {
+		t.Errorf("a computer's tree reported %+v, want it named as somewhere the index does not cover", cover)
 	}
 }
 
@@ -493,5 +602,152 @@ func TestWhatALaterReadingDoesNotFindLeavesTheIndex(t *testing.T) {
 	}
 	if _, there := pathsOf(d.tree(t))["notes.txt"]; there {
 		t.Error("a file the account no longer has is still in the tree")
+	}
+}
+
+// ── what a file says ──
+
+// A keyword reads what a file says as well as what it is called, which is the
+// whole point of holding the text: Proton can answer neither.
+//
+// The type is half of it. A file that is not text is not searched for words it
+// does not have, however its bytes happen to read - so the photograph here
+// carries the same phrase as the notes and is not an answer to it.
+func TestAKeywordReadsNamesAndWhatFilesSay(t *testing.T) {
+	d := newIndexedTree(t)
+	d.addFile(t, d.root, "holiday.png", "holiday.png", "image/png", notesText)
+	d.build(t)
+
+	byText := d.matching(t, "parking permit")
+	if len(byText) != 1 || byText[0].LinkID != "notes.txt" {
+		t.Fatalf("a keyword inside a file matched %+v, want notes.txt alone", pathsOf(byText))
+	}
+	byName := d.matching(t, "invoice")
+	if len(byName) != 1 || byName[0].LinkID != "invoice.pdf" {
+		t.Fatalf("a keyword in a name matched %+v, want invoice.pdf alone", pathsOf(byName))
+	}
+	if got := d.matching(t, "glovebox Q1"); len(got) != 0 {
+		t.Errorf("a keyword whose terms are in different items matched %+v, want nothing", pathsOf(got))
+	}
+	if got := d.matching(t, "GLOVEBOX"); len(got) != 1 {
+		t.Errorf("a keyword in another case matched %+v, want the file that says it", pathsOf(got))
+	}
+}
+
+// A listing says how much of the text it searched had been read, so an empty
+// answer from a half-built index cannot be read as "no such file".
+//
+// A file whose transfer failed is what leaves one half-built: it keeps its
+// place in the index, the listing says the answer is short, and the next build
+// asks for it again rather than writing it off.
+func TestAListingSaysHowMuchOfTheTextItRead(t *testing.T) {
+	d := newIndexedTree(t)
+	d.addFile(t, d.root, "recipe.md", "recipe.md", "text/markdown", "salt, flour, water")
+	block := d.blocks["recipe.md"]
+	delete(d.blocks, "recipe.md")
+
+	d.build(t)
+	cover := d.coverage(t, d.dc)
+	if !cover.Indexed || cover.Texts != 2 || cover.Read != 1 {
+		t.Fatalf("coverage = %+v, want the index answering and owing one of two texts", cover)
+	}
+	if !cover.Short() {
+		t.Error("a listing whose texts are not all read says it read them all")
+	}
+	if got := d.matching(t, "flour"); len(got) != 0 {
+		t.Errorf("a keyword matched %+v from a file whose text never arrived", pathsOf(got))
+	}
+
+	d.blocks["recipe.md"] = block
+	d.build(t)
+	if cover := d.coverage(t, d.dc); cover.Read != 2 || cover.Short() {
+		t.Errorf("coverage = %+v, want every text read", cover)
+	}
+	if got := d.matching(t, "flour"); len(got) != 1 {
+		t.Errorf("a keyword matched %+v, want the file whose text arrived on the second run", pathsOf(got))
+	}
+}
+
+// A file the index could not read is held by everything else it says about
+// itself, and counted where a listing of indexes shows it.
+//
+// The alternative is a drive where a file is in a listing and not in a search,
+// which is the shape of a search nobody can trust.
+func TestAFileWhoseBytesAreNotTextIsHeldByItsName(t *testing.T) {
+	d := newIndexedTree(t)
+	// A name and a type that promise text, over bytes that are not: what a
+	// client stored beside the file is whatever it made of the name.
+	d.addFile(t, d.root, "photo.txt", "photo.txt", "text/plain", "\xff\xfe not text at all")
+	got := d.build(t)
+	if got.Unreadable != 1 {
+		t.Errorf("the build = %+v, want the one file whose bytes would not read counted", got)
+	}
+
+	x := d.indexing(t)
+	if st := x.Status(); st.Unreadable != 1 || st.Bodies != st.Texts {
+		t.Errorf("status = %+v, want the file counted as unreadable and nothing still owed", st)
+	}
+	if found := d.matching(t, "photo.txt"); len(found) != 1 {
+		t.Errorf("a keyword matching the name found %+v, want the file itself", pathsOf(found))
+	}
+}
+
+// Which files the second pass owes is the candidate rule, and it is the whole
+// of what a build spends: a file too large, a file in the trash and a file
+// that is not text are not downloaded at all.
+func TestWhatTheIndexOwesAText(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		in   stored
+		want bool
+	}{
+		{
+			name: "a text file",
+			in:   stored{Type: TypeFile, Name: "notes.md", Size: 4200},
+			want: true,
+		},
+		{name: "a folder", in: stored{Type: TypeFolder, Name: "Notes", Size: 0}},
+		{name: "a photograph", in: stored{Type: TypeFile, Name: "holiday.jpg", Size: 4200}},
+		{
+			name: "a text file in the trash",
+			in:   stored{Type: TypeFile, Name: "notes.md", Size: 4200, Trashed: 1700000000},
+		},
+		{
+			name: "more text than the index keeps",
+			in:   stored{Type: TypeFile, Name: "export.csv", Size: maxTextSize + 1},
+		},
+		{
+			name: "as much text as the index keeps",
+			in:   stored{Type: TypeFile, Name: "export.csv", Size: maxTextSize},
+			want: true,
+		},
+		{name: "an empty file", in: stored{Type: TypeFile, Name: "notes.md"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.in.wantsText(); got != tc.want {
+				t.Errorf("wantsText = %v, want %v", got, tc.want)
+			}
+			if tc.want && tc.in.settled() {
+				t.Error("a file whose text is wanted and not held reads as settled")
+			}
+		})
+	}
+}
+
+// A file uploaded over is a different file to search, so the text the index
+// holds for the version before it is not carried across.
+func TestANewVersionOwesItsTextAgain(t *testing.T) {
+	held := stored{
+		LinkID: "notes.txt", Type: TypeFile, Name: "notes.txt", Size: 12,
+		Revision: "rev-1", Text: "the old text", Fetched: true,
+	}
+	same := stored{LinkID: "notes.txt", Type: TypeFile, Name: "notes.txt", Size: 12, Revision: "rev-1"}
+	if got := same.texted(held, true); got.Text != "the old text" || !got.Fetched {
+		t.Errorf("the same version = %+v, want the text the index already holds", got)
+	}
+	newer := stored{LinkID: "notes.txt", Type: TypeFile, Name: "notes.txt", Size: 14, Revision: "rev-2"}
+	got := newer.texted(held, true)
+	if got.Text != "" || got.Fetched || got.settled() {
+		t.Errorf("a new version = %+v, want it owed its text again", got)
 	}
 }

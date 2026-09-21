@@ -296,8 +296,12 @@ func (x *indexSession) dropped(before stored, had bool) {
 
 // counts hands what the run has kept to the state beside the log, which is what
 // `index list` reads and what a search says its answer covers.
+//
+// Every message has a body to fetch, so what the index owes text for is the
+// whole of what it holds.
 func (x *indexSession) counts() {
 	x.log.State.Bodies, x.log.State.Unreadable = x.bodies, x.unreadable
+	x.log.State.Texts = x.log.State.Indexed
 }
 
 // counted reports whether writing this record is worth reporting as indexed.

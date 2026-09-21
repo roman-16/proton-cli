@@ -11,9 +11,11 @@ import (
 
 // What INDEXED says is what a search over that index would reach.
 //
-// A mailbox goes through two states that are not the same answer: still being
-// read, where older mail is missing outright, and read but still downloading
-// bodies, where every message is there and the text of the older ones is not.
+// An app goes through two states that are not the same answer: still being
+// read, where the far end is missing outright, and read but still downloading
+// contents, where everything is there and the text of some of it is not. Every
+// message has a body, so a mailbox names what it holds; a drive holds the text
+// of the files that are text, so it names that out of how many there are.
 func TestTheListSaysHowMuchOfAnAppASearchWouldReach(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -27,18 +29,32 @@ func TestTheListSaysHowMuchOfAnAppASearchWouldReach(t *testing.T) {
 		},
 		{
 			name: "a mailbox whose bodies are still arriving",
-			st:   search.Status{App: search.AppMail, Indexed: 10887, Total: 10887, Bodies: 2830, Complete: true},
+			st: search.Status{App: search.AppMail, Indexed: 10887, Total: 10887,
+				Bodies: 2830, Texts: 10887, Complete: true},
 			want: "10887 messages, 2830 bodies",
 		},
 		{
 			name: "a mailbox that holds everything",
-			st:   search.Status{App: search.AppMail, Indexed: 10887, Total: 10887, Bodies: 10887, Complete: true},
+			st: search.Status{App: search.AppMail, Indexed: 10887, Total: 10887,
+				Bodies: 10887, Texts: 10887, Complete: true},
 			want: "10887 messages",
 		},
 		{
-			name: "an app whose things have no bodies to download",
-			st:   search.Status{App: search.AppDrive, Indexed: 2422, Total: 2422, Complete: true},
-			want: "2422 items",
+			name: "a drive whose file texts are still arriving",
+			st: search.Status{App: search.AppDrive, Indexed: 8120, Total: 8120,
+				Bodies: 512, Texts: 1240, Complete: true},
+			want: "8120 items, 512 of 1240 texts",
+		},
+		{
+			name: "a drive that holds every text it wants",
+			st: search.Status{App: search.AppDrive, Indexed: 8120, Total: 8120,
+				Bodies: 1240, Texts: 1240, Complete: true},
+			want: "8120 items",
+		},
+		{
+			name: "an app whose things have no contents to download",
+			st:   search.Status{App: search.AppCalendar, Indexed: 2422, Total: 2422, Complete: true},
+			want: "2422 events",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

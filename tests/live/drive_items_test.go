@@ -254,6 +254,53 @@ func TestDriveItemsDownloadBehaviors(t *testing.T) {
 	})
 }
 
+// A folder comes back the way it went up: the same tree, the same bytes.
+//
+// Downloading one is not something a `download` of a file can be asked to do
+// by accident, so the refusal without --recursive is half the test - it is
+// what says a mistyped path cannot start a download of somebody's whole drive.
+func TestDriveItemsDownloadsAFolder(t *testing.T) {
+	folder := "/" + testID() + "-dltree"
+	tmp := t.TempDir()
+	tree := filepath.Join(tmp, "tree")
+	if err := os.MkdirAll(filepath.Join(tree, "sub", "deep"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	wrote := map[string]string{
+		"a.txt":          "A",
+		"sub/b.txt":      "B",
+		"sub/deep/d.txt": "D",
+	}
+	for name, content := range wrote {
+		if err := os.WriteFile(filepath.Join(tree, filepath.FromSlash(name)), []byte(content), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	runOK(t, "drive", "items", "create", folder)
+	cleanupRun(t, fmt.Sprintf("Delete folder: proton drive items delete %s", folder),
+		"drive", "items", "delete", folder)
+	runOK(t, "drive", "items", "upload", "--recursive", tree, folder)
+
+	_, stderr, code := run(t, "drive", "items", "download", "--dest-dir", t.TempDir(), folder+"/tree")
+	if code == 0 {
+		t.Error("a folder was downloaded without --recursive")
+	}
+	assertContains(t, stderr, "--recursive")
+
+	into := t.TempDir()
+	runOK(t, "drive", "items", "download", "--recursive", "--dest-dir", into, folder+"/tree")
+	for name, want := range wrote {
+		got, err := os.ReadFile(filepath.Join(into, "tree", filepath.FromSlash(name)))
+		if err != nil {
+			t.Errorf("%s did not land: %v", name, err)
+			continue
+		}
+		if string(got) != want {
+			t.Errorf("%s holds %q, want %q", name, got, want)
+		}
+	}
+}
+
 func TestDriveItemsUploadRecursive(t *testing.T) {
 	folder := "/" + testID() + "-rec"
 	tmp := t.TempDir()

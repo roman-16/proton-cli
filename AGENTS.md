@@ -12,6 +12,8 @@ This is an open-source CLI tool used by other people. All changes should conside
 
 proton-cli mirrors what the **Proton web clients let a user do**, not every endpoint the API exposes. If an action isn't something a user can do in the official web UI, don't add it to the CLI - even when a backend endpoint for it exists. Web-client parity beats API completeness.
 
+The exception is a **local capability over what the user can already fetch**: something that sends no request a command does not already send, changes nothing in the account, and only does more with what has arrived on this machine. Searching the text of Drive files, which no Proton client does, is one - the bytes are the ones `items download` fetches, and what is new is that they are kept and searched here. The rule is about what the CLI asks Proton for, not about what it does with the answer.
+
 ## The changelog is the release button
 
 `CHANGELOG.md` is not documentation about releases, it is what causes them. A version section reaching `main` is a release request: CI passes, the Release workflow reads the newest section, and that version's tag, artifacts and release notes all follow from it. Nearly every merge adds no section and releases nothing.
