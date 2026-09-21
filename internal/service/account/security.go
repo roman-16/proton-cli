@@ -33,8 +33,8 @@ type Security struct {
 // TwoFactor is what the account is asked for at a sign-in beyond its password.
 type TwoFactor struct {
 	AuthenticatorApp bool `json:"authenticator_app"`
-	// SecurityKeys is the keys registered, by the names they were given.
-	SecurityKeys []string `json:"security_keys"`
+	// SecurityKeys is the keys registered, in the order Proton keeps them.
+	SecurityKeys []SecurityKey `json:"security_keys"`
 }
 
 // RecoveryEmail is the address Proton writes to if the account is lost.
@@ -113,7 +113,12 @@ type settings struct {
 	// field would bind to that and fail to decode.
 	TwoFactor struct {
 		Enabled        int
-		RegisteredKeys []struct{ Name string }
+		RegisteredKeys []struct {
+			Name string
+			// CredentialID is the credential the key named itself with, written
+			// as an array of numbers.
+			CredentialID []int
+		}
 	} `json:"2FA"`
 }
 
@@ -140,14 +145,14 @@ func (s *Service) Security(ctx context.Context) (*Security, error) {
 		return nil, err
 	}
 	set := env.UserSettings
-	keyNames := make([]string, 0, len(set.TwoFactor.RegisteredKeys))
+	registered := make([]SecurityKey, 0, len(set.TwoFactor.RegisteredKeys))
 	for _, k := range set.TwoFactor.RegisteredKeys {
-		keyNames = append(keyNames, k.Name)
+		registered = append(registered, SecurityKey{ID: credentialID(k.CredentialID), Name: k.Name})
 	}
 	return &Security{
 		TwoFactor: TwoFactor{
 			AuthenticatorApp: set.TwoFactor.Enabled&twoFactorTOTP != 0,
-			SecurityKeys:     keyNames,
+			SecurityKeys:     registered,
 		},
 		TwoPasswordMode: set.Password.Mode == keys.PasswordModeTwo,
 		RecoveryEmail: RecoveryEmail{

@@ -823,6 +823,8 @@ func TestReauthCommandsAreDeclared(t *testing.T) {
 		"proton account settings second-password disable",
 		"proton account settings second-password enable",
 		"proton account settings second-password set",
+		"proton account settings security-keys create",
+		"proton account settings security-keys delete",
 		"proton account settings two-factor disable",
 		"proton account settings two-factor enable",
 		"proton calendar settings calendars delete",

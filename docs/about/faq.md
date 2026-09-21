@@ -124,7 +124,7 @@ Touch your security key.
 
 On Linux and macOS the key has to be one you plug into USB. On Windows the sign-in goes through Windows Hello, so a key built into the machine works too. A key held in a phone does not: that needs the Bluetooth handoff a browser does.
 
-Registering a key is a browser's job as well, since WebAuthn enrolment has no non-browser form. Add it in Proton's security settings once, and `login` uses it from then on.
+`proton account settings security-keys create` registers one, and asks you to touch it. It registers a key you plug in; a built-in authenticator or a passkey in a phone is added in Proton's security settings. See [Register a security key](../account/README.md#register-a-security-key).
 
 If the account also has an authenticator app, a code is asked for and pressing Enter reaches for the key instead. A touch needs you there, so unattended jobs still want `--totp` - or better, a session you signed in once and left in place.
 

@@ -177,7 +177,7 @@ func (c *Client) answerSecondFactor(ctx context.Context) func(twoFA) (map[string
 		if t.Enabled == 0 {
 			return nil, nil
 		}
-		offer := t.offer(c.host())
+		offer := t.offer(c.Host())
 		if !offer.TOTP && offer.SecurityKey == nil {
 			return nil, errs.Problemf("This account uses a two-factor method proton does not support (0x%x).",
 				t.Enabled).Exit(2)

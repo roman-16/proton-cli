@@ -4,7 +4,7 @@ Account-wide preferences.
 
 Every command under `proton account settings`, with the arguments and flags it takes. For these commands in use, see [the account guide](README.md).
 
-Holds `get`, `list`, `password`, `recovery-email`, `recovery-phone`, `recovery-phrase`, `second-password`, `set` and `two-factor`.
+Holds `get`, `list`, `password`, `recovery-email`, `recovery-phone`, `recovery-phrase`, `second-password`, `security-keys`, `set` and `two-factor`.
 
 ## `get`
 
@@ -406,6 +406,102 @@ proton account settings second-password set --password-file /run/secrets/proton 
 | `--password-file string` | Read the account password from a file, or - for stdin |
 | `--totp string` | Two-factor code |
 
+## `security-keys`
+
+The security keys this account signs in with.
+
+A key is one you plug in. Registering it asks you to touch it, so it takes somebody at the machine; a built-in authenticator and a passkey held in a phone are registered at https://account.proton.me instead.
+
+An account may have four. Registering the first one makes a key part of every sign-in, and removing the last one ends that.
+
+Holds `create`, `delete`, `list` and `update`.
+
+### `security-keys create`
+
+Register a security key with the account.
+
+Your password is asked for, then the key: plug it in and touch it, and give its PIN if it has one. A key already registered here is refused by the key itself.
+
+--name is required and is what the key is listed under. An account may have four keys, and from the first one a key is asked for at every sign-in.
+
+With no terminal to ask, pass --password-file, which takes - for stdin. The touch still needs you there.
+
+```
+proton account settings security-keys create
+```
+
+```bash
+proton account settings security-keys create --name "YubiKey 5C"
+proton account settings security-keys create --name "Spare key" --password-file /run/secrets/proton
+```
+
+| Flag | Description |
+| --- | --- |
+| `--name string` | Name for the new security key |
+| `--password-file string` | Read the account password from a file, or - for stdin |
+| `--totp string` | Two-factor code |
+
+### `security-keys delete`
+
+Remove a security key from the account.
+
+The key stops signing in here and keeps the credential it made, which only its own manufacturer's tool clears. Removing the last one stops a key being asked for at all.
+
+Asks for your password even when you are signed in. With no terminal to ask, pass --password-file, which takes - for stdin.
+
+```
+proton account settings security-keys delete REF
+```
+
+```bash
+proton account settings security-keys delete "Key in the safe"
+proton account settings security-keys delete 5bH2mQxK --yes --password-file /run/secrets/proton
+```
+
+| Flag | Description |
+| --- | --- |
+| `--password-file string` | Read the account password from a file, or - for stdin |
+| `--totp string` | Two-factor code |
+
+### `security-keys list`
+
+List the security keys registered with the account.
+
+The ID is what `update` and `delete` take, and a key's name works in place of it.
+
+```
+proton account settings security-keys list
+```
+
+```bash
+proton account settings security-keys list
+```
+
+| Flag | Description |
+| --- | --- |
+| `--desc` | Reverse the order |
+| `--limit int` | How many security keys per page; 0 for all of them |
+| `--page int` | Which page of results, counting from zero |
+| `--sort string` | Order by: name (default `name`) |
+
+### `security-keys update`
+
+Rename a security key.
+
+The name is how you tell your keys apart and is all that changes: the key signs in exactly as it did.
+
+```
+proton account settings security-keys update REF
+```
+
+```bash
+proton account settings security-keys update "Spare key" --name "Key in the safe"
+```
+
+| Flag | Description |
+| --- | --- |
+| `--name string` | New name for the security key |
+
 ## `set`
 
 Change one account setting.
@@ -455,7 +551,7 @@ A secret is printed and you are asked for a code from it. With --totp CODE the c
 
 Recovery codes are printed once as it turns on. Each signs you in a single time if you lose the app.
 
-Security keys are registered at https://account.proton.me.
+Security keys are registered with `proton account settings security-keys create`.
 
 ```
 proton account settings two-factor enable

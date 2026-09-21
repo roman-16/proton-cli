@@ -52,7 +52,7 @@ func TestSecurityReadsWhatTheAccountIsProtectedWith(t *testing.T) {
 		"Password": {"Mode": 2},
 		"Mnemonic": {"UpdateTime": 1776000000},
 		"HighSecurity": {"Value": 1},
-		"2FA": {"Enabled": 3, "RegisteredKeys": [{"Name": "the yubikey"}]}
+		"2FA": {"Enabled": 3, "RegisteredKeys": [{"Name": "the yubikey", "CredentialID": [255, 239, 191]}]}
 	}`, `{"MnemonicStatus": 3}`)
 
 	got, err := New(a).Security(context.Background())
@@ -60,7 +60,9 @@ func TestSecurityReadsWhatTheAccountIsProtectedWith(t *testing.T) {
 		t.Fatalf("Security: %v", err)
 	}
 	want := Security{
-		TwoFactor:       TwoFactor{AuthenticatorApp: true, SecurityKeys: []string{"the yubikey"}},
+		TwoFactor: TwoFactor{AuthenticatorApp: true, SecurityKeys: []SecurityKey{
+			{ID: "_--_", Name: "the yubikey"},
+		}},
 		TwoPasswordMode: true,
 		RecoveryEmail:   RecoveryEmail{Address: "jane.roe@example.com", Verified: true, AllowRecovery: true},
 		RecoveryPhone:   RecoveryPhone{Number: "+43 660 1234567"},

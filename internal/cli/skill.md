@@ -79,6 +79,8 @@ A bulk verb acts on at most `--limit` things, 150 by default; `--limit 0` lifts 
 
 Secrets go in the same way they come out. `pass items create` and `pass items update` read them from `--secret-file NAME=FILE`, never from a flag value, because a flag value is in the shell history; `-` as the file reads standard input. The commands that change a credential read it from `--password-file` and `--new-password-file` the same way.
 
+`{{.Program}} account settings security-keys create` cannot be run on somebody's behalf whatever it is handed: it waits for a person to touch the key in front of them.
+
 ## Exit codes
 
 | Code | What happened | What to do |

@@ -147,7 +147,7 @@ proton mail messages list --output yaml
 { "type": "file", "state": "active", "unread": true }
 ```
 
-Keys are `snake_case`. Timestamps are `<verb>_time` in Unix seconds. Sizes are `size` in bytes. IDs are always complete.
+Keys are `snake_case`, the collection's own key included: a listing of watched addresses is `watched_addresses`. Timestamps are `<verb>_time` in Unix seconds. Sizes are `size` in bytes. IDs are always complete.
 
 **Times come back in the zone you are working in** - `--zone`, or `TZ`, or `zone:` in your [config](settings.md), or your system's. An event's `start` and `end` are RFC 3339 with that offset, and the zone the event is anchored to is its own field:
 

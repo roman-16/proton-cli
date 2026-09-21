@@ -58,6 +58,18 @@ var unreachable = map[string]string{
 	"POST /auth/v4/sessions": "only a first sign-in creates one, and no test signs out to force another",
 	"POST /core/v4/auth/2fa": "only a sign-in answers a second factor there, and no test signs in from nothing",
 
+	// Everything about registering a security key. Reaching any of the four means
+	// holding the ceremony, and the ceremony is a person touching a key: a run on
+	// a machine with one plugged in would block until somebody did, and if
+	// somebody did it would enrol their key on a test account for good. A key that
+	// is not plugged in fails before the request. So what is tested is the listing,
+	// the preview, and every refusal that comes before the network; the ceremony
+	// itself is covered offline, against a key made of software.
+	"GET /core/v4/settings/2fa/register":     "registering a key is a person touching one, which no run can do or should",
+	"POST /core/v4/settings/2fa/register":    "the same: there is nothing to hand back without a key somebody touched",
+	"PUT /core/v4/settings/2fa/{id}/rename":  "renaming needs a registered key, and no run may register one",
+	"POST /core/v4/settings/2fa/{id}/remove": "removing needs a registered key, and removing somebody's real one is worse",
+
 	// The organization's key, asked about only when an administrator changes a
 	// password - to refuse the change if that key is locked with it. The one test
 	// account with an organization is somebody's own, and it refuses every

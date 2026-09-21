@@ -69,6 +69,8 @@ The key has to be one you plug in. On Windows the sign-in goes through Windows H
 
 A passkey living in a phone does not work. Sign in with a code instead.
 
+Registering a key is [Register a security key](#register-a-security-key).
+
 **On Linux, a key needs udev rules** to be readable by anyone but root. Every distribution ships them with `libfido2` or its own FIDO package. See [Troubleshooting](../help/troubleshooting.md#a-security-key-that-nothing-finds).
 
 ### Two-password mode
@@ -131,6 +133,7 @@ These commands ask for your password again even when you are signed in:
 - `account settings recovery-phone set` · `account settings recovery-phone enable` · `account settings recovery-phone disable`
 - `account settings recovery-phrase set` · `account settings recovery-phrase disable`
 - `account settings second-password set` · `account settings second-password disable`
+- `account settings security-keys create` · `account settings security-keys delete`
 - `account settings two-factor enable` · `account settings two-factor disable`
 - `calendar settings calendars delete`
 - `mail messages update`
@@ -380,7 +383,49 @@ proton account settings two-factor enable --totp 123456 --password-file /run/sec
 
 `proton account settings two-factor disable` turns it off again, asking for your password and a current code. A recovery code works in place of the code.
 
-Security keys are registered at [account.proton.me](https://account.proton.me). `get` lists the ones you have, and a key goes on being asked for after the authenticator app is turned off.
+A registered security key goes on being asked for after the authenticator app is turned off.
+
+## Register a security key
+
+```console
+$ proton account settings security-keys create --name "YubiKey 5C"
+Password:
+Touch your security key.
+Security key PIN:
+✓ Created security key "YubiKey 5C" - a key is asked for at every sign-in.
+```
+
+The PIN is asked for only by a key that has one. On Windows the prompt comes from Windows itself.
+
+The key has to be one you plug in. A built-in authenticator - Windows Hello, Touch ID, a machine's own secure element - and a passkey held in a phone are registered at [account.proton.me](https://account.proton.me).
+
+An account may have four keys. From the first one, a key is asked for at every sign-in.
+
+```console
+$ proton account settings security-keys list
+ID        NAME
+────────  ──────────
+5bH2mQxK  YubiKey 5C
+9xL4pQrT  Spare key
+2 security keys.
+```
+
+Rename one with `update`, which asks for nothing else:
+
+```bash
+proton account settings security-keys update "Spare key" --name "Key in the safe"
+```
+
+`delete` takes a key off the account and asks for your password:
+
+```console
+$ proton account settings security-keys delete "Key in the safe"
+Would delete security key "Key in the safe". This cannot be undone. Continue? [y/N] y
+Password:
+✓ Deleted security key "Key in the safe".
+```
+
+Removing the last one stops a key being asked for at sign-in. The credential stays on the key itself, where only its manufacturer's own tool clears it.
 
 ## Set a recovery email or phone
 

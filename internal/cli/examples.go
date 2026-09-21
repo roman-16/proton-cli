@@ -100,7 +100,19 @@ var examples = map[string][]string{
 		"proton account settings second-password set --password-file /run/secrets/proton --new-password-file /run/secrets/proton-second",
 	},
 	"proton account settings second-password disable": {"proton account settings second-password disable"},
-	"proton account settings two-factor get":          {"proton account settings two-factor get"},
+	"proton account settings security-keys list":      {"proton account settings security-keys list"},
+	"proton account settings security-keys create": {
+		`proton account settings security-keys create --name "YubiKey 5C"`,
+		`proton account settings security-keys create --name "Spare key" --password-file /run/secrets/proton`,
+	},
+	"proton account settings security-keys update": {
+		`proton account settings security-keys update "Spare key" --name "Key in the safe"`,
+	},
+	"proton account settings security-keys delete": {
+		`proton account settings security-keys delete "Key in the safe"`,
+		`proton account settings security-keys delete 5bH2mQxK --yes --password-file /run/secrets/proton`,
+	},
+	"proton account settings two-factor get": {"proton account settings two-factor get"},
 	"proton account settings two-factor generate": {
 		"proton account settings two-factor generate",
 		"proton account settings two-factor generate --output json",

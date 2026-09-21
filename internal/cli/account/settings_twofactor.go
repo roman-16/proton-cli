@@ -10,18 +10,24 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// The second factor: a code from an authenticator app, and the security keys
-// Proton's own settings register.
+// The second factor: a code from an authenticator app, and what the security
+// keys beside it amount to.
 //
 // Turning the app on is two steps with a person in between - a secret to put
 // somewhere that can compute codes, then a code proving it arrived - so it is
 // offered as one command that does both and as two that can be scripted.
+//
+// The keys themselves are a collection with verbs of its own, next door under
+// `security-keys`. What belongs here is the one thing this command answers:
+// what a sign-in will ask for.
 
 // secretGroup is how many characters of a secret are printed together, which is
 // how Proton's own screen breaks it up for somebody typing it into a phone.
 const secretGroup = 4
 
-// twoFactorView is what `two-factor get` answers.
+// twoFactorView is what `two-factor get` answers. The keys are named rather
+// than counted, and nothing else about them is here: `security-keys list` is
+// where one is addressed.
 type twoFactorView struct {
 	AuthenticatorApp string   `json:"authenticator_app"`
 	SecurityKeys     []string `json:"security_keys"`
@@ -59,7 +65,7 @@ func twoFactorGetCmd() *cobra.Command {
 			}
 			view := twoFactorView{
 				AuthenticatorApp: kit.OnOffText(boolInt(security.TwoFactor.AuthenticatorApp)),
-				SecurityKeys:     security.TwoFactor.SecurityKeys,
+				SecurityKeys:     securityKeyNames(security.TwoFactor.SecurityKeys),
 			}
 			return kit.Show(c, ui.RecordSpec{
 				Object: view,
@@ -113,7 +119,8 @@ func twoFactorEnableCmd() *cobra.Command {
 			"which is how this runs with nobody to ask.\n\n" +
 			"Recovery codes are printed once as it turns on. Each signs you in a single\n" +
 			"time if you lose the app.\n\n" +
-			"Security keys are registered at https://account.proton.me.",
+			"Security keys are registered with `" + kit.Program +
+			" account settings security-keys create`.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			if err := reauth.Supply(c); err != nil {
 				return err
@@ -260,6 +267,17 @@ func grouped(secret string) string {
 		b.WriteRune(r)
 	}
 	return b.String()
+}
+
+// securityKeyNames is the registered keys as this command reports them. What
+// `two-factor get` answers is what a sign-in will ask for, and a name is the
+// whole of what that takes.
+func securityKeyNames(keys []acctsvc.SecurityKey) []string {
+	out := make([]string, 0, len(keys))
+	for _, k := range keys {
+		out = append(out, k.Name)
+	}
+	return out
 }
 
 // names is a list of things as a record shows it, and the word for none of

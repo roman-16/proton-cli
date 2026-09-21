@@ -221,6 +221,7 @@ var SettingsPages = map[string]string{
 	"account settings recovery-phone":  "Recovery",
 	"account settings recovery-phrase": "Recovery",
 	"account settings second-password": "Account and password",
+	"account settings security-keys":   "Account and password",
 	"account settings two-factor":      "Account and password",
 	"calendar settings calendars":      "Calendars",
 	"mail settings addresses":          "Identity and addresses",

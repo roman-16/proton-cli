@@ -202,7 +202,7 @@ func (c *Client) Login(ctx context.Context, username string, password []byte) er
 	if auth.TwoFA.Enabled == 0 {
 		return nil
 	}
-	offer := auth.TwoFA.offer(c.host())
+	offer := auth.TwoFA.offer(c.Host())
 	if !offer.TOTP && offer.SecurityKey == nil {
 		return errs.Problemf("This account uses a two-factor method proton does not support (0x%x).",
 			auth.TwoFA.Enabled).Exit(2)
@@ -221,9 +221,9 @@ func (c *Client) Login(ctx context.Context, username string, password []byte) er
 	return nil
 }
 
-// host is the machine the API answers on, which is the only relying party a
+// Host is the machine the API answers on, which is the only relying party a
 // security key may be asked about.
-func (c *Client) host() string {
+func (c *Client) Host() string {
 	u, err := url.Parse(c.base)
 	if err != nil {
 		return ""

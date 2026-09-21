@@ -83,6 +83,7 @@ These are the listings that can be narrowed, and what narrows them. The same fla
 - `proton pass vaults list --desc --limit int --page int --sort string`
 - `proton account profiles list --desc --limit int --page int --sort string`
 - `proton account sessions list --desc --limit int --page int --sort string`
+- `proton account settings security-keys list --desc --limit int --page int --sort string`
 
 Mail looks in the inbox unless told otherwise, and `--folder all` is what a question about "my mail" usually means.
 
@@ -129,6 +130,8 @@ A bulk verb acts on at most `--limit` things, 150 by default; `--limit 0` lifts 
 `proton pass items get` and `proton pass items totp` print secrets in full. So do `proton account settings two-factor generate` and `proton account settings recovery-phrase set`, which print a two-factor secret and twelve recovery words that are shown once and kept nowhere.
 
 Secrets go in the same way they come out. `pass items create` and `pass items update` read them from `--secret-file NAME=FILE`, never from a flag value, because a flag value is in the shell history; `-` as the file reads standard input. The commands that change a credential read it from `--password-file` and `--new-password-file` the same way.
+
+`proton account settings security-keys create` cannot be run on somebody's behalf whatever it is handed: it waits for a person to touch the key in front of them.
 
 ## Exit codes
 
@@ -234,6 +237,7 @@ One line per group, with the verbs under it. Arguments, flags and examples are i
 - `proton account settings recovery-phone` - The number Proton texts if you lose access: disable, enable, get, set, verify
 - `proton account settings recovery-phrase` - The twelve words that open your account without your password: disable, get, set
 - `proton account settings second-password` - The second password your keys can be locked with: disable, enable, get, set
+- `proton account settings security-keys` - The security keys this account signs in with: create, delete, list, update
 - `proton account settings two-factor` - What you are asked for at sign-in besides your password: disable, enable, generate, get
 
 ### index - An encrypted, searchable copy of your mail, files and events on this machine

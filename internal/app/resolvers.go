@@ -2,11 +2,13 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/fido"
 	"github.com/roman-16/proton-cli/internal/proton"
+	"github.com/roman-16/proton-cli/internal/service/account"
 )
 
 // The transport has exactly three reasons to need something from a person:
@@ -102,35 +104,89 @@ func (a *App) securityKey(ctx context.Context, req proton.SecurityKeyRequest) (p
 	}}, nil
 }
 
+// AttestSecurityKey has a key make a credential for the account, and turns
+// whatever it ran into into a sentence about what to do next.
+//
+// It is the registering half of what securityKey does for a sign-in, and it is
+// here for the same reason: the ceremony needs somebody to touch a key and tell
+// a PIN, and which relying party may be asked is the client's to say.
+func (a *App) AttestSecurityKey(ctx context.Context, challenge json.RawMessage) (account.SecurityKeyCredential, error) {
+	attestation, err := fido.Register(ctx, fido.Request{Options: challenge, Host: a.API.Host()}, fido.Prompts{
+		Touch: a.UI.Instruct,
+		PIN:   a.Creds.SecurityKeyPIN,
+	})
+	if err != nil {
+		return account.SecurityKeyCredential{}, registrationProblem(err)
+	}
+	return account.SecurityKeyCredential{
+		ID:                account.SecurityKeyID(attestation.CredentialID),
+		ClientData:        attestation.ClientData,
+		AttestationObject: attestation.AttestationObject,
+		Transports:        attestation.Transports,
+	}, nil
+}
+
 // keyProblem says what a key refused to do and what would get past it. Every one
 // of these ends a sign-in, so each exits 2 the way a wrong password does.
 func keyProblem(err error) error {
 	switch {
-	case errors.Is(err, fido.ErrNoDevice):
-		return errs.Problemf("No security key is connected to this machine.").
-			Hint("plug in the key you registered with Proton and run this again").Exit(2)
-	case errors.Is(err, fido.ErrPermission):
-		return errs.Problemf("A security key is connected but proton cannot open it.").
-			Hint("install the udev rules for FIDO devices (the libfido2 package ships them),",
-				"then unplug the key and plug it in again").Exit(2)
 	case errors.Is(err, fido.ErrNoCredential):
 		return errs.Problemf("This security key is not one this account is registered with.").
-			Hint("try the key you registered at https://account.proton.me/mail/account-password").Exit(2)
-	case errors.Is(err, fido.ErrDenied):
-		return errs.Problemf("The security key was not used in time.").
-			Hint("run this again and touch the key when it lights up").Exit(2)
+			Hint("try the key you registered with Proton").Exit(2)
 	case errors.Is(err, fido.ErrPINRequired):
 		return errs.Problemf("This security key asks for its PIN, and there is nobody here to ask.").
 			Hint("run this in a terminal, or sign in with --totp instead").Exit(2)
-	case errors.Is(err, fido.ErrPINWrong):
-		return errs.Problemf("That is not the PIN of this security key.").
-			Hint("run this again - a key locks itself after a few wrong PINs").Exit(2)
 	case errors.Is(err, fido.ErrPINBlocked):
 		return errs.Problemf("This security key has locked itself after too many wrong PINs.").
 			Hint("reset it with its manufacturer's own tool, or sign in with --totp").Exit(2)
 	case errors.Is(err, fido.ErrUnsupported):
 		return errs.Problemf("This build cannot reach a security key on this machine.").
 			Hint("sign in with --totp, or install proton from a release rather than with go install").Exit(2)
+	}
+	return reachingKey(err)
+}
+
+// registrationProblem is the same for the ceremony that makes a credential. The
+// key is in the same states and refuses in the same ways; what differs is what
+// there is to suggest, because a code from an authenticator app is not another
+// way of doing this one.
+func registrationProblem(err error) error {
+	switch {
+	case errors.Is(err, fido.ErrRegistered):
+		return errs.Problemf("This security key is already registered with the account.").
+			Hint("proton account settings security-keys list shows the keys it has").Exit(2)
+	case errors.Is(err, fido.ErrPINRequired):
+		return errs.Problemf("This security key asks for its PIN, and there is nobody here to ask.").
+			Hint("run this in a terminal - registering a key takes somebody at the machine").Exit(2)
+	case errors.Is(err, fido.ErrPINBlocked):
+		return errs.Problemf("This security key has locked itself after too many wrong PINs.").
+			Hint("reset it with its manufacturer's own tool, which clears everything on it").Exit(2)
+	case errors.Is(err, fido.ErrUnsupported):
+		return errs.Problemf("This build cannot reach a security key on this machine.").
+			Hint("install proton from a release rather than with go install,",
+				"or register the key at https://account.proton.me").Exit(2)
+	}
+	return reachingKey(err)
+}
+
+// reachingKey is what both ceremonies say about the states a key can be in
+// before it has been asked anything, where there is nothing to suggest that
+// depends on what it was going to be asked.
+func reachingKey(err error) error {
+	switch {
+	case errors.Is(err, fido.ErrNoDevice):
+		return errs.Problemf("No security key is connected to this machine.").
+			Hint("plug the key in and run this again").Exit(2)
+	case errors.Is(err, fido.ErrPermission):
+		return errs.Problemf("A security key is connected but proton cannot open it.").
+			Hint("install the udev rules for FIDO devices (the libfido2 package ships them),",
+				"then unplug the key and plug it in again").Exit(2)
+	case errors.Is(err, fido.ErrDenied):
+		return errs.Problemf("The security key was not used in time.").
+			Hint("run this again and touch the key when it lights up").Exit(2)
+	case errors.Is(err, fido.ErrPINWrong):
+		return errs.Problemf("That is not the PIN of this security key.").
+			Hint("run this again - a key locks itself after a few wrong PINs").Exit(2)
 	}
 	return err
 }

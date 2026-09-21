@@ -38,6 +38,10 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton account settings second-password enable`](../account/settings.md#second-password-enable) | Lock your keys with a second password |
 | [`proton account settings second-password get`](../account/settings.md#second-password-get) | Show whether this account uses two-password mode |
 | [`proton account settings second-password set`](../account/settings.md#second-password-set) | Change your second password |
+| [`proton account settings security-keys create`](../account/settings.md#security-keys-create) | Register a security key with the account |
+| [`proton account settings security-keys delete`](../account/settings.md#security-keys-delete) | Remove a security key from the account |
+| [`proton account settings security-keys list`](../account/settings.md#security-keys-list) | List the security keys registered with the account |
+| [`proton account settings security-keys update`](../account/settings.md#security-keys-update) | Rename a security key |
 | [`proton account settings set`](../account/settings.md#set) | Change one account setting |
 | [`proton account settings two-factor disable`](../account/settings.md#two-factor-disable) | Stop asking for an authenticator app code |
 | [`proton account settings two-factor enable`](../account/settings.md#two-factor-enable) | Ask for an authenticator app code at every sign-in |

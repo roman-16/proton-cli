@@ -169,7 +169,7 @@ func settingsCmd() *cobra.Command {
 		})
 	})
 	c.AddCommand(passwordCmd(), recoveryEmailCmd(), recoveryPhoneCmd(), recoveryPhraseCmd(),
-		secondPasswordCmd(), twoFactorCmd())
+		secondPasswordCmd(), securityKeysCmd(), twoFactorCmd())
 	return c
 }
 

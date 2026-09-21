@@ -83,6 +83,16 @@ func Listing(names []string) string {
 	return strings.Join(names[:len(names)-1], ", ") + " and " + names[len(names)-1]
 }
 
+// Key is a collection's noun as a machine format writes it, which is the noun
+// with its spaces closed up.
+//
+// A noun is written for a person to read - "security keys", "watched addresses"
+// - and a key is written for a program to reach: every other key in an envelope
+// is snake_case, and one with a space in it is the only one a caller cannot
+// write as `.count` or `.messages[]`. Most nouns are a single word and come
+// through unchanged.
+func Key(noun string) string { return strings.ReplaceAll(noun, " ", "_") }
+
 // Singular derives the singular of a collection noun. Collection names in this
 // CLI are ordinary English plurals, so three suffix rules cover all of them:
 // "addresses"/"aliases" lose "es", "entries"/"bodies" trade "ies" for "y", and

@@ -53,8 +53,9 @@ func (c Column[T]) role(row T) Role {
 // TableSpec describes a collection: the columns to draw, and the facts the
 // footer and the JSON envelope need.
 type TableSpec[T any] struct {
-	// Noun is the collection's plural name. It is the JSON envelope key and the
-	// word the footer uses, so the two can never disagree.
+	// Noun is the collection's plural name. The footer says it as it is written
+	// and the JSON envelope keys the rows under Key of it, so the two can never
+	// disagree about which collection was listed.
 	Noun    string
 	Columns []Column[T]
 
@@ -123,8 +124,8 @@ func envelope[T any](spec TableSpec[T], items []T) map[string]any {
 		rows = spec.Rows
 	}
 	env := map[string]any{
-		spec.Noun: rows,
-		"count":   len(items),
+		Key(spec.Noun): rows,
+		"count":        len(items),
 	}
 	if spec.Total != Unknown {
 		env["total"] = spec.Total

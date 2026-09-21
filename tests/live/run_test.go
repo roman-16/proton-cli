@@ -88,6 +88,8 @@ var reauthCommands = [][]string{
 	{"account", "settings", "second-password", "disable"},
 	{"account", "settings", "second-password", "enable"},
 	{"account", "settings", "second-password", "set"},
+	{"account", "settings", "security-keys", "create"},
+	{"account", "settings", "security-keys", "delete"},
 	{"account", "settings", "two-factor", "disable"},
 	{"account", "settings", "two-factor", "enable"},
 	{"calendar", "settings", "calendars", "delete"},

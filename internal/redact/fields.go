@@ -41,6 +41,7 @@ var Fields = map[string]Policy{
 	"error":     Text,   // the chain of what was being attempted, and what stopped it
 	"duration":  Keep,   // how long the run took, in milliseconds
 	"reason":    Keep,   // one of a fixed set of words, declared where it is raised
+	"format":    Keep,   // an attestation statement format, from WebAuthn's closed set
 	"kind":      Keep,   // the singular noun for what a skip was about
 	"ref":       Handle, // the thing a skip was about, whatever kind it is
 	"path":      Route,  // an API path

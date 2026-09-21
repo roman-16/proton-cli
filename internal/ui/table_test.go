@@ -171,6 +171,34 @@ func TestTableEnvelope(t *testing.T) {
 	check(t, "table_envelope_json", out, errb)
 }
 
+// A collection whose name is two words is still one key a caller can reach:
+// the footer says "2 security keys." and the envelope answers to
+// `.security_keys[]`.
+func TestTableEnvelopeKeysAMultiWordNounAsOneWord(t *testing.T) {
+	u, out, _ := fixture(t, Options{Format: FormatJSON})
+	spec := TableSpec[message]{
+		Noun: "security keys", Columns: messageColumns()[:1],
+		Total: Unknown, Page: Unpaged,
+	}
+	if err := Table(u, spec, messages()[:1]); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), `"security_keys"`) {
+		t.Errorf("envelope is not keyed by one word: %s", out.String())
+	}
+	if strings.Contains(out.String(), `"security keys"`) {
+		t.Errorf("envelope carries a key with a space in it: %s", out.String())
+	}
+
+	text, _, footer := fixture(t, Options{})
+	if err := Table(text, spec, messages()[:1]); err != nil {
+		t.Fatal(err)
+	}
+	if got := footer.String(); !strings.Contains(got, "1 security key.") {
+		t.Errorf("footer = %q, want the noun as a person reads it", got)
+	}
+}
+
 // An unpaginated collection omits the pagination fields rather than reporting
 // them as zero, so a consumer can tell "page 0" from "not paginated".
 func TestTableEnvelopeUnpaginated(t *testing.T) {
