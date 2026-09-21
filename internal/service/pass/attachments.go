@@ -612,7 +612,16 @@ type Limits struct {
 	// Vaults is how many vaults the plan allows. A plan with no limit reports
 	// none, which is what a paid one has.
 	Vaults *int
+	// Free says the account is on the plan that costs nothing, which is the one
+	// Pass keeps access tokens from.
+	Free bool
+	// AliasDomains says whether the account may bring a domain of its own for
+	// aliases to be made on.
+	AliasDomains bool
 }
+
+// freePlan is how Proton names the plan that costs nothing.
+const freePlan = "free"
 
 // StorageLimits reads what the account's plan allows of attachments.
 //
@@ -632,6 +641,8 @@ func (s *Service) Limits(ctx context.Context) (*Limits, error) {
 	var r struct {
 		Access struct {
 			Plan struct {
+				Type               string
+				ManageAlias        bool
 				StorageAllowed     bool
 				StorageMaxFileSize int64
 				StorageUsed        int64
@@ -653,7 +664,9 @@ func (s *Service) Limits(ctx context.Context) (*Limits, error) {
 			Used:        plan.StorageUsed,
 			Quota:       plan.StorageQuota,
 		},
-		Vaults: plan.VaultLimit,
+		Vaults:       plan.VaultLimit,
+		Free:         plan.Type == freePlan,
+		AliasDomains: plan.ManageAlias,
 	}, nil
 }
 

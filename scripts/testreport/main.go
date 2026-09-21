@@ -282,8 +282,10 @@ var opaque = regexp.MustCompile(`^[A-Za-z0-9_=-]{20,}$`)
 // Guessing from the characters cannot work: an invitation ID is twenty-two of
 // them and about one in a hundred is all letters, so the words are named instead.
 var words = map[string]bool{
-	"checkAvailableHashes": true,
-	"external-invitations": true,
+	"checkAvailableHashes":  true,
+	"default_alias_domain":  true,
+	"external-invitations":  true,
+	"personal-access-token": true,
 }
 
 // holders are the segments whose next segment names a thing rather than

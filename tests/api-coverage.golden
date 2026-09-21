@@ -1,3 +1,4 @@
+DELETE /account/v4/personal-access-token/{id}
 DELETE /calendar/v1/{id}
 DELETE /calendar/v1/{id}/invitations/{id}
 DELETE /calendar/v1/{id}/members/{id}
@@ -19,6 +20,7 @@ DELETE /mail/v4/forwardings/{id}
 DELETE /mail/v4/messages/empty
 DELETE /pass/v1/breach/custom_email/{id}
 DELETE /pass/v1/invite/{id}
+DELETE /pass/v1/personal-access-token/{id}/access/{id}
 DELETE /pass/v1/public_link/{id}
 DELETE /pass/v1/share/{id}/alias/{id}/contact/{n}
 DELETE /pass/v1/share/{id}/invite/new_user/{id}
@@ -26,9 +28,11 @@ DELETE /pass/v1/share/{id}/invite/{id}
 DELETE /pass/v1/share/{id}/item
 DELETE /pass/v1/share/{id}/item/{id}/pin
 DELETE /pass/v1/share/{id}/user/{id}
+DELETE /pass/v1/user/alias/custom_domain/{n}
 DELETE /pass/v1/user/alias/mailbox/{n}
 DELETE /pass/v1/user/srp
 DELETE /pass/v1/vault/{id}
+GET /account/v4/personal-access-token
 GET /auth/v4/sessions
 GET /auth/v4/sessions/local/key
 GET /calendar/v1
@@ -103,6 +107,8 @@ GET /mail/v4/settings
 GET /pass/v1/breach
 GET /pass/v1/breach/address/{id}/breaches
 GET /pass/v1/invite
+GET /pass/v1/pat/monitor/{id}
+GET /pass/v1/personal-access-token/{id}/access
 GET /pass/v1/public_link
 GET /pass/v1/share
 GET /pass/v1/share/{id}/alias/options
@@ -122,11 +128,13 @@ GET /pass/v1/share/{id}/key
 GET /pass/v1/share/{id}/user
 GET /pass/v1/share/{id}/user/item/{id}
 GET /pass/v1/user/access
+GET /pass/v1/user/alias/custom_domain
 GET /pass/v1/user/alias/domain
 GET /pass/v1/user/alias/mailbox
 GET /pass/v1/user/srp
 GET /pass/v1/user/srp/info
 GET /settings/calendar
+POST /account/v4/personal-access-token
 POST /calendar/v1
 POST /calendar/v1/subscription/validate
 POST /calendar/v1/{id}/keys
@@ -181,6 +189,7 @@ POST /pass/v1/breach/custom_email
 POST /pass/v1/file
 POST /pass/v1/file/{id}/chunk
 POST /pass/v1/invite/{id}
+POST /pass/v1/personal-access-token/{id}/access
 POST /pass/v1/share/{id}/alias/custom
 POST /pass/v1/share/{id}/alias/{id}/contact
 POST /pass/v1/share/{id}/alias/{id}/mailbox
@@ -194,6 +203,8 @@ POST /pass/v1/share/{id}/item/{id}/file/{id}/restore
 POST /pass/v1/share/{id}/item/{id}/link_files
 POST /pass/v1/share/{id}/item/{id}/pin
 POST /pass/v1/share/{id}/item/{id}/public_link
+POST /pass/v1/user/alias/custom_domain
+POST /pass/v1/user/alias/custom_domain/{n}
 POST /pass/v1/user/alias/mailbox
 POST /pass/v1/user/srp
 POST /pass/v1/user/srp/auth
@@ -275,6 +286,7 @@ PUT /pass/v1/share/{id}/item/{id}
 PUT /pass/v1/share/{id}/item/{id}/file/{id}/metadata
 PUT /pass/v1/share/{id}/item/{id}/flags
 PUT /pass/v1/share/{id}/user/{id}
+PUT /pass/v1/user/alias/settings/default_alias_domain
 PUT /pass/v1/user/alias/settings/default_mailbox_id
 PUT /pass/v1/vault/{id}
 PUT /pass/v1/vault/{id}/owner

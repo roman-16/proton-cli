@@ -204,6 +204,33 @@ A new mailbox receives nothing until it answers. Proton emails it a code, and `v
 
 Deleting a mailbox needs somewhere for its aliases to go, which is what `--transfer-to` names. It is required: without it, those aliases would stop receiving mail.
 
+### Your own domain for aliases
+
+On a paid Pass plan, aliases can be made on a domain you own.
+
+```bash
+proton pass settings domains create example.com
+proton pass settings domains get example.com           # the DNS entries, and which ones Proton sees
+proton pass settings domains update example.com --default
+```
+
+A new domain carries no alias until its DNS entries are in place. `get` shows every entry the domain needs, checks them again each time it runs, and says what it found where an entry is wrong. Ownership and MX are what a domain needs to carry aliases; SPF, DKIM and DMARC keep its mail out of spam. `list` shows each custom domain with its STATUS: `unverified`, `unconfigured`, or `active`.
+
+Once the domain is verified, three things can be set on it:
+
+```bash
+proton pass settings domains update example.com --catch-all me@proton.me --catch-all work@proton.me
+proton pass settings domains update example.com --catch-all none
+proton pass settings domains update example.com --display-name "Jane Roe"
+proton pass settings domains update example.com --random-prefix
+```
+
+With a catch-all, mail sent to any name at the domain makes an alias for that name as it arrives, forwarding to the mailboxes named. `--display-name` is what recipients see on mail from the domain's aliases, and `--clear-display-name` takes it off.
+
+`--default` makes new aliases take a domain when nothing names another, and works for Proton's domains too. `--default=false` leaves none chosen.
+
+Deleting a domain deletes every alias made on it. The command names the count and asks first.
+
 ## Sharing
 
 You can share a vault, or one item out of it. Both read the same way, and the same way Drive's sharing does.
@@ -398,6 +425,35 @@ proton pass settings extra-password disable
 `disable` asks for the password first. Pass then opens with your account password alone, on every device, and this session goes on working.
 
 To change it, turn it off and on again.
+
+## Access tokens
+
+On a paid Pass plan, a token lets a program into Pass without your password: Proton's [pass-cli](https://protonpass.github.io/pass-cli/), or an AI agent working through it.
+
+```bash
+proton pass settings access-tokens create --name ci --expires 30d --vault Work
+proton pass settings access-tokens list
+proton pass settings access-tokens get ci
+proton pass settings access-tokens update ci --vault Work --vault Personal
+proton pass settings access-tokens delete ci
+```
+
+A token reads the vaults it is handed and nothing else. `--name`, `--expires` and at least one `--vault` are required; `--expires` is between `1h` and `1y`. `update` names the whole set of vaults, so one left out is taken back.
+
+**The token is shown once**, when it is made. Copy it then: `get` shows the token's name and vaults and never the token itself, and one you have lost is deleted and made again. Under `--output json` it is the `secret` field:
+
+```bash
+TOKEN=$(proton pass settings access-tokens create --name ci --expires 30d --vault Work --output json | jq -r .secret)
+```
+
+### A token for an AI agent
+
+```bash
+proton pass settings access-tokens create --name agent --expires 1d --vault Work --agent
+proton pass settings access-tokens activity list agent
+```
+
+`--agent` marks a token for an AI agent, which then has to give a reason for every action it takes. `activity list` shows them, newest first: what was done, to which item, and why.
 
 ## History
 

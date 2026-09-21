@@ -12,11 +12,10 @@ import (
 	"github.com/roman-16/proton-cli/internal/proton"
 )
 
-// Where aliases arrive, and what they can be built out of.
+// Where aliases arrive.
 //
-// A mailbox is a real address an alias forwards to; a domain is the part after
-// the @ that an alias may be made on. Both are the account's rather than a
-// vault's, which is why neither takes a share.
+// A mailbox is a real address an alias forwards to. It is the account's rather
+// than a vault's, which is why it takes no share.
 
 // Mailbox is an address aliases forward to.
 type Mailbox struct {
@@ -31,17 +30,6 @@ type Mailbox struct {
 	// unverified mailbox receives nothing.
 	Verified bool `json:"verified"`
 	Aliases  int  `json:"aliases"`
-}
-
-// Domain is a domain an alias can be made on.
-type Domain struct {
-	Domain  string `json:"domain"`
-	Custom  bool   `json:"custom"`
-	Default bool   `json:"default"`
-	Premium bool   `json:"premium"`
-	// MXVerified matters only for a custom domain: until its MX records point at
-	// Proton, an alias on it receives nothing.
-	MXVerified bool `json:"mx_verified"`
 }
 
 // Mailboxes lists the addresses aliases forward to.
@@ -75,32 +63,6 @@ func (s *Service) Mailboxes(ctx context.Context) ([]Mailbox, error) {
 		out = append(out, box)
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Email < out[j].Email })
-	return out, nil
-}
-
-// Domains lists the domains an alias can be made on.
-func (s *Service) Domains(ctx context.Context) ([]Domain, error) {
-	var r struct {
-		Domains []struct {
-			Domain     string
-			IsCustom   bool
-			IsDefault  bool
-			IsPremium  bool
-			MXVerified bool
-		}
-	}
-	if err := s.C.Decode(ctx, proton.Request{
-		Method: "GET", Path: "/pass/v1/user/alias/domain",
-	}, &r); err != nil {
-		return nil, err
-	}
-	out := make([]Domain, 0, len(r.Domains))
-	for _, d := range r.Domains {
-		out = append(out, Domain{
-			Domain: d.Domain, Custom: d.IsCustom, Default: d.IsDefault,
-			Premium: d.IsPremium, MXVerified: d.MXVerified,
-		})
-	}
 	return out, nil
 }
 

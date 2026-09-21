@@ -13,13 +13,13 @@ import (
 // What Pass keeps on the account rather than in a vault.
 //
 // Two of these are what an alias is made of: the mailboxes it can arrive in and
-// the domains it can be made on. The third is the password Pass itself can be
-// put behind. Pass only offers any of them in its settings, which is where they
-// hang here.
+// the domains it can be made on. The others are the password Pass itself can be
+// put behind, and the tokens that let a program in without it. Pass only offers
+// any of them in its settings, which is where they hang here.
 
 func settingsCmd() *cobra.Command {
 	c := &cobra.Command{Use: "settings", Short: "Pass settings"}
-	c.AddCommand(domainsCmd(), extraPasswordCmd(), mailboxesCmd())
+	c.AddCommand(accessTokensCmd(), domainsCmd(), extraPasswordCmd(), mailboxesCmd())
 	return c
 }
 
@@ -193,48 +193,6 @@ func mailboxesListCmd() *cobra.Command {
 	}
 	held.Register(c, "mailboxes",
 		kit.Key[passsvc.Mailbox]{Name: "email", Less: func(a, b passsvc.Mailbox) int { return kit.Fold(a.Email, b.Email) }},
-	)
-	return c
-}
-
-func domainsCmd() *cobra.Command {
-	c := &cobra.Command{Use: "domains", Short: "The domains an alias can be made on"}
-	c.AddCommand(domainsListCmd())
-	return c
-}
-
-func domainsListCmd() *cobra.Command {
-	var held kit.Held[passsvc.Domain]
-	c := &cobra.Command{
-		Use:   "list",
-		Short: "List the domains an alias can be made on",
-		Long: "List the domains an alias can be made on.\n\n" +
-			"These are the values `proton pass aliases create --suffix` accepts: the\n" +
-			"part of an alias after the @.",
-		RunE: kit.Run(nil, func(c *kit.Invocation) error {
-			rows, err := c.App.Pass.Domains(c.Ctx)
-			if err != nil {
-				return err
-			}
-			return held.Answer(c, ui.TableSpec[passsvc.Domain]{
-				Noun: "domains",
-				Columns: []ui.Column[passsvc.Domain]{
-					{Header: "DOMAIN", Flex: true, Cell: func(d passsvc.Domain) string { return d.Domain }},
-					{Header: "DEFAULT", Cell: func(d passsvc.Domain) string { return yesNo(d.Default) }},
-					{Header: "CUSTOM", Cell: func(d passsvc.Domain) string { return yesNo(d.Custom) }},
-					{Header: "MX", Cell: func(d passsvc.Domain) string {
-						// Only a custom domain has MX records of yours to get wrong.
-						if !d.Custom {
-							return ""
-						}
-						return yesNo(d.MXVerified)
-					}},
-				},
-			}, rows)
-		}),
-	}
-	held.Register(c, "domains",
-		kit.Key[passsvc.Domain]{Name: "domain", Less: func(a, b passsvc.Domain) int { return kit.Fold(a.Domain, b.Domain) }},
 	)
 	return c
 }

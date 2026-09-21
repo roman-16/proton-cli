@@ -25,6 +25,12 @@ const (
 	TagFileData = "filedata"
 	// TagFileMetadata is a version-2 file's name and type.
 	TagFileMetadata = "v2;filemetadata.item.pass.proton"
+	// TagShareKey seals a vault's share key under an access token's own key,
+	// which is how a program holding the token comes to read the vault.
+	TagShareKey = "sharekey"
+	// TagActionPayload seals what an access token recorded about one action it
+	// took, under that token's key.
+	TagActionPayload = "proton.pass.payload"
 )
 
 // TagFileChunk is the tag over one chunk of a version-2 file.

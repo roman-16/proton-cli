@@ -302,7 +302,17 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton pass export`](../pass/pass.md#export) | Write the vaults you own out to a file |
 | [`proton pass generate`](../pass/pass.md#generate) | Make a password |
 | [`proton pass import`](../pass/pass.md#import) | Read items in from a password manager's export |
+| [`proton pass settings access-tokens activity list`](../pass/settings.md#access-tokens-activity-list) | List what a token has done |
+| [`proton pass settings access-tokens create`](../pass/settings.md#access-tokens-create) | Make a token for a program to use |
+| [`proton pass settings access-tokens delete`](../pass/settings.md#access-tokens-delete) | Stop a token working |
+| [`proton pass settings access-tokens get`](../pass/settings.md#access-tokens-get) | Show a token and the vaults it reads |
+| [`proton pass settings access-tokens list`](../pass/settings.md#access-tokens-list) | List the tokens, expired ones included |
+| [`proton pass settings access-tokens update`](../pass/settings.md#access-tokens-update) | Change which vaults a token reads |
+| [`proton pass settings domains create`](../pass/settings.md#domains-create) | Add a domain of your own for aliases |
+| [`proton pass settings domains delete`](../pass/settings.md#domains-delete) | Remove a domain of your own |
+| [`proton pass settings domains get`](../pass/settings.md#domains-get) | Show a domain, with the DNS entries a custom one needs |
 | [`proton pass settings domains list`](../pass/settings.md#domains-list) | List the domains an alias can be made on |
+| [`proton pass settings domains update`](../pass/settings.md#domains-update) | Change a domain: the default, catch-all or names |
 | [`proton pass settings extra-password disable`](../pass/settings.md#extra-password-disable) | Remove the extra password from Pass |
 | [`proton pass settings extra-password enable`](../pass/settings.md#extra-password-enable) | Protect Pass with an extra password |
 | [`proton pass settings extra-password get`](../pass/settings.md#extra-password-get) | Show whether Pass has an extra password |

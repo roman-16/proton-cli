@@ -7,6 +7,7 @@ import (
 
 	"github.com/roman-16/proton-cli/internal/app"
 	"github.com/roman-16/proton-cli/internal/cli/kit"
+	"github.com/roman-16/proton-cli/internal/dns"
 	"github.com/roman-16/proton-cli/internal/errs"
 	mailsvc "github.com/roman-16/proton-cli/internal/service/mail"
 	"github.com/roman-16/proton-cli/internal/ui"
@@ -86,9 +87,9 @@ func domainsGetCmd() *cobra.Command {
 				{Label: "Catch-all", Value: catchAllText(fresh), Always: true},
 				{Label: "Checked", Value: units.Time(fresh.Checked)},
 			}
-			for _, g := range fresh.DNS {
+			for _, check := range fresh.DNS {
 				fields = append(fields, ui.Field{
-					Label: groupLabels[g.Name], Value: groupText(g), Always: true,
+					Label: checkLabels[check.Name], Value: check.Text(), Always: true,
 				})
 			}
 			return kit.Show(c, ui.RecordSpec{
@@ -116,7 +117,7 @@ func domainsCreateCmd() *cobra.Command {
 			if err := reauth.Supply(c); err != nil {
 				return err
 			}
-			name, err := domainName(c.Args[0])
+			name, err := dns.Name(c.Args[0])
 			if err != nil {
 				return err
 			}
@@ -132,7 +133,7 @@ func domainsCreateCmd() *cobra.Command {
 					return "", err
 				}
 				c.Note("Add this entry at %s, then run `%s mail settings domains get %s`:\n%s",
-					d.Domain, kit.Program, d.Domain, groupText(d.DNS[0]))
+					d.Domain, kit.Program, d.Domain, d.DNS[0].Text())
 				return d.ID, nil
 			})
 		}),
@@ -237,54 +238,13 @@ func domainsDeleteCmd() *cobra.Command {
 	return c
 }
 
-// groupLabels is how each of Proton's five checks is named on screen.
-var groupLabels = map[string]string{
+// checkLabels is how each of Proton's five checks is named on screen.
+var checkLabels = map[string]string{
 	"verification": "Verification",
 	"mx":           "MX",
 	"spf":          "SPF",
 	"dkim":         "DKIM",
 	"dmarc":        "DMARC",
-}
-
-// groupText is one check's verdict with the entries it judges written under it,
-// aligned with one another.
-//
-// A record field keeps a value whole however wide it is, which is what an entry
-// needs: a DKIM value is long, exact, and copied by hand.
-func groupText(g mailsvc.RecordGroup) string {
-	rows := make([][]string, 0, len(g.Records))
-	var widths []int
-	for _, r := range g.Records {
-		cells := recordCells(r)
-		for len(widths) < len(cells) {
-			widths = append(widths, 0)
-		}
-		for i, cell := range cells {
-			if len(cell) > widths[i] {
-				widths[i] = len(cell)
-			}
-		}
-		rows = append(rows, cells)
-	}
-	lines := []string{g.Status}
-	for _, cells := range rows {
-		var line strings.Builder
-		for i, cell := range cells {
-			line.WriteString(cell)
-			line.WriteString(strings.Repeat(" ", widths[i]-len(cell)+2))
-		}
-		lines = append(lines, strings.TrimRight(line.String(), " "))
-	}
-	return strings.Join(lines, "\n")
-}
-
-// recordCells is one entry as a zone file writes it: what to add, where, at what
-// priority where a priority is part of it, and the value itself last.
-func recordCells(r mailsvc.Record) []string {
-	if r.Priority > 0 {
-		return []string{r.Type, r.Host, strconv.Itoa(r.Priority), r.Value}
-	}
-	return []string{r.Type, r.Host, r.Value}
 }
 
 func domainColumns() []ui.Column[mailsvc.Domain] {
@@ -305,7 +265,7 @@ func domainColumns() []ui.Column[mailsvc.Domain] {
 func dnsSummary(d mailsvc.Domain) string {
 	failing := d.Failing()
 	if len(failing) == 0 {
-		return mailsvc.Ok
+		return dns.Ok
 	}
 	return strings.Join(failing, ", ")
 }
@@ -354,19 +314,4 @@ func onDomain(c *kit.Invocation, d mailsvc.Domain, a mailsvc.Address) error {
 		return problem.Hint("that domain has no addresses yet")
 	}
 	return problem.Hint(strings.Join(on, ", "))
-}
-
-// domainName reads DOMAIN as Proton files it, which is a bare name with no
-// scheme, no address around it and no path after it. It is judged from the
-// command line, so a malformed one costs nothing.
-func domainName(arg string) (string, error) {
-	name := strings.TrimSpace(arg)
-	bad := name == "" || !strings.Contains(name, ".") ||
-		strings.ContainsAny(name, "@ \t/:") ||
-		strings.HasPrefix(name, ".") || strings.HasSuffix(name, ".")
-	if bad {
-		return "", kit.Fail("%q is not a domain name.", arg).
-			Hint("write it on its own, as example.com")
-	}
-	return strings.ToLower(name), nil
 }

@@ -202,6 +202,19 @@ var untested = map[string]string{
 	// each side is tested instead: the free plan is refused before the request,
 	// and the paid account is told the address is already there.
 	"POST /core/v4/addresses/setup": "the short domain is turned on once in an account's life, and every test account is past that moment",
+
+	// Everything a verified alias domain has. Proving a domain is yours means a
+	// TXT entry in a real zone, which no run can add, so the domains a run makes
+	// under the paid account's own name stay unverified - and Proton keeps the
+	// settings from an unverified domain, so the CLI refuses to change them before
+	// the request. Adding a domain, checking its DNS, choosing the default and
+	// deleting it are tested; what is left is reached only through a domain
+	// somebody verified by hand.
+	"GET /pass/v1/user/alias/custom_domain/{n}/settings":               "needs a custom alias domain somebody verified by hand, and no run can put an entry in a real zone",
+	"PUT /pass/v1/user/alias/custom_domain/{n}/settings/catch_all":     "the same: only a verified domain has a catch-all to switch",
+	"PUT /pass/v1/user/alias/custom_domain/{n}/settings/mailboxes":     "the same: only a verified domain has mailboxes to point stray mail at",
+	"PUT /pass/v1/user/alias/custom_domain/{n}/settings/name":          "the same: only a verified domain has a display name to set",
+	"PUT /pass/v1/user/alias/custom_domain/{n}/settings/random_prefix": "the same: only a verified domain has a random prefix to switch",
 }
 
 func TestEveryRequestTheCLICanSendIsOneTheSuiteSends(t *testing.T) {

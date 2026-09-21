@@ -160,6 +160,14 @@ func Restrictions() []Restriction {
 		Command: []string{"pass", "import"},
 		Why:     "it adds a copy of everything an archive holds, and finding the copies again means a filter over real data",
 	}, {
+		Command: []string{"pass", "settings", "access-tokens", "delete"}, OnlyOurs: true,
+		Why: "it cuts off whatever program holds the token, and the account's own tokens are somebody's" +
+			" automation - name a token the run made, carrying " + fixture.TestPrefix,
+	}, {
+		Command: []string{"pass", "settings", "domains", "delete"}, OnlyOurs: true,
+		Why: "it deletes every alias on the domain, and an alias address cannot be brought back" +
+			" - name a domain the run made, carrying " + fixture.TestPrefix,
+	}, {
 		Command: []string{"pass", "settings", "extra-password", "disable"},
 		Why: "it signs the owner out of Proton on every device they have, and only they can sign" +
 			" back in",

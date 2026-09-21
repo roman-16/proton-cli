@@ -54,10 +54,12 @@ func TestAnAddressToAddHasToBeAnAddress(t *testing.T) {
 }
 
 // A domain to add is a bare name, so an address, a URL and a path are all wrong
-// before anybody is signed in.
+// before anybody is signed in - whichever app is being handed the domain.
 func TestADomainToAddHasToBeADomain(t *testing.T) {
 	for _, bad := range []string{"example", "me@example.com", "https://example.com", "example.com/mail"} {
 		refuses(t, 1, []string{"mail", "settings", "domains", "create", bad},
+			"is not a domain name", "example.com")
+		refuses(t, 1, []string{"pass", "settings", "domains", "create", bad},
 			"is not a domain name", "example.com")
 	}
 }
@@ -67,6 +69,40 @@ func TestADomainToAddHasToBeADomain(t *testing.T) {
 func TestUpdatingADomainWithNothingToChangeIsRefused(t *testing.T) {
 	refuses(t, 1, []string{"mail", "settings", "domains", "update", "example.com"},
 		"Nothing to change", "--catch-all none")
+	refuses(t, 1, []string{"pass", "settings", "domains", "update", "example.com"},
+		"Nothing to change", "--catch-all", "--default")
+}
+
+// A domain's display name is text, so taking it off has a flag of its own, and
+// saying both at once is a command line that means something its author did not
+// check.
+func TestADomainsDisplayNameIsSetOrClearedButNotBoth(t *testing.T) {
+	refuses(t, 1, []string{"pass", "settings", "domains", "update", "example.com", "--display-name", ""},
+		"--display-name needs a name", "--clear-display-name")
+	refuses(t, 1, []string{"pass", "settings", "domains", "update", "example.com",
+		"--display-name", "Jane", "--clear-display-name"}, "contradict")
+}
+
+// A token is described whole on the command line: what to call it, how long it
+// works, and what it reads. Each is judged before anybody is signed in.
+func TestAnAccessTokenIsDescribedWholeBeforeItIsMade(t *testing.T) {
+	create := func(rest ...string) []string {
+		return append([]string{"pass", "settings", "access-tokens", "create"}, rest...)
+	}
+	for _, tt := range []struct {
+		args    []string
+		phrases []string
+	}{
+		{create("--expires", "30d", "--vault", "Work"), []string{"A token needs a name", "--name"}},
+		{create("--name", "ci", "--vault", "Work"), []string{"How long should the token work?", "--expires 30d"}},
+		{create("--name", "ci", "--expires", "never", "--vault", "Work"), []string{"always expires", "1y"}},
+		{create("--name", "ci", "--expires", "10m", "--vault", "Work"), []string{"between 1h and 1y"}},
+		{create("--name", "ci", "--expires", "2y", "--vault", "Work"), []string{"between 1h and 1y"}},
+		{create("--name", "ci", "--expires", "30d"), []string{"at least one vault", "--vault"}},
+		{[]string{"pass", "settings", "access-tokens", "update", "ci"}, []string{"Nothing to change", "--vault"}},
+	} {
+		refuses(t, 1, tt.args, tt.phrases...)
+	}
 }
 
 func TestSendingNeedsSomethingToSend(t *testing.T) {

@@ -822,6 +822,45 @@ var examples = map[string][]string{
 	},
 	"proton pass settings domains list": {
 		"proton pass settings domains list",
+		"proton pass settings domains list --output json",
+	},
+	"proton pass settings domains get": {
+		"proton pass settings domains get example.com",
+		"proton pass settings domains get example.com --output json",
+	},
+	"proton pass settings domains create": {
+		"proton pass settings domains create example.com",
+	},
+	"proton pass settings domains update": {
+		"proton pass settings domains update example.com --default",
+		"proton pass settings domains update example.com --catch-all me@proton.me",
+		"proton pass settings domains update example.com --catch-all none",
+		"proton pass settings domains update example.com --display-name \"Jane Roe\" --random-prefix",
+	},
+	"proton pass settings domains delete": {
+		"proton pass settings domains delete example.com",
+	},
+	"proton pass settings access-tokens list": {
+		"proton pass settings access-tokens list",
+		"proton pass settings access-tokens list --output json",
+	},
+	"proton pass settings access-tokens get": {
+		"proton pass settings access-tokens get ci",
+	},
+	"proton pass settings access-tokens create": {
+		"proton pass settings access-tokens create --name ci --expires 30d --vault Work",
+		"proton pass settings access-tokens create --name agent --expires 1d --vault Work --agent",
+		"proton pass settings access-tokens create --name ci --expires 30d --vault Work --output json",
+	},
+	"proton pass settings access-tokens update": {
+		"proton pass settings access-tokens update ci --vault Work --vault Personal",
+	},
+	"proton pass settings access-tokens delete": {
+		"proton pass settings access-tokens delete ci",
+	},
+	"proton pass settings access-tokens activity list": {
+		"proton pass settings access-tokens activity list agent",
+		"proton pass settings access-tokens activity list agent --limit 20",
 	},
 	"proton pass settings extra-password get": {
 		"proton pass settings extra-password get",

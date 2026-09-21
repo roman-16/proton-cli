@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -72,7 +73,13 @@ var collections = []struct {
 	{"contacts", []string{"contacts", "list"}, "id", []string{"name"}},
 	{"contact groups", []string{"contacts", "groups", "list"}, "id", []string{"name"}},
 	{"alias mailboxes", []string{"pass", "settings", "mailboxes", "list"}, "id", []string{"email"}},
+	// Which domain is the default is compared beside the domain for the reason a
+	// watched address's state is: a run that left new aliases being made on
+	// another domain has changed something real, and the domains are all still
+	// there.
+	{"alias domains", []string{"pass", "settings", "domains", "list"}, "domain", []string{"default", "status"}},
 	{"alias contacts", []string{"pass", "aliases", "contacts", "list", fixture.PaidAlias}, "id", []string{"email"}},
+	{"access tokens", []string{"pass", "settings", "access-tokens", "list"}, "id", []string{"name"}},
 	{"secure links", []string{"pass", "links", "list"}, "link_id", []string{"item_id"}},
 	{"drive root", []string{"drive", "items", "list", "/"}, "id", []string{"name"}},
 }
@@ -147,6 +154,9 @@ func takePhotograph() paid.Photograph {
 }
 
 // readRows lists a collection and returns one line per row.
+//
+// A field is a word or a yes-or-no; a number is a count Proton keeps and not a
+// state a run could have changed.
 func readRows(args []string, idKey string, fields []string) ([]string, bool) {
 	body, _, code, err := runAs(account.Paid, nil, asJSON(args)...)
 	if err != nil || code != 0 {
@@ -165,8 +175,13 @@ func readRows(args []string, idKey string, fields []string) ([]string, bool) {
 		}
 		line := make([]string, 0, len(fields)+1)
 		for _, f := range fields {
-			if v, _ := m[f].(string); v != "" {
-				line = append(line, v)
+			switch v := m[f].(type) {
+			case string:
+				if v != "" {
+					line = append(line, v)
+				}
+			case bool:
+				line = append(line, f+"="+strconv.FormatBool(v))
 			}
 		}
 		out = append(out, strings.TrimSpace(strings.Join(append(line, id), " ")))

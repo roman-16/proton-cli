@@ -75,6 +75,8 @@ These are the listings that can be narrowed, and what narrows them. The same fla
 - `proton pass items attachments list REF --removed`
 - `proton pass items list --desc --limit int --newer-than string --older-than string --page int --risk string --sort string --type string --vault string`
 - `proton pass links list --desc --limit int --page int --sort string`
+- `proton pass settings access-tokens activity list REF --limit int --page int`
+- `proton pass settings access-tokens list --desc --limit int --page int --sort string`
 - `proton pass settings domains list --desc --limit int --page int --sort string`
 - `proton pass settings mailboxes list --desc --limit int --page int --sort string`
 - `proton pass shared list --desc --limit int --page int --sort string`
@@ -127,7 +129,7 @@ A bulk verb acts on at most `--limit` things, 150 by default; `--limit 0` lifts 
 
 ## Secrets
 
-`proton pass items get` and `proton pass items totp` print secrets in full. So do `proton account settings two-factor generate` and `proton account settings recovery-phrase set`, which print a two-factor secret and twelve recovery words that are shown once and kept nowhere.
+`proton pass items get` and `proton pass items totp` print secrets in full. So do `proton account settings two-factor generate`, `proton account settings recovery-phrase set` and `proton pass settings access-tokens create`, which print a two-factor secret, twelve recovery words and an access token that are shown once and kept nowhere.
 
 Secrets go in the same way they come out. `pass items create` and `pass items update` read them from `--secret-file NAME=FILE`, never from a flag value, because a flag value is in the shell history; `-` as the file reads standard input. The commands that change a credential read it from `--password-file` and `--new-password-file` the same way.
 
@@ -216,7 +218,9 @@ One line per group, with the verbs under it. Arguments, flags and examples are i
 - `proton pass items revisions` - Earlier versions of an item: get, list, restore
 - `proton pass items share` - Who else can open an item: add, confirm, get, remove, update
 - `proton pass links` - Links that show an item to somebody without an account: create, get, list, revoke
-- `proton pass settings domains` - The domains an alias can be made on: list
+- `proton pass settings access-tokens` - Tokens that let a program into Pass: create, delete, get, list, update
+- `proton pass settings access-tokens activity` - What a token has been used for: list
+- `proton pass settings domains` - The domains an alias can be made on: create, delete, get, list, update
 - `proton pass settings extra-password` - The extra password Pass can be protected with: disable, enable, get
 - `proton pass settings mailboxes` - The addresses your aliases forward to: create, delete, list, resend, update, verify
 - `proton pass shared` - Items other people have shared with you: list

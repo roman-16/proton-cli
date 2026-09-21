@@ -85,7 +85,7 @@ func TestEveryRestrictionIsEnforced(t *testing.T) {
 	}
 }
 
-// The one command that is judged by what it was pointed at: something the run
+// The commands that are judged by what they were pointed at: something the run
 // made is allowed, and everything else - the account's own domain, a reference
 // that could resolve to it, nothing at all - is not.
 func TestACommandAimedAtSomethingTheRunMadeIsAllowed(t *testing.T) {
@@ -93,9 +93,11 @@ func TestACommandAimedAtSomethingTheRunMadeIsAllowed(t *testing.T) {
 	for _, args := range [][]string{
 		{"mail", "settings", "domains", "delete", ours},
 		{"--yes", "mail", "settings", "domains", "delete", "--", ours},
+		{"pass", "settings", "domains", "delete", ours},
+		{"pass", "settings", "access-tokens", "delete", fixture.TestPrefix + "123-token"},
 	} {
 		if why := OffLimits(args); why != "" {
-			t.Errorf("%v is refused, and it names a domain the run made: %s", args, why)
+			t.Errorf("%v is refused, and it names something the run made: %s", args, why)
 		}
 	}
 	for _, args := range [][]string{
@@ -103,9 +105,12 @@ func TestACommandAimedAtSomethingTheRunMadeIsAllowed(t *testing.T) {
 		{"mail", "settings", "domains", "delete"},
 		{"mail", "settings", "domains", "delete", "--yes"},
 		{"mail", "settings", "domains", "delete", ours, "someone-elses.example"},
+		{"pass", "settings", "domains", "delete", "lerchster.dev"},
+		{"pass", "settings", "access-tokens", "delete", "ci"},
+		{"pass", "settings", "access-tokens", "delete"},
 	} {
 		if OffLimits(args) == "" {
-			t.Errorf("%v is allowed, and it does not name a domain the run made", args)
+			t.Errorf("%v is allowed, and it does not name something the run made", args)
 		}
 	}
 }

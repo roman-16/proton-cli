@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/roman-16/proton-cli/internal/dns"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
 )
@@ -59,29 +60,29 @@ func TestADomainCarriesEveryEntryItNeeds(t *testing.T) {
 		t.Errorf("checks = %v, want %v", names, want)
 	}
 
-	entries := map[string][]Record{}
+	entries := map[string][]dns.Record{}
 	for _, g := range d.DNS {
 		entries[g.Name] = g.Records
 	}
 	if got := entries["verification"]; len(got) != 1 ||
-		got[0] != (Record{Type: "TXT", Host: "@", Value: "protonmail-verification=abc123"}) {
+		got[0] != (dns.Record{Type: "TXT", Host: "@", Value: "protonmail-verification=abc123"}) {
 		t.Errorf("verification entry = %+v", got)
 	}
 	if got := entries["mx"]; len(got) != 2 ||
-		got[0] != (Record{Type: "MX", Host: "@", Value: "mail.protonmail.ch", Priority: 10}) ||
-		got[1] != (Record{Type: "MX", Host: "@", Value: "mailsec.protonmail.ch", Priority: 20}) {
+		got[0] != (dns.Record{Type: "MX", Host: "@", Value: "mail.protonmail.ch", Priority: 10}) ||
+		got[1] != (dns.Record{Type: "MX", Host: "@", Value: "mailsec.protonmail.ch", Priority: 20}) {
 		t.Errorf("MX entries = %+v", got)
 	}
 	if got := entries["spf"]; len(got) != 1 || got[0].Value != "v=spf1 include:_spf.protonmail.ch ~all" {
 		t.Errorf("SPF entry = %+v", got)
 	}
 	if got := entries["dkim"]; len(got) != 3 ||
-		got[2] != (Record{Type: "CNAME", Host: "protonmail3._domainkey",
+		got[2] != (dns.Record{Type: "CNAME", Host: "protonmail3._domainkey",
 			Value: "protonmail3.domainkey.k1.domains.proton.ch."}) {
 		t.Errorf("DKIM entries = %+v", got)
 	}
 	if got := entries["dmarc"]; len(got) != 1 ||
-		got[0] != (Record{Type: "TXT", Host: "_dmarc", Value: "v=DMARC1; p=quarantine"}) {
+		got[0] != (dns.Record{Type: "TXT", Host: "_dmarc", Value: "v=DMARC1; p=quarantine"}) {
 		t.Errorf("DMARC entry = %+v", got)
 	}
 }
@@ -95,7 +96,7 @@ func TestADomainThatPassesEveryCheckSaysSo(t *testing.T) {
 		t.Errorf("failing = %v, want none", failing)
 	}
 	for _, g := range d.DNS {
-		if g.Status != Ok {
+		if g.Status != dns.Ok {
 			t.Errorf("%s = %q, want ok", g.Name, g.Status)
 		}
 	}

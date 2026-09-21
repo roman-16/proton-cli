@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"sort"
 
+	"github.com/roman-16/proton-cli/internal/dns"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
 )
@@ -22,7 +23,6 @@ import (
 
 // The entries Proton expects at every custom domain.
 const (
-	apex        = "@"
 	mxPrimary   = "mail.protonmail.ch"
 	mxSecondary = "mailsec.protonmail.ch"
 	spfValue    = "v=spf1 include:_spf.protonmail.ch ~all"
@@ -42,9 +42,6 @@ var (
 	dmarcStates  = map[int]string{0: "missing", 1: "wrong", 2: "duplicate", 3: "ok", 4: "relaxed"}
 )
 
-// Ok is the word a check reports when Proton can see what it expects.
-const Ok = "ok"
-
 // Domain is one custom domain, its DNS entries and how each of them stands.
 type Domain struct {
 	ID     string `json:"id"`
@@ -55,35 +52,12 @@ type Domain struct {
 	Addresses int    `json:"addresses"`
 	CatchAll  string `json:"catch_all,omitempty"`
 	// Checked is when Proton last read the domain's DNS.
-	Checked int64         `json:"checked,omitempty"`
-	DNS     []RecordGroup `json:"dns"`
+	Checked int64       `json:"checked,omitempty"`
+	DNS     []dns.Check `json:"dns"`
 }
 
 // Failing names the checks that are not passing, in the order they are shown.
-func (d Domain) Failing() []string {
-	var out []string
-	for _, g := range d.DNS {
-		if g.Status != Ok {
-			out = append(out, g.Name)
-		}
-	}
-	return out
-}
-
-// RecordGroup is the entries that answer one check, and the verdict it reached.
-type RecordGroup struct {
-	Name    string   `json:"name"`
-	Status  string   `json:"status"`
-	Records []Record `json:"records"`
-}
-
-// Record is one entry to put in the domain's zone.
-type Record struct {
-	Type     string `json:"type"`
-	Host     string `json:"host"`
-	Value    string `json:"value"`
-	Priority int    `json:"priority,omitempty"`
-}
+func (d Domain) Failing() []string { return dns.Failing(d.DNS) }
 
 // rawDomain is the domain as Proton writes it, with its own numbers.
 type rawDomain struct {
@@ -115,28 +89,28 @@ func (r rawDomain) domain() Domain {
 	}
 }
 
-func (r rawDomain) dns() []RecordGroup {
-	dkim := make([]Record, 0, len(r.DKIM.Config))
+func (r rawDomain) dns() []dns.Check {
+	dkim := make([]dns.Record, 0, len(r.DKIM.Config))
 	for _, c := range r.DKIM.Config {
-		dkim = append(dkim, Record{Type: "CNAME", Host: c.Hostname, Value: c.CNAME})
+		dkim = append(dkim, dns.Record{Type: "CNAME", Host: c.Hostname, Value: c.CNAME})
 	}
-	return []RecordGroup{{
+	return []dns.Check{{
 		Name: "verification", Status: stateWord(verifyStates, r.VerifyState),
-		Records: []Record{{Type: "TXT", Host: apex, Value: r.VerifyCode}},
+		Records: []dns.Record{{Type: "TXT", Host: dns.Apex, Value: r.VerifyCode}},
 	}, {
 		Name: "mx", Status: stateWord(mxStates, r.MxState),
-		Records: []Record{
-			{Type: "MX", Host: apex, Value: mxPrimary, Priority: 10},
-			{Type: "MX", Host: apex, Value: mxSecondary, Priority: 20},
+		Records: []dns.Record{
+			{Type: "MX", Host: dns.Apex, Value: mxPrimary, Priority: 10},
+			{Type: "MX", Host: dns.Apex, Value: mxSecondary, Priority: 20},
 		},
 	}, {
 		Name: "spf", Status: stateWord(spfStates, r.SpfState),
-		Records: []Record{{Type: "TXT", Host: apex, Value: spfValue}},
+		Records: []dns.Record{{Type: "TXT", Host: dns.Apex, Value: spfValue}},
 	}, {
 		Name: "dkim", Status: stateWord(dkimStates, r.DKIM.State), Records: dkim,
 	}, {
 		Name: "dmarc", Status: stateWord(dmarcStates, r.DmarcState),
-		Records: []Record{{Type: "TXT", Host: dmarcHost, Value: dmarcValue}},
+		Records: []dns.Record{{Type: "TXT", Host: dmarcHost, Value: dmarcValue}},
 	}}
 }
 
