@@ -8,7 +8,8 @@ Everything the maintainer or CI runs, in whatever language suits it: shell insta
 | `gen-completions.sh` | Emits the shell completions shipped in releases (a goreleaser `before` hook) |
 | `changelog/` | Reads `CHANGELOG.md`: the version to release and the notes to publish (`just notes`) |
 | `gendocs/` | Generates the command reference from the command tree (`just docs`) |
-| `openapi-generator/` | Generates `openapi.yaml` from the WebClients TypeScript source (`just openapi`) |
+| `openapi-generator/` | Generates `openapi.yaml` from the WebClients and Drive SDK TypeScript source (`just openapi`) |
+| `openapi-guard/` | Checks a regenerated `openapi.yaml` before the weekly sync commits it |
 | `stats/` | Records the public counters the Stats page charts (`just stats`) |
 | `terminal-demo/` | Records the README panel against the primary account (`just demo`) |
 | `publish-npm.mjs` | Publishes the npm package on release |
@@ -63,7 +64,17 @@ Printing nothing is an answer: the file names no version to release, which is th
 
 ## OpenAPI Generator
 
-Auto-generates `openapi.yaml` from [ProtonMail/WebClients](https://github.com/ProtonMail/WebClients) TypeScript source files using [ts-morph](https://github.com/dsherret/ts-morph) for full AST parsing with type resolution.
+Auto-generates `openapi.yaml` from Proton's own TypeScript using [ts-morph](https://github.com/dsherret/ts-morph) for full AST parsing with type resolution.
+
+### Sources
+
+| Source | Declares |
+|---|---|
+| [ProtonMail/WebClients](https://github.com/ProtonMail/WebClients) `packages/shared/lib/api` | One function per endpoint, for every app |
+| [ProtonMail/WebClients](https://github.com/ProtonMail/WebClients) `packages/pass/types/api/pass.ts` | Pass, as two conditional types |
+| [ProtonDriveApps/sdk](https://github.com/ProtonDriveApps/sdk) `client/js/src/internal/apiService/driveTypes.ts` | Drive, as Proton's own OpenAPI |
+
+Drive's web app calls `@protontech/drive-sdk` rather than the shared package, so the shared package declares little of Drive any more - albums, the photo timeline and the public-link operations are only in the SDK.
 
 ### Usage
 
@@ -71,7 +82,7 @@ Auto-generates `openapi.yaml` from [ProtonMail/WebClients](https://github.com/Pr
 just openapi
 ```
 
-This outputs `openapi.yaml` in the project root. It runs `just webclients` first, which clones `ProtonMail/WebClients` to `/tmp/proton-cli-WebClients` (~30 seconds) or updates a checkout that is already there (~1 second). Run `just webclients` on its own to refresh that checkout for reading.
+This outputs `openapi.yaml` in the project root. It runs `just sources` first, which clones the two repositories to `/tmp/proton-cli-WebClients` and `/tmp/proton-cli-DriveSDK` (~30 seconds) or updates checkouts that are already there (~1 second). Run `just sources` on its own to refresh them for reading.
 
 ### What It Extracts
 
@@ -93,7 +104,21 @@ Per endpoint:
 | `timeout` property | `x-timeout` |
 | `keepalive` property | `x-keepalive` |
 | `silence` array | `x-expected-errors` |
-| All exported enums | Comment block in components section |
+| All enums | Comment block in components section |
+
+A function is read whether or not it is exported: upstream keeps helpers behind exported wrappers, and the endpoint is the same endpoint either way.
+
+Drive's SDK carries Proton's OpenAPI written out by `openapi-typescript`, so it is read as the structure that is:
+
+| Source | OpenAPI |
+|---|---|
+| A key of the `paths` interface | `paths` |
+| A method on it that is not `never` | HTTP method, and `operationId` from the `operations` key it names |
+| The JSDoc above that method | `summary` |
+| Its `@description` tag, or the codes the 422 response explains | `description` |
+| `parameters.path`, `parameters.query` | `parameters` |
+| `requestBody.content` | `requestBody` schema, and the media type it is sent as |
+| `responses.200`, else `responses.202` | Response schema beside the envelope |
 
 Pass declares its API as two conditional types in `packages/pass/types/api/pass.ts` rather than as one function per endpoint, so it is parsed on its own:
 
@@ -109,18 +134,19 @@ Global:
 
 | Source | OpenAPI |
 |---|---|
-| All `export enum` declarations | Enum reference comments with all values |
-| All `export const = 'string'` | Used to resolve URL template constants |
+| All `enum` declarations | Enum reference comments with all values |
+| All `const = 'string'` | Used to resolve URL template constants |
 | TypeScript interfaces | Resolved for request body property types, optionality, and comments |
 
 ### How It Works
 
-1. **Checkout** - `just webclients` puts the current `ProtonMail/WebClients` main in `/tmp/proton-cli-WebClients`, and the directory is passed to the generator
+1. **Checkout** - `just sources` puts the current upstream main of each repository in `/tmp`, and both directories are passed to the generator
 2. **Project setup** - creates a ts-morph `Project` with `tsconfig.base.json` for path resolution
 3. **Registry** - scans all source files for string/number constants and enum declarations
-4. **Parse** - walks all exported declarations in `api/**/*.ts`, extracts endpoint metadata from the AST, then walks the Pass `ApiRequestBody` and `ApiResponse` type chains
+4. **Parse** - walks all declarations in `api/**/*.ts`, extracts endpoint metadata from the AST, then walks the Drive SDK's `paths` interface and the Pass `ApiRequestBody` and `ApiResponse` type chains
 5. **Type resolution** - follows TypeScript imports to resolve `data: SomeType` to actual property lists (including `extends`, `Partial<>`, `Omit<>`, etc.)
-6. **Emit** - generates OpenAPI 3.1 YAML to stdout
+6. **Merge** - a route is a URL with every placeholder blanked, so `{shareID}` and `{shareId}` are one route rather than two. Sources are ordered Drive SDK, then shared, then Pass: the first to declare an operation defines it, and the rest only fill in what they alone say - `deprecated`, `security: []`, `x-timeout`, `x-keepalive`, `x-expected-errors`
+7. **Emit** - generates OpenAPI 3.1 YAML to stdout
 
 ### File Structure
 
@@ -131,7 +157,22 @@ openapi-generator/
 ├── registry.ts           - constant and enum collection
 ├── extract-endpoint.ts   - endpoint extraction from AST nodes
 ├── extract-params.ts     - body/query param type resolution
+├── merge.ts              - one operation per route, from overlapping sources
+├── parse-drive-sdk.ts    - the Drive API, declared as Proton's own OpenAPI
 ├── parse-pass.ts         - the Pass API, declared as conditional types
 ├── emit-yaml.ts          - OpenAPI YAML output
 └── types.ts              - shared TypeScript interfaces
 ```
+
+## OpenAPI Guard
+
+The weekly sync commits `openapi.yaml` to `main` without anyone reading the diff, so this stands in for the reader:
+
+```bash
+go run ./scripts/openapi-guard \
+    --previous /tmp/openapi-previous.yaml \
+    --current openapi.yaml \
+    --sent tests/api-coverage.golden
+```
+
+It refuses a spec that shrank by more than 10%, which is what an upstream refactor the generator no longer follows looks like, and a spec that stopped documenting a request the CLI itself sends - `tests/api-coverage.golden` is the recording of those. Only what the previous spec documented counts as lost: an endpoint no source has ever declared is a gap, not a regression.

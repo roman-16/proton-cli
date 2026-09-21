@@ -32,20 +32,10 @@ jobs:
 
       - name: Verify the regenerated spec
         run: |
-          prev_paths=$(grep -cE '^  /' /tmp/openapi-previous.yaml || true)
-          new_paths=$(grep -cE '^  /' openapi.yaml || true)
-          prev_lines=$(wc -l < /tmp/openapi-previous.yaml)
-          new_lines=$(wc -l < openapi.yaml)
-          echo "paths: $prev_paths -> $new_paths"
-          echo "lines: $prev_lines -> $new_lines"
-
-          # A WebClients refactor the generator no longer understands yields a
-          # spec that is still valid YAML but has lost most of its endpoints.
-          # Refuse anything that shrinks by more than 10%.
-          if (( new_paths * 10 < prev_paths * 9 || new_lines * 10 < prev_lines * 9 )); then
-            echo "::error::regenerated spec shrank by more than 10% ($prev_paths paths/$prev_lines lines -> $new_paths paths/$new_lines lines); refusing to commit"
-            exit 1
-          fi
+          devbox run go run ./scripts/openapi-guard \
+            --previous /tmp/openapi-previous.yaml \
+            --current openapi.yaml \
+            --sent tests/api-coverage.golden
 
       - name: Commit and push
         run: |
@@ -54,8 +44,9 @@ jobs:
             exit 0
           fi
 
-          # Checkout path is `webClients` in the justfile.
+          # Checkout paths are `webClients` and `driveSdk` in the justfile.
           webclients=$(git -C /tmp/proton-cli-WebClients rev-parse --short HEAD)
+          drivesdk=$(git -C /tmp/proton-cli-DriveSDK rev-parse --short HEAD)
 
           git config user.name "Roman"
           git config user.email "roman@lerchster.dev"
@@ -63,6 +54,7 @@ jobs:
           git commit -F - <<EOF
           chore(openapi): sync generated spec
 
-          Regenerated from ProtonMail/WebClients at ${webclients}.
+          Regenerated from ProtonMail/WebClients at ${webclients} and
+          ProtonDriveApps/sdk at ${drivesdk}.
           EOF
           git push

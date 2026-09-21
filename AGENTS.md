@@ -109,7 +109,9 @@ The Proton WebClients TypeScript source is available at `/tmp/proton-cli-WebClie
 - How the web client calls endpoints (parameter names, types, ordering)
 - Constants and enums (`packages/shared/lib/constants.ts`, etc.)
 
-If the clone is missing or stale, run:
+**Drive is the exception**: its app calls `@protontech/drive-sdk`, so the shared package declares little of Drive any more. The SDK is at `/tmp/proton-cli-DriveSDK/` (cloned from https://github.com/ProtonDriveApps/sdk), and `client/js/src/internal/apiService/driveTypes.ts` is Proton's own OpenAPI for Drive: every path, parameter, body and response.
+
+If a clone is missing or stale, run:
 ```bash
-just webclients
+just sources
 ```

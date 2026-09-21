@@ -75,11 +75,12 @@ og:
         --use-fonts-dir "$DEVBOX_PACKAGES_DIR/share/fonts" \
         --font-family "JetBrains Mono" --monospace-family "JetBrains Mono"
 
+driveSdk := "/tmp/proton-cli-DriveSDK"
 webClients := "/tmp/proton-cli-WebClients"
 
-[doc("Regenerate openapi.yaml from the WebClients TypeScript source")]
-openapi: webclients
-    cd scripts && bun install --frozen-lockfile && bun run generate-openapi {{ webClients }} > ../openapi.yaml
+[doc("Regenerate openapi.yaml from the WebClients and Drive SDK TypeScript source")]
+openapi: sources
+    cd scripts && bun install --frozen-lockfile && bun run generate-openapi {{ webClients }} {{ driveSdk }} > ../openapi.yaml
 
 [doc("Build the documentation site, which type-checks it and validates every link")]
 web:
@@ -92,21 +93,23 @@ web-dev:
 # Nothing here is anyone's to keep: the checkout is a shallow, read-only copy of
 # upstream's main, so a local state that will not take the update is discarded
 # and cloned again rather than repaired.
-[doc("Clone or update the WebClients checkout that openapi.yaml and the reference reading come from")]
-webclients:
+[private]
+_checkout name url dir:
     #!/usr/bin/env bash
     set -euo pipefail
     update() {
-        git -C {{ webClients }} fetch --depth 1 origin main \
-            && git -C {{ webClients }} reset --hard --quiet FETCH_HEAD
+        git -C {{ dir }} fetch --depth 1 origin main \
+            && git -C {{ dir }} reset --hard --quiet FETCH_HEAD
     }
     clone() {
-        rm --recursive --force {{ webClients }}
-        git clone --depth 1 --branch main \
-            https://github.com/ProtonMail/WebClients.git {{ webClients }}
+        rm --recursive --force {{ dir }}
+        git clone --depth 1 --branch main {{ url }} {{ dir }}
     }
     update 2>/dev/null || clone
-    git -C {{ webClients }} --no-pager log --max-count=1 --format='WebClients %h %cs %s'
+    git -C {{ dir }} --no-pager log --max-count=1 --format='{{ name }} %h %cs %s'
+
+[doc("Clone or update the Proton checkouts that openapi.yaml and the reference reading come from")]
+sources: (_checkout "Drive SDK" "https://github.com/ProtonDriveApps/sdk.git" driveSdk) (_checkout "WebClients" "https://github.com/ProtonMail/WebClients.git" webClients)
 
 [doc("Rewrite the list of domains that offer a two-factor code, from 2fa.directory")]
 twofa:

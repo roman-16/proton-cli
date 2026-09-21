@@ -20,7 +20,6 @@ export function collectConstants(sf: SourceFile): void {
 
 export function collectEnums(sf: SourceFile): void {
   for (const enumDecl of sf.getEnums()) {
-    if (!enumDecl.isExported()) continue;
     const name = enumDecl.getName();
     const values: { key: string; value: string | number }[] = [];
     for (const member of enumDecl.getMembers()) {

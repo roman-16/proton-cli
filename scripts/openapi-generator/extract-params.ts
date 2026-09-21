@@ -133,6 +133,16 @@ export function typeToProperties(type: Type): Property[] {
         if (jsDocs?.length) {
           description = jsDocs.map((d: any) => d.getDescription?.() ?? "").join(" ").trim();
         }
+        if (!description && jsDocs?.length) {
+          // Generated types carry the prose under an @description tag rather
+          // than as the comment itself.
+          description = jsDocs
+            .flatMap((d: any) => d.getTags?.() ?? [])
+            .filter((t: any) => t.getTagName() === "description")
+            .map((t: any) => t.getCommentText?.() ?? "")
+            .join(" ")
+            .trim();
+        }
         if (!description) {
           const trailing = valDecl.getTrailingCommentRanges();
           if (trailing.length > 0) {
@@ -141,8 +151,10 @@ export function typeToProperties(type: Type): Property[] {
         }
         if (!description) {
           // Pass annotates its types with a block comment above the property
-          // rather than with JSDoc.
-          const leading = valDecl.getLeadingCommentRanges();
+          // rather than with JSDoc, whose own tags are read above.
+          const leading = valDecl
+            .getLeadingCommentRanges()
+            .filter((range) => !range.getText().startsWith("/**"));
           if (leading.length > 0) {
             description = leading[leading.length - 1]
               .getText()

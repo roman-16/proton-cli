@@ -164,13 +164,13 @@ Unit test files are named after the file they test (`size.go` → `size_test.go`
 
 ## Working with Proton's API
 
-Proton's web client is the reference for endpoints, payload shapes, and crypto flows. Put a current copy in `/tmp/proton-cli-WebClients` to read:
+Proton's web client is the reference for endpoints, payload shapes, and crypto flows, except for Drive: its app calls `@protontech/drive-sdk`, which carries Proton's own OpenAPI for Drive. Put a current copy of each in `/tmp` to read:
 
 ```bash
-just webclients
+just sources
 ```
 
-`openapi.yaml` in the repository root is generated from that source and covers roughly 950 endpoints across 786 paths, Pass included. Regenerate it with:
+`openapi.yaml` in the repository root is generated from both checkouts, Pass and Drive included. Regenerate it with:
 
 ```bash
 just openapi

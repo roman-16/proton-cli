@@ -79,6 +79,11 @@ function buildEndpoint(name: string, obj: Node, fnNode: Node, declNode: Node): E
       const propName = prop.getName();
       if (propName === "data") hasBody = true;
       if (propName === "params") hasParams = true;
+      if (propName === "url") {
+        const local = prop.getValueSymbol()?.getValueDeclaration();
+        const init = local && Node.isVariableDeclaration(local) ? local.getInitializer() : undefined;
+        if (init) url = resolveStringValue(init);
+      }
       continue;
     }
     if (Node.isSpreadAssignment(prop)) continue;

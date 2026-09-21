@@ -3,6 +3,9 @@ export interface Endpoint {
   method: string;
   url: string;
   tag: string;
+  // summary is the one-line title, for the part of the API whose source writes
+  // one; the rest are titled after the function that calls them.
+  summary?: string;
   description: string;
   deprecated: boolean;
   isPublic: boolean;

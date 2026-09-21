@@ -1,16 +1,15 @@
-import type { Endpoint, Property, EnumInfo } from "./parse.js";
+import type { Endpoint, EnumInfo } from "./types.js";
+import type { Route } from "./merge.js";
 
-export function generateOpenAPI(
-  endpoints: Endpoint[],
-  enums: Map<string, EnumInfo>
-): string {
-  const tags = [...new Set(endpoints.map((e) => e.tag))].sort();
+export function generateOpenAPI(routes: Route[], enums: Map<string, EnumInfo>): string {
+  const operations = routes.flatMap((route) => [...route.operations.values()]);
+  const tags = [...new Set(operations.map((e) => e.tag))].sort();
   const lines: string[] = [];
 
   emitHeader(lines);
   emitEnumComments(lines, enums);
   emitTags(lines, tags);
-  emitPaths(lines, endpoints);
+  emitPaths(lines, routes);
 
   return lines.join("\n") + "\n";
 }
@@ -21,9 +20,10 @@ function emitHeader(lines: string[]): void {
   lines.push("  title: Proton API");
   lines.push('  version: "1.0"');
   lines.push("  description: |");
-  lines.push("    Auto-generated from ProtonMail/WebClients TypeScript source files.");
+  lines.push("    Auto-generated from Proton's own TypeScript source files.");
   lines.push("    Sources: https://github.com/ProtonMail/WebClients/tree/main/packages/shared/lib/api");
   lines.push("             https://github.com/ProtonMail/WebClients/blob/main/packages/pass/types/api/pass.ts");
+  lines.push("             https://github.com/ProtonDriveApps/sdk/blob/main/client/js/src/internal/apiService/driveTypes.ts");
   lines.push("");
   lines.push("servers:");
   lines.push("  - url: https://mail.proton.me/api");
@@ -67,26 +67,12 @@ function emitTags(lines: string[], tags: string[]): void {
   lines.push("");
 }
 
-function emitPaths(lines: string[], endpoints: Endpoint[]): void {
-  const byPath = new Map<string, Endpoint[]>();
-  for (const ep of endpoints) {
-    const existing = byPath.get(ep.url) || [];
-    existing.push(ep);
-    byPath.set(ep.url, existing);
-  }
-
+function emitPaths(lines: string[], routes: Route[]): void {
   lines.push("paths:");
 
-  for (const urlPath of [...byPath.keys()].sort()) {
-    const eps = byPath.get(urlPath)!;
-    lines.push(`  ${urlPath}:`);
-
-    const byMethod = new Map<string, Endpoint>();
-    for (const ep of eps) {
-      if (!byMethod.has(ep.method)) byMethod.set(ep.method, ep);
-    }
-
-    for (const [method, ep] of byMethod) {
+  for (const route of routes) {
+    lines.push(`  ${route.url}:`);
+    for (const [method, ep] of route.operations) {
       emitOperation(lines, method, ep);
     }
   }
@@ -95,7 +81,7 @@ function emitPaths(lines: string[], endpoints: Endpoint[]): void {
 function emitOperation(lines: string[], method: string, ep: Endpoint): void {
   lines.push(`    ${method}:`);
   lines.push(`      tags: [${ep.tag}]`);
-  lines.push(`      summary: ${camelToTitle(ep.name)}`);
+  lines.push(`      summary: ${esc(ep.summary || camelToTitle(ep.name))}`);
   lines.push(`      operationId: ${ep.name}`);
 
   if (ep.description) lines.push(`      description: ${esc(ep.description)}`);
@@ -214,9 +200,16 @@ function camelToTitle(name: string): string {
     .trim();
 }
 
+// A plain scalar may not carry these, and may not open with one of those a
+// block or a tag starts with.
+const UNQUOTABLE = /[:#{}'"]/;
+const INDICATOR = /^[-?,[\]&*!|>%@`]/;
+
 function esc(s: string): string {
   if (!s) return s;
   const flat = s.replace(/\s+/g, " ").trim();
-  if (/[:#{}'"]/.test(flat)) return `"${flat.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+  if (UNQUOTABLE.test(flat) || INDICATOR.test(flat)) {
+    return `"${flat.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+  }
   return flat;
 }
