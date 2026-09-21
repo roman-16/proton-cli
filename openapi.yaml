@@ -39,7 +39,6 @@ components:
   # ADD_EVENT_ERROR_TYPE: 0=TOO_MANY_PARTICIPANTS
   # ADDON_NAMES: 1member-drivepro2022=MEMBER_DRIVE_PRO, 1lumo-drivepro2022=LUMO_DRIVE_PRO, 1meet-drivepro2022=MEET_DRIVE_PRO, 1member-drivebiz2024=MEMBER_DRIVE_BUSINESS, 1lumo-drivebiz2024=LUMO_DRIVE_BUSINESS, 1meet-drivebiz2024=MEET_DRIVE_BUSINESS, 1member-mailpro2022=MEMBER_MAIL_PRO, 1scribe-mailpro2022=MEMBER_SCRIBE_MAIL_PRO, 1lumo-mailpro2022=LUMO_MAIL_PRO, 1meet-mailpro2022=MEET_MAIL_PRO, 1member-mailbiz2024=MEMBER_MAIL_BUSINESS, 1scribe-mailbiz2024=MEMBER_SCRIBE_MAIL_BUSINESS, 1lumo-mailbiz2024=LUMO_MAIL_BUSINESS, 1meet-mailbiz2024=MEET_MAIL_BUSINESS, 1member-bundlepro2022=MEMBER_BUNDLE_PRO, 1domain-bundlepro2022=DOMAIN_BUNDLE_PRO, 1ip-bundlepro2022=IP_BUNDLE_PRO, 1scribe-bundlepro2022=MEMBER_SCRIBE_BUNDLE_PRO, 1lumo-bundlepro2022=LUMO_BUNDLE_PRO, 1meet-bundlepro2022=MEET_BUNDLE_PRO, 1member-bundlepro2024=MEMBER_BUNDLE_PRO_2024, 1domain-bundlepro2024=DOMAIN_BUNDLE_PRO_2024, 1ip-bundlepro2024=IP_BUNDLE_PRO_2024, 1scribe-bundlepro2024=MEMBER_SCRIBE_BUNDLE_PRO_2024, 1lumo-bundlepro2024=LUMO_BUNDLE_PRO_2024, 1member-bundlebiz2025=MEMBER_BUNDLE_BIZ_2025, 1domain-bundlebiz2025=DOMAIN_BUNDLE_BIZ_2025, 1ip-bundlebiz2025=IP_BUNDLE_BIZ_2025, 1member-vpnpro2023=MEMBER_VPN_PRO, 1lumo-vpnpro2023=LUMO_VPN_PRO, 1meet-vpnpro2023=MEET_VPN_PRO, 1member-vpnbiz2023=MEMBER_VPN_BUSINESS, 1ip-vpnbiz2023=IP_VPN_BUSINESS, 1lumo-vpnbiz2023=LUMO_VPN_BUSINESS, 1meet-vpnbiz2023=MEET_VPN_BUSINESS, 1domain-vpnbiz2023=DOMAIN_VPN_BUSINESS, 1member-passpro2024=MEMBER_PASS_PRO, 1lumo-passpro2024=LUMO_PASS_PRO, 1meet-passpro2024=MEET_PASS_PRO, 1member-passbiz2024=MEMBER_PASS_BUSINESS, 1lumo-passbiz2024=LUMO_PASS_BUSINESS, 1meet-passbiz2024=MEET_PASS_BUSINESS, 1member-lumobiz2025=MEMBER_LUMO_BUSINESS, 1meet-lumobiz2025=MEET_LUMO_BUSINESS, 1member-meetbiz2025=MEMBER_MEET_BUSINESS, 1lumo-meetbiz2025=LUMO_MEET_BUSINESS, 1member-meet2026=MEMBER_MEET, 1lumo-meet2026=LUMO_MEET, 1member-vpnpassbiz2025=MEMBER_VPN_PASS_BUNDLE_BUSINESS, 1lumo-vpnpassbiz2025=LUMO_VPN_PASS_BUNDLE_BUSINESS, 1ip-vpnpassbiz2025=IP_VPN_PASS_BUNDLE_BUSINESS, 1meet-vpnpassbiz2025=MEET_VPN_PASS_BUNDLE_BUSINESS, 1lumo-mail2022=LUMO_MAIL, 1lumo-drive2022=LUMO_DRIVE, 1lumo-drive1tb2025=LUMO_DRIVE_1TB, 1lumo-pass2023=LUMO_PASS, 1lumo-passfamily2024=LUMO_PASS_FAMILY, 1lumo-vpn2024=LUMO_VPN2024, 1lumo-bundle2022=LUMO_BUNDLE, 1lumo-family2022=LUMO_FAMILY, 1lumo-duo2024=LUMO_DUO, 1meet-lumo2024=MEET_LUMO, 1meet-mail2022=MEET_MAIL, 1meet-drive2022=MEET_DRIVE, 1meet-drive1tb2025=MEET_DRIVE_1TB, 1meet-pass2023=MEET_PASS, 1meet-passfamily2024=MEET_PASS_FAMILY, 1meet-vpn2024=MEET_VPN2024, 1meet-bundle2022=MEET_BUNDLE, 1meet-family2022=MEET_FAMILY, 1meet-duo2024=MEET_DUO, 1meet-vpnpass2023=MEET_VPN_PASS_BUNDLE
   # ADDON_PREFIXES: 1member=MEMBER, 1domain=DOMAIN, 1ip=IP, 1scribe=SCRIBE, 1lumo=LUMO, 1meet=MEET
-  # ADDRESS_COMPONENTS: 0=POST_BOX, 1=EXTENDED, 2=STREET, 3=LOCALITY, 4=REGION, 5=POSTAL_CODE, 6=COUNTRY
   # ADDRESS_FLAGS: 16=FLAG_DISABLE_E2EE, 32=FLAG_DISABLE_EXPECTED_SIGNED, 64=BYOE
   # ADDRESS_PERMISSION_TYPE: receive=RECEIVE, send=SEND
   # ADDRESS_PERMISSIONS: 0=NO_PERMISSION, 1=PERMISSIONS_RECEIVE_ALL, 2=PERMISSIONS_SEND_ALL, 4=PERMISSIONS_AUTORESPONDER, 8=PERMISSIONS_RECEIVE_ORG, 16=PERMISSIONS_SEND_ORG
@@ -49,10 +48,9 @@ components:
   # ADDRESS_TYPE: 1=TYPE_ORIGINAL, 2=TYPE_ALIAS, 3=TYPE_CUSTOM_DOMAIN, 4=TYPE_PREMIUM, 5=TYPE_EXTERNAL, 6=TYPE_GROUP
   # AddressActiveStatus: 0=INACTIVE, 1=ACTIVE
   # AddressConfirmationState: 0=CONFIRMATION_NOT_CONFIRMED, 1=CONFIRMATION_CONFIRMED, 2=CONFIRMATION_INVALID
-  # AgentType: 1=ClosedCaptions
   # AI_ASSISTANT_ACCESS: 0=UNSET, 1=OFF, 2=SERVER_ONLY, 3=CLIENT_ONLY
   # ALMOST_ALL_MAIL: 0=DISABLED, 1=ENABLED
-  # API_CODES: 1001=GLOBAL_SUCCESS, 1000=SINGLE_SUCCESS, 2011=NOT_ALLOWED_ERROR, 2000=INVALID_REQUIREMENT_ERROR, 2001=INVALID_LINK_TYPE_ERROR, 2500=ALREADY_EXISTS_ERROR, 2501=NOT_FOUND_ERROR, 2061=INVALID_ID_ERROR
+  # API_CODES: 1001=GLOBAL_SUCCESS, 1000=SINGLE_SUCCESS, 2011=NOT_ALLOWED_ERROR, 2000=INVALID_REQUIREMENT_ERROR, 2500=ALREADY_EXISTS_ERROR, 2501=NOT_FOUND_ERROR, 2061=INVALID_ID_ERROR
   # API_KEY_SOURCE: 0=PROTON, 1=WKD, 2=KOO
   # APP_UPSELL_REF_PATH: upsell_mail-=MAIL_UPSELL_REF_PATH, upsell_calendar-=CALENDAR_UPSELL_REF_PATH, upsell_drive-=DRIVE_UPSELL_REF_PATH, upsell_pass-=PASS_UPSELL_REF_PATH, upsell_vpn-=VPN_UPSELL_REF_PATH, upsell_inbox_desktop-=INBOX_DESKTOP_REF_PATH, upsell_docs-=DOCS_UPSELL_REF_PATH, upsell_account-=ACCOUNT_UPSELL_REF_PATH, upsell_wallet-=WALLET_UPSELL_REF_PATH, upsell_lumo-=LUMO_UPSELL_REF_PATH
   # ASSISTANT_INSERT_TYPE: INSERT=INSERT, REPLACE=REPLACE
@@ -61,14 +59,12 @@ components:
   # ATTACHMENT_DISPOSITION: attachment=ATTACHMENT, inline=INLINE
   # ATTENDEE_COMMENT_ENCRYPTION_TYPE: 0=CLEARTEXT, 1=ENCRYPTED_AND_SIGNED
   # ATTENDEE_MORE_ATTENDEES: 0=NO, 1=YES
-  # ATTENDEE_PERMISSIONS: 1=SEE, 2=INVITE, 3=SEE_AND_INVITE, 4=EDIT, 8=DELETE
   # ATTENDEE_STATUS_API: 0=NEEDS_ACTION, 1=TENTATIVE, 2=DECLINED, 3=ACCEPTED
-  # AttestationFormat: none=None, android-key=AndroidKey, android-safetynet=AndroidSafetyNet, apple=Apple, fido-u2f=FidoU2F, packed=Packed, tpm=TPM
   # Audience: b2c=B2C, b2b=B2B, family=FAMILY
   # AUTH_LOG_EVENTS: 0=LOGIN_FAILURE_PASSWORD, 1=LOGIN_SUCCESS, 2=LOGOUT, 3=LOGIN_FAILURE_2FA, 4=LOGIN_SUCCESS_AWAIT_2FA, 5=LOGIN_SUCCESS_FORBIDDEN, 6=LOGIN_SUCCESS_MNEMONIC, 7=LOGIN_FAILURE_MNEMONIC, 8=LOGIN_SUCCESS_ADMIN, 9=LOGIN_BLOCKED, 80=LOGIN_SUCCESS_AWAIT_VERIFY, 81=LOGIN_ATTEMPT, 10=REAUTH_FAILURE_PASSWORD, 11=REAUTH_FAILURE_2FA, 12=REAUTH_SUCCESS, 20=CHANGE_ACCOUNT_PASSWORD, 21=CHANGE_MAILBOX_PASSWORD, 22=RESET_ACCOUNT, 23=CHANGE_MNEMONIC, 24=RESET_ACCOUNT_MNEMONIC, 25=CHANGE_EMAIL, 26=CHANGE_PHONE, 27=ENABLE_HIGH_SECURITY, 28=DISABLE_HIGH_SECURITY, 30=ENABLE_MAILBOX_PASSWORD, 31=DISABLE_MAILBOX_PASSWORD, 32=ENABLE_TOTP, 33=DISABLE_TOTP, 34=ADD_U2F, 35=REMOVE_U2F, 36=DISABLE_MNEMONIC, 37=RESET_BACKUP_SECRET, 40=USER_KEY_CREATION, 41=USER_KEY_DELETION, 42=USER_KEY_REACTIVATION, 50=ADDRESS_KEY_CREATION, 51=ADDRESS_KEY_DELETION, 52=ADDRESS_KEY_REACTIVATION, 60=ENABLE_EMAIL_RECOVERY, 61=ENABLE_PHONE_RECOVERY, 62=DISABLE_EMAIL_RECOVERY, 63=DISABLE_PHONE_RECOVERY, 70=REVOKE_ALL_SESSIONS, 71=REVOKE_SINGLE_SESSION
   # AuthDeviceErrorCodes: 10300=AUTH_DEVICE_NOT_FOUND, 10301=AUTH_DEVICE_NOT_ACTIVE, 10302=AUTH_DEVICE_TOKEN_INVALID, 10303=AUTH_DEVICE_REJECTED
   # AuthDeviceState: 0=Inactive, 1=Active, 2=PendingActivation, 3=PendingAdminActivation, 4=Rejected, 5=NoSession
-  # AuthLogStatus: success=Success, attempt=Attempt, failure=Failure
+  # AuthLogStatus: attempt=Attempt, failure=Failure
   # AUTO_DELETE_SPAM_AND_TRASH_DAYS: 30=ACTIVE, 0=DISABLED
   # AUTO_SAVE_CONTACTS: 0=DISABLED, 1=ENABLED
   # AutoAddVideoConferenceLinkProvider: 0=None, 1=Zoom, 2=Meet
@@ -79,13 +75,13 @@ components:
   # CALENDAR_CARD_TYPE: 0=CLEAR_TEXT, 1=ENCRYPTED, 2=SIGNED, 3=ENCRYPTED_AND_SIGNED
   # CALENDAR_DISPLAY: 0=HIDDEN, 1=VISIBLE
   # CALENDAR_FLAGS: 0=INACTIVE, 1=ACTIVE, 2=UPDATE_PASSPHRASE, 4=RESET_NEEDED, 8=INCOMPLETE_SETUP, 16=LOST_ACCESS, 32=SELF_DISABLED, 64=SUPER_OWNER_DISABLED
-  # CALENDAR_ORDER_BY: 0=ASCENDING, 1=DESCENDING
+  # CALENDAR_ORDER_BY: 0=ASCENDING
   # CALENDAR_PERMISSIONS: 1=SUPER_OWNER, 2=OWNER, 4=ADMIN, 8=READ_MEMBER_LIST, 16=WRITE, 32=READ, 64=AVAILABILITY
   # CALENDAR_RETURN_FLAGS: 0=NO, 1=YES
   # CALENDAR_SHARE_BUSY_TIME_SLOTS: 0=NO, 1=YES
   # CALENDAR_STATUS: 1=ACTIVE, 2=DELETED
-  # CALENDAR_STATUS_TYPE: 0=DEFAULT, 1=ACTIVE, 2=DISABLED, 3=SYNCING, 4=NOT_SYNCED
-  # CALENDAR_SUBSCRIPTION_STATUS: 0=OK, 1=ERROR, 2=INVALID_ICS, 3=CALENDAR_SOFT_DELETED, 4=CALENDAR_NOT_FOUND, 5=USER_NOT_EXIST, 6=ICS_SIZE_EXCEED_LIMIT, 7=SYNCHRONIZING, 8=CALENDAR_MISSING_PRIMARY_KEY, 20=HTTP_REQUEST_FAILED_GENERIC, 21=HTTP_REQUEST_FAILED_BAD_REQUEST, 22=HTTP_REQUEST_FAILED_UNAUTHORIZED, 23=HTTP_REQUEST_FAILED_FORBIDDEN, 24=HTTP_REQUEST_FAILED_NOT_FOUND, 25=HTTP_REQUEST_FAILED_INTERNAL_SERVER_ERROR, 26=HTTP_REQUEST_FAILED_TIMEOUT, 27=INTERNAL_CALENDAR_URL_NOT_FOUND, 28=INTERNAL_CALENDAR_UNDECRYPTABLE, 30=INVALID_URL
+  # CALENDAR_STATUS_TYPE: 0=DEFAULT, 1=ACTIVE, 2=DISABLED, 4=NOT_SYNCED
+  # CALENDAR_SUBSCRIPTION_STATUS: 0=OK, 2=INVALID_ICS, 6=ICS_SIZE_EXCEED_LIMIT, 7=SYNCHRONIZING, 8=CALENDAR_MISSING_PRIMARY_KEY, 20=HTTP_REQUEST_FAILED_GENERIC, 21=HTTP_REQUEST_FAILED_BAD_REQUEST, 22=HTTP_REQUEST_FAILED_UNAUTHORIZED, 23=HTTP_REQUEST_FAILED_FORBIDDEN, 24=HTTP_REQUEST_FAILED_NOT_FOUND, 25=HTTP_REQUEST_FAILED_INTERNAL_SERVER_ERROR, 26=HTTP_REQUEST_FAILED_TIMEOUT, 27=INTERNAL_CALENDAR_URL_NOT_FOUND, 28=INTERNAL_CALENDAR_UNDECRYPTABLE, 30=INVALID_URL
   # CALENDAR_TYPE: 0=PERSONAL, 1=SUBSCRIPTION, 2=HOLIDAYS
   # CALENDAR_UPSELL_PATHS: multi-cal=MULTI_CAL, share-cal=SHARE_CAL, max-cal=MAX_CAL, color-per-event=COLOR_PER_EVENT, booking-page=BOOKING_PAGE
   # CALENDAR_VALIDATION_MODE: 0=DOWNLOAD_ONLY, 1=DOWNLOAD_AND_PARSE
@@ -102,6 +98,7 @@ components:
   # ColorScheme: 0=Dark, 1=Light
   # COMPOSER_MODE: 0=POPUP, 1=MAXIMIZED
   # CONFIRM_LINK: 0=DISABLED, 1=CONFIRM
+  # ConfirmationCodeVersion: 1=V1, 2=V2
   # CONTACT_CARD_TYPE: 3=ENCRYPTED_AND_SIGNED, 2=SIGNED, 1=ENCRYPTED, 0=CLEAR_TEXT
   # CookieSameSiteAttribute: lax=Lax, strict=Strict, none=None
   # COUPON_CODES: PORKBUN=PORKBUN, BF25PROMO=BLACK_FRIDAY_2025, BF25PROMO1M=BLACK_FRIDAY_2025_MONTH, BF25BUNDLEPROMO=BLACK_FRIDAY_2025_BUNDLE, BF25LIGHTNING=BLACK_FRIDAY_2025_LIGHTNING, BF25LUMOADDON=BLACK_FRIDAY_2025_LUMOADDON, BF25LUMOADDONPROMO=BLACK_FRIDAY_2025_LUMOADDON_OMNI, BF25DEALPD=BLACK_FRIDAY_2025_DEALPD, BF25DEALVM=BLACK_FRIDAY_2025_DEALVM, BF25PROMO24=BLACK_FRIDAY_2025_TWOYEAR, BF25PROMOCS=BLACK_FRIDAY_2025_CS, BF25PROMO24CS=BLACK_FRIDAY_2025_TWOYEAR_CS, BF25PROMO1MCS=BLACK_FRIDAY_2025_MONTH_CS, BF25BUNDLEPROMOCS=BLACK_FRIDAY_2025_BUNDLE_CS, BF25LUMOADDONCS=BLACK_FRIDAY_2025_LUMOADDON_CS, BF25LIGHTNINGCS=BLACK_FRIDAY_2025_LIGHTNING_CS, BF25LUMOADDONPROMOCS=BLACK_FRIDAY_2025_LUMOADDON_PROMO_CS, ANNUALOFFER25=ANNUALOFFER25, RENEWANDSAVE1M26=RENEWANDSAVE1M26, RENEWANDSAVE12M26=RENEWANDSAVE12M26, LIFETIME=LIFETIME, VIVALDIVPN=VPN_VIVALDI, MAILPLUSINTRO=MAILPLUSINTRO, DRIVEPLUSINTRO2024=TRYDRIVEPLUS2024, PASSPLUSINTRO2024=PASSPLUSINTRO2024, VPNINTROPRICE2025=VPN_INTRO_2025, VPNPLUSFREE2024=VPN_PLUS_FREE_2024, TRYVPNPLUS2024=TRYVPNPLUS2024, VPNMATCHDAYDEALS=VPNMATCHDAYDEALS, TECHRADARVPNPASS=TECHRADARVPNPASS, CNETVPNPASS=CNETVPNPASS, COMPARITECHVPNPASS=COMPARITECHVPNPASS, PCMAGVPNPASS=PCMAGVPNPASS, VPNPASSINTRO2026=VPNPASSINTRO2026, TRYMAILPLUS0724=TRYMAILPLUS0724, TRYMAILPLUSMOBILE2026=TRYMAILPLUSMOBILE2026, PASSEARLYSUPPORTER=PASSEARLYSUPPORTER, PASSFAMILYLAUNCH=PASSFAMILYLAUNCH, MAR26SALECS=MAR26SALECS, MAR26BUNDLESALECS=MAR26BUNDLESALECS, MAR26OFFERCS=MAR26OFFERCS, JUNE26SALE=JUNE26SALE, JUNE26BUNDLESALE=JUNE26BUNDLESALE, SEP26BUNDLESALE=SEP26BUNDLESALE, SEP26BUNDLEDEAL=SEP26BUNDLEDEAL, SEP26BUNDLESALECS=SEP26BUNDLESALECS, SEP26BUNDLEDEALCS=SEP26BUNDLEDEALCS, VPNSAVEOFFER=VPNSAVEOFFER
@@ -109,14 +106,13 @@ components:
   # CreateMemberMode: 0=Password, 1=Invitation, 2=LoginLink
   # CRYPTO_PROCESSING_TYPES: 0=SUCCESS, 1=SIGNATURE_NOT_VERIFIED, 2=FAIL_TO_READ, 3=FAIL_TO_LOAD, 4=FAIL_TO_DECRYPT
   # CurrencySymbols: US$=USD, AU$=AUD, CA$=CAD, €=EUR, £=GBP, CHF=CHF, BRL=BRL, ¥=JPY, ₩=KRW, zł=PLN, SGD=SGD, HK$=HKD
-  # CUSTOM_FETCH_ERROR_STATUS_CODE: 0=NO_NETWORK_CONNECTION, -1=TIMEOUT
   # CUSTOM_VIEWS_LABELS: views/newsletters=NEWSLETTER_SUBSCRIPTIONS
-  # CustomPasswordState: 0=NO_PASSWORD, 1=PASSWORD_SET
+  # CustomPasswordState: 0=NO_PASSWORD
   # CYCLE: 1=MONTHLY, 3=THREE, 6=SIX, 12=YEARLY, 15=FIFTEEN, 18=EIGHTEEN, 24=TWO_YEARS, 30=THIRTY
   # DAILY_TYPE: 0=ALL_DAYS
-  # DARK_WEB_MONITORING_ELIGIBILITY_STATE: 0=NONPAID, 1=PAID
-  # DARK_WEB_MONITORING_EMAILS_STATE: 0=DISABLED, 1=ENABLED
-  # DARK_WEB_MONITORING_STATE: 0=DISABLED, 1=ENABLED
+  # DARK_WEB_MONITORING_ELIGIBILITY_STATE: 1=PAID
+  # DARK_WEB_MONITORING_EMAILS_STATE: 1=ENABLED
+  # DARK_WEB_MONITORING_STATE: 1=ENABLED
   # DASHBOARD_UPSELL_PATHS: mailplus-dashboard=MAILPLUS, mailpro-dashboard=MAILEPRO, unlimited-dashboard=UNLIMITED, drive-dashboard=DRIVE, pass-dashboard=PASS, vpn-dashboard=VPN, docs-dashboard=DOCS, wallet-dashboard=WALLET, family-dashboard=FAMILY, duo-dashboard=DUO, business-dashboard=BUSINESS, lumo-dashboard=LUMO, meet-dashboard=MEET
   # DELAY_IN_SECONDS: 0=NONE, 5=SMALL, 10=MEDIUM, 20=LARGE
   # DelegatedAccessStateEnum: 0=Disabled, 1=Enabled, 2=Accessible, 3=Recoverable
@@ -127,21 +123,15 @@ components:
   # DESKTOP_APP_NAMES: drive=DRIVE
   # DESKTOP_PLATFORMS: linux=LINUX, macos=MACOS, windows=WINDOWS, windows/x64=WINDOWS_X64, windows/arm64=WINDOWS_ARM
   # DIRECTION: 0=LEFT_TO_RIGHT, 1=RIGHT_TO_LEFT
-  # DKIM_KEY_DNS_STATUS: 0=NOT_SET, 1=GOOD, 2=INVALID
-  # DKIM_KEY_STATUS: 0=ACTIVE, 1=PENDING, 2=RETIRED, 3=DECEASED
   # DKIM_STATE: 0=DKIM_STATE_DEFAULT, 3=DKIM_STATE_ERROR, 4=DKIM_STATE_GOOD, 5=DKIM_STATE_DELEGATED, 6=DKIM_STATE_WARNING
   # DMARC_STATE: 0=DMARC_STATE_DEFAULT, 1=DMARC_STATE_ONE, 2=DMARC_STATE_MULT, 3=DMARC_STATE_GOOD, 4=DMARC_STATE_RELAXED
   # DocsApiErrorCode: 250000=CommitIdOutOfSync, 250004=NeedsReadonlyMode, 2011=InsufficientPermissions, 2061=InvalidID, 0=Unknown
   # DOMAIN_STATE: 0=DOMAIN_STATE_DEFAULT, 1=DOMAIN_STATE_VERIFIED, 2=DOMAIN_STATE_WARN
-  # DRAFT_TYPE: text/html=NORMAL, text/plain=PLAIN_TEXT
   # DRAWER_EVENTS: close=CLOSE, show=SHOW, switch=SWITCH, ready=READY, session=SESSION, api-request=API_REQUEST, api-response=API_RESPONSE, api-request-abort=ABORT_REQUEST, child-url-update=CHILD_URL_UPDATE, outside-call-event-manager=CALL_EVENT_MANAGER_FROM_OUTSIDE, outside-update-theme=UPDATE_THEME, outside-calendar-open-event=CALENDAR_OPEN_EVENT, outside-call-calendar-event-manager=CALL_CALENDAR_EVENT_MANAGER, outside-set-widget-event=SET_WIDGET_EVENT, outside-unset-widget-event=UNSET_WIDGET_EVENT, outside-request-open-events=REQUEST_OPEN_EVENTS, outside-refresh-widget=REFRESH_WIDGET, open-contact-modal=OPEN_CONTACT_MODAL, open-bug-modal=OPEN_BUG_MODAL
   # DRAWER_NATIVE_APPS: quick-settings=QUICK_SETTINGS, contacts=CONTACTS, security-center=SECURITY_CENTER, vpn=VPN, referral=REFERRAL, lumo=LUMO
   # DRAWER_VISIBILITY: 0=SHOW, 1=HIDE
-  # DRIVE_PERMISSIONS: 4=READ, 2=WRITE, 16=ADMIN
   # DRIVE_SIGNATURE_CONTEXT: drive.share-member.inviter=SHARE_MEMBER_INVITER, drive.share-member.member=SHARE_MEMBER_MEMBER, drive.share-member.external-invitation=SHARE_MEMBER_EXTERNAL_INVITATION, drive.search.index=SEARCH_INDEX
   # DRIVE_UPSELL_PATHS: sidebar=SIDEBAR, one-dollar-initial-reminder=ONE_DOLLAR_INITIAL_REMINDER, one-dollar-second-reminder=ONE_DOLLAR_SECOND_REMINDER, one-dollar-last-reminder=ONE_DOLLAR_LAST_REMINDER, plus_monthly-subscriber-nudge-variant-money=PLUS_MONTHLY_SUBSCRIBER_NUDGE_VARIANT_MONEY
-  # DriveDocsPublicShareMessageType: CUSTOM_PASSWORD=CUSTOM_PASSWORD, READY_TO_RECEIVE_CUSTOM_PASSWORD=READY_TO_RECEIVE_CUSTOM_PASSWORD
-  # EDM_VALUE: 0=ENABLED, 1=DISABLED
   # EdugainAffiliations: student=STUDENT, faculty=FACULTY, staff=STAFF, alum=ALUM, affiliate=AFFILIATE, employee=EMPLOYEE, library-walk-in=LIBRARY_WALK_IN
   # ENCRYPTION_PREFERENCES_ERROR_TYPES: 0=EMAIL_ADDRESS_ERROR, 1=INTERNAL_USER_DISABLED, 2=INTERNAL_USER_NO_API_KEY, 3=PRIMARY_CANNOT_SEND, 4=PRIMARY_NOT_PINNED, 5=EXTERNAL_USER_NO_VALID_EXTERNALLY_FETCHED_KEY, 6=EXTERNAL_USER_NO_VALID_PINNED_KEY, 7=CONTACT_SIGNATURE_NOT_VERIFIED
   # END_TYPE: NEVER=NEVER, COUNT=AFTER_N_TIMES, UNTIL=UNTIL
@@ -150,7 +140,6 @@ components:
   # EVENT_INVITATION_ERROR_TYPE: NON_GREGORIAN=NON_GREGORIAN, INVALID_METHOD=INVALID_METHOD, NO_VEVENT=NO_VEVENT, MISSING_ORIGINAL_UID=MISSING_ORIGINAL_UID, MISSING_ORGANIZER=MISSING_ORGANIZER, MISSING_ORIGINAL_ORGANIZER=MISSING_ORIGINAL_ORGANIZER, MISSING_ATTENDEE=MISSING_ATTENDEE, DUPLICATE_ATTENDEES=DUPLICATE_ATTENDEES, UNEXPECTED_FLOATING_TIME=UNEXPECTED_FLOATING_TIME, X_WR_TIMEZONE_UNSUPPORTED=X_WR_TIMEZONE_UNSUPPORTED, TZID_UNSUPPORTED=TZID_UNSUPPORTED, DTSTART_MISSING=DTSTART_MISSING, ALLDAY_INCONSISTENCY=ALLDAY_INCONSISTENCY, DTSTART_MALFORMED=DTSTART_MALFORMED, DTSTART_OUT_OF_BOUNDS=DTSTART_OUT_OF_BOUNDS, DTEND_MALFORMED=DTEND_MALFORMED, DTEND_OUT_OF_BOUNDS=DTEND_OUT_OF_BOUNDS, RRULE_MALFORMED=RRULE_MALFORMED, RRULE_UNSUPPORTED=RRULE_UNSUPPORTED, SINGLE_EDIT_UNSUPPORTED=SINGLE_EDIT_UNSUPPORTED, NO_OCCURRENCES=NO_OCCURRENCES, EXTERNAL_ERROR=EXTERNAL_ERROR, VALIDATION_ERROR=VALIDATION_ERROR
   # EVENT_TYPES: 0=DELETE, 1=CREATE, 2=UPDATE, 3=UPDATE_METADATA
   # EVENT_VERIFICATION_STATUS: 1=SUCCESSFUL, 0=NOT_VERIFIED, -1=FAILED
-  # EXPIRATION_DAYS: never=NEVER, 1=ONE, 15=FIFTEEN, 30=THIRTY, 60=SIXTY, 90=NINETY
   # EXPORT_ERRORS: 0=NETWORK_ERROR
   # EXPORT_EVENT_ERROR_TYPES: 0=DECRYPTION_ERROR, 1=PASSWORD_RESET
   # EXPORT_STEPS: 0=EXPORTING, 1=FINISHED
@@ -158,7 +147,6 @@ components:
   # ExtraSessionForkSearchParameters: email=Email
   # FIDO2_CREDENTIALS_PIN_VALUE: 1=ENABLED, 0=DISABLED
   # Fido2CredentialFlags: 1=Compromised
-  # FileRevisionState: 0=Draft, 1=Active, 2=Inactive
   # FILTER_STATUS: 1=ENABLED, 0=DISABLED
   # FlagAction: 0=MARK_OBSOLETE, 1=MARK_NOT_OBSOLETE, 2=MARK_COMPROMISED, 3=MARK_NOT_COMPROMISED, 4=DISABLE_ENCRYPTION, 5=ENABLE_ENCRYPTION, 6=DISABLE_EXPECT_SIGNED, 7=ENABLE_EXPECT_SIGNED
   # FOLDER_COLOR: 0=DISABLED, 1=ENABLED
@@ -170,14 +158,14 @@ components:
   # GENERATION_SELECTION_TYPE: HAS_SELECTION=HAS_SELECTION, NO_SELECTION=NO_SELECTION
   # GENERATION_TYPE: WRITE_FULL_EMAIL=WRITE_FULL_EMAIL, SHORTEN=SHORTEN, PROOFREAD=PROOFREAD, EXPAND=EXPAND, FORMALIZE=FORMALIZE, FRIENDLY=FRIENDLY, CUSTOM_REFINE=CUSTOM_REFINE
   # GetActiveSessionType: 0=Switch, 1=AutoPick
-  # GROUP_MEMBER_PERMISSIONS: 0=NONE, 1=SEND, 2=LEAVE, 4=OWNER, 8=OWNER_WITH_KEYS
-  # GROUP_MEMBER_STATE: 0=PENDING, 1=ACTIVE, 2=OUTDATED, 3=PAUSED, 4=REJECTED, 5=PENDING_KEYS
+  # GROUP_MEMBER_PERMISSIONS: 0=NONE, 1=SEND, 2=LEAVE, 4=OWNER
+  # GROUP_MEMBER_STATE: 0=PENDING, 1=ACTIVE, 3=PAUSED, 4=REJECTED, 5=PENDING_KEYS
   # GROUP_MEMBER_TYPE: 0=INTERNAL, 1=EXTERNAL, 2=INTERNAL_TYPE_EXTERNAL
   # GROUP_MEMBERSHIP_STATUS: active=ACTIVE, unanswered=UNANSWERED
-  # GroupFlags: 0=None, 1=System, 2=Drive, 4=Scim
+  # GroupFlags: 0=None, 1=System, 4=Scim
   # GroupMemberType: 0=Internal, 1=External
-  # GroupPermissions: 0=NobodyCanSend, 1=GroupMembersCanSend, 2=OrgMembersCanSend, 3=EveryoneCanSend
-  # HandshakeInfoVendorType: 0=ProtonDrive, 1=ProtonDoc, 2=ProtonSheet
+  # GroupPermissions: 0=NobodyCanSend, 1=GroupMembersCanSend, 3=EveryoneCanSend
+  # HandshakeInfoVendorType: 0=ProtonDrive, 1=ProtonDoc
   # HIDE_SENDER_IMAGES: 0=SHOW, 1=HIDE
   # HTTP_STATUS_CODE: 200=OK, 204=NO_CONTENT, 400=BAD_REQUEST, 401=UNAUTHORIZED, 403=FORBIDDEN, 404=NOT_FOUND, 409=CONFLICT, 422=UNPROCESSABLE_ENTITY, 429=TOO_MANY_REQUESTS, 500=INTERNAL_SERVER_ERROR
   # ICAL_ALARM_ACTION: DISPLAY=DISPLAY, EMAIL=EMAIL, AUDIO=AUDIO
@@ -188,7 +176,6 @@ components:
   # ICAL_EVENT_STATUS: TENTATIVE=TENTATIVE, CONFIRMED=CONFIRMED, CANCELLED=CANCELLED
   # ICAL_METHOD: PUBLISH=PUBLISH, REQUEST=REQUEST, REPLY=REPLY, CANCEL=CANCEL, COUNTER=COUNTER, DECLINECOUNTER=DECLINECOUNTER, ADD=ADD, REFRESH=REFRESH
   # IDP_TYPE: 1=DEFAULT, 2=EDUGAIN
-  # IGNORE_KT: 0=NORMAL, 1=EXTERNAL, 2=CATCHALL
   # IMAGE_PROXY_FLAGS: 0=NONE, 1=INCORPORATOR, 2=PROXY, 3=ALL
   # IMPORT_CONTACT_ERROR_TYPE: 0=UNSUPPORTED_VCARD_VERSION, 1=MISSING_FN, 2=ENCRYPTION_ERROR, 3=EXTERNAL_ERROR
   # IMPORT_ERROR_TYPE: 0=NO_FILE_SELECTED, 1=NO_CSV_OR_VCF_FILE, 2=FILE_EMPTY, 3=FILE_TOO_BIG, 4=FILE_CORRUPTED, 5=NO_CONTACTS, 6=TOO_MANY_CONTACTS
@@ -209,7 +196,6 @@ components:
   # KEYGEN_TYPES: CURVE25519=CURVE25519, PQC=PQC
   # KeyTransparencyActivation: 0=DISABLED, 1=LOG_ONLY, 2=SHOW_UI
   # KT_VERIFICATION_STATUS: 0=VERIFIED_KEYS, 1=UNVERIFIED_KEYS, 2=VERIFICATION_FAILED
-  # LABEL_EXCLUSIVE: 1=FOLDER, 0=LABEL
   # LABEL_TYPE: 1=MESSAGE_LABEL, 2=CONTACT_GROUP, 3=MESSAGE_FOLDER, 4=SYSTEM_FOLDER
   # LayoutSetting: 0=List, 1=Grid
   # LINK_TYPES: web=WEB, email=EMAIL, phone=PHONE
@@ -223,9 +209,8 @@ components:
   # MAIL_VERIFICATION_STATUS: -1=NOT_VERIFIED, 0=NOT_SIGNED, 1=SIGNED_AND_VALID, 2=SIGNED_AND_INVALID
   # MAILBOX_LABEL_IDS: 0=INBOX, 1=ALL_DRAFTS, 2=ALL_SENT, 3=TRASH, 4=SPAM, 5=ALL_MAIL, 10=STARRED, 6=ARCHIVE, 7=SENT, 8=DRAFTS, 9=OUTBOX, 12=SCHEDULED, 15=ALMOST_ALL_MAIL, 16=SNOOZED, 20=CATEGORY_SOCIAL, 21=CATEGORY_PROMOTIONS, 22=CATEGORY_UPDATES, 24=CATEGORY_DEFAULT, 25=CATEGORY_NEWSLETTERS, 26=CATEGORY_TRANSACTIONS, 40=SOFT_DELETED
   # MARK_AS_STATUS: read=READ, unread=UNREAD
-  # MeetingState: 0=DELETED, 1=ACTIVE
   # MeetingType: 0=INSTANT, 1=PERSONAL, 2=SCHEDULED, 3=RECURRING, 4=PERMANENT
-  # MEMBER_FLAGS: 1=ToMigrateOrgKey, 2=InactiveKey, 4=NonPrimary, 8=OrgKeyResetPrivatization
+  # MEMBER_FLAGS: 8=OrgKeyResetPrivatization
   # MEMBER_INVITATION_STATUS: 0=PENDING, 1=ACCEPTED, 2=REJECTED
   # MEMBER_ORG_KEY_STATE: 0=NoKey, 1=Active, 2=Missing, 3=Pending
   # MEMBER_PERMISSIONS: 1=MANAGE_FORWARDING
@@ -235,7 +220,7 @@ components:
   # MEMBER_SUBSCRIBER: 0=NON_PAYER, 1=PAYER
   # MEMBER_TYPE: 0=PROTON, 1=MANAGED
   # MemberUnprivatizationMode: 0=None, 1=MagicLinkInvite, 2=GSSO, 3=AdminAccess
-  # MemberUnprivatizationState: 0=Declined, 1=Pending, 2=Ready
+  # MemberUnprivatizationState: 1=Pending, 2=Ready
   # MESSAGE_BUTTONS: 0=READ_UNREAD, 1=UNREAD_READ
   # METRICS_LOG: signup=SIGNUP, encrypted_search=ENCRYPTED_SEARCH, dark_styles=DARK_STYLES
   # MIME_TYPES: multipart/mixed=MIME, text/plain=PLAINTEXT, text/html=DEFAULT, text/calendar=ICS, application/ics=APPLICATION_ICS, application/pgp-keys=PGP_KEYS
@@ -250,7 +235,7 @@ components:
   # NOTIFICATION_TYPE_API: 0=EMAIL, 1=DEVICE
   # NOTIFICATION_UNITS: 1=WEEK, 2=DAY, 3=HOUR, 4=MINUTE
   # NOTIFICATION_WHEN: -=BEFORE, =AFTER
-  # ORGANIZATION_FLAGS: 1=LOYAL, 2=COVID, 4=SMTP_SUBMISSION, 8=NO_CYCLE_SCHEDULED, 64=DISSIDENT, 128=PROTON, 256=PHONE_SUPPORT, 512=TO_MIGRATE_ORG_KEY, 2048=DELETION_WHITELISTED
+  # ORGANIZATION_FLAGS: 1=LOYAL, 2=COVID, 8=NO_CYCLE_SCHEDULED, 64=DISSIDENT, 128=PROTON, 256=PHONE_SUPPORT, 512=TO_MIGRATE_ORG_KEY, 2048=DELETION_WHITELISTED
   # ORGANIZATION_POLICY_ENFORCED: 0=NO, 1=YES
   # ORGANIZATION_STATE: 0=DISABLED, 1=ACTIVE, 2=DELINQUENT
   # ORGANIZATION_TWOFA_SETTING: 0=NOT_REQUIRED, 1=REQUIRED_ADMIN_ONLY, 2=REQUIRED_ALL
@@ -259,15 +244,13 @@ components:
   # OrganizationPlanFlag: 1=Mail, 2=Drive, 4=VPN, 8=Pass, 16=Wallet, 64=Lumo
   # OrganizationSignatureState: 0=publicKeys, 1=valid, 2=error
   # OVERWRITE: 0=THROW_ERROR_IF_CONFLICT, 1=OVERWRITE_CONTACT
-  # PACKAGE_SIGNATURES_MODE: 0=SIGNATURES_NONE, 1=SIGNATURES_ATTACHMENTS, 2=SIGNATURES_BODY
+  # PACKAGE_SIGNATURES_MODE: 0=SIGNATURES_NONE, 1=SIGNATURES_ATTACHMENTS
   # PACKAGE_TYPE: 1=SEND_PM, 2=SEND_EO, 4=SEND_CLEAR, 8=SEND_PGP_INLINE, 16=SEND_PGP_MIME, 32=SEND_CLEAR_MIME
-  # ParticipantCapabilityPermission: 0=NotAllowed, 1=Allowed
   # PASSWORD_MODE: 1=SINGLE, 2=TWO_PASSWORD
   # PASSWORD_REMINDERS_VALUE: 0=ENABLED, 1=DISABLED
   # PasswordPolicyState: 1=ENABLED, 2=OPTIONAL
   # PAYMENT_METHOD_TYPES: chargebee-bitcoin=CHARGEBEE_BITCOIN, cash=CASH, token=TOKEN, chargebee-card=CHARGEBEE_CARD, chargebee-paypal=CHARGEBEE_PAYPAL, chargebee-ideal=CHARGEBEE_IDEAL, sepa-direct-debit=CHARGEBEE_SEPA_DIRECT_DEBIT, apple-pay=APPLE_PAY, google-pay=GOOGLE_PAY
   # PAYMENT_TOKEN_STATUS: 0=PENDING, 1=CHARGEABLE, 2=FAILED, 3=CONSUMED, 4=NOT_SUPPORTED
-  # PersonalMeetingState: 0=NOT_YOUR_PERSONAL, 1=YOUR_PERSONAL
   # PGP_SCHEME_TEXT: PGP/Inline=INLINE, PGP/MIME=MIME
   # PGP_SCHEMES: pgp-inline=PGP_INLINE, pgp-mime=PGP_MIME
   # PGP_SCHEMES_MORE: =GLOBAL_DEFAULT
@@ -279,11 +262,11 @@ components:
   # PM_SIGNATURE: 0=DISABLED, 1=ENABLED, 2=LOCKED
   # PM_SIGNATURE_REFERRAL: 0=DISABLED, 1=ENABLED
   # PREDEFINED_ROLE_NAME: Owner=OWNER, User Admin=USER_ADMIN, Security Admin=SECURITY_ADMIN
-  # Product: Account=Account, Authenticator=Authenticator, Mail=Mail, Calendar=Calendar, Wallet=Wallet, Docs=Docs, Sheets=Sheets, Lumo=Lumo, Drive=Drive, VPN=VPN, VPN=Verify, Admin=Admin, Pass=Pass, Meet=Meet, Spaces=Spaces, Other=Other
-  # PRODUCT: 1=MAIL, 2=VPN, 3=CALENDAR, 4=DRIVE, 5=PASS, 6=WALLET, 9=LUMO, 10=AUTHENTICATOR
+  # Product: Account=Account, Authenticator=Authenticator, Mail=Mail, Calendar=Calendar, Wallet=Wallet, Docs=Docs, Sheets=Sheets, Lumo=Lumo, Drive=Drive, VPN=VPN, VPN=Verify, Admin=Admin, Pass=Pass, Meet=Meet, Spaces=Spaces, Console=Console, Other=Other
+  # PRODUCT: 6=WALLET
   # PRODUCT_BIT: 1=MAIL, 2=DRIVE, 4=VPN, 8=PASS, 16=WALLET, 32=SPACES, 64=LUMO, 256=MEET
   # PROMPT_PIN: 0=DISABLED, 1=ENABLED
-  # ProtectionType: 1=BLOCKED, 2=CAPTCHA, 3=OWNERSHIP_VERIFICATION, 4=DEVICE_VERIFICATION, 5=OK
+  # ProtectionType: 5=OK
   # PROTON_WEBSITES: https://status.proton.me=PROTON_STATUS_PAGE
   # ProtonCalendarState: 0=NOT_FROM_PROTON_CALENDAR, 1=FROM_PROTON_CALENDAR
   # RAWMimeTypes: image/x-dcraw=dcraw, image/x-adobe-dng=dng, image/x-canon-crw=crw, image/x-canon-cr2=cr2, image/x-canon-cr3=cr3, image/x-epson-erf=erf, image/x-fuji-raf=raf, image/x-kodak-dcr=dcr, image/x-kodak-k25=k25, image/x-kodak-kdc=kdc, image/x-minolta-mrw=mrw, image/x-nikon-nef=nef, image/x-nikon-nrw=nrw, image/x-olympus-orf=orf, image/x-panasonic-raw=raw, image/x-panasonic-rw2=rw2, image/x-pentax-pef=pef, image/x-pentax-ptx=ptx, image/x-sigma-x3f=x3f, image/x-sony-srf=srf, image/x-sony-sr2=sr2, image/x-sony-arw=arw, image/x-phaseone-iiq=iiq, image/x-mamiya-mef=mef, image/x-leica-rwl=rwl, image/x-hasselblad-3fr='3fr', image/x-hasselblad-fff=fff
@@ -294,7 +277,7 @@ components:
   # ReferralState: 0=INVITED, 1=SIGNED_UP, 2=TRIAL, 3=COMPLETED, 4=REWARDED
   # RELEASE_CATEGORIES: Stable=STABLE, Alpha=ALPHA, EarlyAccess=EARLY_ACCESS
   # Renew: 0=Disabled, 1=Enabled
-  # RESPONSE_CODE: 1000=SUCCESS, 2011=NOT_ALLOWED, 2000=INVALID_REQUIREMENT, 2001=INVALID_LINK_TYPE, 2500=ALREADY_EXISTS, 2501=NOT_FOUND, 2061=INVALID_ID
+  # RESPONSE_CODE: 1000=SUCCESS, 2011=NOT_ALLOWED, 2001=INVALID_LINK_TYPE, 2500=ALREADY_EXISTS, 2501=NOT_FOUND, 2061=INVALID_ID
   # RetentionRuleAction: 0=RetainPurgeDeleted, 1=RetainPurgeAll, 2=RetainAll
   # RetentionRuleProduct: 1=Mail
   # RetentionRuleScopeType: 1=User, 2=Group
@@ -303,19 +286,18 @@ components:
   # SEND_MESSAGE_DIRECT_ACTION: 0=REPLY, 1=REPLY_ALL, 2=FORWARD, 3=AUTO_RESPONSE, 4=READ_RECEIPT
   # SentryCalendarInitiatives: rsvp-note=RSVP_NOTE, bookings=BOOKINGS
   # SentryCommonInitiatives: post-subscription=POST_SUBSCRIPTION, encrypted-search=ENCRYPTED_SEARCH, contact-import=CONTACT_IMPORT
-  # SentryMailInitiatives: assistant=ASSISTANT, attachment-encryption-error=ATTACHMENT_ENCRYPTION_ERROR, attachment-upload-error=ATTACHMENT_UPLOAD_ERROR, composer=COMPOSER, drawer-security-center=DRAWER_SECURITY_CENTER, drawer-vpn=DRAWER_VPN, list-actions-telemetry=LIST_ACTIONS_TELEMETRY, mail-onboarding=MAIL_ONBOARDING, mail-redux-errors=MAIL_REDUX_ERRORS, migration-tool=MIGRATION_TOOL, move-actions=MOVE_ACTIONS, remove-email-trackers=REMOVE_EMAIL_TRACKERS, upsell-modals=UPSELL_MODALS, mailbox-redirect=MAILBOX_REDIRECT, categories-view=CATEGORIES_VIEW, mail-logger=LOGGER
-  # SentryMailPerformanceInitiatives: apply-location-performance=APPLY_LOCATION_PERFORMANCE
+  # SentryMailInitiatives: assistant=ASSISTANT, attachment-encryption-error=ATTACHMENT_ENCRYPTION_ERROR, attachment-upload-error=ATTACHMENT_UPLOAD_ERROR, composer=COMPOSER, drawer-security-center=DRAWER_SECURITY_CENTER, drawer-vpn=DRAWER_VPN, list-actions-telemetry=LIST_ACTIONS_TELEMETRY, mail-onboarding=MAIL_ONBOARDING, mail-redux-errors=MAIL_REDUX_ERRORS, migration-tool=MIGRATION_TOOL, move-actions=MOVE_ACTIONS, remove-email-trackers=REMOVE_EMAIL_TRACKERS, upsell-modals=UPSELL_MODALS, categories-view=CATEGORIES_VIEW, mail-logger=LOGGER
   # SentryRealtimeInitiatives: realtime-sdk-switch=SDK_SWITCH
-  # SERVER_FEATURES: 1=SECURE_CORE, 2=TOR, 4=P2P, 8=XOR, 16=IPV6, 32=RESTRICTED, 64=PARTNER, 128=DOUBLE_RESTRICTION
-  # SessionRecoveryReason: 0=NONE, 1=CANCELLED, 2=AUTHENTICATION
-  # SessionRecoveryState: 0=NONE, 1=GRACE_PERIOD, 2=CANCELLED, 3=INSECURE, 4=EXPIRED
+  # SERVER_FEATURES: 1=SECURE_CORE, 2=TOR, 4=P2P, 16=IPV6, 128=DOUBLE_RESTRICTION
+  # SessionAccessTypeFlag: 1=AdminAccess, 2=DelegatedAccess, 4=OrgAccess
+  # SessionRecoveryState: 0=NONE, 1=GRACE_PERIOD, 2=CANCELLED, 3=INSECURE
   # SessionSource: 0=Proton, 1=Saml, 2=Oauth, 3=Msp
   # SETTINGS_2FA_ENABLED: 1=OTP, 2=FIDO2
   # SETTINGS_DATE_FORMAT: 0=LOCALE_DEFAULT, 1=DDMMYYYY, 2=MMDDYYYY, 3=YYYYMMDD
   # SETTINGS_LOG_AUTH_STATE: 0=DISABLE, 1=BASIC, 2=ADVANCED
   # SETTINGS_PASSWORD_MODE: 1=ONE_PASSWORD_MODE, 2=TWO_PASSWORD_MODE
   # SETTINGS_PROTON_SENTINEL_STATE: 0=DISABLED, 1=ENABLED
-  # SETTINGS_STATUS: 0=UNVERIFIED, 1=VERIFIED, 2=INVALID
+  # SETTINGS_STATUS: 0=UNVERIFIED, 1=VERIFIED
   # SETTINGS_TIME_FORMAT: 0=LOCALE_DEFAULT, 1=H24, 2=H12
   # SETTINGS_VIEW: 0=DAY, 1=WEEK, 2=MONTH, 3=YEAR, 4=PLANNING
   # SETTINGS_WEEK_START: 0=LOCALE_DEFAULT, 1=MONDAY, 2=TUESDAY, 3=WEDNESDAY, 4=THURSDAY, 5=FRIDAY, 6=SATURDAY, 7=SUNDAY
@@ -323,19 +305,16 @@ components:
   # SHARE_MEMBER_STATE: 1=PENDING, 2=REJECTED, 3=DELETED
   # SHARED_UPSELL_PATHS: emergency-access=EMERGENCY_ACCESS, multi-user=MULTI_USER, contact-groups=CONTACT_GROUP, storage=STORAGE, user-dropdown=USER_DROPDOWN, storage-percentage=STORAGE_PERCENTAGE, organization-capacity=ORGANIZATION_CAPACITY, sentinel=SENTINEL, sentinel-b2b=SENTINEL_B2B, trial-will-end=TRIAL_WILL_END, top-navigation-bar=TOP_NAVIGATION_BAR, public-sharing-permissions-menu=PUBLIC_SHARING_PERMISSIONS_MENU, easy-switch-byoe=EASY_SWITCH_BYOE, easy-switch-byoe-more-storage=EASY_SWITCH_BYOE_MORE_STORAGE
   # SharedURLFlags: 0=Legacy, 1=CustomPassword, 2=GeneratedPasswordIncluded, 3=GeneratedPasswordWithCustom
-  # ShareTargetType: 0=Root, 1=Folder, 2=File, 3=Album, 4=Photo, 5=ProtonVendor
   # SHORTCUTS: 0=DISABLED, 1=ENABLED
   # SHOW_IMAGES: 0=SHOW, 1=HIDE
   # SHOW_MOVED: 0=NONE, 1=DRAFTS, 2=SENT, 3=DRAFTS_AND_SENT
   # SIGN: 0=DISABLED, 1=ENABLED
-  # SIMPLE_LOGIN_EXTENSION_LINKS: https://simplelogin.io=MAIN_PAGE, https://app.simplelogin.io/dashboard/=DASHBOARD, https://app.simplelogin.io/admin/=ADMIN_DASHBOARD, https://app.sldev.ovh/admin/=ADMIN_DASHBOARD_DEV
-  # SIMPLE_LOGIN_TAGS: EXTENSION_INSTALLED_QUERY=EXTENSION_INSTALLED_QUERY, EXTENSION_INSTALLED_RESPONSE=EXTENSION_INSTALLED_RESPONSE
+  # SIMPLE_LOGIN_EXTENSION_LINKS: https://app.simplelogin.io/admin/=ADMIN_DASHBOARD, https://app.sldev.ovh/admin/=ADMIN_DASHBOARD_DEV
   # SORT_DIRECTION: ASC=ASC, DESC=DESC
   # SortSetting: 1=NameAsc, 2=SizeAsc, 4=ModifiedAsc, -1=NameDesc, -2=SizeDesc, -4=ModifiedDesc
   # SOURCE_EVENT: BUTTON_SIDEBAR=BUTTON_SIDEBAR, BUTTON_FOLDERS=BUTTON_FOLDERS, BUTTON_LABELS=BUTTON_LABELS, BUTTON_VIEWS=BUTTON_VIEWS, BUTTON_BOOKINGS=BUTTON_BOOKINGS, BUTTON_CALENDARS=BUTTON_CALENDARS
   # SpaceState: 0=Good, 1=Warning, 2=Danger
   # SPAM_ACTION: 0=JustSpam, 1=SpamAndUnsub
-  # SPAM_SCORE: 100=PM_SPOOFED, 101=DMARC_FAILED, 102=PHISHING
   # SPF_STATE: 0=SPF_STATE_DEFAULT, 1=SPF_STATE_ONE, 2=SPF_STATE_MULT, 3=SPF_STATE_GOOD
   # Status: 1=Pending, 2=Resolved, 3=Rejected
   # STICKY_LABELS: 0=DISABLED, 1=ENABLED
@@ -351,7 +330,6 @@ components:
   # TelemetryAccountDashboardEvents: page_load=pageLoad, cross_product_click=crossProductClick, feature_card_click=featureCardClick, upgrade_button_click=upgradeButtonClick, upsell_cta_click=upsellCtaClick, download_cta_click=downloadCtaClick
   # TelemetryAccountOrganizationLogoUploadEvents: process_start=processStart, process_success=processSuccess, process_failure=processFailure
   # TelemetryAccountSecurityCheckupEvents: page_load=pageLoad, cohort_change.complete_recovery_multiple=completeRecoveryMultiple, cohort_change.complete_recovery_single=completeRecoverySingle, cohort_change.account_recovery_enabled=accountRecoveryEnabled
-  # TelemetryAccountSignupBasicEvents: flow_started=flow_started, account_created=account_created
   # TelemetryAccountSignupEvents: fe.page_load=pageLoad, user.plan_select=planSelect, user.cycle_select=cycleSelect, user.currency_select=currencySelect, user.payment_select=paymentSelect, user.checkout=userCheckout, user.sign_in=userSignIn, user.interact.account_create=interactAccountCreate, user.interact.upsell=interactUpsell, user.interact.credit_card=interactCreditCard, user.interact.password=interactPassword, user.interact.recovery=interactRecoveryKit, user.interact.download=interactDownload, be.available_external=beAvailableExternal, be.sign_in_success=beSignInSuccess, be.sign_out_success=beSignOutSuccess, be.payments_available=bePaymentMethods, be.checkout_error=checkoutError, fe.onboarding_start=onboardingStart, fe.onboarding_shown=onboardShown, fe.onboarding_finish=onboardFinish, fe.signup_finish=signupFinish
   # TelemetryAlwaysOnUpsellEvents: click_upsell_button=clickUpsellButton, click_top_navbar=clickTopNavbar, close_offer=closeOffer, user_subscribed=userSubscribed
   # TelemetryAppSwitcher: dropdown_app_click=dropdown_app_click
@@ -360,7 +338,6 @@ components:
   # TelemetryCalendarEvents: change_temporary_time_zone=change_temporary_time_zone, answer_invite=answer_invite
   # TelemetryCalendarVideoConferencing: video_conference_widget=video_conference_widget, video_conference_settings_toggle=video_conference_settings_toggle, video_conference_zoom_integration=video_conference_zoom_integration, video_conference_proton_meet_integration=video_conference_proton_meet_integration, video_conference_proton_meet_settings_toggle=video_conference_proton_meet_settings_toggle
   # TelemetryCategoriesOnboardingEvents: onboarding_reply=onboarding_reply, category_nav=category_nav, recategorize_email=recategorize_email, settings_toggle_category_view=settings_toggle_category_view, settings_toggle_category=settings_toggle_category, settings_toggle_notification=settings_toggle_notification, report_unread_count=report_unread_count
-  # TelemetryChangelog: opened=opened
   # TelemetryCollapsibleLeftSidebarEvents: toggle_left_sidebar=toggleLeftSidebar
   # TelemetryContentSearchEvents: query_completed=query_completed, result_opened=result_opened, result_action=result_action, search_session_completed=search_session_completed
   # TelemetryContentSearchIndexEvents: mailbox_index_completed=mailbox_index_completed
@@ -388,7 +365,7 @@ components:
   # TelemetryMailPagingControlsEvents: move_to_previous_page=move_to_previous_page, move_to_next_page=move_to_next_page, clicked_load_more_search_results=clicked_load_more_search_results, move_to_custom_page=move_to_custom_page
   # TelemetryMailSelectAllEvents: button_move_to_archive=button_move_to_archive, button_move_to_trash=button_move_to_trash, banner_move_to=banner_move_to, banner_label_as=banner_label_as, banner_mark_as_read=banner_mark_as_read, banner_mark_as_unread=banner_mark_as_unread, banner_permanent_delete=banner_permanent_delete
   # TelemetryMailTrial2024UpsellModal: no_thanks=noThanks, close_modal=closeModal, upsell=upsell
-  # TelemetryMeasurementGroups: account.any.signup=accountSignup, account.web.org_logo_upload=accountOrgLogoUpload, account.web.security_checkup=accountSecurityCheckup, account.web.safety_review_ctr=accountSafetyReviewCtr, account.web.safety_review_score_diff=accountSafetyReviewScoreDiff, account.web.recovery_settings=accountRecoverySettings, account.web.password_reminder=accountPasswordReminder, account.web.reset_password=accountResetPassword, account.web.unauth_lost_2fa=accountUnauthLost2FA, account.web.dashboard=accountDashboard, account.web.upgrade_page=accountUpgradePage, any.web.referral_discover=referralDiscover, any.web.always_on_upsell=alwaysOnUpsell, calendar.web.encrypted_search=calendarEncryptedSearch, calendar.web.ics_surgery=calendarIcsSurgery, calendar.web.timezone_selector=calendarTimeZoneSelector, calendar.web.video_conferencing=calendarVideoConferencing, meet.web.meet_funnel_telemetry=meetFunnelTelemetry, account.web.cancellation=accountCancellation, account.web.cancellation_feedback_first=accountCancellationFeedbackFirst, any.web.settings_heart_beat=settingsHeartBeat, any.web.calendar_settings_heart_beat=calendarSettingsHeartBeat, any.web.calendar_invite=calendarInvite, any.changelog_opened=changelogOpened, any.web.key_transparency=keyTransparency, any.web.subscription_modal=subscriptionModal, mail.web.onboarding=mailOnboarding, any.web.paid_users_nudge=paidUsersNudge, mail.web.privacy_dropdown=mailPrivacyDropdown, mail.web.select_all=mailSelectAll, mail.web.snooze=mailSnooze, mail.web.signup=mailSignup, mail.web.composer_assistant=mailComposerAssistant, mail.web.proton_tips=mailProtonTips, any.web.post_subscription_tour_events=postSubscriptionTourEvents, mail.desktop.default_mailto=mailDesktopDefaultMailto, mail.desktop.daily_stats=mailDesktopDailyStats, mail.web.clicks_mail_actions=mailActions, mail.web.list_settings=mailListSettings, mail.web.post_signup_one_dollar=mailPostSignupOneDollar, mail.web.paging_controls=mailPagingControls, mail.web.expand_blockquotes=mailExpandBlockquotes, mail.any.categories_view=categoriesView, mail.web.pass_nudge=passNudge, mail.any.search=contentSearch, mail.any.search_index=contentSearchIndex, mail.web.newsletter_subscriptions=mailNewsletterSubscriptions, any.web.unlimited_offer_2025=unlimitedOffer2025, any.web.unlimited_to_duo_offer=unlimitedToDuoOffer, mail.es_migration_tool=esMigrationTool, any.web.security_center=securityCenter, any.web.vpn_drawer=vpnDrawer, payments.flow=paymentsFlow, drive.web.feature_performance_unauth=driveWebFeaturePerformance, drive.web.actions_unauth=driveWebActions, drive.web.post_signup_one_dollar=drivePostSignupOneDollar, mail.web.unlimited_offer_2025=driveUnlimitedOffer2025, any.web.collapsible_left_sidebar=collapsibleLeftSidebar, any.web.smart_banner=smartBanner, common.any.client_installs=clientInstalls, any.web.client_search=clientSearch, any.web.b2b_onboarding=b2bOnboarding, any.web.bring_your_own_email=bringYourOwnEmail, any.web.app_switcher=appSwitcher, account.web.explore_apps=accountExploreApps, any.web.prevent_wasm_loading=preventWasmLoading, common.web.suggestions=docsSuggestions, drive.docs.homepage=docsHomepage, drive.docs.editor=docsEditor, vpn.any.tv_signin=vpnTv, vpn.web.always_on_policy=vpnAlwaysOnPolicy, vpn.web.b2b_user_activity=vpnB2bUserActivity, mail.common.foreground_activity=mailForegroundActivity
+  # TelemetryMeasurementGroups: account.any.signup=accountSignup, account.web.org_logo_upload=accountOrgLogoUpload, account.web.security_checkup=accountSecurityCheckup, account.web.safety_review_ctr=accountSafetyReviewCtr, account.web.safety_review_score_diff=accountSafetyReviewScoreDiff, account.web.recovery_settings=accountRecoverySettings, account.web.password_reminder=accountPasswordReminder, account.web.reset_password=accountResetPassword, account.web.unauth_lost_2fa=accountUnauthLost2FA, account.web.dashboard=accountDashboard, account.web.upgrade_page=accountUpgradePage, any.web.referral_discover=referralDiscover, any.web.always_on_upsell=alwaysOnUpsell, calendar.web.ics_surgery=calendarIcsSurgery, calendar.web.timezone_selector=calendarTimeZoneSelector, calendar.web.video_conferencing=calendarVideoConferencing, meet.web.meet_funnel_telemetry=meetFunnelTelemetry, account.web.cancellation=accountCancellation, account.web.cancellation_feedback_first=accountCancellationFeedbackFirst, any.web.settings_heart_beat=settingsHeartBeat, any.web.calendar_settings_heart_beat=calendarSettingsHeartBeat, any.web.calendar_invite=calendarInvite, any.web.key_transparency=keyTransparency, any.web.subscription_modal=subscriptionModal, mail.web.onboarding=mailOnboarding, any.web.paid_users_nudge=paidUsersNudge, mail.web.privacy_dropdown=mailPrivacyDropdown, mail.web.select_all=mailSelectAll, mail.web.snooze=mailSnooze, mail.web.signup=mailSignup, mail.web.composer_assistant=mailComposerAssistant, mail.web.proton_tips=mailProtonTips, any.web.post_subscription_tour_events=postSubscriptionTourEvents, mail.desktop.default_mailto=mailDesktopDefaultMailto, mail.desktop.daily_stats=mailDesktopDailyStats, mail.web.clicks_mail_actions=mailActions, mail.web.list_settings=mailListSettings, mail.web.post_signup_one_dollar=mailPostSignupOneDollar, mail.web.paging_controls=mailPagingControls, mail.web.expand_blockquotes=mailExpandBlockquotes, mail.any.categories_view=categoriesView, mail.web.pass_nudge=passNudge, mail.any.search=contentSearch, mail.any.search_index=contentSearchIndex, mail.web.newsletter_subscriptions=mailNewsletterSubscriptions, any.web.unlimited_offer_2025=unlimitedOffer2025, any.web.unlimited_to_duo_offer=unlimitedToDuoOffer, mail.es_migration_tool=esMigrationTool, any.web.security_center=securityCenter, any.web.vpn_drawer=vpnDrawer, payments.flow=paymentsFlow, drive.web.feature_performance_unauth=driveWebFeaturePerformance, drive.web.actions_unauth=driveWebActions, drive.web.post_signup_one_dollar=drivePostSignupOneDollar, any.web.collapsible_left_sidebar=collapsibleLeftSidebar, any.web.smart_banner=smartBanner, common.any.client_installs=clientInstalls, any.web.client_search=clientSearch, any.web.b2b_onboarding=b2bOnboarding, any.web.bring_your_own_email=bringYourOwnEmail, any.web.app_switcher=appSwitcher, account.web.explore_apps=accountExploreApps, any.web.prevent_wasm_loading=preventWasmLoading, common.web.suggestions=docsSuggestions, drive.docs.homepage=docsHomepage, drive.docs.editor=docsEditor, vpn.any.tv_signin=vpnTv, vpn.web.always_on_policy=vpnAlwaysOnPolicy, vpn.web.b2b_user_activity=vpnB2bUserActivity, mail.common.foreground_activity=mailForegroundActivity
   # TelemetryMeetFunnelTelemetry: spotlight_displayed=spotlight_displayed, explore_meet_clicked=explore_meet_clicked, meeting_created=meeting_created, meet_opened=meet_opened
   # TelemetryPaidUsersNudge: click_upsell_button=clickUpsellButton, click_top_navbar=clickTopNavbar, close_offer=closeOffer, user_subscribed=userSubscribed, click_hide_offer=clickHideOffer
   # TelemetryPassExtensionEvents: fe.pass_extension_installed=pass_extension_installed
@@ -419,7 +396,6 @@ components:
   # ThemeFontSizeSetting: 0=DEFAULT, 1=X_SMALL, 2=SMALL, 3=LARGE, 4=X_LARGE
   # ThemeModeSetting: 0=Auto, 1=Dark, 2=Light
   # ThemeTypes: 0=Duotone, 1=Carbon, 2=Snow, 3=Monokai, 4=ContrastLight, 5=Legacy, 6=Classic, 7=ContrastDark, 8=PassDark, 9=Storefront, 10=WalletLight, 11=StorefrontWallet, 12=PassLight, 13=WalletDark, 14=LumoLight, 15=LumoDark
-  # TOKEN_TYPES: email=EMAIL, sms=SMS, invite=INVITE, coupon=COUPON, captcha=CAPTCHA
   # TransactionState: 0=SUCCESS, 1=VOIDED, 2=FAILURE, 3=TIMEOUT, 4=NEEDS_ATTENTION, 5=REFUNDED, 6=CHARGEBACK
   # TransactionType: 0=AUTHORIZATION, 1=PAYMENT, 2=REFUND, 3=PAYMENT_REVERSAL, 4=CURRENCY_CONVERSION, 5=CREDIT, 6=GIFT_CARD, 7=BANK_TRANSFER, 8=BITCOIN, 9=CASH, 10=CHARGEBACK, 11=CREDIT_TRANSFER, 12=MIGRATION, 13=ADJUSTMENT_CREDIT, 14=TEST_CREDIT, 15=PREPAYMENT
   # TrialType: 0=ReferralProgram, 1=FamilyPlan, 2=Manual
@@ -432,7 +408,6 @@ components:
   # UserLockedFlags: 1=BASE_STORAGE_EXCEEDED, 2=DRIVE_STORAGE_EXCEEDED, 3=STORAGE_EXCEEDED, 4=ORG_ISSUE_FOR_PRIMARY_ADMIN, 8=ORG_ISSUE_FOR_MEMBER, 16=USER_WITH_A_DOMAIN
   # UserType: 1=PROTON, 2=MANAGED, 3=EXTERNAL
   # VcalDays: 0=SU, 1=MO, 2=TU, 3=WE, 4=TH, 5=FR, 6=SA
-  # VCardGender: M=Male, F=Female, O=Other, N=None, U=Unknown, =Empty
   # VERIFY_STATE: 0=VERIFY_STATE_DEFAULT, 1=VERIFY_STATE_EXIST, 2=VERIFY_STATE_GOOD
   # VIDEO_CONFERENCE_PROVIDER: 1=ZOOM, 2=PROTON_MEET
   # VIEW_LAYOUT: 0=COLUMN, 1=ROW
@@ -978,11 +953,14 @@ paths:
               type: object
               required:
                 - Name
+                - ConfirmationCodeVersion
               properties:
                 Name:
                   type: string
                 ActivationToken:
                   type: string
+                ConfirmationCodeVersion:
+                  type: integer
       responses:
         "200":
           description: Success
@@ -1776,34 +1754,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
-  /calendar/v1/events/{uid}/accept:
-    put:
-      tags: [Calendar]
-      summary: Accept Invite
-      operationId: acceptInvite
-      parameters:
-        - name: uid
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - Signature
-              properties:
-                Signature:
-                  type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
   /calendar/v1/invitations:
     get:
       tags: [Calendar]
@@ -1817,17 +1767,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
   /calendar/v1/keys/reset:
-    get:
-      tags: [Calendar]
-      summary: Get Calendar Group Reset
-      operationId: getCalendarGroupReset
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
     post:
       tags: [Calendar]
       summary: Reset Calendars
@@ -1961,29 +1900,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
-  /calendar/v1/{calendarID}/alarms/{alarmID}:
-    get:
-      tags: [Calendar]
-      summary: Get Calendar Alarm
-      operationId: getCalendarAlarm
-      parameters:
-        - name: calendarID
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: alarmID
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
   /calendar/v1/{calendarID}/events:
     get:
       tags: [Calendar]
@@ -2077,28 +1993,6 @@ paths:
       tags: [Calendar]
       summary: Get Event
       operationId: getEvent
-      parameters:
-        - name: calendarID
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: eventID
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-    delete:
-      tags: [Calendar]
-      summary: Delete Event
-      operationId: deleteEvent
       parameters:
         - name: calendarID
           in: path
@@ -2516,23 +2410,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
-    get:
-      tags: [Calendar]
-      summary: Get Calendar Keys
-      operationId: getCalendarKeys
-      parameters:
-        - name: calendarID
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
   /calendar/v1/{calendarID}/keys/all:
     get:
       tags: [Calendar]
@@ -2811,24 +2688,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
-  /calendar/v1/{calendarID}/passphrase:
-    get:
-      tags: [Calendar]
-      summary: Get Passphrase
-      operationId: getPassphrase
-      parameters:
-        - name: calendarID
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
   /calendar/v1/{calendarID}/passphrases:
     get:
       tags: [Calendar]
@@ -2848,23 +2707,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
   /calendar/v1/{calendarID}/settings:
-    get:
-      tags: [Calendar]
-      summary: Get Calendar Settings
-      operationId: getCalendarSettings
-      parameters:
-        - name: calendarID
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
     put:
       tags: [Calendar]
       summary: Update Calendar Settings
@@ -3342,32 +3184,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
-  /contacts/v4/contacts/unlabel:
-    put:
-      tags: [Contacts]
-      summary: Un Label Contacts
-      operationId: unLabelContacts
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - LabelID
-                - ContactIDs
-              properties:
-                LabelID:
-                  type: string
-                ContactIDs:
-                  type: array
-                  items: {}
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
   /contacts/v4/contacts/{contactID}:
     get:
       tags: [Contacts]
@@ -3445,17 +3261,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
   /core/v4/addresses:
-    get:
-      tags: [Core]
-      summary: Query Addresses
-      operationId: queryAddresses
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
     post:
       tags: [Core]
       summary: Create Address
@@ -4049,24 +3854,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
-  /core/v4/features/{featureCode}:
-    get:
-      tags: [Core]
-      summary: Get Feature
-      operationId: getFeature
-      parameters:
-        - name: featureCode
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
   /core/v4/features/{featureCode}/value:
     put:
       tags: [Core]
@@ -4083,34 +3870,6 @@ paths:
           application/json:
             schema:
               type: object
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-  /core/v4/feedback:
-    post:
-      tags: [Core]
-      summary: Send Feedback
-      operationId: sendFeedback
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - Score
-                - Feedback
-                - FeedbackType
-              properties:
-                Score:
-                  type: integer
-                Feedback:
-                  type: string
-                FeedbackType:
-                  type: string
       responses:
         "200":
           description: Success
@@ -4333,24 +4092,6 @@ paths:
                   type: string
                 AddressSignaturePacket:
                   type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-  /core/v4/groups/members/{groupMemberID}/reinvite:
-    put:
-      tags: [Core]
-      summary: Resend Group Invitation
-      operationId: resendGroupInvitation
-      parameters:
-        - name: groupMemberID
-          in: path
-          required: true
-          schema:
-            type: string
       responses:
         "200":
           description: Success
@@ -4620,31 +4361,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
-  /core/v4/invites:
-    post:
-      tags: [Core]
-      summary: Create Invitation
-      operationId: createInvitation
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - Email
-                - Type
-              properties:
-                Email:
-                  type: string
-                Type:
-                  type: integer
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
   /core/v4/invites/check:
     post:
       tags: [Core]
@@ -4674,18 +4390,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
   /core/v4/keys:
-    get:
-      tags: [Core]
-      summary: Get Public Keys
-      operationId: getPublicKeys
-      deprecated: true
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
     post:
       tags: [Core]
       summary: Create Address Key Route
@@ -5222,39 +4926,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
-  /core/v4/keys/{ID}:
-    put:
-      tags: [Core]
-      summary: Reactivate Key Route
-      operationId: reactivateKeyRoute
-      parameters:
-        - name: ID
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - ID
-                - PrivateKey
-              properties:
-                ID:
-                  type: string
-                PrivateKey:
-                  type: string
-                SignedKeyList:
-                  type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
   /core/v4/keys/{ID}/activate:
     put:
       tags: [Core]
@@ -5357,22 +5028,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
   /core/v4/labels:
-    get:
-      tags: [Core]
-      summary: Get
-      operationId: get
-      parameters:
-        - name: Type
-          in: query
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
     post:
       tags: [Core]
       summary: Create
@@ -5446,34 +5101,6 @@ paths:
           application/json:
             schema:
               type: object
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-  /core/v4/labels/order:
-    put:
-      tags: [Core]
-      summary: Order
-      operationId: order
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - Type
-                - LabelIDs
-              properties:
-                Type:
-                  type: integer
-                LabelIDs:
-                  type: array
-                  items: {}
-                ParentID:
-                  type: string
       responses:
         "200":
           description: Success
@@ -5579,23 +5206,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
-  /core/v4/load:
-    get:
-      tags: [Core]
-      summary: Load
-      operationId: load
-      parameters:
-        - name: page
-          in: query
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
   /core/v4/logs/auth:
     get:
       tags: [Core]
@@ -5636,6 +5246,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
+      x-timeout: MEMBERS_TIMEOUT
     post:
       tags: [Core]
       summary: Create Member
@@ -5687,33 +5298,6 @@ paths:
                   type: string
                 Domain:
                   type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-  /core/v4/members/addresses/permissions/organization/switch:
-    put:
-      tags: [Core]
-      summary: Switch Addresses Organization Permissions
-      operationId: switchAddressesOrganizationPermissions
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - Ids
-                - Permissions
-              properties:
-                Ids:
-                  type: array
-                  items: {}
-                Permissions:
-                  type: array
-                  items: {}
       responses:
         "200":
           description: Success
@@ -5864,6 +5448,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
+      x-timeout: MEMBERS_TIMEOUT
   /core/v4/members/search/summary:
     get:
       tags: [Core]
@@ -5956,23 +5541,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
   /core/v4/members/{memberID}/addresses:
-    get:
-      tags: [Core]
-      summary: Query Addresses
-      operationId: queryAddresses
-      parameters:
-        - name: memberID
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
     post:
       tags: [Core]
       summary: Create Member Address
@@ -6430,45 +5998,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
-  /core/v4/organizations/2fa:
-    put:
-      tags: [Core]
-      summary: Update Two Factor
-      operationId: updateTwoFactor
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
   /core/v4/organizations/2fa/remind:
     post:
       tags: [Core]
       summary: Send Email Reminder Two FA
       operationId: sendEmailReminderTwoFA
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-  /core/v4/organizations/email:
-    put:
-      tags: [Core]
-      summary: Update Organization Email
-      operationId: updateOrganizationEmail
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
       responses:
         "200":
           description: Success
@@ -6862,17 +6396,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
   /core/v4/organizations/subsidiaries:
-    get:
-      tags: [Core]
-      summary: Get Msp Subsidiaries
-      operationId: getMspSubsidiaries
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
     post:
       tags: [Core]
       summary: Create Msp Subsidiary
@@ -6972,23 +6495,6 @@ paths:
           required: true
           schema:
             type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-  /core/v4/organizations/theme:
-    put:
-      tags: [Core]
-      summary: Update Organization Theme
-      operationId: updateOrganizationTheme
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
       responses:
         "200":
           description: Success
@@ -7180,42 +6686,6 @@ paths:
       summary: Get Referrals Status
       operationId: getReferralsStatus
       description: Get current user referral status
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-  /core/v4/referrals/{id}:
-    get:
-      tags: [Core]
-      summary: Resend Email Invitation
-      operationId: resendEmailInvitation
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-    delete:
-      tags: [Core]
-      summary: Delete Invitation
-      operationId: deleteInvitation
-      description: delete an invitation or outdated referral
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
       responses:
         "200":
           description: Success
@@ -7970,23 +7440,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
-  /core/v4/settings/email/notify:
-    put:
-      tags: [Core]
-      summary: Update Notify Email
-      operationId: updateNotifyEmail
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
   /core/v4/settings/email/reset:
     put:
       tags: [Core]
@@ -8004,23 +7457,6 @@ paths:
                   type: integer
                 PersistPasswordScope:
                   type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-  /core/v4/settings/email/verify:
-    post:
-      tags: [Core]
-      summary: Verify Email
-      operationId: verifyEmail
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
       responses:
         "200":
           description: Success
@@ -8315,17 +7751,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
   /core/v4/settings/news:
-    get:
-      tags: [Core]
-      summary: Get News
-      operationId: getNews
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
     patch:
       tags: [Core]
       summary: Patch News
@@ -8495,23 +7920,6 @@ paths:
                   type: string
                 PersistPasswordScope:
                   type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-  /core/v4/settings/phone/notify:
-    put:
-      tags: [Core]
-      summary: Update Notify Phone
-      operationId: updateNotifyPhone
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
       responses:
         "200":
           description: Success
@@ -8689,23 +8097,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
-  /core/v4/settings/themetype:
-    put:
-      tags: [Core]
-      summary: Update Theme Type
-      operationId: updateThemeType
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
   /core/v4/settings/timeformat:
     put:
       tags: [Core]
@@ -8798,18 +8189,6 @@ paths:
           required: true
           schema:
             type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-  /core/v4/update:
-    get:
-      tags: [Core]
-      summary: Update
-      operationId: update
       responses:
         "200":
           description: Success
@@ -8988,23 +8367,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
-  /core/v4/users/direct:
-    get:
-      tags: [Core]
-      summary: Query Direct Signup Status
-      operationId: queryDirectSignupStatus
-      parameters:
-        - name: Type
-          in: query
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
   /core/v4/users/disable/{data.JWT}:
     get:
       tags: [Core]
@@ -9052,18 +8414,6 @@ paths:
                   type: string
                 VisitorId:
                   type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-  /core/v4/users/human:
-    get:
-      tags: [Core]
-      summary: Get Human Verification Methods
-      operationId: getHumanVerificationMethods
       responses:
         "200":
           description: Success
@@ -9757,33 +9107,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
-    post:
-      tags: [Drive]
-      summary: Query Create Drive Device
-      operationId: queryCreateDriveDevice
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - Device
-                - Share
-                - Link
-              properties:
-                Device:
-                  type: object
-                Share:
-                  type: object
-                Link:
-                  type: object
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
   /drive/devices/{deviceId}:
     delete:
       tags: [Drive]
@@ -9913,74 +9236,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
       x-expected-errors: [HTTP_STATUS_CODE.NOT_FOUND]
-  /drive/photos/albums/shared-with-me:
-    get:
-      tags: [Drive]
-      summary: Query Shared With Me Albums
-      operationId: querySharedWithMeAlbums
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-  /drive/photos/volumes:
-    post:
-      tags: [Drive]
-      summary: Query Create Photos With Albums Volume
-      operationId: queryCreatePhotosWithAlbumsVolume
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - Share
-                - Link
-              properties:
-                Share:
-                  type: object
-                Link:
-                  type: object
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-  /drive/photos/volumes/{volumeID}/albums:
-    post:
-      tags: [Drive]
-      summary: Query Create Album
-      operationId: queryCreateAlbum
-      parameters:
-        - name: volumeID
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - Locked
-                - Link
-              properties:
-                Locked:
-                  type: boolean
-                Link:
-                  type: object
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
   /drive/photos/volumes/{volumeID}/recover-multiple:
     put:
       tags: [Drive]
@@ -10019,199 +9274,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
-  /drive/photos/volumes/{volumeId}/albums:
-    get:
-      tags: [Drive]
-      summary: Query Albums
-      operationId: queryAlbums
-      parameters:
-        - name: volumeId
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-    post:
-      tags: [Drive]
-      summary: Query Create Album
-      operationId: queryCreateAlbum
-      parameters:
-        - name: volumeId
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - Locked
-                - Link
-              properties:
-                Locked:
-                  type: boolean
-                Link:
-                  type: object
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-  /drive/photos/volumes/{volumeId}/albums/{albumLinkId}:
-    put:
-      tags: [Drive]
-      summary: Query Update Album Cover
-      operationId: queryUpdateAlbumCover
-      parameters:
-        - name: volumeId
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: albumLinkId
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                CoverLinkID:
-                  type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-    delete:
-      tags: [Drive]
-      summary: Query Delete Album
-      operationId: queryDeleteAlbum
-      parameters:
-        - name: volumeId
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: albumLinkId
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-      x-expected-errors: [API_CUSTOM_ERROR_CODES.ALBUM_DATA_LOSS]
-  /drive/photos/volumes/{volumeId}/albums/{albumLinkId}/add-multiple:
-    post:
-      tags: [Drive]
-      summary: Query Add Album Photos
-      operationId: queryAddAlbumPhotos
-      parameters:
-        - name: volumeId
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: albumLinkId
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - AlbumData
-              properties:
-                AlbumData:
-                  type: array
-                  items: {}
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-  /drive/photos/volumes/{volumeId}/albums/{albumLinkId}/children:
-    get:
-      tags: [Drive]
-      summary: Query Album Photos
-      operationId: queryAlbumPhotos
-      parameters:
-        - name: volumeId
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: albumLinkId
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-  /drive/photos/volumes/{volumeId}/albums/{albumLinkId}/remove-multiple:
-    post:
-      tags: [Drive]
-      summary: Query Remove Album Photos
-      operationId: queryRemoveAlbumPhotos
-      parameters:
-        - name: volumeId
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: albumLinkId
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - LinkIDs
-              properties:
-                LinkIDs:
-                  type: array
-                  items: {}
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
   /drive/photos/volumes/{volumeId}/links/{linkId}/favorite:
     post:
       tags: [Drive]
@@ -10236,40 +9298,6 @@ paths:
               properties:
                 PhotoData:
                   type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-  /drive/photos/volumes/{volumeId}/links/{linkId}/tags:
-    delete:
-      tags: [Drive]
-      summary: Query Remove Tags From Photo
-      operationId: queryRemoveTagsFromPhoto
-      parameters:
-        - name: volumeId
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: linkId
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - Tags
-              properties:
-                Tags:
-                  type: array
-                  items: {}
       responses:
         "200":
           description: Success
@@ -10767,86 +9795,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
-  /drive/shares/{shareID}/members:
-    get:
-      tags: [Drive]
-      summary: Query Share Members
-      operationId: queryShareMembers
-      parameters:
-        - name: shareID
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-  /drive/shares/{shareID}/members/invitations/{memberID}:
-    post:
-      tags: [Drive]
-      summary: Query Accept Share Invite
-      operationId: queryAcceptShareInvite
-      parameters:
-        - name: shareID
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: memberID
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - AddressID
-                - AddressKeyID
-                - SessionKeySignature
-              properties:
-                AddressID:
-                  type: string
-                AddressKeyID:
-                  type: string
-                SessionKeySignature:
-                  type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-  /drive/shares/{shareID}/members/{memberID}:
-    delete:
-      tags: [Drive]
-      summary: Query Remove Share Member
-      operationId: queryRemoveShareMember
-      parameters:
-        - name: shareID
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: memberID
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
   /drive/shares/{shareId}/documents:
     post:
       tags: [Drive]
@@ -10969,29 +9917,6 @@ paths:
       x-timeout: 90000
       x-expected-errors: [all]
   /drive/shares/{shareId}/files/{linkId}/revisions:
-    get:
-      tags: [Drive]
-      summary: Query File Revisions
-      operationId: queryFileRevisions
-      parameters:
-        - name: shareId
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: linkId
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-      x-expected-errors: [all]
     post:
       tags: [Drive]
       summary: Query Create File Revision
@@ -11026,34 +9951,6 @@ paths:
       tags: [Drive]
       summary: Query Delete File Revision
       operationId: queryDeleteFileRevision
-      parameters:
-        - name: shareId
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: linkId
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: revisionId
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-  /drive/shares/{shareId}/files/{linkId}/revisions/{revisionId}/restore:
-    post:
-      tags: [Drive]
-      summary: Query Restore File Revision
-      operationId: queryRestoreFileRevision
       parameters:
         - name: shareId
           in: path
@@ -11406,51 +10303,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
       x-expected-errors: [all]
-  /drive/urls/{token}/blocks:
-    post:
-      tags: [Drive]
-      summary: Query Public Request Upload
-      operationId: queryPublicRequestUpload
-      parameters:
-        - name: token
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - BlockList
-                - LinkID
-                - RevisionID
-              properties:
-                BlockList:
-                  type: array
-                  items: {}
-                ThumbnailList:
-                  type: string
-                SignatureEmail:
-                  type: string
-                LinkID:
-                  type: string
-                RevisionID:
-                  type: string
-                Thumbnail:
-                  type: string
-                ThumbnailHash:
-                  type: string
-                ThumbnailSize:
-                  type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
   /drive/urls/{token}/documents:
     post:
       tags: [Drive]
@@ -11509,147 +10361,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
-  /drive/urls/{token}/files:
-    post:
-      tags: [Drive]
-      summary: Query Public Create File
-      operationId: queryPublicCreateFile
-      description: Public
-      security: []
-      parameters:
-        - name: token
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - Name
-                - Hash
-                - ParentLinkID
-                - NodePassphrase
-                - NodePassphraseSignature
-                - NodeKey
-                - MIMEType
-                - ContentKeyPacket
-              properties:
-                Name:
-                  type: string
-                Hash:
-                  type: string
-                ParentLinkID:
-                  type: string
-                NodePassphrase:
-                  type: string
-                NodePassphraseSignature:
-                  type: string
-                SignatureEmail:
-                  type: string
-                NodeKey:
-                  type: string
-                MIMEType:
-                  type: string
-                ContentKeyPacket:
-                  type: string
-                ContentKeyPacketSignature:
-                  type: string
-                ClientUID:
-                  type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-      x-timeout: 90000
-      x-expected-errors: [all]
-  /drive/urls/{token}/files/{linkID}/revisions/{revisionId}:
-    put:
-      tags: [Drive]
-      summary: Query Public Update File Revision
-      operationId: queryPublicUpdateFileRevision
-      parameters:
-        - name: token
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: linkID
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: revisionId
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - ManifestSignature
-              properties:
-                XAttr:
-                  type: string
-                ManifestSignature:
-                  type: string
-                Photo:
-                  type: string
-                SignatureEmail:
-                  type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-      x-timeout: 90000
-  /drive/urls/{token}/files/{linkId}/checkAvailableHashes:
-    post:
-      tags: [Drive]
-      summary: Query Public Check Available Hashes
-      operationId: queryPublicCheckAvailableHashes
-      description: Public
-      security: []
-      parameters:
-        - name: token
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: linkId
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - Hashes
-              properties:
-                Hashes:
-                  type: array
-                  items: {}
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-      x-timeout: 60000
   /drive/urls/{token}/folders:
     post:
       tags: [Drive]
@@ -11702,50 +10413,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
-  /drive/urls/{token}/folders/{linkId}/children:
-    get:
-      tags: [Drive]
-      summary: Query Shared URL Children
-      operationId: querySharedURLChildren
-      parameters:
-        - name: token
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: linkId
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: Page
-          in: query
-          schema:
-            type: string
-        - name: PageSize
-          in: query
-          schema:
-            type: string
-        - name: Sort
-          in: query
-          schema:
-            type: string
-        - name: Desc
-          in: query
-          schema:
-            type: string
-        - name: Thumbnails
-          in: query
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-      x-expected-errors: [HTTP_ERROR_CODES.UNAUTHORIZED]
   /drive/urls/{token}/folders/{parentLinkId}/delete_multiple:
     post:
       tags: [Drive]
@@ -11888,36 +10555,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
-  /drive/urls/{token}/links/{linkId}/revisions/{revisionId}/verification:
-    get:
-      tags: [Drive]
-      summary: Query Public Verification Data
-      operationId: queryPublicVerificationData
-      description: This route should never be called without also instanciating a verifier. See the file uploader in the Drive app.
-      parameters:
-        - name: token
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: linkId
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: revisionId
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-      x-expected-errors: [all]
   /drive/urls/{token}/security:
     post:
       tags: [Drive]
@@ -12594,62 +11231,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
-  /drive/v2/volumes/{volumeId}/shares/{shareId}/invitations:
-    get:
-      tags: [Drive]
-      summary: Query Share Invitations Listing
-      operationId: queryShareInvitationsListing
-      parameters:
-        - name: volumeId
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: shareId
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-    post:
-      tags: [Drive]
-      summary: Query Share Invitation Details
-      operationId: queryShareInvitationDetails
-      parameters:
-        - name: volumeId
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: shareId
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - InvitationIDs
-              properties:
-                InvitationIDs:
-                  type: array
-                  items: {}
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
   /drive/volumes:
     get:
       tags: [Drive]
@@ -12733,44 +11314,6 @@ paths:
                 PhotoShares:
                   type: string
                 AddressKeyID:
-                  type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-  /drive/volumes/{volumeID}/links/move-multiple:
-    put:
-      tags: [Drive]
-      summary: Query Move Links
-      operationId: queryMoveLinks
-      parameters:
-        - name: volumeID
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - ParentLinkID
-                - Links
-                - NameSignatureEmail
-                - NewShareId
-              properties:
-                ParentLinkID:
-                  type: string
-                Links:
-                  type: array
-                  items: {}
-                NameSignatureEmail:
-                  type: string
-                NewShareId:
                   type: string
       responses:
         "200":
@@ -13068,32 +11611,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
-  /drive/volumes/{volumeId}/photos:
-    get:
-      tags: [Drive]
-      summary: Query Photos
-      operationId: queryPhotos
-      parameters:
-        - name: volumeId
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: PageSize
-          in: query
-          schema:
-            type: string
-        - name: Tag
-          in: query
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
   /drive/volumes/{volumeId}/photos/duplicates:
     post:
       tags: [Drive]
@@ -13261,48 +11778,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
-  /lumo/v1/invitation:
-    post:
-      tags: [Lumo]
-      summary: Send Lumo Invitation
-      operationId: sendLumoInvitation
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - Email
-                - InviterAddressID
-              properties:
-                Email:
-                  type: string
-                InviterAddressID:
-                  type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
   /lumo/v1/invitation/remaining:
     get:
       tags: [Lumo]
       summary: Get Remaining Invitations
       operationId: getRemainingInvitations
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-  /lumo/v1/waitlist:
-    post:
-      tags: [Lumo]
-      summary: Join Lumo Waitlist
-      operationId: joinLumoWaitlist
       responses:
         "200":
           description: Success
@@ -13538,23 +12018,6 @@ paths:
       tags: [Mail]
       summary: Delete Conversations
       operationId: deleteConversations
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-  /mail/v4/conversations/expire:
-    put:
-      tags: [Mail]
-      summary: Set Expiration
-      operationId: setExpiration
       requestBody:
         content:
           application/json:
@@ -13810,8 +12273,13 @@ paths:
   /mail/v4/filters:
     post:
       tags: [Mail]
-      summary: Add Sieve Filter
-      operationId: addSieveFilter
+      summary: Add Tree Filter
+      operationId: addTreeFilter
+      parameters:
+        - name: Source
+          in: query
+          schema:
+            type: string
       requestBody:
         content:
           application/json:
@@ -13819,14 +12287,26 @@ paths:
               type: object
               required:
                 - Name
-                - Sieve
+                - Status
+                - ID
                 - Version
+                - Simple
+                - Tree
+                - Sieve
               properties:
                 Name:
                   type: string
-                Sieve:
+                Status:
+                  type: string
+                ID:
                   type: string
                 Version:
+                  type: string
+                Simple:
+                  type: string
+                Tree:
+                  type: string
+                Sieve:
                   type: string
       responses:
         "200":
@@ -13846,17 +12326,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
-    delete:
-      tags: [Mail]
-      summary: Clear Filters
-      operationId: clearFilters
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
   /mail/v4/filters/check:
     put:
       tags: [Mail]
@@ -13868,9 +12337,9 @@ paths:
             schema:
               type: object
               properties:
-                Sieve:
-                  type: string
                 Version:
+                  type: string
+                Sieve:
                   type: string
       responses:
         "200":
@@ -13916,10 +12385,10 @@ paths:
                 - Name
                 - Status
                 - ID
-                - Sieve
                 - Version
                 - Simple
                 - Tree
+                - Sieve
               properties:
                 Name:
                   type: string
@@ -13927,13 +12396,13 @@ paths:
                   type: string
                 ID:
                   type: string
-                Sieve:
-                  type: string
                 Version:
                   type: string
                 Simple:
                   type: string
                 Tree:
+                  type: string
+                Sieve:
                   type: string
       responses:
         "200":
@@ -13946,42 +12415,6 @@ paths:
       tags: [Mail]
       summary: Delete Filter
       operationId: deleteFilter
-      parameters:
-        - name: filterID
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-  /mail/v4/filters/{filterID}/disable:
-    put:
-      tags: [Mail]
-      summary: Disable Filter
-      operationId: disableFilter
-      parameters:
-        - name: filterID
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-  /mail/v4/filters/{filterID}/enable:
-    put:
-      tags: [Mail]
-      summary: Enable Filter
-      operationId: enableFilter
       parameters:
         - name: filterID
           in: path
@@ -14108,31 +12541,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
-  /mail/v4/forwardings/incoming:
-    get:
-      tags: [Mail]
-      summary: Query Incoming Forwardings
-      operationId: queryIncomingForwardings
-      parameters:
-        - name: Page
-          in: query
-          schema:
-            type: string
-        - name: PageSize
-          in: query
-          schema:
-            type: string
-        - name: AddressID
-          in: query
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
   /mail/v4/forwardings/incoming/{id}:
     get:
       tags: [Mail]
@@ -14142,31 +12550,6 @@ paths:
         - name: id
           in: path
           required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-  /mail/v4/forwardings/outgoing:
-    get:
-      tags: [Mail]
-      summary: Query Outgoing Forwardings
-      operationId: queryOutgoingForwardings
-      parameters:
-        - name: Page
-          in: query
-          schema:
-            type: string
-        - name: PageSize
-          in: query
-          schema:
-            type: string
-        - name: AddressID
-          in: query
           schema:
             type: string
       responses:
@@ -14348,17 +12731,6 @@ paths:
           in: query
           schema:
             type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-    delete:
-      tags: [Mail]
-      summary: Clear Incoming Defaults
-      operationId: clearIncomingDefaults
       responses:
         "200":
           description: Success
@@ -14863,23 +13235,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
-  /mail/v4/messages/undelete:
-    put:
-      tags: [Mail]
-      summary: Undelete Messages
-      operationId: undeleteMessages
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
   /mail/v4/messages/unlabel:
     put:
       tags: [Mail]
@@ -14911,23 +13266,6 @@ paths:
       tags: [Mail]
       summary: Mark Message As Unread
       operationId: markMessageAsUnread
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-  /mail/v4/messages/unsubscribe:
-    post:
-      tags: [Mail]
-      summary: Unsubscribe Messages
-      operationId: unsubscribeMessages
       requestBody:
         content:
           application/json:
@@ -14978,36 +13316,23 @@ paths:
                 $ref: '#/components/schemas/ApiResponse'
     post:
       tags: [Mail]
-      summary: Send Message
-      operationId: sendMessage
+      summary: Send Message Form
+      operationId: sendMessageForm
       parameters:
         - name: messageID
           in: path
           required: true
           schema:
             type: string
+        - name: Source
+          in: query
+          schema:
+            type: string
       requestBody:
         content:
-          application/json:
+          multipart/form-data:
             schema:
               type: object
-              required:
-                - AutoSaveContacts
-                - Packages
-              properties:
-                AutoSaveContacts:
-                  type: integer
-                DelaySeconds:
-                  type: string
-                DeliveryTime:
-                  type: string
-                ExpirationTime:
-                  type: string
-                ExpiresIn:
-                  type: string
-                Packages:
-                  type: array
-                  items: {}
       responses:
         "200":
           description: Success
@@ -15045,34 +13370,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
-  /mail/v4/messages/{messageID}/body:
-    post:
-      tags: [Mail]
-      summary: Update Body
-      operationId: updateBody
-      parameters:
-        - name: messageID
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - Body
-              properties:
-                Body:
-                  type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
   /mail/v4/messages/{messageID}/cancel_send:
     post:
       tags: [Mail]
@@ -15096,24 +13393,6 @@ paths:
       tags: [Mail]
       summary: Force Send
       operationId: forceSend
-      parameters:
-        - name: messageID
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-  /mail/v4/messages/{messageID}/mark/broken:
-    put:
-      tags: [Mail]
-      summary: Mark As Broken
-      operationId: markAsBroken
       parameters:
         - name: messageID
           in: path
@@ -15290,17 +13569,6 @@ paths:
           in: query
           schema:
             type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-    delete:
-      tags: [Mail]
-      summary: Clear Org Incoming Defaults
-      operationId: clearOrgIncomingDefaults
       responses:
         "200":
           description: Success
@@ -15747,23 +14015,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
-  /mail/v4/settings/messagebuttons:
-    put:
-      tags: [Mail]
-      summary: Update Message Buttons
-      operationId: updateMessageButtons
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
   /mail/v4/settings/moved:
     put:
       tags: [Mail]
@@ -16007,23 +14258,6 @@ paths:
       tags: [Mail]
       summary: Update Swipe Right
       operationId: updateSwipeRight
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-  /mail/v4/settings/theme:
-    put:
-      tags: [Mail]
-      summary: Update Theme
-      operationId: updateTheme
       requestBody:
         content:
           application/json:
@@ -17003,24 +15237,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
-  /organizations/subsidiaries/{id}/members:
-    get:
-      tags: [Organizations]
-      summary: Get Msp Subsidiary Managers
-      operationId: getMspSubsidiaryManagers
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
   /organizations/subsidiaries/{id}/members/{memberId}:
     delete:
       tags: [Organizations]
@@ -17906,6 +16122,26 @@ paths:
                   - $ref: '#/components/schemas/ApiResponse'
                   - type: object
                     properties:
+                      Code:
+                        type: integer
+  /pass/v1/organization/report/user_shares:
+    get:
+      tags: [pass]
+      summary: Get Pass Organization Report User Shares
+      operationId: getPassOrganizationReportUserShares
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      Report:
+                        type: object
+                        description: Report on share usage for batch of users
                       Code:
                         type: integer
   /pass/v1/organization/settings:
@@ -19489,7 +17725,7 @@ paths:
                   description: Email of the target user
                 TargetType:
                   type: integer
-                  description: Invite target type. 1 = Vault, 2 = Item
+                  description: Invite target type. 1 = Vault, 2 = Item, 3 = Folder
                 ShareRoleID:
                   type: string
                   description: ShareRoleID for this invite. The values are in the top level Pass docs.
@@ -19499,6 +17735,9 @@ paths:
                 ItemID:
                   type: string
                   description: Invite encrypted item ID (only in case the invite is of type Item)
+                FolderID:
+                  type: string
+                  description: Invite encrypted folder ID (only in case the invite is of type Folder)
                 Data:
                   type: string
                   description: Base64 encrypted invite message encrypted with the object key
@@ -19609,7 +17848,7 @@ paths:
                   description: Email of the target user
                 TargetType:
                   type: integer
-                  description: Invite target type. 1 = Vault, 2 = Item
+                  description: Invite target type. 1 = Vault, 2 = Item, 3 = Folder
                 Signature:
                   type: string
                   description: "Base64 signature of \"inviteemail|base64(vaultKey)\" signed with the manager's address key"
@@ -19622,6 +17861,9 @@ paths:
                 ItemID:
                   type: string
                   description: Invite encrypted item ID (only in case the invite is of type Item)
+                FolderID:
+                  type: string
+                  description: Invite encrypted folder ID (only in case the invite is of type Folder)
                 ExpirationTime:
                   type: string
                   description: Expiration time for the share
@@ -22685,18 +20927,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
-  /tests/humanverification:
-    get:
-      tags: [Tests]
-      summary: Test Human Verification
-      operationId: testHumanVerification
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
   /tests/ping:
     get:
       tags: [Tests]
@@ -22768,18 +20998,6 @@ paths:
               schema:
                 type: string
                 format: binary
-  /vpn/v1/countries/count:
-    get:
-      tags: [Vpn]
-      summary: Query VPN Countries Count
-      operationId: queryVPNCountriesCount
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
   /vpn/v1/location:
     get:
       tags: [Vpn]
@@ -22804,40 +21022,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
-  /vpn/v1/logicals/count:
-    get:
-      tags: [Vpn]
-      summary: Query VPN Logical Server Info Count
-      operationId: queryVPNLogicalServerInfoCount
-      parameters:
-        - name: GroupBy
-          in: query
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
   /vpn/v1/logicals/lookup/{encodeURIComponent(name)}:
     get:
       tags: [Vpn]
       summary: Query VPN Logical Server Lookup
       operationId: queryVPNLogicalServerLookup
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-  /vpn/v1/servers-count:
-    get:
-      tags: [Vpn]
-      summary: Query VPN Servers Count
-      operationId: queryVPNServersCount
       responses:
         "200":
           description: Success
