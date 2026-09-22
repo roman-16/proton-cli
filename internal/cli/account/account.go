@@ -135,6 +135,7 @@ func count(n int) string {
 func loginCmd() *cobra.Command {
 	var (
 		extra  kit.ExtraPassword
+		qr     bool
 		reauth kit.Reauth
 		second kit.SecondPassword
 		user   string
@@ -142,6 +143,9 @@ func loginCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "login",
 		Short: "Sign in and save the session for this profile",
+		// The one mutation whose preview cannot want a session: this is what makes
+		// one, so a machine with none is exactly where previewing it is asked for.
+		Annotations: map[string]string{kit.SignedOut: "yes"},
 		Long: "Sign in and save the session for this profile.\n\n" +
 			"Signing in also unlocks your keys, so your password is needed once per\n" +
 			"machine and not again. Anything a flag has not set is asked for, as long as\n" +
@@ -159,9 +163,25 @@ func loginCmd() *cobra.Command {
 			"printed and can be solved on any device, so a machine with no display signs\n" +
 			"in like any other. A run that cannot ask prints the page and the token to\n" +
 			"repeat the command with.\n\n" +
+			"--qr asks for nothing at all. It prints a code to approve on a device that\n" +
+			"is already signed in, and signs in as whoever approves it, so it takes none\n" +
+			"of the flags that name an account or carry a secret. A code lasts nine\n" +
+			"minutes.\n\n" +
 			"Signing in again as the same account changes nothing, so an unattended job\n" +
 			"can run it first to recover from an expired session.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
+			if qr {
+				if err := refuseCredentials(c); err != nil {
+					return err
+				}
+			}
+			// A preview of signing in signs nobody in, which is the whole of what it
+			// has to get right: everything past here asks Proton for a session and
+			// writes it to disk.
+			if c.App.DryRun {
+				return kit.Mutate(c, signedIn(c, wouldSignInAs(c, user, qr)),
+					func() error { return nil })
+			}
 			if err := reauth.Supply(c); err != nil {
 				return err
 			}
@@ -171,7 +191,7 @@ func loginCmd() *cobra.Command {
 			if err := extra.Supply(c); err != nil {
 				return err
 			}
-			if err := c.App.Login(c.Ctx, user); err != nil {
+			if err := signIn(c, qr, user); err != nil {
 				return err
 			}
 			acct, err := c.App.Account.Get(c.Ctx)
@@ -182,19 +202,85 @@ func loginCmd() *cobra.Command {
 			if err := c.App.SaveSession(); err != nil {
 				return err
 			}
-			return kit.Mutate(c, ui.ResultSpec{
-				Action: ui.SignedIn, Count: 1, Name: acct.Email,
-				Detail: fmt.Sprintf("(profile %q)", c.App.Profile),
-			}, func() error { return nil })
+			return kit.Mutate(c, signedIn(c, acct.Email), func() error { return nil })
 		}),
 	}
 	// Naming an account belongs here. Every other command acts as whichever
 	// profile it was given, and already knows the address from its session.
 	c.Flags().StringVar(&user, "user", "", "Proton account email to sign in as")
+	c.Flags().BoolVar(&qr, "qr", false, "Sign in by approving a code on another device")
 	extra.Declare(c)
 	reauth.Declare(c)
 	second.Declare(c)
 	return c
+}
+
+// signIn attaches an account to this profile: by proving its password here, or
+// by having somebody approve a code on a device that already holds one.
+func signIn(c *kit.Invocation, qr bool, user string) error {
+	if !qr {
+		return c.App.Login(c.Ctx, user)
+	}
+	return c.App.LoginQR(c.Ctx, func(code string) error { return showCode(c, code) })
+}
+
+// showCode puts a sign-in code in front of a person twice over: as a square for
+// a camera, and as a line for a device that has none.
+func showCode(c *kit.Invocation, code string) error {
+	u := c.UI()
+	u.Instruct("Scan this with a Proton app on a device that is already signed in:")
+	u.Break()
+	if err := u.QR(code); err != nil {
+		return err
+	}
+	u.Break()
+	u.Instruct("In Proton Mail on a phone: Settings, then Sign in on another device.")
+	u.Instruct("Without a camera, run this on a device that is already signed in:")
+	u.Break()
+	u.Instruct("  " + kit.Program + " account sessions create " + code)
+	u.Break()
+	u.Instruct("Waiting for approval. Ctrl+C stops.")
+	return nil
+}
+
+// signedIn is the one shape a sign-in is reported in, whether it happened or is
+// being previewed.
+func signedIn(c *kit.Invocation, account string) ui.ResultSpec {
+	return ui.ResultSpec{
+		Action: ui.SignedIn, Count: 1, Name: account,
+		Detail: fmt.Sprintf("(profile %q)", c.App.Profile),
+	}
+}
+
+// wouldSignInAs is who a preview says the account would be.
+//
+// A code names nobody until somebody approves it, and approving it is the change
+// a preview exists not to make - so that is what the preview says, rather than
+// an address it would have had to sign in to learn.
+func wouldSignInAs(c *kit.Invocation, user string, qr bool) string {
+	switch {
+	case qr:
+		return "whoever approves the code"
+	case user != "":
+		return user
+	case c.App.Email() != "":
+		return c.App.Email()
+	}
+	return "the account you name"
+}
+
+// refuseCredentials stops --qr being handed something it has no use for, before
+// a code is minted for nobody.
+func refuseCredentials(c *kit.Invocation) error {
+	for _, flag := range []string{"password-file", "second-password-file", "totp"} {
+		if c.Changed(flag) {
+			return kit.Fail("--qr proves the account on the other device, so --%s has nothing to prove here.", flag)
+		}
+	}
+	if c.Changed("user") {
+		return kit.Fail("--qr signs in as whoever approves the code, so it cannot be told which account to expect.")
+	}
+	return nil
 }
 
 func logoutCmd() *cobra.Command {

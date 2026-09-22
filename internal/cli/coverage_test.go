@@ -50,12 +50,10 @@ const (
 // suite signs a paid account in on every run. What is left is what no run of
 // anything could do.
 var unreachable = map[string]string{
-	"DELETE /auth/v4/sessions":      "revoking every other session would end the run",
-	"DELETE /auth/v4/sessions/{id}": "the only session there is to revoke is the one running",
+	"DELETE /auth/v4/sessions": "revoking every other session would end the run",
 
 	"GET /core/v4/keys/salts": "only a first unlock derives the key password, and the suite resumes a session",
 
-	"POST /auth/v4/sessions": "only a first sign-in creates one, and no test signs out to force another",
 	"POST /core/v4/auth/2fa": "only a sign-in answers a second factor there, and no test signs in from nothing",
 
 	// Everything about registering a security key. Reaching any of the four means

@@ -41,6 +41,51 @@ proton drive items upload backup.zst /backups
 
 A second factor is only asked for when the account actually has one enabled.
 
+### Sign in by scanning a code
+
+With a phone or another machine already signed in, sign in here without typing anything:
+
+```console
+$ proton account login --qr
+Scan this with a Proton app on a device that is already signed in:
+
+                                         
+                                         
+    █▀▀▀▀▀█ ▄ █ ▀ █▀▄▀ █▄▄ ▀  █▀▀▀▀▀█    
+    █ ███ █ ▄▄▄ █▀██  ▄ █▄▀ ▄ █ ███ █    
+    █ ▀▀▀ █ ▄█ ▄▄▀  ▄▀█▀▄▄▄█  █ ▀▀▀ █    
+    ▀▀▀▀▀▀▀ ▀▄█▄▀ ▀▄▀▄▀ █▄█ █ ▀▀▀▀▀▀▀    
+    ██▀█▀▄▀██▀▄▀▄▄ ██▀▄▀█▄  ▀▀ █▄▀ █     
+    ▄ ▀▄▄▄▀▀█ ▀ ▄█▀▄█ ▀▀▄▀▄▀█ ▀▄ ▀▄█     
+    █▀█▀█▀▀  ▀▀ ▀ ▀ ▀▄ ▄ ▀█ ▀▀▀▀▀ ▀▄     
+    █▀▄▀ ▀▀ █▀▀█▀ ▄█▀▄▀▀▀██▀▄▄▀▄ ▀▀▄▄    
+     ▀▀█▄▀▀ █ ▀▀▄▄▄ ▄█▀█   ▄▄█▀ ▄▀▄█▀    
+    █▀▄  █▀▄▄▀  ▄█▀▄▄▄█ █▀█   ▀▀ ▄▀█     
+    █▀▀▄ █▀██ ▄ ▀ ▀▀█▄▄▀▀█▄▀▀▀█▄█        
+    █ █▀ █▀▄▀  █▀ ▄▄▄  ▀██▄▀ █   ▀█ ▀    
+    ▀ ▀▀  ▀▀█▀▄▀▄▄▄▄▄     ▄ █▀▀▀█▄▄      
+    █▀▀▀▀▀█ ▀   ▄█▀▄█▄▀ █▀▄▄█ ▀ █▄█▀     
+    █ ███ █ █▄▀ ▀ ▀█▄▀▀ █▀▄▀████▀▀█      
+    █ ▀▀▀ █ █ ██▀ ▄██▄█▀██▄ ▄▀  ▀▄▀▄     
+    ▀▀▀▀▀▀▀ ▀ ▀▀   ▀▀   ▀▀ ▀▀▀ ▀▀ ▀      
+                                         
+                                         
+
+In Proton Mail on a phone: Settings, then Sign in on another device.
+Without a camera, run this on a device that is already signed in:
+
+  proton account sessions create 0:8FJ3K2QP:qm4Xb2v9tR1sLp0yZcHwKdNfEuAgJi7MoBxVn3Tl5Qs=:Other
+
+Waiting for approval. Ctrl+C stops.
+✓ Signed in as alice@proton.me (profile "default").
+```
+
+You are signed in as whoever approves the code, so `--qr` takes no `--user`, `--password-file`, `--second-password-file` or `--totp`. No password, second factor or second password is asked for, and the keys are unlocked the same as after any other sign-in.
+
+A code lasts nine minutes and works once. Run the command again for a new one.
+
+The other direction, where this machine approves a code another device is showing, is [Sign another device in](#sign-another-device-in).
+
 ### Security keys
 
 An account that signs in with a security key is asked to touch it:
@@ -129,6 +174,7 @@ These commands ask for your password again even when you are signed in:
 
 - `account keys reactivate`
 - `account security-log delete` · `account security-log disable` · `account security-log enable`
+- `account sessions revoke`
 - `account settings password set`
 - `account settings recovery-email set` · `account settings recovery-email enable` · `account settings recovery-email disable`
 - `account settings recovery-phone set` · `account settings recovery-phone enable` · `account settings recovery-phone disable`
@@ -297,7 +343,22 @@ proton account sessions revoke 3Ns8pT2v
 proton account sessions revoke --others     # everything but this one
 ```
 
+Revoking asks for your password again. With nobody to ask, pass it with `--password-file`.
+
 **If you lose a device, revoke its session.** That also makes the credentials saved on it useless, even to someone who already copied the file.
+
+### Sign another device in
+
+Where the other device shows a sign-in code, pass it to this one:
+
+```console
+$ proton account sessions create 0:8FJ3K2QP:qm4Xb2v9tR1sLp0yZcHwKdNfEuAgJi7MoBxVn3Tl5Qs=:Other
+✓ Signed in as alice@proton.me on the device that showed the code.
+```
+
+The code comes from `proton account login --qr` on the other machine, or from a Proton app's sign-in screen. That device is signed in as this account, with no password typed on it, and stays signed in after this one signs out.
+
+**Only ever pass a code you are looking at yourself.** A code somebody sends you signs their device in as you.
 
 ## Check the security log
 

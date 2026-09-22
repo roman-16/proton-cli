@@ -23,7 +23,7 @@ func UpdateCmd(version string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:         "update [VERSION]",
 		Aliases:     []string{"upgrade", "self-update"},
-		Annotations: map[string]string{kit.OnThisMachine: "yes"},
+		Annotations: map[string]string{kit.SignedOut: "yes"},
 		Short:       "Update proton to the latest release",
 		Long: `Replace this proton binary in place with the latest GitHub release
 (or a specific version), verifying the download against the published

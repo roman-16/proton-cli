@@ -686,27 +686,39 @@ func saltOf(keys []Key, salts []salt) string {
 	return ""
 }
 
-// wrapAndPersist generates a fresh client key, stores it server-side, wraps the
-// salted key password with it, and rewrites the session file in encrypted form.
-// Best-effort: skp is already held in memory for this run, so a failure here
-// never fails the unlock - it only defers persistence to the next run.
-func wrapAndPersist(ctx context.Context, c *proton.Client, skp string) {
+// Seal generates a fresh client key, stores it server-side, wraps the salted key
+// password with it, and rewrites the session file in encrypted form.
+//
+// It is exported for the one sign-in that never derives a passphrase: a session
+// approved on another device arrives with the key password already stretched, so
+// sealing it is the whole of what makes the machine able to read anything - and
+// a failure there leaves a session nothing on this machine can ever unlock, which
+// is worth reporting rather than deferring.
+func Seal(ctx context.Context, c *proton.Client, skp string) error {
 	key, err := localkey.Generate()
 	if err != nil {
-		slog.Debug("localkey: generate failed; key password not persisted this run", "error", err)
-		return
+		return fmt.Errorf("generate a client key: %w", err)
 	}
 	if err := localkey.Put(ctx, c, key); err != nil {
-		slog.Debug("localkey: put failed; key password not persisted this run", "error", err)
-		return
+		return fmt.Errorf("store the client key: %w", err)
 	}
 	blob, err := localkey.Wrap(skp, key)
 	if err != nil {
-		slog.Debug("localkey: wrap failed; key password not persisted this run", "error", err)
-		return
+		return fmt.Errorf("wrap the key password: %w", err)
 	}
 	c.SetEncKeyBlob(blob)
 	c.Persist()
+	return nil
+}
+
+// wrapAndPersist seals the key password an unlock derived.
+//
+// Best-effort: skp is already held in memory for this run, so a failure here
+// never fails the unlock - it only defers persistence to the next run.
+func wrapAndPersist(ctx context.Context, c *proton.Client, skp string) {
+	if err := Seal(ctx, c, skp); err != nil {
+		slog.Debug("localkey: key password not persisted this run", "error", err)
+	}
 }
 
 // PrimaryUserKey is the user key this account writes with.
@@ -723,6 +735,14 @@ func wrapAndPersist(ctx context.Context, c *proton.Client, skp string) {
 func (u *Unlocked) PrimaryUserKey() (*pgp.KeyRing, error) {
 	return u.UserKR.FirstKey()
 }
+
+// KeyPassword is the passphrase the hierarchy opened with.
+//
+// One thing asks for it: signing another device in, which seals it under a key
+// that device made so the account's contents open there too. Handing it over is
+// handing over everything the account holds, which is why nothing else takes it
+// out of the hierarchy it belongs to.
+func (u *Unlocked) KeyPassword() string { return string(u.keyPass) }
 
 // PrimaryAddr returns the rings and address record for the user's primary
 // proton.me/pm.me address, falling back to the first unlockable address.

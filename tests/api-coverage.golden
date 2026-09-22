@@ -1,4 +1,5 @@
 DELETE /account/v4/personal-access-token/{id}
+DELETE /auth/v4/sessions/{id}
 DELETE /calendar/v1/{id}
 DELETE /calendar/v1/{id}/invitations/{id}
 DELETE /calendar/v1/{id}/members/{id}
@@ -36,6 +37,8 @@ DELETE /pass/v1/user/srp
 DELETE /pass/v1/vault/{id}
 GET /account/v4/personal-access-token
 GET /auth/v4/sessions
+GET /auth/v4/sessions/forks
+GET /auth/v4/sessions/forks/{id}
 GET /auth/v4/sessions/local/key
 GET /calendar/v1
 GET /calendar/v1/events
@@ -142,6 +145,8 @@ GET /pass/v1/user/srp
 GET /pass/v1/user/srp/info
 GET /settings/calendar
 POST /account/v4/personal-access-token
+POST /auth/v4/sessions
+POST /auth/v4/sessions/forks
 POST /calendar/v1
 POST /calendar/v1/subscription/validate
 POST /calendar/v1/{id}/keys

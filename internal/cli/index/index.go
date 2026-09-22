@@ -394,7 +394,7 @@ func described(r search.Result, noun string) string {
 func deleteCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:         "delete [REF...]",
-		Annotations: map[string]string{kit.OnThisMachine: "yes"},
+		Annotations: map[string]string{kit.SignedOut: "yes"},
 		Short:       "Remove an index from this machine",
 		Long: "Remove an index from this machine.\n\n" +
 			"Name the apps to remove, or none for all of them. Nothing in your account\n" +

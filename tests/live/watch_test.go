@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -164,4 +165,131 @@ func (w *watch) stop(t *testing.T) {
 		w.record(-1)
 		t.Fatalf("watch did not stop after SIGINT\nstderr:\n%s", w.errb.String())
 	}
+}
+
+// A sign-in that waits for another device.
+//
+// `account login --qr` prints a code and then waits for somebody to approve it,
+// so the suite has to be the somebody: the code is read off this process while
+// it is still running, and the approval comes from an invocation beside it. It
+// is the only way three of the requests this CLI can send are ever sent, so it
+// records what it asked Proton for exactly as a watch does.
+type pendingSignIn struct {
+	cmd  *exec.Cmd
+	errb *bytes.Buffer
+	// code carries the sign-in code as soon as it is printed, and done the exit.
+	code chan string
+	done chan error
+
+	// dir is the config directory this sign-in writes its session to, profile
+	// the environment it runs under, and args, started what the trace records.
+	dir     string
+	profile string
+	args    []string
+	started time.Time
+	traced  sync.Once
+}
+
+// codeOffer is how `account login --qr` offers its code to a device with no
+// camera, and so how a test reads one.
+const codeOffer = " account sessions create "
+
+// signingIn starts a sign-in that waits, writing its session into dir rather
+// than anywhere the suite's own three profiles live.
+func signingIn(profile, dir string) (*pendingSignIn, error) {
+	if _, ok := accounts[profile]; !ok {
+		return nil, fmt.Errorf("unknown test profile %q", profile)
+	}
+	args := []string{"account", "login", "--qr"}
+	s := &pendingSignIn{
+		cmd:  exec.Command(binaryPath, args...),
+		errb: &bytes.Buffer{},
+		code: make(chan string, 1),
+		done: make(chan error, 1),
+		dir:  dir, profile: profile, args: args, started: time.Now(),
+	}
+	// Both names for one thing: os.UserConfigDir reads XDG_CONFIG_HOME on Linux
+	// and HOME on macOS, and signing in over a developer's own session is the one
+	// outcome this must not have.
+	s.cmd.Env = withEnv(childEnv(profile), map[string]string{
+		"HOME":            dir,
+		"XDG_CONFIG_HOME": filepath.Join(dir, "config"),
+	})
+	if tracingRequests() {
+		s.cmd.Env = append(s.cmd.Env, "PROTON_LOG_LEVEL=debug")
+	}
+
+	errPipe, err := s.cmd.StderrPipe()
+	if err != nil {
+		return nil, err
+	}
+	if err := s.cmd.Start(); err != nil {
+		return nil, err
+	}
+	go func() { s.done <- s.cmd.Wait() }()
+	go func() {
+		scanner := bufio.NewScanner(errPipe)
+		for scanner.Scan() {
+			line := scanner.Text()
+			s.errb.WriteString(line + "\n")
+			if _, code, found := strings.Cut(line, codeOffer); found {
+				select {
+				case s.code <- strings.TrimSpace(code):
+				default:
+				}
+			}
+		}
+	}()
+	return s, nil
+}
+
+// waitForCode returns the code the sign-in is showing.
+func (s *pendingSignIn) waitForCode(t *testing.T, timeout time.Duration) string {
+	t.Helper()
+	select {
+	case code := <-s.code:
+		return code
+	case err := <-s.done:
+		s.record(s.cmd.ProcessState.ExitCode())
+		t.Fatalf("the sign-in ended before it showed a code: %v\nstderr:\n%s", err, s.errb.String())
+	case <-time.After(timeout):
+		t.Fatalf("no code within %s\nstderr:\n%s", timeout, s.errb.String())
+	}
+	return ""
+}
+
+// waitForSession expects the sign-in to finish, which it does once the code has
+// been approved, and hands back what it said.
+func (s *pendingSignIn) waitForSession(t *testing.T, timeout time.Duration) string {
+	t.Helper()
+	select {
+	case err := <-s.done:
+		s.record(s.cmd.ProcessState.ExitCode())
+		if err != nil {
+			t.Fatalf("the sign-in failed: %v\nstderr:\n%s", err, s.errb.String())
+		}
+	case <-time.After(timeout):
+		t.Fatalf("the sign-in did not finish within %s of the code being approved\nstderr:\n%s",
+			timeout, s.errb.String())
+	}
+	return s.errb.String()
+}
+
+// stop ends a sign-in that is still waiting, for the test that never got as far
+// as approving its code.
+func (s *pendingSignIn) stop() {
+	if s.cmd.Process == nil || s.cmd.ProcessState != nil {
+		return
+	}
+	_ = s.cmd.Process.Kill()
+	<-s.done
+	s.record(-1)
+}
+
+// record hands the sign-in's stderr to the trace, so the requests it made count
+// towards what the live suite reached.
+func (s *pendingSignIn) record(exitCode int) {
+	s.traced.Do(func() {
+		_ = trace(s.profile, s.args, time.Since(s.started), exitCode, s.errb.String())
+	})
 }

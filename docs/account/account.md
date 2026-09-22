@@ -33,6 +33,8 @@ Pass extra password: not asked for here. The first `pass` command asks, and the 
 
 Human verification: Proton may ask you to prove you are human. The page is printed and can be solved on any device, so a machine with no display signs in like any other. A run that cannot ask prints the page and the token to repeat the command with.
 
+--qr asks for nothing at all. It prints a code to approve on a device that is already signed in, and signs in as whoever approves it, so it takes none of the flags that name an account or carry a secret. A code lasts nine minutes.
+
 Signing in again as the same account changes nothing, so an unattended job can run it first to recover from an expired session.
 
 ```
@@ -46,12 +48,14 @@ proton account login --user me@proton.me --password-file /run/secrets/proton
 proton account login --user me@proton.me --password-file - --totp 123456
 proton account login --user me@proton.me --password-file /run/secrets/proton --second-password-file /run/secrets/proton-second
 proton account login --user me@proton.me --password-file /run/secrets/proton --extra-password-file /run/secrets/proton-pass
+proton account login --qr
 ```
 
 | Flag | Description |
 | --- | --- |
 | `--extra-password-file string` | Read the Pass extra password from a file, or - for stdin |
 | `--password-file string` | Read the account password from a file, or - for stdin |
+| `--qr` | Sign in by approving a code on another device |
 | `--second-password-file string` | Read the second password (two-password mode) from a file, or - for stdin |
 | `--totp string` | Two-factor code |
 | `--user string` | Proton account email to sign in as |

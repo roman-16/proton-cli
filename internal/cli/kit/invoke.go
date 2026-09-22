@@ -118,18 +118,17 @@ func (c *Invocation) Changed(flag string) bool {
 
 // preview makes sure a dry run is as true as the change would be.
 //
-// A preview claims what the command would do, and for a mutation that reaches
-// Proton the honest claim includes needing an account: it sends no request, so
+// A preview claims what the command would do, and for a mutation that needs a
+// session the honest claim includes needing an account: it sends no request, so
 // nothing else would ever discover there is nobody signed in. A command that
-// declares OnThisMachine changes the disk and not the account, and would have
-// succeeded signed out, so its preview says so too - and so does work inside a
-// public link, which the link itself authorises.
+// declares SignedOut would have run with nobody signed in, so its preview does
+// too - and so does work inside a public link, which the link itself authorises.
 func (c *Invocation) preview(spec *ui.ResultSpec) error {
 	spec.DryRun = true
 	if c.linkAuthorised {
 		return nil
 	}
-	if c.Cmd != nil && c.Cmd.Annotations[OnThisMachine] != "" {
+	if c.Cmd != nil && c.Cmd.Annotations[SignedOut] != "" {
 		return nil
 	}
 	return c.App.Authenticate(c.Ctx)

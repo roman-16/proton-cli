@@ -196,7 +196,7 @@ Anything judgeable from the command line alone must fail **without a session**, 
 
 This holds because **no step asserts that an account exists, and none of them unlocks its keys**. Both requirements belong to the request: the client holds the session one (`SetSessionGuard`) and a service holds the key one, asking for the hierarchy where it decrypts. So a command judges what it can judge and only then finds out whether anyone is signed in.
 
-One place keeps the requirement earlier, on purpose: **a dry run of a mutation that reaches Proton**, because a preview is a claim about what the command would do, and without an account it would not do it. So `drive items delete --all` and `mail settings filters reorder` exit `2` offline and their tests stay live. The two commands that change this machine instead - `update` and `uninstall` - declare `kit.OnThisMachine` and preview signed out, because that is what they would have done.
+One place keeps the requirement earlier, on purpose: **a dry run of a mutation that needs a session**, because a preview is a claim about what the command would do, and without an account it would not do it. So `drive items delete --all` and `mail settings filters reorder` exit `2` offline and their tests stay live. The commands that would have run with nobody signed in - `update`, `uninstall`, `index delete` and `account login`, which is what makes a session - declare `kit.SignedOut` and preview signed out, because that is what they would have done.
 
 ## What a run costs, and how to know
 

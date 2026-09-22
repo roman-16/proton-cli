@@ -814,6 +814,7 @@ func TestReauthCommandsAreDeclared(t *testing.T) {
 		"proton account security-log delete",
 		"proton account security-log disable",
 		"proton account security-log enable",
+		"proton account sessions revoke",
 		"proton account settings password set",
 		"proton account settings recovery-email disable",
 		"proton account settings recovery-email enable",
@@ -918,14 +919,16 @@ func TestExtraPasswordCommandsAreDeclared(t *testing.T) {
 
 // A dry run asserts that an account exists, because it sends no request and
 // would otherwise be the one path answering as though it had one. The exceptions
-// are the commands that change this machine instead of the account, and there
-// are exactly three: they would have run signed out, so their previews do too.
+// are the commands that would have run with nobody signed in, and there are
+// exactly four: the three that change this machine, and the one that makes the
+// session the rest of them assume.
 //
 // The set is pinned rather than counted, because the failure this guards against
-// is a fourth command quietly declaring itself local and skipping a check it
+// is a fifth command quietly declaring itself exempt and skipping a check it
 // needed.
-func TestCommandsThatActOnThisMachineAreDeclared(t *testing.T) {
+func TestCommandsThatRunSignedOutAreDeclared(t *testing.T) {
 	want := []string{
+		"proton account login",
 		"proton index delete",
 		"proton uninstall",
 		"proton update",
@@ -933,13 +936,13 @@ func TestCommandsThatActOnThisMachineAreDeclared(t *testing.T) {
 	leaves, groups := partition(t)
 	var got []string
 	for _, c := range append(leaves, groups...) {
-		if c.Annotations[kit.OnThisMachine] != "" {
+		if c.Annotations[kit.SignedOut] != "" {
 			got = append(got, cmdPath(c))
 		}
 	}
 	sort.Strings(got)
 	if !slices.Equal(got, want) {
-		t.Errorf("commands declaring they act on this machine are:\n  %s\nwant:\n  %s",
+		t.Errorf("commands declaring they run signed out are:\n  %s\nwant:\n  %s",
 			strings.Join(got, "\n  "), strings.Join(want, "\n  "))
 	}
 }

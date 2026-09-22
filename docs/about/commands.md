@@ -21,6 +21,7 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton account security-log enable`](../account/security-log.md#enable) | Record sign-ins and credential changes |
 | [`proton account security-log get`](../account/security-log.md#get) | Show what is being recorded, and how much of it there is |
 | [`proton account security-log list`](../account/security-log.md#list) | List what Proton recorded, newest first |
+| [`proton account sessions create`](../account/sessions.md#create) | Sign another device in from this one |
 | [`proton account sessions list`](../account/sessions.md#list) | List every signed-in session |
 | [`proton account sessions revoke`](../account/sessions.md#revoke) | Invalidate sessions at Proton |
 | [`proton account settings get`](../account/settings.md#get) | Show the account settings now in effect |

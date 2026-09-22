@@ -79,6 +79,7 @@ var reauthCommands = [][]string{
 	{"account", "security-log", "delete"},
 	{"account", "security-log", "disable"},
 	{"account", "security-log", "enable"},
+	{"account", "sessions", "revoke"},
 	{"account", "settings", "password", "set"},
 	{"account", "settings", "recovery-email", "disable"},
 	{"account", "settings", "recovery-email", "enable"},

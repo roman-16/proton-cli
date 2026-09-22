@@ -157,21 +157,23 @@ var Irreversible = map[string]bool{
 // it is put to the person at the gate, where a command that changes nothing is.
 var Opaque = map[string]bool{"api": true}
 
-// OnThisMachine marks a command that changes this computer rather than the
-// account, and is the third thing declared about a mutation, beside whether it
-// can be taken back and whether it changes state at all.
+// SignedOut marks a command that does its work with nobody signed in, and is the
+// third thing declared about a mutation, beside whether it can be taken back and
+// whether it changes state at all.
 //
 // It exists for one rule. A preview has to be as true as the change would be, so
 // a dry run asserts that an account exists - otherwise it is the one path that
 // answers as though it had one, since it sends no request to find out. That is
-// right for every mutation that reaches Proton and wrong for the two that reach
-// only the disk: replacing or deleting this binary needs no account, and asking
-// for one would refuse a preview of work that would have succeeded.
+// right for every mutation that needs a session and wrong for the ones that do
+// not: replacing this binary, deleting it, dropping what this machine has
+// indexed, and signing in, which is the command that makes the session the
+// others assume. Asking any of them for an account would refuse a preview of
+// work that would have succeeded.
 //
 // It is declared per command because nothing else separates them. `update` is a
 // verb eight collections use, and `Updated` is the action a draft reports too;
-// only the command knows whose thing it is changing.
-const OnThisMachine = "on-this-machine"
+// only the command knows what it needs.
+const SignedOut = "signed-out"
 
 // Mutating lists the verbs that change state. Every command whose verb is in
 // here has to honour --dry-run, which kit.Mutate guarantees structurally.
@@ -282,6 +284,7 @@ var Placeholders = map[string]Placeholder{
 	"ALIAS_CONTACT_REF": {Means: "an address the addressed alias may write to", Picks: PicksHolding},
 	"ATTACHMENT_REF":    {Means: "an attachment on the addressed message or item", Picks: PicksHolding},
 	"COMMAND":           {Means: "a command, as you would type it"},
+	"CODE":              {Means: "a sign-in code another device is showing"},
 	"CONTACT_REF":       {Means: "a contact, when the command already addresses something else", Picks: "contacts"},
 	"DEST":              {Means: "a Drive folder to write into"},
 	"DOMAIN":            {Means: "a domain name"},

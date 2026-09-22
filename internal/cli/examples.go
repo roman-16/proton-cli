@@ -42,6 +42,7 @@ var examples = map[string][]string{
 		"proton account login --user me@proton.me --password-file - --totp 123456",
 		"proton account login --user me@proton.me --password-file /run/secrets/proton --second-password-file /run/secrets/proton-second",
 		"proton account login --user me@proton.me --password-file /run/secrets/proton --extra-password-file /run/secrets/proton-pass",
+		"proton account login --qr",
 	},
 	"proton account logout": {
 		"proton account logout",
@@ -68,10 +69,14 @@ var examples = map[string][]string{
 		"proton account security-log delete",
 		"proton account security-log delete --yes --password-file /run/secrets/proton",
 	},
+	"proton account sessions create": {
+		"proton account sessions create 0:8FJ3K2QP:qm4Xb2v9tR1sLp0yZcHwKdNfEuAgJi7MoBxVn3Tl5Qs=:Other",
+	},
 	"proton account sessions list": {"proton account sessions list"},
 	"proton account sessions revoke": {
 		"proton account sessions revoke 5bH2mQxK",
 		"proton account sessions revoke --others",
+		"proton account sessions revoke 5bH2mQxK --password-file /run/secrets/proton",
 	},
 	"proton account settings get":  {"proton account settings get"},
 	"proton account settings list": {"proton account settings list"},

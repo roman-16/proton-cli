@@ -236,6 +236,20 @@ func (s Style) Swatch(hex, glyph string) string {
 	return "\x1b[38;5;" + strconv.Itoa(int(c.x256())) + "m" + glyph + "\x1b[39m"
 }
 
+// Scannable draws a line of a code meant for a camera, in the two colours a
+// scanner expects: black ink on white.
+//
+// It is the second place the CLI names an exact colour, and for the reason the
+// first one does - the colours are the value. A code drawn in the reader's
+// foreground is inverted on half the terminals in the world, and what decides
+// whether that still reads is the phone rather than anything here.
+func (s Style) Scannable(text string) string {
+	if !s.enabled || text == "" {
+		return text
+	}
+	return "\x1b[30;47m" + text + "\x1b[39;49m"
+}
+
 func (s Style) paintMarks(m Marks) string {
 	var b strings.Builder
 	for _, mk := range m {

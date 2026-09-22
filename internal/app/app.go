@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/roman-16/proton-cli/internal/account/fork"
 	"github.com/roman-16/proton-cli/internal/account/keys"
 	"github.com/roman-16/proton-cli/internal/account/session"
 	"github.com/roman-16/proton-cli/internal/config"
@@ -345,6 +346,11 @@ func (a *App) indexKeys(ctx context.Context) (search.Keys, error) {
 // it and a reader has to be able to tell whether it is looking at its own.
 func (a *App) UserID() string { return a.userID }
 
+// Email is the address this profile is signed in as, empty when it holds no
+// session. It is what a preview names, since a preview signs nobody in to find
+// out.
+func (a *App) Email() string { return a.email }
+
 func (a *App) SignedIn() bool {
 	uid, _, _ := a.API.Tokens()
 	return uid != ""
@@ -392,20 +398,9 @@ func (a *App) Login(ctx context.Context, user string) error {
 		if err := a.refuseRepoint(user); err != nil {
 			return err
 		}
-		if _, err := a.Account.Get(ctx); err == nil {
-			// The session works, so the only question left is whether the keys
-			// open - and signing in again cannot change that answer. Reporting
-			// why they did not beats a second SRP exchange that fails the same
-			// way, having asked for a password to do it.
-			if _, err := a.Unlock(ctx); err != nil {
-				return err
-			}
-			if err := a.unlockPass(ctx); err != nil {
-				return err
-			}
-			return a.saveSession()
-		}
-		// The saved session no longer works, so sign in again over the top of it.
+	}
+	if resumed, err := a.resume(ctx); resumed || err != nil {
+		return err
 	}
 	if user == "" {
 		var err error
@@ -423,6 +418,30 @@ func (a *App) Login(ctx context.Context, user string) error {
 	if err := a.saveSession(); err != nil {
 		return err
 	}
+	return a.settle(ctx)
+}
+
+// resume finishes a sign-in that has nothing left to do, and reports whether it
+// was one.
+//
+// A profile whose saved session still works needs neither a password nor a code:
+// the only question left is whether the keys open, and proving the account again
+// cannot change that answer. Reporting why they did not beats a second exchange
+// that fails the same way, having asked for a secret to do it.
+func (a *App) resume(ctx context.Context) (bool, error) {
+	if !a.SignedIn() {
+		return false, nil
+	}
+	if _, err := a.Account.Get(ctx); err != nil {
+		// The saved session no longer works, so sign in again over the top of it.
+		return false, nil
+	}
+	return true, a.settle(ctx)
+}
+
+// settle is the end of every sign-in: the keys open, an extra password that was
+// handed over is spent, and the session file carries what both produced.
+func (a *App) settle(ctx context.Context) error {
 	if _, err := a.Unlock(ctx); err != nil {
 		return err
 	}
@@ -430,6 +449,140 @@ func (a *App) Login(ctx context.Context, user string) error {
 		return err
 	}
 	return a.saveSession()
+}
+
+// forkPoll is how often an unapproved fork is asked about again, and forkLife is
+// how long it is worth asking for.
+//
+// Both are what Proton's own sign-in screen uses
+// (packages/account/signInWithAnotherDevice/signInWithAnotherDevicePull.ts): it
+// asks every three seconds and throws its code away after nine minutes. A code
+// nobody has approved in nine minutes is a code somebody walked away from, and
+// asking for ever would be a run that never ends.
+const (
+	forkPoll = 3 * time.Second
+	forkLife = 9 * time.Minute
+)
+
+// LoginQR attaches an account to this profile through a code approved on a
+// device that is already signed in.
+//
+// Nothing about the account is asked for here: no password, no second factor, no
+// second password. What the approving device seals into the fork is the
+// passphrase the keys are already locked with, so the session this saves is
+// unlocked from the start, the same as one a password opened.
+//
+// show is handed the code to put in front of a person, and is called once. What
+// it draws is the CLI's business rather than this function's; what happens next
+// is waiting.
+//
+// It is idempotent for the same reason Login is: a profile whose session still
+// works is left alone rather than being made to mint a code nobody needs.
+func (a *App) LoginQR(ctx context.Context, show func(code string) error) error {
+	if resumed, err := a.resume(ctx); resumed || err != nil {
+		return err
+	}
+	if err := a.API.AnonymousSession(ctx); err != nil {
+		return err
+	}
+	opened, err := a.API.NewFork(ctx)
+	if err != nil {
+		return err
+	}
+	// The client ID is how the new session names itself, and this build has one
+	// name wherever it says who it is.
+	code, err := fork.New(opened.UserCode, a.API.AppVersion())
+	if err != nil {
+		return err
+	}
+	if err := show(code.String()); err != nil {
+		return err
+	}
+	approved, err := a.awaitFork(ctx, opened.Selector)
+	if err != nil {
+		return err
+	}
+	keyPass, err := code.Open(approved.Payload)
+	if err != nil {
+		return err
+	}
+	a.API.AdoptSession(approved.UID, approved.AccessToken, approved.RefreshToken)
+
+	// Whose account it is, before anything about it is written down: a profile
+	// names one account everywhere else, and a code approved by a second one would
+	// otherwise repoint it silently.
+	acct, err := a.Account.Get(ctx)
+	if err != nil {
+		return err
+	}
+	if err := a.refuseRepoint(acct.Email); err != nil {
+		// The fork is spent either way, and leaving it standing would put a session
+		// on the account that nothing on this machine holds the tokens to.
+		if rerr := a.API.RevokeSession(ctx, approved.UID); rerr != nil {
+			slog.DebugContext(ctx, "the refused fork could not be revoked", "error", rerr.Error())
+		}
+		return err
+	}
+	a.rememberIdentity(acct.ID, acct.Email)
+	if err := a.saveSession(); err != nil {
+		return err
+	}
+	// A code that carried no key signs the machine in and unlocks nothing, which
+	// is a session to save as it is: the first command that decrypts asks for the
+	// password, exactly as one signed in before this build would.
+	if keyPass != "" {
+		if err := keys.Seal(ctx, a.API, keyPass); err != nil {
+			return err
+		}
+	}
+	return a.settle(ctx)
+}
+
+// awaitFork waits for somebody to approve the fork, and gives up when nobody
+// does.
+//
+// Every ask that finds it unapproved is the ordinary case and says nothing; a
+// count of them is what the log carries, because "it timed out" and "it was
+// never asked" are different failures and look identical afterwards.
+func (a *App) awaitFork(ctx context.Context, selector string) (*proton.ForkedSession, error) {
+	deadline := time.Now().Add(forkLife)
+	for attempt := 1; ; attempt++ {
+		approved, err := a.API.PullFork(ctx, selector)
+		switch {
+		case err == nil:
+			slog.DebugContext(ctx, "the code was approved", "attempt", attempt)
+			return approved, nil
+		case !errors.Is(err, proton.ErrForkWaiting):
+			return nil, err
+		case time.Now().After(deadline):
+			slog.DebugContext(ctx, "nobody approved the code", "attempt", attempt)
+			return nil, errs.Problemf("The code expired.").
+				Hint("run the command again for a new one").Exit(2)
+		}
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(forkPoll):
+		}
+	}
+}
+
+// SignInDevice signs another device in as this account, by the code it is
+// showing.
+//
+// The passphrase that opens this account's keys is sealed under a key that
+// device made and Proton never sees, which is what lets it read anything at all
+// once it is signed in.
+func (a *App) SignInDevice(ctx context.Context, code fork.Code) error {
+	unlocked, err := a.Unlock(ctx)
+	if err != nil {
+		return err
+	}
+	payload, err := code.Seal(unlocked.KeyPassword())
+	if err != nil {
+		return err
+	}
+	return a.API.PushFork(ctx, code.UserCode, code.ClientID, payload)
 }
 
 // unlockPass spends an extra password that was handed to this sign-in, so the

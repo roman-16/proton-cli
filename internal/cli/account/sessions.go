@@ -1,6 +1,7 @@
 package account
 
 import (
+	"github.com/roman-16/proton-cli/internal/account/fork"
 	"github.com/roman-16/proton-cli/internal/cli/kit"
 	"github.com/roman-16/proton-cli/internal/proton"
 	"github.com/roman-16/proton-cli/internal/ui"
@@ -14,8 +15,31 @@ import (
 
 func sessionsCmd() *cobra.Command {
 	c := &cobra.Command{Use: "sessions", Short: "Sessions Proton holds for this account"}
-	c.AddCommand(sessionsListCmd(), sessionsRevokeCmd())
+	c.AddCommand(sessionsCreateCmd(), sessionsListCmd(), sessionsRevokeCmd())
 	return c
+}
+
+func sessionsCreateCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "create CODE",
+		Short: "Sign another device in from this one",
+		Long: "Sign another device in from this one.\n\n" +
+			"CODE is what the other device is showing: run `" + kit.Program +
+			" account login --qr`\nthere, or read the code off a Proton app's sign-in " +
+			"screen. That device is\nsigned in as this account, with no password typed " +
+			"on it, and stays signed in\nafter this one signs out.\n\n" +
+			"A code works once. Only ever pass one you are looking at yourself.",
+		RunE: kit.Run(nil, func(c *kit.Invocation) error {
+			code, err := fork.Parse(c.Args[0])
+			if err != nil {
+				return err
+			}
+			return kit.Mutate(c, ui.ResultSpec{
+				Action: ui.SignedIn, Count: 1, Name: c.App.Email(),
+				Detail: "on the device that showed the code",
+			}, func() error { return c.App.SignInDevice(c.Ctx, code) })
+		}),
+	}
 }
 
 func sessionsListCmd() *cobra.Command {
@@ -56,14 +80,22 @@ func sessionsListCmd() *cobra.Command {
 }
 
 func sessionsRevokeCmd() *cobra.Command {
-	var others bool
+	var (
+		others bool
+		reauth kit.Reauth
+	)
 	c := &cobra.Command{
 		Use:   "revoke [REF...]",
 		Short: "Invalidate sessions at Proton",
 		Long: "Invalidate sessions at Proton.\n\n" +
 			"A revoked session can no longer decrypt the key password sealed into its\n" +
-			"saved file, so revoking makes a leaked session file worthless.",
+			"saved file, so revoking makes a leaked session file worthless.\n\n" +
+			"Your password is asked for again. Pass it with --password-file when there\n" +
+			"is nobody to ask.",
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
+			if err := reauth.Supply(c); err != nil {
+				return err
+			}
 			if others {
 				if len(c.Args) > 0 {
 					return kit.Fail("--others revokes every other session, so it takes no REF.")
@@ -90,5 +122,6 @@ func sessionsRevokeCmd() *cobra.Command {
 		}),
 	}
 	c.Flags().BoolVar(&others, "others", false, "Revoke every session except this one")
+	reauth.Declare(c)
 	return c
 }

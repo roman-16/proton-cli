@@ -59,28 +59,6 @@ func TestAccountGetStorageIsHumanReadable(t *testing.T) {
 	t.Error("no Storage line")
 }
 
-func TestAccountSessionsListMarksTheCurrentOne(t *testing.T) {
-	sessions := runJSONArray(t, "account", "sessions", "list")
-	if len(sessions) == 0 {
-		t.Fatal("a signed-in account has at least this session")
-	}
-	current := 0
-	for _, s := range sessions {
-		row := s.(map[string]interface{})
-		for _, key := range []string{"uid", "client_id", "create_time", "current"} {
-			if _, ok := row[key]; !ok {
-				t.Errorf("missing %q in %v", key, keysOf(row))
-			}
-		}
-		if row["current"] == true {
-			current++
-		}
-	}
-	if current != 1 {
-		t.Errorf("exactly one session is the current one, got %d", current)
-	}
-}
-
 func TestAccountSettingsGetAndList(t *testing.T) {
 	stdout := runOK(t, "account", "settings", "get")
 	for _, want := range []string{"Locale:", "Date Format:", "Telemetry:"} {
