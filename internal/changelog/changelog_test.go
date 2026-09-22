@@ -60,6 +60,44 @@ func TestParse(t *testing.T) {
 			sections: "## [Unreleased]\n\n### Added\n\n- Something on its way.\n\n" + shipped,
 		},
 		{
+			name: "a release that says what it is about",
+			sections: `## [2.3.0] - 2026-08-15
+
+### Highlights
+
+- **The thing** - what it lets somebody do.
+
+### Added
+
+- Something that did not exist before.
+`,
+		},
+		{
+			name:     "highlights below a category",
+			sections: "## [2.3.0] - 2026-08-15\n\n### Added\n\n- Something.\n\n### Highlights\n\n- **The thing** - what it does.\n",
+			refuses:  "Highlights in [2.3.0] belongs above Added",
+		},
+		{
+			name:     "highlights twice",
+			sections: "## [2.3.0] - 2026-08-15\n\n### Highlights\n\n- One.\n\n### Highlights\n\n- Two.\n\n### Added\n\n- Something.\n",
+			refuses:  "a second Highlights in [2.3.0]",
+		},
+		{
+			name:     "highlights with no entries",
+			sections: "## [2.3.0] - 2026-08-15\n\n### Highlights\n\n### Added\n\n- Something.\n",
+			refuses:  "Highlights in [2.3.0] has no entries",
+		},
+		{
+			name:     "highlights and no ledger under them",
+			sections: "## [2.3.0] - 2026-08-15\n\n### Highlights\n\n- **The thing** - what it does.\n",
+			refuses:  "[2.3.0] is Highlights and nothing else",
+		},
+		{
+			name:     "highlights on the unreleased section",
+			sections: "## [Unreleased]\n\n### Highlights\n\n- **The thing** - what it does.\n\n" + shipped,
+			refuses:  "[Unreleased] carries no Highlights",
+		},
+		{
 			name: "link references, for a file that keeps them",
 			sections: shipped + `
 [2.3.0]: https://example.test/compare/v2.2.3...v2.3.0
@@ -102,7 +140,7 @@ func TestParse(t *testing.T) {
 		{
 			name:     "an invented category",
 			sections: "## [2.3.0] - 2026-08-15\n\n### Breaking\n\n- Something.\n",
-			refuses:  `"Breaking" is not one of Added, Changed`,
+			refuses:  `"Breaking" is not Highlights or one of Added, Changed`,
 		},
 		{
 			name: "categories out of order",
@@ -131,7 +169,7 @@ func TestParse(t *testing.T) {
 		{
 			name:     "an entry outside a category",
 			sections: "## [2.3.0] - 2026-08-15\n\n- Something.\n",
-			refuses:  "sits outside a category",
+			refuses:  "sits outside a section",
 		},
 		{
 			name:     "an undated version",
@@ -293,6 +331,43 @@ func TestChanges(t *testing.T) {
 	}
 	if !reflect.DeepEqual(document.Releases[0].Changes, want) {
 		t.Fatalf("changes:\n got %#v\nwant %#v", document.Releases[0].Changes, want)
+	}
+}
+
+// Highlights are the release's own, kept apart from the ledger they summarise,
+// and they go onto the release page with it.
+func TestHighlights(t *testing.T) {
+	summarised, err := Parse("CHANGELOG.md", document(`## [2.3.0] - 2026-08-15
+
+### Highlights
+
+- **The thing** - what it lets somebody do, described at a length that the
+  author chose to wrap.
+
+### Added
+
+- Something that did not exist before.
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	release := summarised.Releases[0]
+	want := []string{"**The thing** - what it lets somebody do, described at a length that the author chose to wrap."}
+	if !reflect.DeepEqual(release.Highlights, want) {
+		t.Fatalf("highlights:\n got %#v\nwant %#v", release.Highlights, want)
+	}
+	if !reflect.DeepEqual(release.Changes, []Section{{Category: "Added", Entries: []string{"Something that did not exist before."}}}) {
+		t.Fatalf("changes: %#v", release.Changes)
+	}
+	if !strings.HasPrefix(release.Body, "### Highlights\n") {
+		t.Fatalf("notes do not open with the highlights:\n%s", release.Body)
+	}
+	plain, err := Parse("CHANGELOG.md", document(shipped))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plain.Releases[0].Highlights == nil {
+		t.Fatal("a release with nothing to say about itself has no list to iterate")
 	}
 }
 

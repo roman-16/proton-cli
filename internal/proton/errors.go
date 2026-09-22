@@ -73,6 +73,13 @@ const wrongTOTPCode = 12060
 // packages/drive-store/store/_api/usePublicSession.tsx).
 const wrongLinkPasswordCode = 2026
 
+// jailedCode is Proton shutting an account out of something for a while, after
+// deciding the traffic to it looked like abuse. It arrives under whichever
+// status the endpoint answers with, and Proton's own clients read it as the
+// rate limit it is, in the same breath as an HTTP 429
+// (API_CUSTOM_ERROR_CODES.BANNED, packages/shared/lib/errors.ts).
+const jailedCode = 2028
+
 // Succeeded reports whether a Proton code is one of the ways of saying it worked:
 // done, one answer per item, or accepted and being carried out in the background.
 //
@@ -171,6 +178,9 @@ func (e *APIError) ExitCode() int {
 		return 3
 	case invalidLoginCode, wrongTOTPCode:
 		return 2
+	case jailedCode:
+		// The wait a 429 asks for, arriving in the body rather than the status.
+		return 5
 	}
 	switch e.HTTPStatus {
 	case 401, 403:

@@ -23,7 +23,8 @@ The exception is a **local capability over what the user can already fetch**: so
 - **A version section calls for `just test`.** A release ships every command, so the whole live suite is what confirms one, and it is the user's to start. Offer it through the `live-test` skill as part of writing the section, and say the release is unconfirmed until it passes - `just test-fast` cannot answer for a release.
 - Write the commit message so the entry can be written from it later: what moved on the surface a user touches, and what that means for them. The commit is where the reasoning is still fresh.
 - An entry follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/): the six categories in the specification's order, one line per change, written for the person who types the commands. Internal work gets no entry.
-- `scripts/changelog` parses the file and `just test-fast` fails on a malformed one: a category that is not one of the six, a version that skips a step, a section with nothing in it. `just notes` prints what the release page would say.
+- A release may open with `### Highlights`, above the categories: the few bullets somebody skims to learn what it is about, each `- **Theme** - what they can now do, and where`. Nothing appears there that is not already an entry below, so it is written last, from the ledger. A release whose answer is "bug fixes" has none, and then the section is absent rather than thin.
+- `scripts/changelog` parses the file and `just test-fast` fails on a malformed one: a heading that is neither `Highlights` nor one of the six categories, highlights below a category or on `[Unreleased]`, a version that skips a step, a section with nothing in it. `just notes` prints what the release page would say.
 
 ## The interface is a language, and it is declared
 

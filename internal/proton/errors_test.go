@@ -65,6 +65,7 @@ func TestAPIErrorExitCode(t *testing.T) {
 		{"unprocessable for another reason", APIError{HTTPStatus: 422, Code: 2011}, 4},
 		{"refused credentials", APIError{HTTPStatus: 422, Code: invalidLoginCode}, 2},
 		{"rate limited", APIError{HTTPStatus: 429, Code: 85131}, 5},
+		{"shut out for a while", APIError{HTTPStatus: 422, Code: jailedCode}, 5},
 		{"server error", APIError{HTTPStatus: 503}, 5},
 		{"anything else", APIError{HTTPStatus: 400}, 1},
 	} {

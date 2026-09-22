@@ -6,6 +6,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 Adding a version section here is what publishes a release, so this file is the one place a version is decided: see [Releases](CONTRIBUTING.md#releases). Versions that shipped before this file existed are on the [releases page](https://github.com/roman-16/proton-cli/releases).
 
+## [4.3.0] - 2026-09-22
+
+### Highlights
+
+- **Your account's own security settings** - the password, two-password mode, an authenticator app, security keys, and recovery by email, phone or phrase are set from `proton account settings`, and `proton account security-log` reads Proton's record of the sign-ins. Every write reads its secrets from files, so an unattended script can make the change.
+- **Search inside your files** - `drive items list --keyword` matches what your text files say, not only what they are called, once `proton index create drive` has read them.
+- **Messages behind a password** - `proton mail protected` opens one from the terminal, its attachments and a reply included, and needs no account to do it.
+- **Your own alias domain, and access tokens** - `pass settings domains` takes a domain you own from its DNS entries to a working catch-all, and `pass settings access-tokens` mints a token that reads only the vaults it is handed.
+
+### Added
+
+- `account settings` reaches what Proton's security page does: `password set`, `second-password` for two-password mode, `two-factor` for an authenticator app, and `recovery-email`, `recovery-phone` and `recovery-phrase`. Each proves your current password and reads every secret from a file, so an unattended run can make the change; recovery codes and a recovery phrase are shown once and kept nowhere.
+- `account settings security-keys` registers a security key you plug in, renames it and removes it. Registering one used to mean going to the browser.
+- `account security-log` reads Proton's sign-in log, says whether it is recording and whether it keeps IP addresses, and `security-log delete` clears it. Nothing you do through `proton` appears in it: Proton records a sign-in from a named client, and this is not one.
+- `pass settings domains` handles an alias domain you own: add it, read every DNS entry it needs beside the verdict Proton last reached, choose the domain new aliases take, and once it is verified set its catch-all mailboxes, display name and random prefix. Needs a paid plan.
+- `pass settings access-tokens` mints a token that reads the vaults it is handed and nothing else, for pass-cli or an agent working through it. The token is on the screen once, and `access-tokens activity` says what it has done. Needs a paid plan.
+- `mail settings smtp-tokens` lists, shows, creates and deletes the tokens a printer or another service sends mail with. A token sends from one custom domain address, which is the SMTP username, and it is on the screen once.
+- `mail protected` opens a password-protected message somebody sent you: read it, download its attachments and reply, named by the link that arrived or the id in it, with the password from a file or standard input. It needs no account.
+- `drive items list --keyword` matches what a text file says as well as what it is called, once `index create drive` has read the text: up to 1 MB a file, with a PDF, an image or anything larger searchable by name alone. A drive index built before this holds no text until `index delete drive` and `index create drive` rebuild it.
+- `drive items download --recursive` takes a folder, which lands as a directory of its own name inside `--dest-dir`.
+
+### Changed
+
+- **Breaking.** A listing's JSON key is one word, so `pass breaches list --output json` keys its rows under `watched_addresses` rather than `watched addresses`. Every other collection is unaffected.
+- **Breaking.** `pass settings domains list --output json` rows carry `status`, `id`, `aliases` and `created` in place of `mx_verified`.
+- **Breaking.** The published `openapi.yaml` takes Drive from Proton's own Drive spec: 113 operations are back or newly there, albums and file revisions among them, and Drive's operations are named the way Proton names them. Regenerate anything built from the spec.
+- A filtered Drive listing shows each item's full path.
+- `mail messages get` carries an `Expires` line wherever Proton set one.
+- A password-protected link handed to `mail messages get` says which command opens it instead of failing to find it.
+
+### Fixed
+
+- `account keys reactivate --recovery-phrase` failed with `Path not found`. Those endpoints answer at Proton's account host, and the CLI was asking the host Mail is served from.
+- Proton temporarily limiting an account exited `4`, which a script reads as an ambiguous reference. It exits `5`, the code to wait and retry on.
+
 ## [4.2.3] - 2026-09-18
 
 ### Fixed

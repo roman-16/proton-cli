@@ -86,7 +86,7 @@ func TestMailMessagesListWiderThanAPage(t *testing.T) {
 
 func TestMailMessagesListFooterSinglePage(t *testing.T) {
 	_, stderr := runOKStderr(t, "mail", "messages", "list", "--limit", "150")
-	last := lastNonEmpty(stderr)
+	last := footerOf(stderr)
 	// One page holds everything, so the footer is a plain count: no "of", no
 	// next-page instruction, and never a page number the reader did not ask for.
 	if !strings.HasSuffix(last, "messages.") && !strings.HasSuffix(last, "message.") {
@@ -99,7 +99,7 @@ func TestMailMessagesListFooterSinglePage(t *testing.T) {
 
 func TestMailMessagesListFooterMidPagination(t *testing.T) {
 	_, stderr := runOKStderr(t, "mail", "messages", "list", "--limit", "1")
-	last := lastNonEmpty(stderr)
+	last := footerOf(stderr)
 	// Either mid-pagination ("Pass --page 1") or last/single-page if the
 	// account has ≤ 1 messages. Pin the substring that's present in the
 	// common case.
@@ -122,7 +122,7 @@ func TestMailMessagesListJSONPaginationFields(t *testing.T) {
 func TestMailMessagesListFilteredFooterPages(t *testing.T) {
 	_, stderr := runOKStderr(t, "mail", "messages", "list",
 		"--folder", "all", "--keyword", "proton", "--limit", "5")
-	last := lastNonEmpty(stderr)
+	last := footerOf(stderr)
 	if strings.Contains(last, "page 0") {
 		t.Errorf("a footer should never name the page it is on: %q", last)
 	}

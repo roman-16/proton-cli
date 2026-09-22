@@ -489,19 +489,33 @@ func rowsOf(stdout string) ([]interface{}, bool) {
 
 // ── when Proton asks for room ──
 
-// rateLimited is what the client says when Proton asks for room.
-const rateLimited = "Proton is rate limiting this run"
+// rateLimited is what the client says when Proton asks for room, and jailed how
+// Proton says it has shut the account out of something for a while. Its own
+// clients read the second as the first arriving in a body instead of a status,
+// so the code is what is matched here: the sentence carrying it is Proton's to
+// reword, 2028 is not.
+const (
+	rateLimited = "Proton is rate limiting this run"
+	jailed      = "] 2028: "
+)
 
-// refuseToPush stops the run the first time Proton throttles it.
+// refuseToPush stops the run the first time Proton pushes back.
 //
-// The client backs off and would very likely succeed, so the suite would pass
-// and nobody would learn anything - except that these are real accounts, and a
-// run that has started being throttled is a run that should be asking for less
-// rather than pressing on.
+// The client backs off from a rate limit and would very likely succeed, so the
+// suite would pass and nobody would learn anything - except that these are real
+// accounts, and a run that has started being throttled is a run that should be
+// asking for less rather than pressing on. A jail says the same thing with the
+// waiting already decided and counted in minutes, which is longer than any
+// command sits there for: everything the run does next is a request made into a
+// refusal.
 func refuseToPush(t *testing.T, stderr string) {
 	t.Helper()
-	if strings.Contains(stderr, rateLimited) {
+	switch {
+	case strings.Contains(stderr, rateLimited):
 		t.Fatalf("Proton rate-limited this run. Give the account a few minutes before running it again.\n%s",
+			truncateOutput(stderr))
+	case strings.Contains(stderr, jailed):
+		t.Fatalf("Proton has temporarily limited this account. Give it a few minutes before running it again.\n%s",
 			truncateOutput(stderr))
 	}
 }

@@ -119,7 +119,8 @@ func published(c *kit.Invocation) (*changelog.Changelog, error) {
 }
 
 // notes lays the releases out to be read: one part each, headed by the version
-// and the day it shipped, exactly as a thread of messages is laid out.
+// and the day it shipped, exactly as a thread of messages is laid out. A release
+// that says what it is about opens with that, above the ledger.
 func notes(releases []changelog.Release) ui.DocumentSpec {
 	if releases == nil {
 		releases = []changelog.Release{}
@@ -131,6 +132,13 @@ func notes(releases []changelog.Release) ui.DocumentSpec {
 			header = append(header, ui.Field{Label: "Withdrawn", Value: "yes"})
 		}
 		var body strings.Builder
+		if len(r.Highlights) > 0 {
+			body.WriteString("Highlights\n")
+			for _, highlight := range r.Highlights {
+				body.WriteString("- " + highlight + "\n")
+			}
+			body.WriteString("\n")
+		}
 		for i, section := range r.Changes {
 			if i > 0 {
 				body.WriteString("\n")

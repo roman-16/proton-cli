@@ -21,6 +21,12 @@ import (
 // specification lists them. The order is not alphabetical and is not ours to pick.
 var categories = []string{"Added", "Changed", "Deprecated", "Removed", "Fixed", "Security"}
 
+// highlights is the section a release may open with: the few bullets somebody
+// skims to learn what the release is about, above the ledger saying exactly what
+// moved. It is not a seventh category and holds nothing that is not also an entry
+// below it, so a version section can be read either way round.
+const highlights = "Highlights"
+
 var (
 	releaseHeading = regexp.MustCompile(`^## \[([^\]]+)\] - (\d{4}-\d{2}-\d{2})( \[YANKED\])?$`)
 	linkReference  = regexp.MustCompile(`^\[[^\]]+\]: \S+$`)
@@ -33,16 +39,17 @@ type Section struct {
 	Entries  []string `json:"entries"`
 }
 
-// Release is one version's section: what it is called, when it shipped, the
-// bullets that go onto its release page verbatim, and those same bullets taken
-// apart so a reader can be shown them.
+// Release is one version's section: what it is called, when it shipped, what it
+// is about, the bullets that go onto its release page verbatim, and those same
+// bullets taken apart so a reader can be shown them.
 type Release struct {
-	Version  string    `json:"version"`
-	Date     string    `json:"date"`
-	Yanked   bool      `json:"yanked,omitempty"`
-	Changes  []Section `json:"changes"`
-	Body     string    `json:"-"`
-	headline int
+	Version    string    `json:"version"`
+	Date       string    `json:"date"`
+	Yanked     bool      `json:"yanked,omitempty"`
+	Highlights []string  `json:"highlights"`
+	Changes    []Section `json:"changes"`
+	Body       string    `json:"-"`
+	headline   int
 }
 
 // Changelog is a parsed CHANGELOG.md, newest release first.
@@ -140,9 +147,11 @@ type parser struct {
 	name       string
 	heading    int
 	body       []string
+	highlights []string
 	sections   []Section
+	open       string
+	openAt     int
 	category   int
-	categoryAt int
 	bullets    int
 	current    *Release
 }
@@ -210,26 +219,49 @@ func (p *parser) section(n int, line string) error {
 }
 
 func (p *parser) begin(n int, name string) error {
+	if err := p.settled(); err != nil {
+		return err
+	}
+	if name == highlights {
+		switch {
+		case p.unreleased:
+			return p.at(n, "[Unreleased] carries no %s: they say what a release is about", highlights)
+		case len(p.highlights) > 0:
+			return p.at(n, "a second %s in [%s]", highlights, p.name)
+		case p.category >= 0:
+			return p.at(n, "%s in [%s] belongs above %s: a release says what it is about before what moved",
+				highlights, p.name, categories[p.category])
+		}
+		p.open, p.openAt, p.bullets = highlights, n, 0
+		p.body = append(p.body, "### "+name)
+		return nil
+	}
 	next := slices.Index(categories, name)
 	if next < 0 {
-		return p.at(n, "%q is not one of %s", name, strings.Join(categories, ", "))
-	}
-	if p.category >= 0 && p.bullets == 0 {
-		return p.at(p.categoryAt, "%s in [%s] has no entries", categories[p.category], p.name)
+		return p.at(n, "%q is not %s or one of %s", name, highlights, strings.Join(categories, ", "))
 	}
 	if next <= p.category {
 		return p.at(n, "%s in [%s] belongs above %s: the order is %s",
 			name, p.name, categories[p.category], strings.Join(categories, ", "))
 	}
-	p.category, p.categoryAt, p.bullets = next, n, 0
+	p.category, p.open, p.openAt, p.bullets = next, name, n, 0
 	p.body = append(p.body, "### "+name)
 	p.sections = append(p.sections, Section{Category: name})
 	return nil
 }
 
+// settled reports the section being read as finished, which it is not while
+// nothing has been filed under it.
+func (p *parser) settled() error {
+	if p.open != "" && p.bullets == 0 {
+		return p.at(p.openAt, "%s in [%s] has no entries", p.open, p.name)
+	}
+	return nil
+}
+
 func (p *parser) entry(n int, line string) error {
-	if p.category < 0 {
-		return p.at(n, "entry in [%s] sits outside a category", p.name)
+	if p.open == "" {
+		return p.at(n, "entry in [%s] sits outside a section", p.name)
 	}
 	text := strings.TrimSpace(strings.TrimPrefix(line, "- "))
 	if text == "" {
@@ -237,6 +269,10 @@ func (p *parser) entry(n int, line string) error {
 	}
 	p.bullets++
 	p.body = append(p.body, line)
+	if p.open == highlights {
+		p.highlights = append(p.highlights, text)
+		return nil
+	}
 	last := &p.sections[len(p.sections)-1]
 	last.Entries = append(last.Entries, text)
 	return nil
@@ -245,6 +281,10 @@ func (p *parser) entry(n int, line string) error {
 // continuation folds a wrapped entry's later lines back into the entry, so a
 // reader is shown one sentence rather than the author's line breaks.
 func (p *parser) continuation(line string) {
+	if p.open == highlights {
+		p.highlights[len(p.highlights)-1] += " " + strings.TrimSpace(line)
+		return
+	}
 	last := &p.sections[len(p.sections)-1]
 	i := len(last.Entries) - 1
 	last.Entries[i] += " " + strings.TrimSpace(line)
@@ -257,19 +297,25 @@ func (p *parser) close() error {
 	if p.name == "" {
 		return nil
 	}
-	if p.category >= 0 && p.bullets == 0 {
-		return p.at(p.categoryAt, "%s in [%s] has no entries", categories[p.category], p.name)
+	if err := p.settled(); err != nil {
+		return err
 	}
 	if p.current != nil {
-		body := trimBlank(p.body)
-		if len(body) == 0 {
+		switch {
+		case len(p.sections) > 0:
+		case len(p.highlights) > 0:
+			return p.at(p.heading, "[%s] is %s and nothing else: each of them restates an entry below it",
+				p.name, highlights)
+		default:
 			return p.at(p.heading, "[%s] has no entries", p.name)
 		}
-		p.current.Body = strings.Join(body, "\n")
+		p.current.Body = strings.Join(trimBlank(p.body), "\n")
+		p.current.Highlights = append([]string{}, p.highlights...)
 		p.current.Changes = p.sections
 		p.releases = append(p.releases, *p.current)
 	}
-	p.name, p.body, p.sections, p.category, p.bullets, p.current = "", nil, nil, -1, 0, nil
+	p.name, p.body, p.highlights, p.sections = "", nil, nil, nil
+	p.open, p.category, p.bullets, p.current = "", -1, 0, nil
 	return nil
 }
 

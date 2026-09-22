@@ -192,6 +192,8 @@ A weekly workflow does the same thing and commits when upstream changes. See [`s
 
 [`CHANGELOG.md`](CHANGELOG.md) is the release button. Add a version section to it in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) form and merge it to `main`; that is the whole of it. The version, the tag and the release notes all come from the one file the change was reviewed in, so shipping is a decision made once, in a diff, rather than a version typed into a form afterwards.
 
+A section may open with `### Highlights` above the categories - the few bullets somebody skims to learn what the release is about, each restating an entry below it rather than adding to it. A release that amounts to bug fixes has none.
+
 The section is written when the release is cut, from the commits since the last tag, so there is no `[Unreleased]` heading accumulating between releases and a merge that is not a release leaves the file untouched. That puts the whole of a release in one reviewable diff, and it puts the burden on commit messages, which is where the reasoning is while it is still fresh.
 
 The **Release** workflow runs when CI passes on `main`, reads the newest version section, and stops there when a release for it is already published - which is what nearly every merge does, in seconds. Otherwise it tags and hands the section to GoReleaser as the release notes. The tag is pushed last on purpose: it is fetched by users, resolved by `go install`, and the version GoReleaser derives, so nothing that outlives a failed run happens until everything that can fail has passed. GoReleaser then builds every target, publishes the GitHub release, and updates the APT repository, AUR, Homebrew tap, winget, and npm.

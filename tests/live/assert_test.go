@@ -3,6 +3,7 @@ package live
 import (
 	"fmt"
 	"math/rand"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -100,11 +101,21 @@ func keysOf(m map[string]interface{}) []string {
 	return out
 }
 
-// lastNonEmpty is the last line of a stream, which for a listing is its footer.
-func lastNonEmpty(s string) string {
+// footer opens with what the listing counted: "No messages.", "12 messages.",
+// "25 of 312 messages. Next page: --page 1".
+var footer = regexp.MustCompile(`^(No|\d+) `)
+
+// footerOf is a listing's footer: the line under the rows saying how many came
+// back and whether another page holds more.
+//
+// It is not always the last line on the stream. What an answer did not cover is
+// said after the answer, about it - so a search says what it could not look
+// inside below the count, and whether it has anything to say there depends on
+// what this machine happens to have indexed.
+func footerOf(s string) string {
 	lines := strings.Split(s, "\n")
 	for i := len(lines) - 1; i >= 0; i-- {
-		if line := strings.TrimSpace(lines[i]); line != "" {
+		if line := strings.TrimSpace(lines[i]); footer.MatchString(line) {
 			return line
 		}
 	}
