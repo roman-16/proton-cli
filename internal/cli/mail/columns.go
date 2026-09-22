@@ -44,6 +44,32 @@ func flags(unread, starred, flagged bool, attachments int) ui.Marks {
 	return m
 }
 
+// orderedColumns is the table a listing shows, told what it was ordered by.
+func orderedColumns[T any](opts mailsvc.ListOptions, cols []ui.Column[T], size func(T) int64) []ui.Column[T] {
+	if opts.Sort != mailsvc.SortBySize {
+		return cols
+	}
+	return sized(cols, size)
+}
+
+// sized adds the SIZE column, for a listing that was ordered by size.
+//
+// It is there only then, because an order nobody can see is an order nobody can
+// check - and the rest of the time it would be a sixth column on the widest
+// table in the CLI, taking room from the subject to say something nobody asked
+// about. It goes before FLAGS, which every mail table ends with.
+func sized[T any](cols []ui.Column[T], size func(T) int64) []ui.Column[T] {
+	col := ui.Column[T]{Header: "SIZE", Right: true, Cell: func(row T) string {
+		if size(row) == 0 {
+			return ""
+		}
+		return units.Size(size(row))
+	}}
+	last := len(cols) - 1
+	out := append([]ui.Column[T]{}, cols[:last]...)
+	return append(append(out, col), cols[last])
+}
+
 func messageColumns() []ui.Column[mailsvc.Message] {
 	return []ui.Column[mailsvc.Message]{
 		{Header: "ID", ID: true, Cell: func(m mailsvc.Message) string { return m.ID }},

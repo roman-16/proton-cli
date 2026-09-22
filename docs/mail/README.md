@@ -16,6 +16,12 @@ proton mail messages get REF --body-only > body.txt
 
 Folders are `inbox`, `sent`, `drafts`, `trash`, `spam`, `archive`, `starred`, `scheduled`, `snoozed`, `all`, or any label. Proton's inbox tabs are folders too: `social`, `promotions`, `updates`, `newsletters`, `transactions`.
 
+Listings come back newest first. `--sort size` orders by how much room a message takes, largest first, and `--desc` reverses either order. A listing ordered by size shows a SIZE column and is answered by Proton, so it does not search bodies.
+
+```bash
+proton mail messages list --folder all --sort size --limit 10
+```
+
 `get` shows the plain-text body by default. `--render html` gives you the original markup, `--render raw` the untouched body, and `--strip-quotes` drops quoted reply blocks.
 
 A `Signature:` line reports the verdict of the signature check against the sender's key.
@@ -167,10 +173,35 @@ Add `--dry-run` to see the list first. `--limit` caps how many a verb touches an
 proton mail messages empty --folder trash
 proton mail messages update REF --expires 7d   # delete itself later
 proton mail messages update REF --expires never
-proton mail messages unsubscribe REF           # ask a mailing list to stop
+proton mail messages unsubscribe REF           # leave the list a message came from
 ```
 
-`unsubscribe` uses whatever the message offered: a `List-Unsubscribe` header, or the one-click form behind it.
+`unsubscribe` uses whichever way the list offers, and the answer says which it used. To work from the senders instead of their mail, see [Mailing lists](#mailing-lists).
+
+## Mailing lists
+
+`mail mailing-lists` is the mailbox read by sender: everyone who writes to you as a list, how much they send, and how much of it you never open.
+
+```bash
+proton mail mailing-lists list
+proton mail mailing-lists list --sort unread --desc
+proton mail mailing-lists list --unsubscribed        # the ones you have left
+proton mail mailing-lists get "Trailhead Weekly"
+```
+
+`REF` is the list's name, its sender address, or its ID. Order with `--sort name|unread|frequency|received|read`, newest first, and `--desc` reverses.
+
+```bash
+proton mail mailing-lists unsubscribe "Trailhead Weekly"
+proton mail mailing-lists update "Trailhead Weekly" --into Archive --mark-read
+proton mail mailing-lists remove "Trailhead Weekly"
+```
+
+`unsubscribe` uses one of three ways, and says which: Proton submits a one-click form for you, an unsubscribe address gets a message sent from the address the list writes to, or a link opens in your browser and is printed either way. A list that offers none of them is refused, and the answer points at `proton mail settings senders block`.
+
+`update` covers the mail already here and everything that arrives afterwards. It leaves a filter behind, which `get` names; turn the rule off with `proton mail settings filters disable`.
+
+`remove` drops the entry from the listing. It unsubscribes from nothing, and the list comes back the next time it writes.
 
 ## Threads
 

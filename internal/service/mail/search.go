@@ -3,6 +3,7 @@ package mail
 import (
 	"context"
 	"log/slog"
+	"slices"
 	"sort"
 	"time"
 
@@ -39,6 +40,10 @@ type Coverage struct {
 	// Stale says Proton could not describe what has happened to the mailbox, so
 	// the copy answered as it stands and nothing knows what it is missing.
 	Stale bool
+	// Declined says there is an index and it could not answer this question, so
+	// Proton did. It is a different thing to say than having no index at all -
+	// what was lost is the same, and what to do about it is not.
+	Declined bool
 }
 
 // Search answers a question about messages: from the index when there is one,
@@ -47,10 +52,13 @@ func (s *Service) Search(ctx context.Context, opts ListOptions) ([]Message, int,
 	in, cover, ok := s.searchable(ctx, opts)
 	if !ok {
 		msgs, total, err := s.List(ctx, opts)
-		return msgs, total, Coverage{}, err
+		return msgs, total, cover, err
 	}
 	matched := matching(in, opts)
 	sortMessages(matched)
+	if opts.Reverse {
+		slices.Reverse(matched)
+	}
 	page, total := pageOf(matched, opts)
 	out := make([]Message, 0, len(page))
 	for _, m := range page {
@@ -69,10 +77,13 @@ func (s *Service) SearchConversations(ctx context.Context, opts ListOptions) ([]
 	in, cover, ok := s.searchable(ctx, opts)
 	if !ok {
 		convs, total, err := s.ConversationsList(ctx, opts)
-		return convs, total, Coverage{}, err
+		return convs, total, cover, err
 	}
 	threads := threadsOf(in, matching(in, opts))
 	sort.SliceStable(threads, func(i, j int) bool { return threads[i].Time > threads[j].Time })
+	if opts.Reverse {
+		slices.Reverse(threads)
+	}
 	page, total := pageOf(threads, opts)
 	return page, total, cover, nil
 }
@@ -86,6 +97,13 @@ func (s *Service) SearchConversations(ctx context.Context, opts ListOptions) ([]
 func (s *Service) searchable(ctx context.Context, opts ListOptions) ([]stored, Coverage, bool) {
 	if !opts.Narrowed() || !s.Indexed() {
 		return nil, Coverage{}, false
+	}
+	// A copy built before sizes were recorded holds none, and one built since
+	// holds them only for the messages it has read since. Neither can order a
+	// whole mailbox by size, and ordering by a field half the records are silent
+	// about would put the silent ones at one end and call it an answer.
+	if opts.Sort == SortBySize {
+		return nil, Coverage{Declined: true}, false
 	}
 	x, err := s.openIndex(ctx)
 	if err != nil {

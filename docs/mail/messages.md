@@ -234,6 +234,8 @@ Takes the same filters as trash, move, label and export, so you can preview a se
 
 Looks in the inbox unless told otherwise. Use --folder all to search everything.
 
+Newest first, or largest first with --sort size; --desc reverses either. Ordering by size is Proton's to do, so it is not answered from a local index and does not search bodies.
+
 ```
 proton mail messages list
 ```
@@ -246,12 +248,14 @@ proton mail messages list --starred --output json
 proton mail messages list --from billing@example.com --folder all
 proton mail messages list --keyword invoice --after 2026-01-01 --folder all
 proton mail messages list --keyword 'parking permit' --folder all
+proton mail messages list --folder all --sort size --limit 10
 ```
 
 | Flag | Description |
 | --- | --- |
 | `--after string` | First day to include (YYYY-MM-DD) |
 | `--before string` | Last day to include (YYYY-MM-DD) |
+| `--desc` | Reverse the order |
 | `--folder string` | Folder or label to look in (default: inbox) |
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text in the subject, a name or an address, and in bodies once a mail index exists |
@@ -259,6 +263,7 @@ proton mail messages list --keyword 'parking permit' --folder all
 | `--newer-than string` | Match messages newer than DURATION |
 | `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |
 | `--page int` | Which page of results, counting from zero |
+| `--sort string` | Order by: time, size (default `time`) |
 | `--starred` | Match starred messages |
 | `--subject string` | Match text in the subject |
 | `--to string` | Match a recipient's address |
@@ -595,9 +600,11 @@ proton mail messages unstar 'Invoice #2291'
 
 ## `unsubscribe`
 
-Ask a mailing list to stop.
+Ask the mailing list a message came from to stop.
 
-Proton sends the request on your behalf, using whatever the message offered: a List-Unsubscribe header, or the one-click form behind it.
+A list offers one of three ways, and the answer says which was used. Proton submits a one-click form on your behalf; an unsubscribe address is a message sent from the address the list writes to; a link is a page, which is opened in your browser and printed either way.
+
+To go by sender instead of by message, see `proton mail mailing-lists`.
 
 ```
 proton mail messages unsubscribe REF...

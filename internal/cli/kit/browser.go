@@ -1,4 +1,4 @@
-package cli
+package kit
 
 import (
 	"os/exec"
@@ -14,14 +14,14 @@ import (
 // registered for https - has already done so.
 const browserGrace = 2 * time.Second
 
-// showInBrowser asks the desktop to open url, and reports whether it looks like
+// ShowInBrowser asks the desktop to open url, and reports whether it looks like
 // it did.
 //
 // The answer chooses a word and nothing more. The address is printed either way,
 // so a machine where this fails - a server, a container, a session with no
 // desktop - loses a convenience rather than the ability to verify, and there is
 // no need to work out in advance which kind of machine this is.
-func showInBrowser(url string) bool {
+func ShowInBrowser(url string) bool {
 	name, args := opener(url)
 	if name == "" {
 		return false

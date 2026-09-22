@@ -111,6 +111,11 @@ type Message struct {
 	Unread         int      `json:"unread"`
 	NumAttachments int      `json:"num_attachments"`
 	Labels         []string `json:"labels"`
+	// Size is how many bytes the message takes up, which is what --sort size
+	// orders by. It is absent rather than zero where it is not known: a mail
+	// index built before the copy recorded sizes answers everything else about a
+	// message and nothing about this.
+	Size int64 `json:"size,omitempty"`
 
 	// What Proton concluded about the message. Each is written only when it is
 	// true: a message nobody doubts carries no verdict at all, and "phishing":
@@ -178,6 +183,7 @@ type Conversation struct {
 	NumMessages    int              `json:"num_messages"`
 	NumUnread      int              `json:"num_unread"`
 	NumAttachments int              `json:"num_attachments"`
+	Size           int64            `json:"size,omitempty"`
 	Time           int64            `json:"time"`
 	Senders        []map[string]any `json:"senders"`
 	Recipients     []map[string]any `json:"recipients"`
@@ -242,6 +248,13 @@ type ListOptions struct {
 	Unread        bool
 	Starred       bool
 
+	// Sort is the key Proton orders the answer by - "time" or "size", and "time"
+	// when nothing asked. Reverse turns the order round: both keys run from the
+	// interesting end, newest and largest first, which is where a mailbox is read
+	// from and what every client shows by default.
+	Sort    string
+	Reverse bool
+
 	// Page and PageSize are the caller's page of the result, counting from zero.
 	// A size of zero is the whole result. A bulk selection asks for page zero the
 	// size of its own cap, which is what --limit sets.
@@ -251,6 +264,16 @@ type ListOptions struct {
 	// that is already an ID is turned back into a row.
 	ID string
 }
+
+// The keys a mailbox may be ordered by, which are the two Proton offers and the
+// two its own clients put in front of a reader.
+const (
+	SortByTime = "time"
+	SortBySize = "size"
+)
+
+// SortKeys is the domain --sort takes over mail, for the flag to declare.
+func SortKeys() []string { return []string{SortByTime, SortBySize} }
 
 // pageMax is how many rows Proton returns for one listing request, whatever
 // larger number is asked for.

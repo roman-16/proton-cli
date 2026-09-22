@@ -13,6 +13,7 @@ type rawConversation struct {
 	ID                                     string
 	Subject                                string
 	NumMessages, NumUnread, NumAttachments int
+	Size                                   int64
 	Time                                   int64
 	Senders                                []map[string]any
 	Recipients                             []map[string]any
@@ -27,6 +28,7 @@ func toConversation(c rawConversation) Conversation {
 	return Conversation{
 		ID: c.ID, Subject: c.Subject,
 		NumMessages: c.NumMessages, NumUnread: c.NumUnread, NumAttachments: c.NumAttachments,
+		Size: c.Size,
 		Time: c.Time, Senders: c.Senders, Recipients: c.Recipients, Labels: labels,
 	}
 }

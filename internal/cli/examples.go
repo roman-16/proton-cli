@@ -489,6 +489,7 @@ var examples = map[string][]string{
 		"proton mail messages list --from billing@example.com --folder all",
 		"proton mail messages list --keyword invoice --after 2026-01-01 --folder all",
 		"proton mail messages list --keyword 'parking permit' --folder all",
+		"proton mail messages list --folder all --sort size --limit 10",
 	},
 	"proton mail messages watch": {
 		"proton mail messages watch",
@@ -565,6 +566,25 @@ var examples = map[string][]string{
 	"proton mail messages unsubscribe": {
 		"proton mail messages unsubscribe 5bH2mQxK",
 	},
+	"proton mail mailing-lists list": {
+		"proton mail mailing-lists list",
+		"proton mail mailing-lists list --sort unread",
+		"proton mail mailing-lists list --unsubscribed",
+	},
+	"proton mail mailing-lists get": {
+		"proton mail mailing-lists get 'Trailhead Weekly'",
+	},
+	"proton mail mailing-lists unsubscribe": {
+		"proton mail mailing-lists unsubscribe 'Trailhead Weekly'",
+		"proton mail mailing-lists unsubscribe news@example.com --dry-run",
+	},
+	"proton mail mailing-lists update": {
+		"proton mail mailing-lists update 'Trailhead Weekly' --into Archive",
+		"proton mail mailing-lists update news@example.com --into Archive --mark-read",
+	},
+	"proton mail mailing-lists remove": {
+		"proton mail mailing-lists remove 'Trailhead Weekly'",
+	},
 	"proton mail messages export": {
 		"proton mail messages export 'Invoice #2291' --dest-dir ./backup",
 		"proton mail messages export --folder archive --all --dest-dir ./mail-backup",
@@ -585,6 +605,7 @@ var examples = map[string][]string{
 		"proton mail conversations list",
 		"proton mail conversations list --unread --folder inbox",
 		"proton mail conversations list --from jane@example.com --folder all",
+		"proton mail conversations list --sort size --desc",
 	},
 	"proton mail conversations get": {
 		"proton mail conversations get 'Quarterly numbers'",
@@ -637,7 +658,10 @@ var examples = map[string][]string{
 	},
 
 	// ── mail: drafts ──
-	"proton mail drafts list": {"proton mail drafts list"},
+	"proton mail drafts list": {
+		"proton mail drafts list",
+		"proton mail drafts list --sort size",
+	},
 	"proton mail drafts create": {
 		"proton mail drafts create --to team@example.com --subject Standup --body 'Notes to follow.'",
 		"proton mail drafts create --to jane@example.com --subject Report --attach ./report.pdf",

@@ -21,7 +21,7 @@ Commands:
   unlabel      Detach a label from messages
   unschedule   Cancel a scheduled send, returning the message to drafts
   unstar       Remove the star from messages
-  unsubscribe  Ask a mailing list to stop
+  unsubscribe  Ask the mailing list a message came from to stop
   update       Change when messages delete themselves
   watch        Print each message as it arrives
 

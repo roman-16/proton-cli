@@ -49,18 +49,23 @@ proton mail drafts delete 5bH2mQxK
 
 List drafts.
 
+Newest first, or largest first with --sort size; --desc reverses either.
+
 ```
 proton mail drafts list
 ```
 
 ```bash
 proton mail drafts list
+proton mail drafts list --sort size
 ```
 
 | Flag | Description |
 | --- | --- |
+| `--desc` | Reverse the order |
 | `--limit int` | How many drafts per page; 0 for all of them (default `25`) |
 | `--page int` | Which page of results, counting from zero |
+| `--sort string` | Order by: time, size (default `time`) |
 
 ## `send`
 

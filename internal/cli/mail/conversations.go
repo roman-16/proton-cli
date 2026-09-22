@@ -42,7 +42,8 @@ func convListCmd() *cobra.Command {
 			"Proton's own index, which lags a change by a few seconds, or through the\n" +
 			"copy `index create mail` builds, which also reads bodies.\n\n" +
 			"Looks in the inbox unless told otherwise. Use --folder all to search\n" +
-			"everything.",
+			"everything.\n\n" +
+			"Newest first, or largest first with --sort size; --desc reverses either.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			opts, err := f.list(c.Ctx, c)
 			if err != nil {
@@ -53,7 +54,8 @@ func convListCmd() *cobra.Command {
 				return err
 			}
 			if err := kit.List(c, ui.TableSpec[mailsvc.Conversation]{
-				Noun: "conversations", Columns: conversationColumns(),
+				Noun: "conversations", Columns: orderedColumns(opts, conversationColumns(),
+					func(cv mailsvc.Conversation) int64 { return cv.Size }),
 				Total: f.total(total, len(convs)), Page: opts.Page, PageSize: opts.PageSize,
 				Filtered: f.narrowed(),
 			}, convs); err != nil {
@@ -68,6 +70,7 @@ func convListCmd() *cobra.Command {
 	}
 	f.registerNarrowing(c, "inbox")
 	f.registerPaging(c, "threads")
+	f.registerOrder(c)
 	return c
 }
 

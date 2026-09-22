@@ -66,6 +66,7 @@ type stored struct {
 	BCC            []addressee `json:"bcc"`
 	Time           int64       `json:"time"`
 	Order          int64       `json:"order,omitempty"`
+	Size           int64       `json:"size,omitempty"`
 	Unread         int         `json:"unread,omitempty"`
 	Flags          int64       `json:"flags,omitempty"`
 	Labels         []string    `json:"labels"`
@@ -98,6 +99,7 @@ func (s stored) message() Message {
 		ID: s.ID, ConversationID: s.ConversationID, Subject: s.Subject,
 		FromName: s.SenderName, FromAddress: s.SenderAddress,
 		Time: s.Time, Unread: s.Unread, NumAttachments: s.Attachments, Labels: s.Labels,
+		Size:        s.Size,
 		DMARCFailed: v.dmarcFailed, MarkedLegitimate: v.markedLegitimate,
 		Phishing: v.phishing, Suspicious: v.suspicious,
 	}
@@ -747,7 +749,7 @@ func indexedFrom(m rawListMessage) stored {
 		ID: m.ID, ConversationID: m.ConversationID, Subject: m.Subject,
 		SenderName: m.Sender.Name, SenderAddress: m.Sender.Address,
 		To: addressees(m.ToList), CC: addressees(m.CCList), BCC: addressees(m.BCCList),
-		Time: m.Time, Order: m.Order, Unread: m.Unread, Flags: m.Flags,
+		Time: m.Time, Order: m.Order, Size: m.Size, Unread: m.Unread, Flags: m.Flags,
 		Labels: m.LabelIDs, Attachments: m.NumAttachments, Expires: m.ExpirationTime,
 	}
 }

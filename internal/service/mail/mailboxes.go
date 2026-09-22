@@ -127,6 +127,27 @@ func (s *Service) ResolveMailbox(ctx context.Context, ref string) (Mailbox, erro
 	return Mailbox{}, &errs.Ambiguous{Kind: "folder or label", Ref: ref, Candidates: cands}
 }
 
+// MailboxNames is what each destination ID is called, so a stored ID can be
+// shown as the word somebody chose for it.
+//
+// It is the reverse of ResolveMailbox and exists for the same reason: a rule
+// Proton hands back names its destination by ID, and a listing that printed the
+// ID would be reporting something nobody can read.
+func (s *Service) MailboxNames(ctx context.Context) (map[string]string, error) {
+	names := make(map[string]string, len(systemFolders))
+	for name, id := range systemFolders {
+		names[id] = name
+	}
+	labels, folders, err := s.LabelsList(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, m := range append(append([]Label{}, folders...), labels...) {
+		names[m.ID] = m.Name
+	}
+	return names, nil
+}
+
 // ResolveFolderTarget resolves a move destination, refusing a label.
 //
 // Refusing is the point: applying a label where a move was asked for is a

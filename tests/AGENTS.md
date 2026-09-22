@@ -13,6 +13,16 @@ Nothing else decides a tier. A subscription is a property of an *account*, not o
 
 **An agent starts `just test-fast` by itself and nothing else.** The live suite takes the best part of an hour, spends allowances Proton meters by the hour, and acts on real accounts - one of them somebody's own. A live run is the user's decision, put to them through the `live-test` skill (`.agents/skills/live-test/SKILL.md`), which names the tests a change points at and starts nothing until they pick one.
 
+**The trap is `go test` with a wildcard.** `./...` and `./tests/...` both match `tests/live`, and matching it is starting it: the nine variables live in the shell a developer already works in, so `TestMain` finds them, signs all three accounts in and runs whatever the pattern selected. Nothing prompts, and the first sign of it is the sign-in. That is why `test-fast` is a recipe rather than a command worth remembering - the safe set is "everything except one package", which only `go list` can spell:
+
+```bash
+just test-fast                          # the safe set
+go test ./internal/... ./tests/offline  # naming packages is safe too
+go test ./tests/...                     # a live run, against real accounts
+```
+
+**Never pipe a run that reaches Proton.** `go test … | head` ends it on the first SIGPIPE, part-way through whatever test was running: `t.Cleanup` never fires, so what that test made is left on a real account, and the closing photograph of the paid account never runs. An interrupted run leaves `proton-cli-test-*` artifacts behind, which `just seed` is what sweeps.
+
 ## Layout
 
 ```

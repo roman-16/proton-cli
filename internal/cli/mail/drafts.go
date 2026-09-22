@@ -23,11 +23,22 @@ func draftsCmd() *cobra.Command {
 
 func draftsListCmd() *cobra.Command {
 	page := kit.Page{Default: defaultPageSize}
+	var order kit.Order
 	c := &cobra.Command{
 		Use:   "list",
 		Short: "List drafts",
+		Long: "List drafts.\n\n" +
+			"Newest first, or largest first with --sort size; --desc reverses either.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
-			msgs, total, err := c.App.Mail.DraftsList(c.Ctx, page.Number, page.Size)
+			key, err := order.Key()
+			if err != nil {
+				return err
+			}
+			opts := mailsvc.ListOptions{
+				Page: page.Number, PageSize: page.Size,
+				Sort: key, Reverse: order.Desc,
+			}
+			msgs, total, err := c.App.Mail.DraftsList(c.Ctx, opts)
 			if err != nil {
 				return err
 			}
@@ -35,12 +46,14 @@ func draftsListCmd() *cobra.Command {
 				total = len(msgs)
 			}
 			return kit.List(c, ui.TableSpec[mailsvc.Message]{
-				Noun: "drafts", Columns: draftColumns(),
+				Noun: "drafts", Columns: orderedColumns(opts, draftColumns(),
+					func(m mailsvc.Message) int64 { return m.Size }),
 				Total: total, Page: page.Number, PageSize: page.Size,
 			}, msgs)
 		}),
 	}
 	page.Register(c, "drafts")
+	order.Register(c, mailsvc.SortKeys()...)
 	return c
 }
 

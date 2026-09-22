@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/roman-16/proton-cli/internal/app"
+	"github.com/roman-16/proton-cli/internal/cli/kit"
 	"github.com/roman-16/proton-cli/internal/proton"
 )
 
@@ -41,7 +42,7 @@ func cliHVResolver(a *app.App) proton.HVResolver {
 
 		a.UI.Break()
 		a.UI.Instruct("Proton wants to confirm you are human. Solve the CAPTCHA on this page -")
-		if showInBrowser(page) {
+		if kit.ShowInBrowser(page) {
 			a.UI.Instruct("it should have opened in your browser, and works on any device too:")
 		} else {
 			a.UI.Instruct("you can open it on any device:")

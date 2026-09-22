@@ -181,6 +181,11 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton mail drafts list`](../mail/drafts.md#list) | List drafts |
 | [`proton mail drafts send`](../mail/drafts.md#send) | Send a draft as it stands |
 | [`proton mail drafts update`](../mail/drafts.md#update) | Change a draft's recipients, subject, body or attachments |
+| [`proton mail mailing-lists get`](../mail/mailing-lists.md#get) | Show one mailing list in full |
+| [`proton mail mailing-lists list`](../mail/mailing-lists.md#list) | List the senders that write to you as a list |
+| [`proton mail mailing-lists remove`](../mail/mailing-lists.md#remove) | Drop a mailing list from the listing |
+| [`proton mail mailing-lists unsubscribe`](../mail/mailing-lists.md#unsubscribe) | Ask a mailing list to stop writing to you |
+| [`proton mail mailing-lists update`](../mail/mailing-lists.md#update) | Set what happens to a mailing list's mail |
 | [`proton mail messages attachments download`](../mail/messages.md#attachments-download) | Download and decrypt attachments |
 | [`proton mail messages attachments list`](../mail/messages.md#attachments-list) | List a message's attachments |
 | [`proton mail messages delete`](../mail/messages.md#delete) | Delete messages permanently |
@@ -202,7 +207,7 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton mail messages unlabel`](../mail/messages.md#unlabel) | Detach a label from messages |
 | [`proton mail messages unschedule`](../mail/messages.md#unschedule) | Cancel a scheduled send, returning the message to drafts |
 | [`proton mail messages unstar`](../mail/messages.md#unstar) | Remove the star from messages |
-| [`proton mail messages unsubscribe`](../mail/messages.md#unsubscribe) | Ask a mailing list to stop |
+| [`proton mail messages unsubscribe`](../mail/messages.md#unsubscribe) | Ask the mailing list a message came from to stop |
 | [`proton mail messages update`](../mail/messages.md#update) | Change when messages delete themselves |
 | [`proton mail messages watch`](../mail/messages.md#watch) | Print each message as it arrives |
 | [`proton mail protected attachments download`](../mail/protected.md#attachments-download) | Download and decrypt attachments |

@@ -21,13 +21,13 @@ import (
 // and "the first 150 of them" are one ask, so a cap and a page size are one
 // field under one name, and only the sentence in the help differs.
 //
-// Ordering is the part that cannot be asked of every collection. Proton orders
-// mail itself, so `mail messages list` hands --sort to the server. Nothing else
-// it stores can be asked for in pieces: contacts arrive as one encrypted export,
-// Pass items as one batch per vault, a Drive folder as its whole listing. Those
-// are decrypted locally, so Slice cuts the page out here - and only they can also
-// sort, because sorting one pre-cut page and calling it the answer would be a
-// lie.
+// Ordering is the part that is not answered the same way twice. Proton orders
+// mail itself, so the mailbox hands --sort to the server and reads back whatever
+// comes. Nothing else it stores can be asked for in pieces: contacts arrive as
+// one encrypted export, Pass items as one batch per vault, a Drive folder as its
+// whole listing. Those are decrypted locally, so Slice cuts the page out here -
+// and only they can also sort, because sorting one pre-cut page and calling it
+// the answer would be a lie.
 
 // Page is the position in a collection this invocation asked for.
 //
@@ -115,6 +115,16 @@ func (o *Order) Register(c *cobra.Command, keys ...string) {
 	o.key = &Enum{Name: "sort", Usage: "Order by", Values: keys, Default: keys[0]}
 	o.key.Register(c)
 	c.Flags().BoolVar(&o.Desc, "desc", false, "Reverse the order")
+}
+
+// Key is the ordering this invocation asked for, and "" for a command that
+// offers none. It is what a collection ordered somewhere else - by Proton, on
+// the far side of a request - reads instead of Sort.
+func (o Order) Key() (string, error) {
+	if o.key == nil {
+		return "", nil
+	}
+	return o.key.Value()
 }
 
 // Comparators is how one collection may be ordered: a comparison per key it

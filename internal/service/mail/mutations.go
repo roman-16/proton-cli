@@ -205,17 +205,6 @@ func (s *Service) SetExpiration(ctx context.Context, ids []string, at int64) err
 	}, nil)
 }
 
-// Unsubscribe asks a mailing list to stop, using whatever the message itself
-// offered - a List-Unsubscribe header, or the one-click form behind it.
-//
-// Proton does the asking, because it is the party the list already knows; this
-// only says which message.
-func (s *Service) Unsubscribe(ctx context.Context, id string) error {
-	return s.C.Decode(ctx, proton.Request{
-		Method: "POST", Path: "/mail/v4/messages/" + id + "/unsubscribe",
-	}, nil)
-}
-
 // Snooze takes threads out of the inbox until a moment, and Unsnooze brings them
 // back early.
 func (s *Service) Snooze(ctx context.Context, ids []string, until int64) error {

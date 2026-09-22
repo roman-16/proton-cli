@@ -44,7 +44,10 @@ func listCmd() *cobra.Command {
 			"own index, which lags a change by a few seconds and does not cover bodies,\n" +
 			"or through the copy `index create mail` builds, which does.\n\n" +
 			"Looks in the inbox unless told otherwise. Use --folder all to search\n" +
-			"everything.",
+			"everything.\n\n" +
+			"Newest first, or largest first with --sort size; --desc reverses either.\n" +
+			"Ordering by size is Proton's to do, so it is not answered from a local\n" +
+			"index and does not search bodies.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			opts, err := f.list(c.Ctx, c)
 			if err != nil {
@@ -55,7 +58,8 @@ func listCmd() *cobra.Command {
 				return err
 			}
 			if err := kit.List(c, ui.TableSpec[mailsvc.Message]{
-				Noun: "messages", Columns: messageColumns(),
+				Noun: "messages", Columns: orderedColumns(opts, messageColumns(),
+					func(m mailsvc.Message) int64 { return m.Size }),
 				Total: f.total(total, len(msgs)), Page: opts.Page, PageSize: opts.PageSize,
 				Filtered: f.narrowed(),
 			}, msgs); err != nil {
@@ -72,6 +76,7 @@ func listCmd() *cobra.Command {
 	}
 	f.registerNarrowing(c, "inbox")
 	f.registerPaging(c, "messages")
+	f.registerOrder(c)
 	return c
 }
 
@@ -716,14 +721,20 @@ func updateCmd() *cobra.Command {
 
 // ── mailing lists ──
 
-// Unsubscribe asks a list to stop, using what the message itself offered.
+// Unsubscribe asks the list a message came from to stop, the same three ways
+// `mailing-lists unsubscribe` does - this one addressed by the mail that
+// arrived rather than by the sender behind it.
 func unsubscribeCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "unsubscribe REF...",
-		Short: "Ask a mailing list to stop",
-		Long: "Ask a mailing list to stop.\n\n" +
-			"Proton sends the request on your behalf, using whatever the message offered:\n" +
-			"a List-Unsubscribe header, or the one-click form behind it.",
+		Short: "Ask the mailing list a message came from to stop",
+		Long: "Ask the mailing list a message came from to stop.\n\n" +
+			"A list offers one of three ways, and the answer says which was used.\n" +
+			"Proton submits a one-click form on your behalf; an unsubscribe address is\n" +
+			"a message sent from the address the list writes to; a link is a page,\n" +
+			"which is opened in your browser and printed either way.\n\n" +
+			"To go by sender instead of by message, see `" + kit.Program +
+			" mail mailing-lists`.",
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			ids := make([]string, 0, len(c.Args))
 			for _, ref := range c.Args {
@@ -734,11 +745,23 @@ func unsubscribeCmd() *cobra.Command {
 				ids = append(ids, id)
 			}
 			ids = kit.Dedupe(ids)
+			lists := make([]mailsvc.UnsubscribeTarget, 0, len(ids))
+			for _, id := range ids {
+				l, err := c.App.Mail.MailingListOf(c.Ctx, id)
+				if err != nil {
+					return err
+				}
+				if l.Offer().Way == "" {
+					return noWayToLeave(l)
+				}
+				lists = append(lists, l)
+			}
 			return kit.Mutate(c, ui.ResultSpec{
 				Action: ui.Unsubscribed, Kind: "messages", Count: len(ids), IDs: ids,
+				Detail: unsubscribeDetail(lists),
 			}, func() error {
-				for _, id := range ids {
-					if err := c.App.Mail.Unsubscribe(c.Ctx, id); err != nil {
+				for _, l := range lists {
+					if err := askToStop(c, l); err != nil {
 						return err
 					}
 				}

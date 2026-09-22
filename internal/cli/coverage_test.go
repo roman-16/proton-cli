@@ -179,8 +179,19 @@ var untested = map[string]string{
 	"PUT /drive/devices/{id}":    "the same, and it fires only for a computer named before Proton moved the name onto the root",
 	"DELETE /drive/devices/{id}": "the same, and deleting the one computer an account has cannot be undone by a run",
 
-	"POST /mail/v4/messages/{id}/unsubscribe":     "reaching it needs a message from a real mailing list carrying a List-Unsubscribe header, which no seeding can put on these accounts",
-	"GET /calendar/v1/{id}/events/{id}/attendees": "reaching it needs an event with more attendees than a page holds, which would mean inviting a hundred addresses from these accounts",
+	// Leaving a mailing list, from either end: the message that arrived, or the
+	// sender behind it. Proton records a subscription when mail carrying List-
+	// headers arrives from a real sender, and nothing a run does puts one there -
+	// a message these accounts send each other has no such headers, so the record
+	// never appears and the four requests that act on one cannot be reached. The
+	// listing is tested, and so is every refusal that is settled before a request.
+	"POST /mail/v4/messages/{id}/unsubscribe":                 "reaching it needs a message from a real mailing list carrying a List-Unsubscribe header, which no seeding can put on these accounts",
+	"PUT /mail/v4/messages/mark/unsubscribed":                 "the same message: only one from a real list is left by sending mail or opening a link",
+	"POST /mail/v4/newsletter-subscriptions/{id}":             "only a real list leaves a subscription record to mark as left",
+	"POST /mail/v4/newsletter-subscriptions/{id}/unsubscribe": "the same record, which no run can cause Proton to create",
+	"POST /mail/v4/newsletter-subscriptions/{id}/filter":      "the same record: a standing rule needs a list to put it on",
+	"DELETE /mail/v4/newsletter-subscriptions/{id}":           "the same record, which has to exist before it can be forgotten",
+	"GET /calendar/v1/{id}/events/{id}/attendees":             "reaching it needs an event with more attendees than a page holds, which would mean inviting a hundred addresses from these accounts",
 
 	// Deleting an address. Proton allows one a year, and the paid account - the
 	// one account that may delete at all - refuses the command outright, so

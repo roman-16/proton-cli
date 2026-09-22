@@ -33,6 +33,10 @@ type filters struct {
 	days           kit.DayRange
 	age            kit.Range
 	all            bool
+	// order is what a listing asked Proton for. A bulk verb never registers it,
+	// so it stays the mailbox's own order there: which hundred and fifty messages
+	// a filtered change touches is not a thing to vary by a flag.
+	order kit.Order
 	// page is where in the result to read. A listing pairs --limit with --page; a
 	// verb that acts on what a filter found takes --limit alone, because a cap on
 	// a bulk change is its first page.
@@ -105,10 +109,15 @@ func (f *filters) list(ctx context.Context, c *kit.Invocation) (mailsvc.ListOpti
 		folder = box.ID
 	}
 	after, before := f.days.Days()
+	key, err := f.order.Key()
+	if err != nil {
+		return mailsvc.ListOptions{}, err
+	}
 	opts := mailsvc.ListOptions{
 		Keyword: f.keyword, From: f.from, To: f.to, Subject: f.subject,
 		Folder: folder, Unread: f.unread, Starred: f.starred,
 		After: after, Before: before,
+		Sort: key, Reverse: f.order.Desc,
 		Page: f.page.Number, PageSize: f.page.Size,
 	}
 	// A duration is the same bound as a date, said relatively. Whichever is
@@ -138,6 +147,15 @@ const filterHint = "--unread, --starred, --from, --subject or --older-than"
 func (f *filters) registerPaging(c *cobra.Command, noun string) {
 	f.page.Default = defaultPageSize
 	f.page.Register(c, noun)
+}
+
+// registerOrder adds the ordering Proton itself applies.
+//
+// It is a listing's flag alone. Both keys run from the end a reader starts at,
+// so the default is the order the mailbox has always come back in and --desc is
+// what turns it round.
+func (f *filters) registerOrder(c *cobra.Command) {
+	f.order.Register(c, mailsvc.SortKeys()...)
 }
 
 // defaultPageSize is a screenful of mail.
@@ -229,16 +247,22 @@ func selectConversations(c *kit.Invocation, f *filters) (kit.Selection[mailsvc.C
 // on the screen distinguishes "there is no such message" from "the part of your
 // mailbox that has it is not indexed".
 //
-// There are four ways it is short, and they are not the same thing to do
+// There are five ways it is short, and they are not the same thing to do
 // something about. No index at all means Proton answered, which is subjects,
-// names and addresses and not a word of what any message says. A mailbox still
-// being read is missing older mail outright. A mailbox whose bodies are still
-// arriving holds every message and can be searched by everything except what
-// the ones at the far end say. An index Proton could not describe the changes
-// to is missing nothing anybody can name, which is exactly why it has to be
-// said.
+// names and addresses and not a word of what any message says. An index that
+// declined the question means the same loss with a different remedy: the order
+// that was asked for is the one it cannot apply. A mailbox still being read is
+// missing older mail outright. A mailbox whose bodies are still arriving holds
+// every message and can be searched by everything except what the ones at the
+// far end say. An index Proton could not describe the changes to is missing
+// nothing anybody can name, which is exactly why it has to be said.
 func shortIndex(c *kit.Invocation, cover mailsvc.Coverage, opts mailsvc.ListOptions) {
 	switch {
+	case cover.Declined && opts.Keyword != "":
+		c.Warn("The mail index on this machine does not record message size, so Proton " +
+			"searched subjects, names and addresses and no bodies. Drop --sort size to " +
+			"search bodies again.")
+	case cover.Declined:
 	case !cover.Indexed && opts.Keyword != "":
 		c.Warn("There is no mail index on this machine, so Proton searched subjects, names "+
 			"and addresses and no bodies. `%s index create mail` makes bodies searchable.",

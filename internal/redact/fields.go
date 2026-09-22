@@ -44,7 +44,10 @@ var Fields = map[string]Policy{
 	"format":    Keep,   // an attestation statement format, from WebAuthn's closed set
 	"kind":      Keep,   // the singular noun for what a skip was about
 	"ref":       Handle, // the thing a skip was about, whatever kind it is
-	"path":      Route,  // an API path
+	// which of the three ways a mailing list offered to be left, from a closed
+	// set - never the address or the link behind it
+	"unsubscribe": Keep,
+	"path":        Route, // an API path
 
 	// ── counts, which describe a shape and never a person ──
 	"count":  Keep,

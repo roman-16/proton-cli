@@ -80,9 +80,11 @@ func (s *Service) attachmentBytes(ctx context.Context, a *draftAttachment) ([]by
 	return a.Data, nil
 }
 
-// DraftsList lists the Drafts folder.
-func (s *Service) DraftsList(ctx context.Context, page, pageSize int) ([]Message, int, error) {
-	return s.List(ctx, ListOptions{Folder: "drafts", Page: page, PageSize: pageSize})
+// DraftsList lists the Drafts folder. The folder is the one thing about the
+// question that is settled; the page and the order are the caller's.
+func (s *Service) DraftsList(ctx context.Context, opts ListOptions) ([]Message, int, error) {
+	opts.Folder = "drafts"
+	return s.List(ctx, opts)
 }
 
 // ResolveDraft resolves a REF within the Drafts folder, so editing or sending a

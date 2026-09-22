@@ -184,6 +184,8 @@ Takes the same filters as the verbs that organise threads, so you can preview a 
 
 Looks in the inbox unless told otherwise. Use --folder all to search everything.
 
+Newest first, or largest first with --sort size; --desc reverses either.
+
 ```
 proton mail conversations list
 ```
@@ -192,12 +194,14 @@ proton mail conversations list
 proton mail conversations list
 proton mail conversations list --unread --folder inbox
 proton mail conversations list --from jane@example.com --folder all
+proton mail conversations list --sort size --desc
 ```
 
 | Flag | Description |
 | --- | --- |
 | `--after string` | First day to include (YYYY-MM-DD) |
 | `--before string` | Last day to include (YYYY-MM-DD) |
+| `--desc` | Reverse the order |
 | `--folder string` | Folder or label to look in (default: inbox) |
 | `--from string` | Match the sender's address |
 | `--keyword string` | Match text in the subject, a name or an address, and in bodies once a mail index exists |
@@ -205,6 +209,7 @@ proton mail conversations list --from jane@example.com --folder all
 | `--newer-than string` | Match messages newer than DURATION |
 | `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |
 | `--page int` | Which page of results, counting from zero |
+| `--sort string` | Order by: time, size (default `time`) |
 | `--starred` | Match starred messages |
 | `--subject string` | Match text in the subject |
 | `--to string` | Match a recipient's address |

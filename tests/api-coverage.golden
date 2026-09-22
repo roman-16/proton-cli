@@ -105,6 +105,7 @@ GET /mail/v4/forwardings/outgoing
 GET /mail/v4/incomingdefaults
 GET /mail/v4/messages
 GET /mail/v4/messages/{id}
+GET /mail/v4/newsletter-subscriptions
 GET /mail/v4/settings
 GET /mail/v4/smtptokens
 GET /pass/v1/breach

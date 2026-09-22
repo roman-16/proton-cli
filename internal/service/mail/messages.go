@@ -30,6 +30,8 @@ type rawListMessage struct {
 	NumAttachments int
 	LabelIDs       []string
 	Flags          int64
+	// Size is the whole message in bytes, which --sort size orders by.
+	Size int64
 	// Order is where Proton puts the message among the others of its second,
 	// which is what keeps a page boundary in the same place twice.
 	Order int64
@@ -43,7 +45,7 @@ func toMessage(m rawListMessage) Message {
 		ID: m.ID, ConversationID: m.ConversationID,
 		Subject: m.Subject, Unread: m.Unread, Time: m.Time,
 		FromName: m.Sender.Name, FromAddress: m.Sender.Address,
-		NumAttachments: m.NumAttachments, Labels: m.LabelIDs,
+		NumAttachments: m.NumAttachments, Labels: m.LabelIDs, Size: m.Size,
 		DMARCFailed: v.dmarcFailed, MarkedLegitimate: v.markedLegitimate,
 		Phishing: v.phishing, Suspicious: v.suspicious,
 	}
@@ -88,8 +90,10 @@ func listQuery(opts ListOptions, recipients bool) url.Values {
 	if opts.ID != "" {
 		q.Set("ID", opts.ID)
 	}
-	q.Set("Sort", "Time")
-	q.Set("Desc", "1")
+	q.Set("Sort", sortField(opts.Sort))
+	// Both keys run from the interesting end, so the reversal a caller asks for is
+	// the one Proton is not given.
+	q.Set("Desc", map[bool]string{true: "0", false: "1"}[opts.Reverse])
 	if opts.Unread {
 		q.Set("Unread", "1")
 	}
@@ -120,6 +124,15 @@ func listQuery(opts ListOptions, recipients bool) url.Values {
 		q.Set("End", fmt.Sprintf("%d", startOfDay(opts.Before).AddDate(0, 0, 1).Unix()-1))
 	}
 	return q
+}
+
+// sortField is the ordering key as Proton names it. Time is what a mailbox is
+// read by, and what an unsorted request means.
+func sortField(key string) string {
+	if key == SortBySize {
+		return "Size"
+	}
+	return "Time"
 }
 
 // starredOnly answers a question about starred mail.
@@ -189,6 +202,10 @@ type rawMessage struct {
 	Header        string
 	ParsedHeaders map[string]any
 	Attachments   []rawAttachment
+	// UnsubscribeMethods is what Proton worked out about the List- headers of
+	// this message, which is how a message offers a way off the list it came
+	// from.
+	UnsubscribeMethods rawUnsubscribeMethods
 }
 
 type rawAttachment struct {
