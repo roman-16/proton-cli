@@ -567,6 +567,7 @@ var examples = map[string][]string{
 		"proton mail messages send --to team@example.com --subject Standup --body -",
 		"proton mail messages send --to jane@example.com --subject Reminder --send-at 2026-04-16T09:00",
 		"proton mail messages send --to jane@example.com --subject Invoice --body 'See attached.' --eo-password-file /run/secrets/jane",
+		"proton mail messages send --to jane@example.com --subject Contract --body 'Signed and attached.' --request-receipt",
 		"proton mail messages send --eml ./draft.eml",
 	},
 	"proton mail messages reply": {
@@ -625,6 +626,10 @@ var examples = map[string][]string{
 	},
 	"proton mail messages unsubscribe": {
 		"proton mail messages unsubscribe 5bH2mQxK",
+	},
+	"proton mail messages receipt": {
+		"proton mail messages receipt 'Invoice #2291'",
+		"proton mail messages receipt 5bH2mQxK --dry-run",
 	},
 	"proton mail mailing-lists list": {
 		"proton mail mailing-lists list",

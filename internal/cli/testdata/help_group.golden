@@ -14,6 +14,7 @@ Commands:
   list         List messages in a folder
   mark         Set what messages count as
   move         Move messages to a folder
+  receipt      Tell the sender you read their message
   reply        Reply to a message
   send         Compose and send a message
   star         Star messages

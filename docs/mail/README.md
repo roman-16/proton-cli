@@ -131,6 +131,39 @@ A reply leaves from the address the original arrived on. A forward carries the o
 
 Reply and forward take everything `send` takes.
 
+## Read receipts
+
+Ask the people you write to for confirmation that they read the message:
+
+```bash
+proton mail messages send --to alice@proton.me --subject Contract --body "Signed and attached." --request-receipt
+```
+
+Every command that composes takes the flag: `send`, `reply`, `forward`, both `conversations` answers, and `drafts create`. On a draft, `proton mail drafts update REF --request-receipt=false` takes the request off again.
+
+A message that asks you for one says so:
+
+```console
+$ proton mail messages get 5bH2mQxK
+Subject:    Invoice #2291 is ready
+From:       Fastmail Billing <billing@fastmail.com>
+To:         me@proton.me
+Date:       2026-04-15 14:32
+Receipt:    requested
+Signature:  verified
+ID:         5bH2mQxK
+```
+
+Nothing goes back until you send it:
+
+```bash
+proton mail messages receipt 5bH2mQxK
+```
+
+The line then reads `Receipt: sent`. A receipt cannot be taken back, and a message that already has one is refused.
+
+In `--output json` a message carries `receipt_requested`, `receipt_sent`, and `receipt_due` for the ones you can still answer.
+
 ## Drafts
 
 A draft is a message, so `messages get`, `move` and the rest already work on one. `mail drafts` holds what only makes sense before it goes out.

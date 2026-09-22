@@ -82,6 +82,7 @@ func draftsCreateCmd() *cobra.Command {
 	f.registerBody(c)
 	f.registerAttachments(c)
 	f.registerIdentity(c)
+	f.registerReceipt(c)
 	f.registerEML(c)
 	return c
 }
@@ -137,6 +138,9 @@ func draftsUpdateCmd() *cobra.Command {
 	f.registerAttachments(c)
 	c.Flags().StringArrayVar(&f.detach, "detach", nil, "Remove an attachment by name or ID (repeatable)")
 	f.registerIdentity(c)
+	f.registerReceipt(c)
+	c.Flags().Lookup("request-receipt").Usage =
+		"Ask the recipients to confirm when they read it; --request-receipt=false takes the request off"
 	return c
 }
 

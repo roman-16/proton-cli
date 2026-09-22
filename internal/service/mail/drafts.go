@@ -135,6 +135,7 @@ func draftPayload(c Content, armoredBody string) map[string]any {
 		"Body":      armoredBody,
 		"MIMEType":  c.mimeType(),
 		"AddressID": c.From.Address.ID,
+		"Flags":     c.flagWord(),
 	}
 	return out
 }
@@ -250,6 +251,8 @@ func (s *Service) DraftLoad(ctx context.Context, id string) (*Draft, error) {
 			Subject: raw.Subject,
 			Body:    body,
 			HTML:    mailtext.IsHTML(raw.MIMEType),
+			Receipt: raw.Flags&flagReceiptRequest != 0,
+			flags:   raw.Flags,
 		},
 	}
 	for _, a := range raw.Attachments {

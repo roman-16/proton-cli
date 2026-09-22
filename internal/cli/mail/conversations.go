@@ -375,6 +375,7 @@ func convAnswerCmd(use, short string, forward bool) *cobra.Command {
 	c.Flags().BoolVar(&f.html, "html", false, "Compose in HTML (default: match the original)")
 	f.registerAttachments(c)
 	f.registerIdentity(c)
+	f.registerReceipt(c)
 	d.register(c)
 	c.Flags().BoolVar(&noQuote, "no-quote", false, "Do not quote the original message")
 	c.Flags().BoolVar(&asDraft, "draft", false, "Save as a draft instead of sending")

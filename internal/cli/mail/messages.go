@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/roman-16/proton-cli/internal/cli/kit"
+	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/mailtext"
 	mailsvc "github.com/roman-16/proton-cli/internal/service/mail"
 	"github.com/roman-16/proton-cli/internal/ui"
@@ -17,7 +18,7 @@ func messagesCmd() *cobra.Command {
 	c := &cobra.Command{Use: "messages", Short: "Individual messages"}
 	c.AddCommand(
 		listCmd(), watchCmd(), getCmd(), sendCmd(), replyCmd(), forwardCmd(), exportCmd(),
-		emptyCmd(), updateCmd(), unsubscribeCmd(),
+		emptyCmd(), updateCmd(), unsubscribeCmd(), receiptCmd(),
 		moveCmd(), labelCmd(), unlabelCmd(), starCmd(), unstarCmd(), markCmd(),
 		trashCmd(), deleteCmd(), unscheduleCmd(), attachmentsCmd(),
 	)
@@ -117,6 +118,7 @@ func getCmd() *cobra.Command {
 				return err
 			}
 			overruleHint(c, msg)
+			receiptHint(c, msg)
 			return nil
 		}),
 	}
@@ -186,6 +188,9 @@ func messageHeader(msg *mailsvc.Full) []ui.Field {
 	if msg.Expires > 0 {
 		fields = append(fields, ui.Field{Label: "Expires", Value: units.Time(msg.Expires)})
 	}
+	if msg.ReceiptRequested {
+		fields = append(fields, ui.Field{Label: "Receipt", Value: receiptLine(msg)})
+	}
 	fields = append(fields, kit.SignatureField(string(msg.Signature)))
 	if msg.DMARCFailed {
 		fields = append(fields, ui.Field{Label: "DMARC", Value: "failed", Role: ui.Danger})
@@ -219,6 +224,27 @@ func verdictRole(msg *mailsvc.Full) ui.Role {
 		return ui.Plain
 	}
 	return ui.Danger
+}
+
+// receiptLine says where a message stands with read receipts: a request that is
+// still open, or one that has been answered.
+func receiptLine(msg *mailsvc.Full) string {
+	if msg.ReceiptSent {
+		return "sent"
+	}
+	return "requested"
+}
+
+// receiptHint offers the answer beside the message that asked for it.
+//
+// A message this account sent carries the request it made rather than one to
+// answer, so it gets the line above and nothing to act on.
+func receiptHint(c *kit.Invocation, msg *mailsvc.Full) {
+	if !msg.ReceiptDue {
+		return
+	}
+	c.UI().Hint("The sender asked to be told when you read this: " +
+		kit.Program + " mail messages receipt " + ui.Short(msg.ID, c.UI().ShortIDs()))
 }
 
 // overruleHint offers the way out of a wrong verdict, beside the message it is
@@ -717,6 +743,83 @@ func updateCmd() *cobra.Command {
 	// for another SRP exchange, so the command carries what it can answer with.
 	reauth.Declare(c)
 	return c
+}
+
+// ── read receipts ──
+
+// Receipt answers a message that asked to have its reading confirmed.
+//
+// It names its messages and takes no filters, for the reason the two verdicts
+// do: it is a decision about something that was read, and here one that cannot
+// be taken back once the sender has been told.
+func receiptCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "receipt REF...",
+		Short: "Tell the sender you read their message",
+		Long: "Tell the sender you read their message.\n\n" +
+			"Only a message that asked for a read receipt can be answered, and only\n" +
+			"once. `get` shows such a message as Receipt: requested.\n\n" +
+			"To ask for one yourself, send with `" + kit.Program +
+			" mail messages send --request-receipt`.",
+		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
+			ids := make([]string, 0, len(c.Args))
+			for _, refArg := range c.Args {
+				id, err := c.App.Mail.Resolve(c.Ctx, refArg)
+				if err != nil {
+					return wrongTable(err, "receipt")
+				}
+				ids = append(ids, id)
+			}
+			ids = kit.Dedupe(ids)
+			due := make([]mailsvc.Receipt, 0, len(ids))
+			for _, id := range ids {
+				r, err := c.App.Mail.ReceiptOf(c.Ctx, id)
+				if err != nil {
+					return err
+				}
+				if !r.Answerable() {
+					return noReceiptToSend(r)
+				}
+				due = append(due, r)
+			}
+			return kit.Mutate(c, ui.ResultSpec{
+				Action: ui.Sent, Kind: "receipts", Count: len(ids), IDs: ids,
+				Detail: receiptDetail(due),
+			}, func() error {
+				for _, id := range ids {
+					if err := c.App.Mail.SendReceipt(c.Ctx, id); err != nil {
+						return err
+					}
+				}
+				return nil
+			})
+		}),
+	}
+}
+
+// receiptDetail names who is about to be told, for the one message where there
+// is a single answer to that.
+func receiptDetail(due []mailsvc.Receipt) string {
+	if len(due) != 1 || due[0].To == "" {
+		return ""
+	}
+	return "to " + due[0].To
+}
+
+// noReceiptToSend says which of the three ways a message has nothing to answer.
+// Whether anything was asked for comes first, because a message that asked for
+// nothing is answered by nobody, whichever end of it this account is on.
+func noReceiptToSend(r mailsvc.Receipt) error {
+	switch {
+	case !r.Requested:
+		return errs.Naming(r.Subject, kit.Fail(
+			"%q did not ask for a read receipt.", r.Subject).Exit(3))
+	case r.Outgoing:
+		return errs.Naming(r.Subject, kit.Fail(
+			"%q is a message you sent, so its request is one you made.", r.Subject).Exit(3))
+	}
+	return errs.Naming(r.Subject, kit.Fail(
+		"A read receipt has already been sent for %q.", r.Subject).Exit(3))
 }
 
 // ── mailing lists ──

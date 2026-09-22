@@ -600,6 +600,82 @@ func TestMailMessagesReadIncludeInlineTags(t *testing.T) {
 	}
 }
 
+// A read receipt has two ends, and one account cannot play both: the asking is a
+// flag on the message that goes out, and the answering is a header on the copy
+// that arrives. So this is the cross-account one - the primary asks, the
+// secondary is told it was asked, answers, and is refused a second answer.
+//
+// The receipt itself arrives as ordinary mail on the asking account, which is
+// why the primary's inbox is swept of it afterwards.
+func TestMailMessagesReadReceipt(t *testing.T) {
+	subject := testID() + "-receipt"
+	body := "read receipt requested for " + subject
+	runOK(t, "mail", "messages", "send", "--to", secondaryEmail(),
+		"--subject", subject, "--body", body, "--request-receipt")
+	cleanupRun(t, "Delete the read receipt: proton mail messages delete --folder inbox --keyword "+
+		subject+" --all --yes",
+		"mail", "messages", "delete", "--folder", "inbox", "--keyword", subject, "--all")
+
+	sentID := findMessage(t, "sent", subject)
+	if sentID == "" {
+		t.Fatal("the message that asked for a receipt never reached the sent folder")
+	}
+	cleanupRun(t, "Delete sent mail: proton mail messages delete "+sentID,
+		"mail", "messages", "delete", "--", sentID)
+
+	// The copy you sent carries the request you made, and there is nothing on it
+	// to answer.
+	sent := runJSON(t, "mail", "messages", "get", "--output", "json", "--", sentID)
+	if requested, _ := sent["receipt_requested"].(bool); !requested {
+		t.Errorf("receipt_requested = %v on the message you sent, want true", sent["receipt_requested"])
+	}
+	if due, _ := sent["receipt_due"].(bool); due {
+		t.Error("receipt_due is true on a message you sent, which has nobody to answer")
+	}
+	if _, _, code := run(t, "mail", "messages", "receipt", sentID); code != 3 {
+		t.Errorf("answering your own message exited %d, want 3", code)
+	}
+
+	var recvID string
+	waitFor(45*time.Second, 3*time.Second, func() bool {
+		recvID = secondaryMailContaining(t, selfEmail(), body)
+		return recvID != ""
+	})
+	if recvID == "" {
+		t.Fatal("the second account did not receive the message that asked for a receipt")
+	}
+	cleanupRunSecondary(t, "Delete received mail (secondary): proton --profile secondary mail messages delete "+recvID,
+		"mail", "messages", "delete", "--", recvID)
+
+	read := runOKSecondary(t, "mail", "messages", "get", "--", recvID)
+	assertField(t, read, "Receipt:", "requested")
+	received := runJSONSecondary(t, "mail", "messages", "get", "--output", "json", "--", recvID)
+	if due, _ := received["receipt_due"].(bool); !due {
+		t.Errorf("receipt_due = %v on a message that asked, want true", received["receipt_due"])
+	}
+
+	runOKSecondary(t, "mail", "messages", "receipt", "--", recvID)
+
+	answered := runJSONSecondary(t, "mail", "messages", "get", "--output", "json", "--", recvID)
+	if sent, _ := answered["receipt_sent"].(bool); !sent {
+		t.Errorf("receipt_sent = %v after sending one, want true", answered["receipt_sent"])
+	}
+	if _, _, code := runSecondary(t, "mail", "messages", "receipt", recvID); code != 3 {
+		t.Errorf("a second receipt for the same message exited %d, want 3", code)
+	}
+}
+
+// A message nobody asked about is refused before anything is sent, which is what
+// keeps the verb from telling a sender something they never asked to know.
+func TestMailMessagesReceiptRefusesAMessageThatDidNotAsk(t *testing.T) {
+	msgID, _, _ := plainMail(t)
+	_, stderr, code := run(t, "mail", "messages", "receipt", "--", msgID)
+	if code != 3 {
+		t.Errorf("exit %d, want 3 for a message that asked for no receipt: %s", code, stderr)
+	}
+	assertContains(t, stderr, "did not ask for a read receipt")
+}
+
 // Emptying a folder is not a filtered delete: nothing is enumerated, Proton
 // clears it, and that is why it always asks.
 func TestMailMessagesEmptyClearsAFolder(t *testing.T) {

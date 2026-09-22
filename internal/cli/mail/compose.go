@@ -26,6 +26,15 @@ type composeFlags struct {
 	from         string
 	noSignature  bool
 	eml          string
+	receipt      bool
+}
+
+// registerReceipt adds the read-receipt request, which every command that
+// composes takes: what a message asks of the people who get it is part of the
+// message, whether it goes out now or is stored as a draft.
+func (f *composeFlags) registerReceipt(c *cobra.Command) {
+	c.Flags().BoolVar(&f.receipt, "request-receipt", false,
+		"Ask the recipients to confirm when they read it")
 }
 
 func (f *composeFlags) registerRecipients(c *cobra.Command) {
@@ -114,6 +123,7 @@ func (f *composeFlags) content(c *kit.Invocation) (mailsvc.Content, error) {
 		Body:    body,
 		HTML:    f.html,
 		Attach:  atts,
+		Receipt: f.receipt,
 	}
 
 	if f.eml != "" {
@@ -167,6 +177,9 @@ func (f *composeFlags) applyTo(c *kit.Invocation, draft *mailsvc.Draft) (mailsvc
 	}
 	if c.Changed("html") {
 		out.HTML = f.html
+	}
+	if c.Changed("request-receipt") {
+		out.Receipt = f.receipt
 	}
 	if c.Changed("from") {
 		sender, err := c.App.Mail.ResolveSender(c.Ctx, mailsvc.SenderRequest{Explicit: f.from})
@@ -377,6 +390,7 @@ func sendCmd() *cobra.Command {
 	f.registerBody(c)
 	f.registerAttachments(c)
 	f.registerIdentity(c)
+	f.registerReceipt(c)
 	f.registerEML(c)
 	d.register(c)
 	return c
@@ -431,6 +445,7 @@ func answerCmd(use, short, long string, forward bool) *cobra.Command {
 	c.Flags().BoolVar(&f.html, "html", false, "Compose in HTML (default: match the original)")
 	f.registerAttachments(c)
 	f.registerIdentity(c)
+	f.registerReceipt(c)
 	d.register(c)
 	c.Flags().BoolVar(&noQuote, "no-quote", false, "Do not quote the original message")
 	c.Flags().BoolVar(&asDraft, "draft", false, "Save as a draft instead of sending")
@@ -462,6 +477,7 @@ func buildAnswer(c *kit.Invocation, id string, f *composeFlags,
 		NoQuote:       noQuote,
 		NoAttachments: noAttachments,
 		NoSignature:   f.noSignature,
+		Receipt:       f.receipt,
 	}
 	if c.Changed("html") {
 		spec.HTML = &f.html

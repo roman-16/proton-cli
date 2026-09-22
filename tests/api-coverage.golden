@@ -201,6 +201,7 @@ POST /mail/v4/messages
 POST /mail/v4/messages/apply-filters
 POST /mail/v4/messages/{id}
 POST /mail/v4/messages/{id}/cancel_send
+POST /mail/v4/messages/{id}/receipt
 POST /mail/v4/smtptokens
 POST /pass/v1/breach/custom_email
 POST /pass/v1/file

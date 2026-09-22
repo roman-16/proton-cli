@@ -47,6 +47,8 @@ A message Proton flagged carries `phishing`, `suspicious` or `dmarc_failed` set 
 
 "Who fills my inbox" is `{{.Program}} mail mailing-lists list`, one row per sender that writes as a list, with how much it sends and how much is unread - not a listing of messages grouped by hand. Leaving one may send mail from the user's account or open a page in their browser, so `unsubscribe` is theirs to run.
 
+A message with `receipt_due` set to true asks to have its reading confirmed. Sending the confirmation tells the sender their mail was read and cannot be taken back, so `{{.Program}} mail messages receipt REF` is the user's to run: say that the sender asked, and leave the answer to them.
+
 ```bash
 {{.Program}} mail messages list --unread --output json
 {{.Program}} mail messages list --keyword invoice --folder all --output json

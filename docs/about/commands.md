@@ -221,6 +221,7 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton mail messages mark read`](../mail/messages.md#mark-read) | Mark messages as read |
 | [`proton mail messages mark unread`](../mail/messages.md#mark-unread) | Mark messages as unread |
 | [`proton mail messages move`](../mail/messages.md#move) | Move messages to a folder |
+| [`proton mail messages receipt`](../mail/messages.md#receipt) | Tell the sender you read their message |
 | [`proton mail messages reply`](../mail/messages.md#reply) | Reply to a message |
 | [`proton mail messages send`](../mail/messages.md#send) | Compose and send a message |
 | [`proton mail messages star`](../mail/messages.md#star) | Star messages |

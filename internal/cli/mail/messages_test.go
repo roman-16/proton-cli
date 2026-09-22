@@ -92,6 +92,43 @@ func TestMessageHeaderStatesWhatProtonConcluded(t *testing.T) {
 	}
 }
 
+// A read receipt is stated where the message is read: whether one was asked for,
+// and whether it has been answered.
+func TestMessageHeaderStatesWhereAReceiptStands(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		msg  mailsvc.Full
+		want string
+	}{
+		{name: "a message that asked for nothing"},
+		{
+			name: "a request nobody has answered",
+			msg:  mailsvc.Full{ReceiptRequested: true, ReceiptDue: true},
+			want: "requested",
+		},
+		{
+			name: "a request already answered",
+			msg:  mailsvc.Full{ReceiptRequested: true, ReceiptSent: true},
+			want: "sent",
+		},
+		{
+			name: "a request of your own, on a message you sent",
+			msg:  mailsvc.Full{ReceiptRequested: true},
+			want: "requested",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := field(messageHeader(&tc.msg), "Receipt")
+			if ok != (tc.want != "") {
+				t.Fatalf("Receipt present = %v, want %v", ok, tc.want != "")
+			}
+			if ok && got.Value != tc.want {
+				t.Errorf("Receipt = %q, want %q", got.Value, tc.want)
+			}
+		})
+	}
+}
+
 // The ID closes the block wherever a verdict lands, because that is the field a
 // reader copies to act on what they have just read.
 func TestMessageHeaderKeepsTheIDLast(t *testing.T) {

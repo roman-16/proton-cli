@@ -30,6 +30,8 @@ type AnswerSpec struct {
 	NoAttachments bool
 	// NoSignature suppresses the sending address's signature and Proton's footer.
 	NoSignature bool
+	// Receipt asks the recipients to confirm that they read the answer.
+	Receipt bool
 }
 
 // Answer builds the Content for a reply or forward of parentID. It resolves the
@@ -90,6 +92,7 @@ func (s *Service) Answer(ctx context.Context, parentID string, spec AnswerSpec) 
 		ParentID:        raw.ID,
 		Action:          &action,
 		ParentAddressID: raw.AddressID,
+		Receipt:         spec.Receipt,
 	}
 
 	if action == ActionForward {

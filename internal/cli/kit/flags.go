@@ -167,6 +167,7 @@ var Flags = map[string]Flag{
 	"removed":                {Means: "list what was taken away rather than what is there"},
 	"render":                 {Means: "which representation of a message body to print"},
 	"repeat":                 {Means: "how a schedule repeats"},
+	"request-receipt":        {Means: "ask the recipients to confirm that they read the message"},
 	"revoke":                 {Means: "also invalidate the session at Proton"},
 	"risk":                   {Means: "which password-health check a login fails"},
 	"role":                   {Means: "the part somebody plays in an organization"},

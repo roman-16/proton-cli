@@ -30,6 +30,7 @@ proton mail drafts create --to jane@example.com --subject Report --attach ./repo
 | `--from string` | Address to send from, by email or ID (default: your primary) |
 | `--html` | Treat the body as HTML rather than plain text |
 | `--no-signature` | Leave out this address's signature and Proton's footer |
+| `--request-receipt` | Ask the recipients to confirm when they read it |
 | `--subject string` | Subject line |
 | `--to stringArray` | Recipient (repeatable; accepts "Name <addr>") |
 
@@ -115,6 +116,7 @@ proton mail drafts update 5bH2mQxK --detach report.pdf
 | `--from string` | Address to send from, by email or ID (default: your primary) |
 | `--html` | Switch the draft to HTML; --html=false switches it to plain text |
 | `--no-signature` | Leave out this address's signature and Proton's footer |
+| `--request-receipt` | Ask the recipients to confirm when they read it; --request-receipt=false takes the request off |
 | `--subject string` | Subject line |
 | `--to stringArray` | Recipient (repeatable; accepts "Name <addr>") |
 

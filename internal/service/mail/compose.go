@@ -106,6 +106,22 @@ type Content struct {
 	// ParentAddressID names the address the parent was encrypted to, whose key
 	// unwraps the session keys of everything in Carry.
 	ParentAddressID string
+
+	// Receipt asks the recipients to confirm that they read the message.
+	Receipt bool
+	// flags are the message's flag word as Proton holds it, filled in when a
+	// stored draft is loaded. Writing the draft back keeps the bits this content
+	// says nothing about.
+	flags int64
+}
+
+// flagWord is the flag value a draft is stored with: what Proton already holds,
+// with the receipt request as this content states it.
+func (c Content) flagWord() int64 {
+	if c.Receipt {
+		return c.flags | flagReceiptRequest
+	}
+	return c.flags &^ flagReceiptRequest
 }
 
 // Delivery is how a message goes out, independent of what it says. It applies at

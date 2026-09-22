@@ -166,6 +166,14 @@ type Full struct {
 	MarkedLegitimate bool `json:"marked_legitimate,omitempty"`
 	Phishing         bool `json:"phishing,omitempty"`
 	Suspicious       bool `json:"suspicious,omitempty"`
+
+	// ReceiptRequested says the message asks to have its reading confirmed, and
+	// ReceiptSent that one has gone back. ReceiptDue is the pair as the reader's
+	// own question: a message this account sent carries the request it made
+	// rather than one to answer.
+	ReceiptRequested bool `json:"receipt_requested,omitempty"`
+	ReceiptSent      bool `json:"receipt_sent,omitempty"`
+	ReceiptDue       bool `json:"receipt_due,omitempty"`
 }
 
 // Flagged reports whether Proton thinks this message is not what it says it is.

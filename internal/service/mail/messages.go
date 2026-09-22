@@ -219,12 +219,14 @@ type rawAttachment struct {
 // sender's domain vouched for it, what the spam filters made of it, and whether
 // the reader has since overruled them.
 const (
-	flagSent         = 1 << 1
-	flagImported     = 1 << 9
-	flagDMARCFail    = 1 << 26
-	flagHamManual    = 1 << 27
-	flagPhishingAuto = 1 << 30
-	flagSuspicious   = 1 << 33
+	flagSent           = 1 << 1
+	flagImported       = 1 << 9
+	flagReceiptSent    = 1 << 11
+	flagReceiptRequest = 1 << 16
+	flagDMARCFail      = 1 << 26
+	flagHamManual      = 1 << 27
+	flagPhishingAuto   = 1 << 30
+	flagSuspicious     = 1 << 33
 )
 
 // verdict is what Proton concluded about one message, read off the flags every
@@ -319,6 +321,7 @@ func asFull(m rawMessage, body string, sig pgphelper.VerifyResult) Full {
 		})
 	}
 	v := verdicts(m.Flags)
+	r := receiptOf(m)
 	return Full{
 		ID: m.ID, ConversationID: m.ConversationID, Subject: m.Subject, Sender: m.Sender,
 		ToList: m.ToList, CCList: m.CCList, BCCList: m.BCCList,
@@ -326,6 +329,7 @@ func asFull(m rawMessage, body string, sig pgphelper.VerifyResult) Full {
 		AddressID: m.AddressID, Attachments: atts, Signature: sig,
 		DMARCFailed: v.dmarcFailed, MarkedLegitimate: v.markedLegitimate,
 		Phishing: v.phishing, Suspicious: v.suspicious,
+		ReceiptRequested: r.Requested, ReceiptSent: r.Sent, ReceiptDue: r.Answerable(),
 	}
 }
 

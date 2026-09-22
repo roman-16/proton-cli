@@ -4,7 +4,7 @@ Individual messages.
 
 Every command under `proton mail messages`, with the arguments and flags it takes. For these commands in use, see [the mail guide](README.md).
 
-Holds `attachments`, `delete`, `empty`, `export`, `forward`, `get`, `label`, `list`, `mark`, `move`, `reply`, `send`, `star`, `trash`, `unlabel`, `unschedule`, `unstar`, `unsubscribe`, `update` and `watch`.
+Holds `attachments`, `delete`, `empty`, `export`, `forward`, `get`, `label`, `list`, `mark`, `move`, `receipt`, `reply`, `send`, `star`, `trash`, `unlabel`, `unschedule`, `unstar`, `unsubscribe`, `update` and `watch`.
 
 ## `attachments`
 
@@ -170,6 +170,7 @@ proton mail messages forward 'Invoice #2291' --to jane@example.com --no-attachme
 | `--no-attachments` | Leave the original's attachments behind |
 | `--no-quote` | Do not quote the original message |
 | `--no-signature` | Leave out this address's signature and Proton's footer |
+| `--request-receipt` | Ask the recipients to confirm when they read it |
 | `--send-at string` | Schedule delivery (RFC 3339, or YYYY-MM-DDTHH:MM in the zone you are working in) |
 | `--to stringArray` | Recipient (repeatable; accepts "Name <addr>") |
 
@@ -393,6 +394,23 @@ proton mail messages move --from newsletter@example.com --older-than 90d --into 
 | `--to string` | Match a recipient's address |
 | `--unread` | Match unread messages |
 
+## `receipt`
+
+Tell the sender you read their message.
+
+Only a message that asked for a read receipt can be answered, and only once. `get` shows such a message as Receipt: requested.
+
+To ask for one yourself, send with `proton mail messages send --request-receipt`.
+
+```
+proton mail messages receipt REF...
+```
+
+```bash
+proton mail messages receipt 'Invoice #2291'
+proton mail messages receipt 5bH2mQxK --dry-run
+```
+
 ## `reply`
 
 Reply to a message.
@@ -427,6 +445,7 @@ proton mail messages reply 'Invoice #2291' --body 'Draft first.' --draft
 | `--html` | Compose in HTML (default: match the original) |
 | `--no-quote` | Do not quote the original message |
 | `--no-signature` | Leave out this address's signature and Proton's footer |
+| `--request-receipt` | Ask the recipients to confirm when they read it |
 | `--send-at string` | Schedule delivery (RFC 3339, or YYYY-MM-DDTHH:MM in the zone you are working in) |
 | `--to stringArray` | Recipient (repeatable; accepts "Name <addr>") |
 
@@ -443,6 +462,7 @@ proton mail messages send --to jane@example.com --subject Report --body 'See att
 proton mail messages send --to team@example.com --subject Standup --body -
 proton mail messages send --to jane@example.com --subject Reminder --send-at 2026-04-16T09:00
 proton mail messages send --to jane@example.com --subject Invoice --body 'See attached.' --eo-password-file /run/secrets/jane
+proton mail messages send --to jane@example.com --subject Contract --body 'Signed and attached.' --request-receipt
 proton mail messages send --eml ./draft.eml
 ```
 
@@ -460,6 +480,7 @@ proton mail messages send --eml ./draft.eml
 | `--from string` | Address to send from, by email or ID (default: your primary) |
 | `--html` | Treat the body as HTML rather than plain text |
 | `--no-signature` | Leave out this address's signature and Proton's footer |
+| `--request-receipt` | Ask the recipients to confirm when they read it |
 | `--send-at string` | Schedule delivery (RFC 3339, or YYYY-MM-DDTHH:MM in the zone you are working in) |
 | `--subject string` | Subject line |
 | `--to stringArray` | Recipient (repeatable; accepts "Name <addr>") |

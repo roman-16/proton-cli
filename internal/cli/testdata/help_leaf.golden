@@ -8,6 +8,7 @@ Examples:
   proton mail messages send --to team@example.com --subject Standup --body -
   proton mail messages send --to jane@example.com --subject Reminder --send-at 2026-04-16T09:00
   proton mail messages send --to jane@example.com --subject Invoice --body 'See attached.' --eo-password-file /run/secrets/jane
+  proton mail messages send --to jane@example.com --subject Contract --body 'Signed and attached.' --request-receipt
   proton mail messages send --eml ./draft.eml
 
 Flags:
@@ -24,6 +25,7 @@ Flags:
   -h, --help                        help for send
       --html                        Treat the body as HTML rather than plain text
       --no-signature                Leave out this address's signature and Proton's footer
+      --request-receipt             Ask the recipients to confirm when they read it
       --send-at string              Schedule delivery (RFC 3339, or YYYY-MM-DDTHH:MM in the zone you are working in)
       --subject string              Subject line
       --to stringArray              Recipient (repeatable; accepts "Name <addr>")

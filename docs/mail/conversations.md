@@ -123,6 +123,7 @@ proton mail conversations forward 'Quarterly numbers' --to jane@example.com
 | `--no-attachments` | Leave the original's attachments behind |
 | `--no-quote` | Do not quote the original message |
 | `--no-signature` | Leave out this address's signature and Proton's footer |
+| `--request-receipt` | Ask the recipients to confirm when they read it |
 | `--send-at string` | Schedule delivery (RFC 3339, or YYYY-MM-DDTHH:MM in the zone you are working in) |
 | `--to stringArray` | Recipient (repeatable; accepts "Name <addr>") |
 
@@ -337,6 +338,7 @@ proton mail conversations reply 'Quarterly numbers' --everyone --body Agreed.
 | `--html` | Compose in HTML (default: match the original) |
 | `--no-quote` | Do not quote the original message |
 | `--no-signature` | Leave out this address's signature and Proton's footer |
+| `--request-receipt` | Ask the recipients to confirm when they read it |
 | `--send-at string` | Schedule delivery (RFC 3339, or YYYY-MM-DDTHH:MM in the zone you are working in) |
 | `--to stringArray` | Recipient (repeatable; accepts "Name <addr>") |
 
