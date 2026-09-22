@@ -166,6 +166,32 @@ Invited:  kim@example.com (editor, ready to confirm)
 
 `update`, `resend` and `remove` work on these the way they work on any invitation.
 
+### A photo album, or one photo
+
+An album is shared with named people and has no public link.
+
+```bash
+proton drive photos albums share add Holidays jane@proton.me --access editor
+proton drive photos albums share get Holidays
+proton drive photos albums share update Holidays jane@proton.me --access viewer
+proton drive photos albums share remove Holidays jane@proton.me
+```
+
+Whoever you invite gets the photos the album holds, and anything you add to it afterwards.
+
+`share resend` and `share confirm` work as they do for a file, and so does inviting an address that is not on Proton.
+
+One photo takes either mechanism:
+
+```bash
+proton drive photos share add 5bH2mQxK jane@proton.me
+proton drive photos links create 5bH2mQxK --expires 7d
+proton drive photos links get 5bH2mQxK
+proton drive photos links revoke 5bH2mQxK
+```
+
+Albums and photos have no path. Name an album by its name or ID, a photo by the ID `photos list` shows.
+
 ### What is shared, and by whom
 
 ```bash
@@ -176,12 +202,28 @@ proton drive invitations list
 proton drive invitations accept INVITATION_ID
 ```
 
+`invitations list` names what each offer is for:
+
+```console
+$ proton drive invitations list
+ID        FROM           TYPE    NAME       ROLE    CREATED
+4Np72kRt  bob@proton.me  album   Holidays   viewer  2026-03-14 09:12
+7Kd91mQx  kim@proton.me  folder  Q3 report  editor  2026-03-12 16:40
+```
+
 An item somebody shared with you has no path of its own. Open it with `--shared`, naming it by the ID or the name the listing showed:
 
 ```bash
 proton drive items list / --shared Project              # a shared folder
 proton drive items download /report.pdf --shared Project --dest-dir ./downloads/
 proton drive items download / --shared quarterly.pdf    # a shared file is / itself
+```
+
+An album somebody shared with you is listed there as well, and opens like any other item, with its photos inside it:
+
+```bash
+proton drive items list / --shared Holidays
+proton drive items download /IMG_2291.jpg --shared Holidays --dest-dir ./trip/
 ```
 
 ROLE in `shared list` is what you may do there: a viewer lists and downloads, an editor uploads and changes things as well.
@@ -276,6 +318,8 @@ proton drive photos albums add ALBUM_ID PHOTO_ID...
 proton drive photos list --album ALBUM_ID
 proton drive photos albums delete Holiday --delete-photos
 ```
+
+To hand an album to somebody, or a link to one photo, see [A photo album, or one photo](#a-photo-album-or-one-photo).
 
 ## After a password reset
 

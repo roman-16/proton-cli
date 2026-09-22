@@ -34,6 +34,8 @@ proton drive invitations decline 5bH2mQxK
 
 List invitations waiting for an answer.
 
+NAME is what is being offered and TYPE what kind of thing it is: a file, a folder, or a photo album. A name that cannot be decrypted is left empty, and the invitation can still be accepted or declined by the ID beside it.
+
 ```
 proton drive invitations list
 ```
@@ -47,7 +49,7 @@ proton drive invitations list
 | `--desc` | Reverse the order |
 | `--limit int` | How many invitations per page; 0 for all of them |
 | `--page int` | Which page of results, counting from zero |
-| `--sort string` | Order by: created, sender (default `created`) |
+| `--sort string` | Order by: created, name, sender (default `created`) |
 
 ---
 

@@ -25,7 +25,7 @@ func photosCmd() *cobra.Command {
 		photoTagVerb("unfavorite", "Remove photos from favourites", ui.Unfavorited),
 		photosRemoveCmd("trash", "Move photos to the trash", ui.Trashed, false),
 		photosRemoveCmd("delete", "Delete photos permanently", ui.Deleted, true),
-		albumsCmd())
+		albumsCmd(), photosLinksCmd(), shareCmd(photosShared()))
 	return c
 }
 
@@ -249,7 +249,8 @@ func albumsCmd() *cobra.Command {
 	c := &cobra.Command{Use: "albums", Short: "Photo albums"}
 	c.AddCommand(albumsListCmd(), albumsCreateCmd(), albumsDeleteCmd(), albumsUpdateCmd(),
 		albumMembersCmd("add", "Put photos into an album", ui.Added, "into"),
-		albumMembersCmd("remove", "Take photos out of an album", ui.Removed, "from"))
+		albumMembersCmd("remove", "Take photos out of an album", ui.Removed, "from"),
+		shareCmd(albumsShared()))
 	return c
 }
 

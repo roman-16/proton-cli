@@ -22,7 +22,7 @@ func itemsCmd() *cobra.Command {
 	c := &cobra.Command{Use: "items", Short: "Files and folders"}
 	c.AddCommand(itemsListCmd(), itemsGetCmd(), itemsCreateCmd(), itemsUploadCmd(),
 		itemsDownloadCmd(), itemsUpdateCmd(), itemsMoveCmd(), itemsCopyCmd(),
-		itemsTrashCmd(), itemsDeleteCmd(), revisionsCmd(), shareCmd())
+		itemsTrashCmd(), itemsDeleteCmd(), revisionsCmd(), shareCmd(filesShared()))
 	return c
 }
 

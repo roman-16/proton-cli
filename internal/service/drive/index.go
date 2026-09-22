@@ -619,7 +619,7 @@ func (s *Service) walkFiles(ctx context.Context, dc *Context, visit func(found) 
 	if err != nil {
 		return walked{}, err
 	}
-	return s.walkTree(ctx, dc, res.LinkID, res.NodeKR, "", visit)
+	return s.walkTree(ctx, dc, res.Link, res.NodeKR, "", visit)
 }
 
 // Sync applies the volume's change feed.

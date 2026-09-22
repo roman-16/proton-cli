@@ -57,7 +57,7 @@ proton drive links get /Documents/report.pdf
 
 List the links you have made.
 
-The URLs are not shown: each one opens its item for anybody holding it. To read a URL, use `links get`.
+The URLs are not shown: each one opens its item for anybody holding it. To read a URL, use `links get`, or `photos links get` for a link on a photo.
 
 ```
 proton drive links list

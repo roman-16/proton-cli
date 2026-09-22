@@ -185,12 +185,10 @@ func outsideStage(state int) Stage {
 // a signature over the address and the session key together - a commitment the
 // key this offer is for is the key the person named gets, which is what makes it
 // safe to hand over later against whatever key Proton publishes for them then.
-func (s *Service) InviteMember(ctx context.Context, dc *Context, path, email string, canEdit bool, message string) (Stage, error) {
-	res, err := s.ResolvePath(ctx, dc, path)
-	if err != nil {
-		return "", err
-	}
-	linkShareID, sk, err := s.shareForLink(ctx, dc, res)
+func (s *Service) InviteMember(ctx context.Context, t Target, email string, canEdit bool, message string) (Stage, error) {
+	res := t.Node
+	dc := res.dc
+	linkShareID, sk, err := s.shareForLink(ctx, res)
 	if err != nil {
 		return "", err
 	}
@@ -199,7 +197,7 @@ func (s *Service) InviteMember(ctx context.Context, dc *Context, path, email str
 		return "", err
 	}
 	if inviteeKR == nil {
-		return StageNoAccount, s.inviteOutside(ctx, dc, linkShareID, email, res.Name, canEdit, message, sk)
+		return StageNoAccount, s.inviteOutside(ctx, dc, linkShareID, email, res.Name, canEdit, message, sk, t)
 	}
 	return StageOffered, s.inviteProton(ctx, dc, linkShareID, email, res.Name, canEdit, message, sk, inviteeKR, "")
 }
@@ -244,7 +242,7 @@ func (s *Service) inviteProton(ctx context.Context, dc *Context, shareID, email,
 // the signature binding the address to this share's session key, and what it
 // sends is an email inviting them to make an account.
 func (s *Service) inviteOutside(ctx context.Context, dc *Context, shareID, email, name string,
-	canEdit bool, message string, sk *pgp.SessionKey) error {
+	canEdit bool, message string, sk *pgp.SessionKey, t Target) error {
 	sig, err := dc.Addr.Write.SignDetachedWithContext(
 		outsideSigned(email, sk), pgp.NewSigningContext(sigContextOutside, true))
 	if err != nil {
@@ -261,7 +259,7 @@ func (s *Service) inviteOutside(ctx context.Context, dc *Context, shareID, email
 	}
 	return outsideRefused(s.C.Decode(ctx, proton.Request{
 		Method: "POST", Path: "/drive/v2/shares/" + shareID + "/external-invitations", Body: body,
-	}, nil))
+	}, nil), t)
 }
 
 // Proton keeps an offer to an address outside Proton on an endpoint of its own,
@@ -307,15 +305,21 @@ func outsideSigned(email string, sk *pgp.SessionKey) *pgp.PlainMessage {
 
 // outsideRefused phrases the killswitch Proton keeps over this feature, which
 // otherwise surfaces as a bare 422 and reads as a bug in this program.
-func outsideRefused(err error) error {
+//
+// The other way to reach somebody without an account is a public link, so the
+// hint offers one - except on an album, which Proton has no public link for and
+// which is therefore left with nothing to suggest but waiting.
+func outsideRefused(err error, t Target) error {
 	var api *proton.APIError
-	if errors.As(err, &api) && api.Code == featureDisabled {
-		return errs.Problemf("Proton has turned off invitations to addresses outside Proton.").
-			Hint("`proton drive links create PATH` shares it by public link instead",
-				"this is temporary - try the invitation again later").
-			Exit(4)
+	if !errors.As(err, &api) || api.Code != featureDisabled {
+		return err
 	}
-	return err
+	hints := []string{"this is temporary - try the invitation again later"}
+	if t.Linking != "" {
+		hints = append([]string{"`proton " + t.Linking + " create " + t.Ref + "` shares it by public link instead"}, hints...)
+	}
+	return errs.Problemf("Proton has turned off invitations to addresses outside Proton.").
+		Hint(hints...).Exit(4)
 }
 
 func emailDetails(message, name string) map[string]any {
@@ -333,11 +337,9 @@ func emailDetails(message, name string) map[string]any {
 // checking it against the address Proton now reports is what stops a substituted
 // invitee from being handed the key. It is required and it is contextual: a
 // signature made for anything else vouches for nothing.
-func (s *Service) ConfirmInvite(ctx context.Context, dc *Context, path, email string) error {
-	res, err := s.ResolvePath(ctx, dc, path)
-	if err != nil {
-		return err
-	}
+func (s *Service) ConfirmInvite(ctx context.Context, t Target, email string) error {
+	res := t.Node
+	dc := res.dc
 	for _, sid := range res.Link.ShareIDs {
 		if sid == dc.ShareID {
 			continue
@@ -351,14 +353,16 @@ func (s *Service) ConfirmInvite(ctx context.Context, dc *Context, path, email st
 			if !strings.EqualFold(held.InviteeEmail, email) {
 				continue
 			}
-			return s.confirm(ctx, dc, sid, res, held)
+			return s.confirm(ctx, sid, t, held)
 		}
 	}
-	return errs.Problemf("Nobody at %s was invited to %s before they had a Proton account.", email, path).
-		Hint("`proton drive items share get " + path + "` shows who is waiting").Exit(3)
+	return errs.Problemf("Nobody at %s was invited to %s before they had a Proton account.", email, t.Ref).
+		Hint("`proton " + t.Sharing + " get " + t.Ref + "` shows who is waiting").Exit(3)
 }
 
-func (s *Service) confirm(ctx context.Context, dc *Context, shareID string, res *Resolved, held outsideInvite) error {
+func (s *Service) confirm(ctx context.Context, shareID string, t Target, held outsideInvite) error {
+	res := t.Node
+	dc := res.dc
 	if held.State != outsideRegistered {
 		return errs.Problemf("%s has not created a Proton account yet.", held.InviteeEmail).
 			Hint("Proton has emailed them an invitation to create one").Exit(3)
@@ -377,7 +381,7 @@ func (s *Service) confirm(ctx context.Context, dc *Context, shareID string, res 
 		return errs.Problemf(
 			"The invitation to %s is not the one this account signed, so the key will not be handed over.",
 			held.InviteeEmail).
-			Hint("`proton drive items share remove` withdraws it; invite them again afterwards").Exit(3)
+			Hint("`proton " + t.Sharing + " remove` withdraws it; invite them again afterwards").Exit(3)
 	}
 	inviteeKR, err := keys.Published(ctx, s.C, held.InviteeEmail)
 	if err != nil {
@@ -391,11 +395,9 @@ func (s *Service) confirm(ctx context.Context, dc *Context, shareID string, res 
 		held.Permissions&permWrite != 0, "", sk, inviteeKR, held.ExternalInvitationID)
 }
 
-func (s *Service) RemoveMember(ctx context.Context, dc *Context, path, email string) error {
-	res, err := s.ResolvePath(ctx, dc, path)
-	if err != nil {
-		return err
-	}
+func (s *Service) RemoveMember(ctx context.Context, t Target, email string) error {
+	res := t.Node
+	dc := res.dc
 	for _, sid := range res.Link.ShareIDs {
 		if sid == dc.ShareID {
 			continue
@@ -451,11 +453,9 @@ func (s *Service) whoHolds(ctx context.Context, shareID string) ([]Member, []Pen
 // be re-encrypted: the key packet the member already holds still opens the share,
 // and only what they are allowed to do with it changes. An offer to somebody with
 // no account carries no key at all, so the same is true of it.
-func (s *Service) SetMemberRole(ctx context.Context, dc *Context, path, email string, edit bool) error {
-	res, err := s.ResolvePath(ctx, dc, path)
-	if err != nil {
-		return err
-	}
+func (s *Service) SetMemberRole(ctx context.Context, t Target, email string, edit bool) error {
+	res := t.Node
+	dc := res.dc
 	for _, sid := range res.Link.ShareIDs {
 		if sid == dc.ShareID {
 			continue
@@ -491,11 +491,9 @@ func (s *Service) SetMemberRole(ctx context.Context, dc *Context, path, email st
 // the alternative - cancel it and invite again - churns the invitation's identity
 // for no reason. An offer to somebody with no Proton account is the email far
 // more than it is anything else, so it is the one most worth sending twice.
-func (s *Service) ResendInvite(ctx context.Context, dc *Context, path, email string) error {
-	res, err := s.ResolvePath(ctx, dc, path)
-	if err != nil {
-		return err
-	}
+func (s *Service) ResendInvite(ctx context.Context, t Target, email string) error {
+	res := t.Node
+	dc := res.dc
 	for _, sid := range res.Link.ShareIDs {
 		if sid == dc.ShareID {
 			continue
@@ -515,5 +513,5 @@ func (s *Service) ResendInvite(ctx context.Context, dc *Context, path, email str
 	// Somebody who has already accepted has nothing to resend, and saying so is
 	// more use than a generic miss.
 	return errs.Problemf("no invitation to %s is waiting for an answer.", email).
-		Hint("`proton drive items share get` shows who has accepted and who has not.").Exit(3)
+		Hint("`proton " + t.Sharing + " get` shows who has accepted and who has not.").Exit(3)
 }

@@ -76,13 +76,14 @@ var Fields = map[string]Policy{
 	"volumes":          Keep, // how many volumes the account has
 
 	// ── the things an account holds ──
-	"calendar": Handle,
-	"item":     Handle,
-	"link":     Handle,
-	"parent":   Handle,
-	"share":    Handle,
-	"vault":    Handle,
-	"volume":   Handle,
+	"calendar":   Handle,
+	"invitation": Handle,
+	"item":       Handle,
+	"link":       Handle,
+	"parent":     Handle,
+	"share":      Handle,
+	"vault":      Handle,
+	"volume":     Handle,
 
 	// ── restoring a volume a password reset locked ──
 	"share_type":       Keep, // which sort of share it is, as Proton numbers them

@@ -69,11 +69,32 @@ type ShareLink struct {
 }
 
 type ShareStatus struct {
-	Path     string          `json:"path"`
+	// Ref is what the person called the thing: the path of a file or folder, the
+	// name or ID of an album or a photo.
+	Ref      string          `json:"ref"`
 	Type     string          `json:"type"`
 	Links    []ShareLink     `json:"public_links"`
 	Members  []Member        `json:"members"`
 	Invitees []PendingInvite `json:"pending_invitations"`
+}
+
+// Target is what a share is put on: the node, what the person called it, and
+// the commands that act on its kind.
+//
+// A file is named by a path and a photo or an album by the reference its listing
+// showed, and each has its own commands - so a refusal points at the ones the
+// person is already using rather than at the ones for files.
+type Target struct {
+	// Node is the resolved link: its keys, the shares on it, and the tree it was
+	// resolved in.
+	Node *Resolved
+	// Ref is what the person typed for it.
+	Ref string
+	// Sharing is the command family that shares this kind with named people.
+	Sharing string
+	// Linking is the command that makes a public link for this kind, and is empty
+	// for an album, because Proton offers no public link for one.
+	Linking string
 }
 
 // LinkOptions Set* fields record which options the caller explicitly provided,
@@ -213,12 +234,10 @@ func (s *Service) verifyCreator(ctx context.Context, dc *Context, res *Resolved,
 	return string(pgphelper.VerifyDetachedStatus(verKR, norm, link.NodePassphraseSignature))
 }
 
-func (s *Service) EnsureLink(ctx context.Context, dc *Context, path string, opts LinkOptions) (*ShareLink, error) {
-	res, err := s.ResolvePath(ctx, dc, path)
-	if err != nil {
-		return nil, err
-	}
-	linkShareID, sk, err := s.shareForLink(ctx, dc, res)
+func (s *Service) EnsureLink(ctx context.Context, t Target, opts LinkOptions) (*ShareLink, error) {
+	res := t.Node
+	dc := res.dc
+	linkShareID, sk, err := s.shareForLink(ctx, res)
 	if err != nil {
 		return nil, err
 	}
@@ -315,11 +334,9 @@ func (s *Service) updateShareURL(ctx context.Context, dc *Context, linkShareID s
 	return &link, nil
 }
 
-func (s *Service) RemoveLinks(ctx context.Context, dc *Context, path string) (int, error) {
-	res, err := s.ResolvePath(ctx, dc, path)
-	if err != nil {
-		return 0, err
-	}
+func (s *Service) RemoveLinks(ctx context.Context, t Target) (int, error) {
+	res := t.Node
+	dc := res.dc
 	link := res.Link
 	removed := 0
 	for _, sid := range link.ShareIDs {
@@ -342,11 +359,9 @@ func (s *Service) RemoveLinks(ctx context.Context, dc *Context, path string) (in
 	return removed, nil
 }
 
-func (s *Service) CountLinks(ctx context.Context, dc *Context, path string) (int, error) {
-	res, err := s.ResolvePath(ctx, dc, path)
-	if err != nil {
-		return 0, err
-	}
+func (s *Service) CountLinks(ctx context.Context, t Target) (int, error) {
+	res := t.Node
+	dc := res.dc
 	link := res.Link
 	n := 0
 	for _, sid := range link.ShareIDs {
@@ -362,16 +377,11 @@ func (s *Service) CountLinks(ctx context.Context, dc *Context, path string) (int
 	return n, nil
 }
 
-func (s *Service) ShareStatusOf(ctx context.Context, dc *Context, path string) (*ShareStatus, error) {
-	res, err := s.ResolvePath(ctx, dc, path)
-	if err != nil {
-		return nil, err
-	}
+func (s *Service) ShareStatusOf(ctx context.Context, t Target) (*ShareStatus, error) {
+	res := t.Node
+	dc := res.dc
 	link := res.Link
-	st := &ShareStatus{Path: "/" + strings.Trim(path, "/"), Type: "file"}
-	if link.Type == 1 {
-		st.Type = "folder"
-	}
+	st := &ShareStatus{Ref: t.Ref, Type: linkType(link.Type)}
 	for _, sid := range link.ShareIDs {
 		if sid == dc.ShareID {
 			continue
@@ -402,7 +412,8 @@ func (s *Service) ShareStatusOf(ctx context.Context, dc *Context, path string) (
 	return st, nil
 }
 
-func (s *Service) shareForLink(ctx context.Context, dc *Context, res *Resolved) (string, *pgp.SessionKey, error) {
+func (s *Service) shareForLink(ctx context.Context, res *Resolved) (string, *pgp.SessionKey, error) {
+	dc := res.dc
 	link := res.Link
 	for _, sid := range link.ShareIDs {
 		if sid == dc.ShareID {
@@ -654,34 +665,71 @@ func (i SharedItem) Ref() string {
 // A share is somebody else's when its creator is not one of your own addresses.
 // The main share, the photos share and the desktop client's device shares are
 // yours by definition and are left out.
+//
+// An album somebody shared is answered for on an endpoint of its own as well,
+// so both are read and matched up by share: an album in both is one album.
 func (s *Service) SharedWithMe(ctx context.Context) ([]SharedItem, error) {
-	shares, mine, err := s.listShares(ctx)
-	if err != nil {
-		return nil, err
-	}
-	saved, err := s.savedLinks(ctx)
-	if err != nil {
+	var shares []rawShare
+	var mine map[string]bool
+	var saved []SharedItem
+	var albums []sharedAlbum
+	if err := fetch.Together(ctx,
+		func(ctx context.Context) error {
+			var err error
+			shares, mine, err = s.listShares(ctx)
+			return err
+		},
+		func(ctx context.Context) error {
+			var err error
+			saved, err = s.savedLinks(ctx)
+			return err
+		},
+		func(ctx context.Context) error {
+			// Albums are the one half of this answer that can go missing on its
+			// own, so it is recorded as short rather than failing the listing that
+			// holds everything else somebody shared.
+			var err error
+			if albums, err = s.albumsSharedWithMe(ctx); err != nil {
+				skip.Record(ctx, skip.KindAlbum, "shared with me", skip.Unreadable, err)
+				albums = nil
+			}
+			return nil
+		},
+	); err != nil {
 		return nil, err
 	}
 	out := saved
+	seen := make(map[string]bool, len(shares))
 	for _, sh := range shares {
 		if sh.Locked || sh.Type != shareTypeStandard || mine[strings.ToLower(sh.Creator)] {
 			continue
 		}
-		item, err := s.describeShare(ctx, sh)
-		if err != nil {
-			// A share whose key will not open is reported by its identity rather
-			// than dropped: knowing it is there is what lets somebody act on it.
-			slog.Debug("drive: could not read a share", "share", sh.ShareID, "error", err)
-			out = append(out, SharedItem{
-				ShareID: sh.ShareID, LinkID: sh.LinkID, VolumeID: sh.VolumeID,
-				SharedBy: sh.Creator, Created: sh.CreateTime,
-			})
+		seen[sh.ShareID] = true
+		out = append(out, s.shared(ctx, sh))
+	}
+	for _, a := range albums {
+		if a.Locked || a.ShareID == "" || seen[a.ShareID] {
 			continue
 		}
-		out = append(out, *item)
+		out = append(out, s.shared(ctx, rawShare{ShareID: a.ShareID, LinkID: a.LinkID, VolumeID: a.VolumeID}))
 	}
 	return out, nil
+}
+
+// shared is one thing somebody granted you, as a listing shows it.
+//
+// A share whose key will not open is reported by its identity rather than
+// dropped: knowing it is there is what lets somebody act on it.
+func (s *Service) shared(ctx context.Context, sh rawShare) SharedItem {
+	item, err := s.describeShare(ctx, sh)
+	if err != nil {
+		slog.DebugContext(ctx, "drive: could not read a share", "share", sh.ShareID, "error", err)
+		return SharedItem{
+			ShareID: sh.ShareID, LinkID: sh.LinkID, VolumeID: sh.VolumeID,
+			SharedBy: sh.Creator, Created: sh.CreateTime,
+		}
+	}
+	return *item
 }
 
 // SharedByMe lists the items you have handed to named people.
@@ -823,6 +871,10 @@ func (s *Service) listShares(ctx context.Context) ([]rawShare, map[string]bool, 
 }
 
 // describeShare opens a share and reads what it grants.
+//
+// Who made it and when come from the share itself rather than from the listing
+// that named it, because not every share reaches this from a listing: an album
+// somebody shared arrives with nothing but its identity.
 func (s *Service) describeShare(ctx context.Context, sh rawShare) (*SharedItem, error) {
 	dc, err := s.unlockShare(ctx, sh.ShareID, sh.LinkID, sh.VolumeID)
 	if err != nil {
@@ -835,7 +887,7 @@ func (s *Service) describeShare(ctx context.Context, sh rawShare) (*SharedItem, 
 	return &SharedItem{
 		ShareID: sh.ShareID, LinkID: sh.LinkID, VolumeID: sh.VolumeID,
 		Name: dc.RootName, Type: linkType(root.Type), Size: root.Size,
-		SharedBy: sh.Creator, Role: grantedRole(dc.Permissions), Created: sh.CreateTime,
+		SharedBy: dc.Creator, Role: grantedRole(dc.Permissions), Created: dc.Created,
 	}, nil
 }
 

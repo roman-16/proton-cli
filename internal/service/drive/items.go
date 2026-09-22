@@ -18,20 +18,32 @@ import (
 // The kinds a link can be. A response says what a thing is rather than which
 // number Proton files it under.
 const (
+	TypeAlbum  = "album"
 	TypeFolder = "folder"
 	TypeFile   = "file"
 )
 
 // linkType names Proton's numeric link kind.
 func linkType(t int) string {
-	if t == protonFolder {
+	switch t {
+	case protonFolder:
 		return TypeFolder
+	case protonAlbum:
+		return TypeAlbum
 	}
 	return TypeFile
 }
 
-// protonFolder is Proton's number for a folder link.
-const protonFolder = 1
+// Proton's numbers for the two kinds of link that hold other links: a folder in
+// the file tree, and an album on the photo volume.
+const (
+	protonFolder = 1
+	protonAlbum  = 3
+)
+
+// holds reports whether a link of this kind has things inside it, which is the
+// question every walk asks and the one a path has to answer to continue.
+func holds(t int) bool { return t == protonFolder || t == protonAlbum }
 
 type Child struct {
 	LinkID     string `json:"link_id"`
@@ -51,7 +63,7 @@ func (s *Service) List(ctx context.Context, dc *Context, path string) ([]Child, 
 	if !res.IsFolder {
 		return nil, errs.Problemf("%s is not a folder.", res.Describe(path))
 	}
-	raw, err := s.listRawChildren(ctx, dc, res.LinkID)
+	raw, err := s.listRawChildren(ctx, dc, res.Link)
 	if err != nil {
 		return nil, err
 	}
@@ -112,13 +124,13 @@ func (s *Service) Walk(ctx context.Context, dc *Context, path, keyword string) (
 	if !res.IsFolder {
 		return nil, cover, errs.Problemf("%s is not a folder.", res.Describe(path))
 	}
-	out, err := s.walk(ctx, dc, res.LinkID, res.NodeKR, strings.TrimRight(path, "/"), terms)
+	out, err := s.walk(ctx, dc, res.Link, res.NodeKR, strings.TrimRight(path, "/"), terms)
 	return out, cover, err
 }
 
-func (s *Service) walk(ctx context.Context, dc *Context, linkID string, parentKR *pgp.KeyRing, prefix string, terms []string) ([]Child, error) {
+func (s *Service) walk(ctx context.Context, dc *Context, parent *Link, parentKR *pgp.KeyRing, prefix string, terms []string) ([]Child, error) {
 	var out []Child
-	_, err := s.walkTree(ctx, dc, linkID, parentKR, prefix, func(f found) error {
+	_, err := s.walkTree(ctx, dc, parent, parentKR, prefix, func(f found) error {
 		if !search.Matches(terms, f.label()) {
 			return nil
 		}
@@ -186,9 +198,9 @@ func (w walked) with(other walked) walked {
 // right - a name decrypted with its parent's key, a folder opened with its own,
 // a subtree that would not open recorded rather than dropped - is the same
 // whether the answer is a listing on the screen or a record in the index.
-func (s *Service) walkTree(ctx context.Context, dc *Context, linkID string, parentKR *pgp.KeyRing, prefix string, visit func(found) error) (walked, error) {
+func (s *Service) walkTree(ctx context.Context, dc *Context, parent *Link, parentKR *pgp.KeyRing, prefix string, visit func(found) error) (walked, error) {
 	var tally walked
-	raw, err := s.listRawChildren(ctx, dc, linkID)
+	raw, err := s.listRawChildren(ctx, dc, parent)
 	if err != nil {
 		return tally, err
 	}
@@ -200,7 +212,7 @@ func (s *Service) walkTree(ctx context.Context, dc *Context, linkID string, pare
 			// on the screen says what happened, and an index counts it as one thing
 			// it holds without all of what the account says about it.
 			slog.DebugContext(ctx, "drive: a child's name could not be decrypted",
-				"link", r.LinkID, "parent", linkID, "error", nameErr)
+				"link", r.LinkID, "parent", parent.LinkID, "error", nameErr)
 			f.Unreadable = true
 		}
 		f.Name = name
@@ -221,7 +233,7 @@ func (s *Service) walkTree(ctx context.Context, dc *Context, linkID string, pare
 		if r.Type != protonFolder || f.Sealed {
 			continue
 		}
-		under, err := s.walkTree(ctx, dc, r.LinkID, childKR, f.Path, visit)
+		under, err := s.walkTree(ctx, dc, &r, childKR, f.Path, visit)
 		tally = tally.with(under)
 		if err != nil {
 			if ctx.Err() != nil {
@@ -747,7 +759,7 @@ func (s *Service) removable(ctx context.Context, dc *Context, res *Resolved) (le
 	if !res.IsFolder {
 		return taken, "", nil
 	}
-	children, err := s.listRawChildren(ctx, dc, res.LinkID)
+	children, err := s.listRawChildren(ctx, dc, res.Link)
 	if err != nil {
 		return nil, "", err
 	}
@@ -758,7 +770,7 @@ func (s *Service) removable(ctx context.Context, dc *Context, res *Resolved) (le
 		}
 		below, refusal, err := s.removable(ctx, dc, &Resolved{
 			dc: dc, Parent: res, LinkID: child.LinkID, ParentKR: res.NodeKR, NodeKR: childKR,
-			IsFolder: child.Type == protonFolder, Link: &child,
+			IsFolder: holds(child.Type), Link: &child,
 		})
 		if err != nil {
 			return nil, "", err

@@ -135,7 +135,7 @@ func (s *Service) PlanDownload(ctx context.Context, dc *Context, path string) (*
 	if base := baseOf(path); base != "" {
 		plan.Top = base
 	}
-	_, err = s.walkTree(ctx, dc, res.LinkID, res.NodeKR, "", func(f found) error {
+	_, err = s.walkTree(ctx, dc, res.Link, res.NodeKR, "", func(f found) error {
 		if f.Link.Type == protonFolder {
 			plan.Folders = append(plan.Folders, f.Path)
 			return nil

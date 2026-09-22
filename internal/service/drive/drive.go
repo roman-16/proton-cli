@@ -71,6 +71,10 @@ type Context struct {
 	// item somebody shared. It is empty for the volumes Proton's own clients
 	// label rather than name, and for a root whose name will not decrypt.
 	RootName string
+	// Creator is the address that made the share, and Created when they made it -
+	// which, for a share somebody granted you, is who shared the thing and when.
+	Creator string
+	Created int64
 
 	// rootLink is the share's root, fetched while the share itself was being
 	// fetched. Everything addressed by path starts from it, so resolving the
@@ -168,6 +172,8 @@ func (s *Service) unlockShare(ctx context.Context, shareID, rootLinkID, volumeID
 		Passphrase          string
 		PassphraseSignature string
 		Type                int
+		Creator             string
+		CreateTime          int64
 		// Memberships is your own standing in the share, which Proton sends for a
 		// share somebody shared with you and leaves empty for one of your own.
 		Memberships []struct{ Permissions int }
@@ -232,6 +238,7 @@ func (s *Service) unlockShare(ctx context.Context, shareID, rootLinkID, volumeID
 		Addr: addrRings, AddrID: sh.AddressID, AddrEmail: addrEmail, addrKeys: addrKeys,
 		VolumeID: volumeID, RootLinkID: rootLinkID, rootLink: rootLink,
 		Type: sh.Type, RootName: rootName(ctx, shareID, sh.Type, rootLink, shareKR),
+		Creator: sh.Creator, Created: sh.CreateTime,
 	}
 	if len(sh.Memberships) > 0 {
 		dc.Permissions = sh.Memberships[0].Permissions
@@ -329,7 +336,7 @@ func rootName(ctx context.Context, shareID string, shareType int, root *Link, sh
 type Link struct {
 	LinkID       string
 	ParentLinkID string
-	Type         int // 1=folder, 2=file
+	Type         int // 1=folder, 2=file, 3=album
 	Size         int64
 	Name         string
 	// Hash is the name's lookup hash under the parent folder's hash key, which a
@@ -413,6 +420,11 @@ func (r *Resolved) Describe(path string) string {
 // is the one item with no parent to be named under.
 func (r *Resolved) IsRoot() bool { return r.Link != nil && r.Link.ParentLinkID == "" }
 
+// IsAlbum reports whether this is a photo album, which holds things the way a
+// folder does and is shared the way anything else is - but has no public link,
+// because Proton offers none for one.
+func (r *Resolved) IsAlbum() bool { return r.Link != nil && r.Link.Type == protonAlbum }
+
 func (s *Service) ResolvePath(ctx context.Context, dc *Context, path string) (*Resolved, error) {
 	st, err := s.resolveTo(ctx, dc, path)
 	if err != nil {
@@ -465,7 +477,7 @@ func (s *Service) resolveTo(ctx context.Context, dc *Context, path string) (*sto
 	st := &stopped{
 		at: &Resolved{
 			dc: dc, LinkID: dc.RootLinkID, ParentKR: dc.ShareKR,
-			NodeKR: rootKR, Name: dc.RootName, IsFolder: dc.rootLink.Type == protonFolder,
+			NodeKR: rootKR, Name: dc.RootName, IsFolder: holds(dc.rootLink.Type),
 			Link: dc.rootLink,
 		},
 		path: "/",
@@ -492,7 +504,7 @@ func (s *Service) resolveTo(ctx context.Context, dc *Context, path string) (*sto
 // childNamed finds one named child of a folder, or nothing when the folder has
 // no such child. A name that will not decrypt is not the name being looked for.
 func (s *Service) childNamed(ctx context.Context, dc *Context, parent *Resolved, name string) (*Resolved, error) {
-	children, err := s.listRawChildren(ctx, dc, parent.LinkID)
+	children, err := s.listRawChildren(ctx, dc, parent.Link)
 	if err != nil {
 		return nil, err
 	}
@@ -507,10 +519,83 @@ func (s *Service) childNamed(ctx context.Context, dc *Context, parent *Resolved,
 		return &Resolved{
 			dc: dc, Parent: parent, LinkID: child.LinkID,
 			ParentKR: parent.NodeKR, NodeKR: childKR, Name: name,
-			IsFolder: child.Type == protonFolder, Link: &child,
+			IsFolder: holds(child.Type), Link: &child,
 		}, nil
 	}
 	return nil, nil
+}
+
+// ResolveRef opens a node named by the ID its listing showed rather than by a
+// path, which is how everything on the photo volume is named: a photo, and an
+// album.
+//
+// What wraps its name and its passphrase is the volume's root, or the album a
+// photo was put into - the album holding a second, re-wrapped copy of the
+// passphrase is exactly what lets whoever the album was shared with read the
+// photos in it.
+func (s *Service) ResolveRef(ctx context.Context, dc *Context, linkID string) (*Resolved, error) {
+	root, err := s.rootResolved(dc)
+	if err != nil {
+		return nil, err
+	}
+	if linkID == dc.RootLinkID {
+		return root, nil
+	}
+	link, err := s.getLink(ctx, dc.ShareID, linkID)
+	if err != nil {
+		return nil, err
+	}
+	parent := root
+	if id := heldBy(link, dc.RootLinkID); id != "" {
+		if parent, err = s.ResolveRef(ctx, dc, id); err != nil {
+			return nil, fmt.Errorf("open the album %s is in: %w", linkID, err)
+		}
+	}
+	nodeKR, err := unlockNode(link, parent.NodeKR, dc.Addr.Read)
+	if err != nil {
+		return nil, fmt.Errorf("unlock %s: %w", linkID, err)
+	}
+	name, err := decryptName(link.Name, parent.NodeKR)
+	if err != nil {
+		// Recorded and not counted: the caller addressed this by ID and every
+		// screen it reaches names it by ID too, so nothing is missing from the
+		// answer - only the name it would have been nicer to say.
+		slog.DebugContext(ctx, "drive: the name of a referenced item could not be decrypted",
+			"link", linkID, "share", dc.handle(), "error", err)
+	}
+	return &Resolved{
+		dc: dc, Parent: parent, LinkID: linkID, ParentKR: parent.NodeKR, NodeKR: nodeKR,
+		Name: name, IsFolder: holds(link.Type), Link: link,
+	}, nil
+}
+
+// rootResolved is the top of a tree as a resolved node, which is where a walk
+// from a path starts and what a reference falls back to for its parent.
+func (s *Service) rootResolved(dc *Context) (*Resolved, error) {
+	rootKR, err := dc.RootKR()
+	if err != nil {
+		return nil, err
+	}
+	return &Resolved{
+		dc: dc, LinkID: dc.RootLinkID, ParentKR: dc.ShareKR, NodeKR: rootKR,
+		Name: dc.RootName, IsFolder: holds(dc.rootLink.Type), Link: dc.rootLink,
+	}, nil
+}
+
+// heldBy names the album whose key wraps a photo, and nothing at all for
+// anything sitting directly under the volume's root.
+//
+// A photo put into an album is a child of it; one that only appears in an album
+// carries the album on its own record instead, which is where a photo somebody
+// shared into an album is reached from.
+func heldBy(link *Link, rootLinkID string) string {
+	if link.ParentLinkID != "" && link.ParentLinkID != rootLinkID {
+		return link.ParentLinkID
+	}
+	if link.PhotoProperties != nil && len(link.PhotoProperties.Albums) > 0 {
+		return link.PhotoProperties.Albums[0].AlbumLinkID
+	}
+	return ""
 }
 
 // components splits a path into the names along it. The root is no name at all.
@@ -599,7 +684,16 @@ const childrenPageSize = 150
 
 // listRawChildren reads what a folder holds, of whichever endpoints serve the
 // tree it is in.
-func (s *Service) listRawChildren(ctx context.Context, dc *Context, linkID string) ([]Link, error) {
+//
+// An album holds things too, and Proton serves what is in one from the photo
+// volume rather than from the share - so an album somebody shared is a tree
+// like any other here, and everything that lists, walks or downloads one works
+// on it without knowing.
+func (s *Service) listRawChildren(ctx context.Context, dc *Context, parent *Link) ([]Link, error) {
+	linkID := parent.LinkID
+	if parent.Type == protonAlbum {
+		return s.albumChildren(ctx, dc, linkID)
+	}
 	if dc.Public() {
 		return s.linkChildren(ctx, dc, linkID)
 	}

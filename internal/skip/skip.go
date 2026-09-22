@@ -56,6 +56,7 @@ type Kind string
 
 const (
 	KindAddress    Kind = "address"
+	KindAlbum      Kind = "album"
 	KindAttachment Kind = "attachment"
 	KindCalendar   Kind = "calendar"
 	KindContact    Kind = "contact"
@@ -80,6 +81,7 @@ const (
 // express, because what was inside is exactly what could not be read. The
 // warning has to say so instead of reporting one.
 var Hides = map[Kind]bool{
+	KindAlbum:    true,
 	KindCalendar: true,
 	KindFolder:   true,
 	KindShare:    true,

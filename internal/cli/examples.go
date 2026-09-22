@@ -467,10 +467,47 @@ var examples = map[string][]string{
 		"proton drive photos albums delete Holidays",
 		"proton drive photos albums delete Holidays --delete-photos",
 	},
-	"proton drive settings get":  {"proton drive settings get"},
-	"proton drive settings list": {"proton drive settings list"},
-	"proton drive settings set":  {"proton drive settings set version-history 30d"},
-	"proton drive volumes list":  {"proton drive volumes list"},
+	"proton drive photos albums share add": {
+		"proton drive photos albums share add Holidays jane@proton.me",
+		"proton drive photos albums share add Holidays jane@proton.me --access editor --message 'Photos from the trip'",
+	},
+	"proton drive photos albums share get": {"proton drive photos albums share get Holidays"},
+	"proton drive photos albums share update": {
+		"proton drive photos albums share update Holidays jane@proton.me --access viewer",
+	},
+	"proton drive photos albums share remove": {
+		"proton drive photos albums share remove Holidays jane@proton.me",
+	},
+	"proton drive photos albums share resend": {
+		"proton drive photos albums share resend Holidays jane@proton.me",
+	},
+	"proton drive photos albums share confirm": {
+		"proton drive photos albums share confirm Holidays sam@example.com",
+	},
+	"proton drive photos share add": {
+		"proton drive photos share add 5bH2mQxK jane@proton.me",
+		"proton drive photos share add 5bH2mQxK jane@proton.me --access editor",
+	},
+	"proton drive photos share get": {"proton drive photos share get 5bH2mQxK"},
+	"proton drive photos share update": {
+		"proton drive photos share update 5bH2mQxK jane@proton.me --access viewer",
+	},
+	"proton drive photos share remove": {"proton drive photos share remove 5bH2mQxK jane@proton.me"},
+	"proton drive photos share resend": {"proton drive photos share resend 5bH2mQxK jane@proton.me"},
+	"proton drive photos share confirm": {
+		"proton drive photos share confirm 5bH2mQxK sam@example.com",
+	},
+	"proton drive photos links create": {
+		"proton drive photos links create 5bH2mQxK",
+		"proton drive photos links create 5bH2mQxK --expires 7d",
+		"proton drive photos links create 5bH2mQxK --link-password-file /run/secrets/photo-link",
+	},
+	"proton drive photos links get":    {"proton drive photos links get 5bH2mQxK"},
+	"proton drive photos links revoke": {"proton drive photos links revoke 5bH2mQxK"},
+	"proton drive settings get":        {"proton drive settings get"},
+	"proton drive settings list":       {"proton drive settings list"},
+	"proton drive settings set":        {"proton drive settings set version-history 30d"},
+	"proton drive volumes list":        {"proton drive volumes list"},
 	"proton drive volumes restore": {
 		"proton drive volumes restore 7Kd91mQx",
 		"proton drive volumes restore --all",

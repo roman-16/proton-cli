@@ -131,11 +131,26 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton drive photos albums delete`](../drive/photos.md#albums-delete) | Delete albums |
 | [`proton drive photos albums list`](../drive/photos.md#albums-list) | List albums |
 | [`proton drive photos albums remove`](../drive/photos.md#albums-remove) | Take photos out of an album |
+| [`proton drive photos albums share add`](../drive/photos.md#albums-share-add) | Invite someone to an album |
+| [`proton drive photos albums share confirm`](../drive/photos.md#albums-share-confirm) | Let somebody in once they join Proton |
+| [`proton drive photos albums share get`](../drive/photos.md#albums-share-get) | Show how an album is shared |
+| [`proton drive photos albums share remove`](../drive/photos.md#albums-share-remove) | Revoke someone's access, or cancel their invitation |
+| [`proton drive photos albums share resend`](../drive/photos.md#albums-share-resend) | Send an unanswered invitation again |
+| [`proton drive photos albums share update`](../drive/photos.md#albums-share-update) | Change what somebody may do with an album |
 | [`proton drive photos albums update`](../drive/photos.md#albums-update) | Rename an album, or change its cover |
 | [`proton drive photos delete`](../drive/photos.md#delete) | Delete photos permanently |
 | [`proton drive photos download`](../drive/photos.md#download) | Download a photo |
 | [`proton drive photos favorite`](../drive/photos.md#favorite) | Mark photos as favourites |
+| [`proton drive photos links create`](../drive/photos.md#links-create) | Make a link that opens a photo for anyone |
+| [`proton drive photos links get`](../drive/photos.md#links-get) | Show the link on a photo, URL and all |
+| [`proton drive photos links revoke`](../drive/photos.md#links-revoke) | Stop the link on a photo working |
 | [`proton drive photos list`](../drive/photos.md#list) | List photos |
+| [`proton drive photos share add`](../drive/photos.md#share-add) | Invite someone to a photo |
+| [`proton drive photos share confirm`](../drive/photos.md#share-confirm) | Let somebody in once they join Proton |
+| [`proton drive photos share get`](../drive/photos.md#share-get) | Show how a photo is shared |
+| [`proton drive photos share remove`](../drive/photos.md#share-remove) | Revoke someone's access, or cancel their invitation |
+| [`proton drive photos share resend`](../drive/photos.md#share-resend) | Send an unanswered invitation again |
+| [`proton drive photos share update`](../drive/photos.md#share-update) | Change what somebody may do with a photo |
 | [`proton drive photos trash`](../drive/photos.md#trash) | Move photos to the trash |
 | [`proton drive photos unfavorite`](../drive/photos.md#unfavorite) | Remove photos from favourites |
 | [`proton drive photos upload`](../drive/photos.md#upload) | Upload a photo to the library |

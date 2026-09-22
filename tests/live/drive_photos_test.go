@@ -60,6 +60,39 @@ func uploadedPhoto(t *testing.T) string {
 	return photoID
 }
 
+// createdAlbum makes an album and hands back the ID it landed under,
+// registering the cleanup that removes it again.
+//
+// An album is found the way a photo is, by what the creation added: the listing
+// is the only thing that says which album is which.
+func createdAlbum(t *testing.T, name string) string {
+	t.Helper()
+	before := map[string]bool{}
+	for _, a := range runJSONArray(t, "drive", "photos", "albums", "list") {
+		before[a.(map[string]interface{})["link_id"].(string)] = true
+	}
+	runOK(t, "drive", "photos", "albums", "create", "--name", name)
+
+	var albumID string
+	for _, a := range runJSONArray(t, "drive", "photos", "albums", "list") {
+		m := a.(map[string]interface{})
+		id := m["link_id"].(string)
+		if before[id] {
+			continue
+		}
+		albumID = id
+		if seen, _ := m["name"].(string); seen != name {
+			t.Errorf("album name: got %q want %q", seen, name)
+		}
+	}
+	if albumID == "" {
+		t.Fatal("created album not found in listing")
+	}
+	cleanupRun(t, fmt.Sprintf("Delete album: proton drive photos albums delete %s", albumID),
+		"drive", "photos", "albums", "delete", "--", albumID)
+	return albumID
+}
+
 func photoLinkIDs(t *testing.T) map[string]bool {
 	t.Helper()
 	set := map[string]bool{}
@@ -88,30 +121,7 @@ func TestDrivePhotosWriteLifecycle(t *testing.T) {
 		t.Errorf("photos download --dest-dir wrote no file: %v", err)
 	}
 
-	// Create an album; identify it as the new entry in the listing.
-	albumsBefore := map[string]bool{}
-	for _, a := range runJSONArray(t, "drive", "photos", "albums", "list") {
-		albumsBefore[a.(map[string]interface{})["link_id"].(string)] = true
-	}
-	albumName := testID() + "-album"
-	runOK(t, "drive", "photos", "albums", "create", "--name", albumName)
-	var albumID, albumNameSeen string
-	for _, a := range runJSONArray(t, "drive", "photos", "albums", "list") {
-		m := a.(map[string]interface{})
-		id := m["link_id"].(string)
-		if !albumsBefore[id] {
-			albumID = id
-			albumNameSeen, _ = m["name"].(string)
-		}
-	}
-	if albumID == "" {
-		t.Fatal("created album not found in listing")
-	}
-	if albumNameSeen != albumName {
-		t.Errorf("album name: got %q want %q", albumNameSeen, albumName)
-	}
-	cleanupRun(t, fmt.Sprintf("Delete album: proton drive photos albums delete %s", albumID),
-		"drive", "photos", "albums", "delete", "--", albumID)
+	albumID := createdAlbum(t, testID()+"-album")
 
 	// Add the photo to the album (node-passphrase re-wrap), verify, remove.
 	runOK(t, "drive", "photos", "albums", "add", albumID, photoID)
@@ -267,4 +277,155 @@ func TestDrivePhotoAlbumCover(t *testing.T) {
 	if code == 0 || stderr == "" {
 		t.Errorf("the refusal says nothing: %q", stderr)
 	}
+}
+
+// ── sharing ──
+//
+// An album is shared with people and a photo either way, so what is asserted
+// here is the half the file tree's tests cannot: that Proton takes a share on
+// the photo volume, that an album arrives at the other account as an album, and
+// that the photos inside it can be read there.
+
+// TestDriveAlbumShareMemberRoundTrip invites a real Proton address to an album,
+// changes what it may do, and withdraws it again.
+func TestDriveAlbumShareMemberRoundTrip(t *testing.T) {
+	invitee := secondaryEmail()
+	albumID := createdAlbum(t, testID()+"-shared-album")
+	runOK(t, "drive", "photos", "albums", "add", albumID, uploadedPhoto(t))
+
+	runOK(t, "drive", "photos", "albums", "share", "add", "--", albumID, invitee)
+	cleanupRun(t, fmt.Sprintf("Revoke member: proton drive photos albums share remove %s %s", albumID, invitee),
+		"drive", "photos", "albums", "share", "remove", "--", albumID, invitee)
+
+	status := runOK(t, "drive", "photos", "albums", "share", "get", "--", albumID)
+	assertContains(t, status, invitee)
+	assertContains(t, status, "not yet accepted")
+	assertContains(t, status, "album")
+
+	runOK(t, "drive", "photos", "albums", "share", "update", "--access", "editor", "--", albumID, invitee)
+	assertContains(t, runOK(t, "drive", "photos", "albums", "share", "get", "--", albumID), "editor")
+
+	runOK(t, "drive", "photos", "albums", "share", "remove", "--", albumID, invitee)
+	after := runOKBothStreams(t, "drive", "photos", "albums", "share", "get", "--", albumID)
+	assertNotContains(t, after, invitee)
+}
+
+// TestDriveAlbumSharedWithAnotherAccount follows an album the whole way: the
+// second account is invited, accepts, and reads the photos the album holds.
+func TestDriveAlbumSharedWithAnotherAccount(t *testing.T) {
+	invitee := secondaryEmail()
+	albumName := testID() + "-album-rt"
+	albumID := createdAlbum(t, albumName)
+	runOK(t, "drive", "photos", "albums", "add", albumID, uploadedPhoto(t))
+
+	before := altInvitationIDs(t)
+	runOK(t, "drive", "photos", "albums", "share", "add", "--access", "editor", "--", albumID, invitee)
+	cleanupRun(t, fmt.Sprintf("Revoke member: proton drive photos albums share remove %s %s", albumID, invitee),
+		"drive", "photos", "albums", "share", "remove", "--", albumID, invitee)
+
+	// What is on offer says which thing it is, which is the whole use of a
+	// listing of invitations.
+	var offer map[string]interface{}
+	waitFor(45*time.Second, 3*time.Second, func() bool {
+		for _, i := range runJSONArraySecondary(t, "drive", "invitations", "list") {
+			m := i.(map[string]interface{})
+			if id, _ := m["invitation_id"].(string); !before[id] {
+				offer = m
+				return true
+			}
+		}
+		return false
+	})
+	if offer == nil {
+		t.Fatal("the second account never saw the album invitation")
+	}
+	if got, _ := offer["type"].(string); got != "album" {
+		t.Errorf("invitation type: got %q want album", got)
+	}
+	if got, _ := offer["name"].(string); got != albumName {
+		t.Errorf("invitation name: got %q want %q", got, albumName)
+	}
+	runOKSecondary(t, "drive", "invitations", "accept", offer["invitation_id"].(string))
+
+	var shared map[string]interface{}
+	waitFor(45*time.Second, 3*time.Second, func() bool {
+		for _, it := range runJSONArraySecondary(t, "drive", "shared", "list") {
+			m := it.(map[string]interface{})
+			if name, _ := m["name"].(string); name == albumName {
+				shared = m
+				return true
+			}
+		}
+		return false
+	})
+	if shared == nil {
+		t.Fatal("the album never appeared in what the second account has been shared")
+	}
+	if got, _ := shared["type"].(string); got != "album" {
+		t.Errorf("shared album type: got %q want album", got)
+	}
+
+	// The album opens like anything else shared, and the photos in it are what
+	// is inside it.
+	ref := shared["link_id"].(string)
+	inside := runJSONArraySecondary(t, "drive", "items", "list", "--shared", ref, "/")
+	if len(inside) == 0 {
+		t.Fatal("the shared album lists none of its photos")
+	}
+	name, _ := inside[0].(map[string]interface{})["name"].(string)
+	if name == "" {
+		t.Fatal("the shared album's photo has no readable name")
+	}
+	out := filepath.Join(t.TempDir(), "shared-photo")
+	runOKSecondary(t, "drive", "items", "download", "--shared", ref, "--dest", out, "/"+name)
+	if fi, err := os.Stat(out); err != nil || fi.Size() == 0 {
+		t.Errorf("a photo out of the shared album came back empty: %v", err)
+	}
+}
+
+// A photo is handed to somebody by address the way anything else is.
+func TestDrivePhotoSharedWithAnAddress(t *testing.T) {
+	invitee := secondaryEmail()
+	photoID := uploadedPhoto(t)
+
+	runOK(t, "drive", "photos", "share", "add", "--", photoID, invitee)
+	cleanupRun(t, fmt.Sprintf("Revoke member: proton drive photos share remove %s %s", photoID, invitee),
+		"drive", "photos", "share", "remove", "--", photoID, invitee)
+
+	status := runOK(t, "drive", "photos", "share", "get", "--", photoID)
+	assertContains(t, status, invitee)
+	assertContains(t, status, "not yet accepted")
+
+	runOK(t, "drive", "photos", "share", "remove", "--", photoID, invitee)
+	assertNotContains(t, runOKBothStreams(t, "drive", "photos", "share", "get", "--", photoID), invitee)
+}
+
+// A photo carries a public link, and the URL it hands back is the one to send.
+func TestDrivePhotoLinkLifecycle(t *testing.T) {
+	photoID := uploadedPhoto(t)
+
+	url := strings.TrimSpace(runOK(t, "drive", "photos", "links", "create", "--", photoID))
+	if !strings.Contains(url, "/urls/") {
+		t.Fatalf("photo link stdout has no public URL: %q", url)
+	}
+	if !strings.Contains(url, "#") {
+		t.Errorf("the photo's link is missing the password fragment: %q", url)
+	}
+	assertContains(t, runOK(t, "drive", "photos", "links", "get", "--", photoID), tokenOf(t, url))
+
+	runOK(t, "drive", "photos", "links", "revoke", "--", photoID)
+	after := runOKBothStreams(t, "drive", "photos", "share", "get", "--", photoID)
+	assertField(t, after, "Shared:", "no")
+}
+
+// An album has no public link, so the command that would make one refuses
+// before anything is created.
+func TestDrivePhotoLinkRefusesAnAlbum(t *testing.T) {
+	albumID := createdAlbum(t, testID()+"-album-nolink")
+
+	_, stderr, code := run(t, "drive", "photos", "links", "create", "--", albumID)
+	if code == 0 {
+		t.Error("a public link for an album should be refused")
+	}
+	assertContains(t, stderr, "is an album")
 }

@@ -14,12 +14,52 @@ import (
 // is a thing rather than a property of the item, so it lives in `drive links`.
 // `get` reports both at once, which is the question a user actually has about a
 // file.
+//
+// Three collections have something to hand to somebody - files and folders,
+// albums, and photos - and Proton shares all three the same way, so the verbs
+// are built once from what tells them apart: what the thing is called, how it
+// is named on the command line, and what that name resolves to.
 
-func shareCmd() *cobra.Command {
-	c := &cobra.Command{Use: "share", Short: "The people you share a file or folder with"}
-	c.AddCommand(shareGetCmd(), shareAddCmd(), shareConfirmCmd(), shareUpdateCmd(),
-		shareResendCmd(), shareRemoveCmd())
+// shared is a collection whose things can be handed to named people.
+type shared struct {
+	// noun is the thing in a sentence: "a file or folder", "an album".
+	noun string
+	// arg is the placeholder a command in this collection addresses one with.
+	arg string
+	// label is what `get` calls the reference it shows back.
+	label string
+	// address is how a reference becomes the node a share goes on. It is a
+	// constructor, because each command owns the flags its addressing reads.
+	address func() addressing
+}
+
+func filesShared() shared {
+	return shared{noun: "a file or folder", arg: "PATH", label: "Path",
+		address: func() addressing { return &inTree{} }}
+}
+
+func albumsShared() shared {
+	return shared{noun: "an album", arg: "REF", label: "Name",
+		address: func() addressing { return anAlbum{} }}
+}
+
+func photosShared() shared {
+	return shared{noun: "a photo", arg: "REF", label: "ID",
+		address: func() addressing { return aPhoto{notAPhoto: "%q is an album, not a photo."} }}
+}
+
+func shareCmd(s shared) *cobra.Command {
+	c := &cobra.Command{Use: "share", Short: "The people you share " + s.noun + " with"}
+	c.AddCommand(shareGetCmd(s), shareAddCmd(s), shareConfirmCmd(s), shareUpdateCmd(s),
+		shareResendCmd(s), shareRemoveCmd(s))
 	return c
+}
+
+// addressed resolves a command's first argument, which every verb here begins
+// by doing: what the share is on has to be open before anything can be asked
+// about it or done to it.
+func addressed(c *kit.Invocation, a addressing) (drivesvc.Target, error) {
+	return a.resolve(c, c.Args[0])
 }
 
 // waiting words how far an unanswered offer has got, for the person reading it.
@@ -33,22 +73,22 @@ func waiting(stage drivesvc.Stage) string {
 	return "not yet accepted"
 }
 
-func shareGetCmd() *cobra.Command {
-	var t tree
+func shareGetCmd(s shared) *cobra.Command {
+	a := s.address()
 	c := &cobra.Command{
-		Use:   "get PATH",
-		Short: "Show how a file or folder is shared",
+		Use:   "get " + s.arg,
+		Short: "Show how " + s.noun + " is shared",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
-			dc, err := t.context(c)
+			target, err := addressed(c, a)
 			if err != nil {
 				return err
 			}
-			st, err := c.App.Drive.ShareStatusOf(c.Ctx, dc, c.Args[0])
+			st, err := c.App.Drive.ShareStatusOf(c.Ctx, target)
 			if err != nil {
 				return err
 			}
 			fields := []ui.Field{
-				{Label: "Path", Value: st.Path},
+				{Label: s.label, Value: st.Ref},
 				{Label: "Type", Value: st.Type},
 			}
 			for _, l := range st.Links {
@@ -76,7 +116,7 @@ func shareGetCmd() *cobra.Command {
 			return kit.Show(c, ui.RecordSpec{Object: st, Fields: fields})
 		}),
 	}
-	t.register(c, manages)
+	a.register(c)
 	return c
 }
 
@@ -87,19 +127,19 @@ func expiry(at *int64) string {
 	return units.Time(*at)
 }
 
-func shareAddCmd() *cobra.Command {
+func shareAddCmd(s shared) *cobra.Command {
 	access := kit.Viewing()
 	var message string
-	var t tree
+	a := s.address()
 	c := &cobra.Command{
-		Use:   "add PATH EMAIL",
-		Short: "Invite someone to a file or folder",
-		Long: "Invite someone to a file or folder.\n\n" +
+		Use:   "add " + s.arg + " EMAIL",
+		Short: "Invite someone to " + s.noun,
+		Long: "Invite someone to " + s.noun + ".\n\n" +
 			"EMAIL may be an address outside Proton. Proton emails them an invitation to\n" +
 			"create an account, and nothing reaches them until they have one and you run\n" +
 			"`share confirm`.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
-			dc, err := t.context(c)
+			target, err := addressed(c, a)
 			if err != nil {
 				return err
 			}
@@ -110,23 +150,23 @@ func shareAddCmd() *cobra.Command {
 			var stage drivesvc.Stage
 			if err := kit.Mutate(c, ui.ResultSpec{
 				Action: ui.Invited, Count: 1, Name: c.Args[1],
-				Detail: "to " + c.Args[0],
+				Detail: "to " + target.Ref,
 			}, func() error {
 				var err error
-				stage, err = c.App.Drive.InviteMember(c.Ctx, dc, c.Args[0], c.Args[1], edit, message)
+				stage, err = c.App.Drive.InviteMember(c.Ctx, target, c.Args[1], edit, message)
 				return err
 			}); err != nil {
 				return err
 			}
 			if stage == drivesvc.StageNoAccount {
-				warnHeld(c, "drive items share confirm")
+				warnHeld(c, target)
 			}
 			return nil
 		}),
 	}
 	access.Register(c)
 	c.Flags().StringVar(&message, "message", "", "Note to include in the invitation email")
-	t.register(c, manages)
+	a.register(c)
 	return c
 }
 
@@ -135,21 +175,21 @@ func shareAddCmd() *cobra.Command {
 // The ✓ above it is true - the offer was made - and on its own it would read as
 // the whole job. It is half of it, and the other half needs this account back at
 // a terminal at a moment nothing announces, so the sentence says that too.
-func warnHeld(c *kit.Invocation, confirm string) {
+func warnHeld(c *kit.Invocation, target drivesvc.Target) {
 	c.Warn("%s has no Proton account, so there is no key to send yet. Proton has "+
 		"emailed an invitation to create one. Nothing reaches them until they have an "+
-		"account and you run `%s %s %s %s`, and nothing will remind you.",
-		c.Args[1], kit.Program, confirm, c.Args[0], c.Args[1])
+		"account and you run `%s %s confirm %s %s`, and nothing will remind you.",
+		c.Args[1], kit.Program, target.Sharing, target.Ref, c.Args[1])
 }
 
 // Handing the key over is its own verb because a CLI has no moment to do it in.
 // A web client converts the held offer out of an event nobody asked for; here
 // the person who made the offer is the only one who can finish it, and asking
 // them is the only honest alternative to never finishing it at all.
-func shareConfirmCmd() *cobra.Command {
-	var t tree
+func shareConfirmCmd(s shared) *cobra.Command {
+	a := s.address()
 	c := &cobra.Command{
-		Use:   "confirm PATH EMAIL",
+		Use:   "confirm " + s.arg + " EMAIL",
 		Short: "Let somebody in once they join Proton",
 		Long: "Let somebody in once they join Proton.\n\n" +
 			"Use it for an address that had no Proton account when you invited it. It is\n" +
@@ -157,32 +197,32 @@ func shareConfirmCmd() *cobra.Command {
 			"Afterwards they hold an ordinary invitation, which they still have to\n" +
 			"accept.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
-			dc, err := t.context(c)
+			target, err := addressed(c, a)
 			if err != nil {
 				return err
 			}
 			return kit.Mutate(c, ui.ResultSpec{
 				Action: ui.Confirmed, Count: 1, Name: c.Args[1],
-				Detail: "on " + c.Args[0],
+				Detail: "on " + target.Ref,
 			}, func() error {
-				return c.App.Drive.ConfirmInvite(c.Ctx, dc, c.Args[0], c.Args[1])
+				return c.App.Drive.ConfirmInvite(c.Ctx, target, c.Args[1])
 			})
 		}),
 	}
-	t.register(c, manages)
+	a.register(c)
 	return c
 }
 
 // Changing what somebody may do is `update`, the same verb every other
 // collection uses for changing a field. Re-running `add` would read as inviting
 // them twice.
-func shareUpdateCmd() *cobra.Command {
+func shareUpdateCmd(s shared) *cobra.Command {
 	access := kit.Viewing()
-	var t tree
+	a := s.address()
 	c := &cobra.Command{
-		Use:   "update PATH EMAIL",
-		Short: "Change what somebody may do with a file or folder",
-		Long: "Change what somebody may do with a file or folder.\n\n" +
+		Use:   "update " + s.arg + " EMAIL",
+		Short: "Change what somebody may do with " + s.noun,
+		Long: "Change what somebody may do with " + s.noun + ".\n\n" +
 			"Name them by address. It works whether they have accepted the share or\n" +
 			"still have it pending.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
@@ -190,66 +230,66 @@ func shareUpdateCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			dc, err := t.context(c)
+			target, err := addressed(c, a)
 			if err != nil {
 				return err
 			}
 			return kit.Mutate(c, ui.ResultSpec{
 				Action: ui.Updated, Count: 1, Name: c.Args[1],
-				Detail: "to " + drivesvc.Access(edit) + " on " + c.Args[0],
+				Detail: "to " + drivesvc.Access(edit) + " on " + target.Ref,
 			}, func() error {
-				return c.App.Drive.SetMemberRole(c.Ctx, dc, c.Args[0], c.Args[1], edit)
+				return c.App.Drive.SetMemberRole(c.Ctx, target, c.Args[1], edit)
 			})
 		}),
 	}
 	access.Register(c)
-	t.register(c, manages)
+	a.register(c)
 	return c
 }
 
 // An invitation nobody answered is usually one nobody saw, so it can be sent
 // again rather than cancelled and remade.
-func shareResendCmd() *cobra.Command {
-	var t tree
+func shareResendCmd(s shared) *cobra.Command {
+	a := s.address()
 	c := &cobra.Command{
-		Use:   "resend PATH EMAIL",
+		Use:   "resend " + s.arg + " EMAIL",
 		Short: "Send an unanswered invitation again",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
-			dc, err := t.context(c)
+			target, err := addressed(c, a)
 			if err != nil {
 				return err
 			}
 			return kit.Mutate(c, ui.ResultSpec{
 				Action: ui.Resent, Kind: "invitations", Count: 1, Name: c.Args[1],
-				Detail: "for " + c.Args[0],
+				Detail: "for " + target.Ref,
 			}, func() error {
-				return c.App.Drive.ResendInvite(c.Ctx, dc, c.Args[0], c.Args[1])
+				return c.App.Drive.ResendInvite(c.Ctx, target, c.Args[1])
 			})
 		}),
 	}
-	t.register(c, manages)
+	a.register(c)
 	return c
 }
 
-func shareRemoveCmd() *cobra.Command {
-	var t tree
+func shareRemoveCmd(s shared) *cobra.Command {
+	a := s.address()
 	c := &cobra.Command{
-		Use:   "remove PATH EMAIL",
+		Use:   "remove " + s.arg + " EMAIL",
 		Short: "Revoke someone's access, or cancel their invitation",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
-			dc, err := t.context(c)
+			target, err := addressed(c, a)
 			if err != nil {
 				return err
 			}
 			return kit.Mutate(c, ui.ResultSpec{
 				Action: ui.Removed, Count: 1, Name: c.Args[1],
-				Detail: "from " + c.Args[0],
+				Detail: "from " + target.Ref,
 			}, func() error {
-				return c.App.Drive.RemoveMember(c.Ctx, dc, c.Args[0], c.Args[1])
+				return c.App.Drive.RemoveMember(c.Ctx, target, c.Args[1])
 			})
 		}),
 	}
-	t.register(c, manages)
+	a.register(c)
 	return c
 }
 
@@ -271,6 +311,10 @@ func invitationsListCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "list",
 		Short: "List invitations waiting for an answer",
+		Long: "List invitations waiting for an answer.\n\n" +
+			"NAME is what is being offered and TYPE what kind of thing it is: a file, a\n" +
+			"folder, or a photo album. A name that cannot be decrypted is left empty, and\n" +
+			"the invitation can still be accepted or declined by the ID beside it.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			invitations, err := c.App.Drive.ListInvitations(c.Ctx)
 			if err != nil {
@@ -281,6 +325,8 @@ func invitationsListCmd() *cobra.Command {
 				Columns: []ui.Column[drivesvc.Invitation]{
 					{Header: "ID", ID: true, Cell: func(i drivesvc.Invitation) string { return i.InvitationID }},
 					{Header: "FROM", Flex: true, Cell: func(i drivesvc.Invitation) string { return i.InviterEmail }},
+					{Header: "TYPE", Cell: func(i drivesvc.Invitation) string { return i.Type }},
+					{Header: "NAME", Flex: true, Cell: func(i drivesvc.Invitation) string { return i.Name }},
 					{Header: "ROLE", Cell: func(i drivesvc.Invitation) string { return i.Role }},
 					{Header: "CREATED", Cell: func(i drivesvc.Invitation) string { return units.Time(i.CreateTime) }},
 				},
@@ -289,6 +335,7 @@ func invitationsListCmd() *cobra.Command {
 	}
 	held.Register(c, "invitations",
 		kit.Key[drivesvc.Invitation]{Name: "created", Less: func(a, b drivesvc.Invitation) int { return kit.Ints(a.CreateTime, b.CreateTime) }},
+		kit.Key[drivesvc.Invitation]{Name: "name", Less: func(a, b drivesvc.Invitation) int { return kit.Fold(a.Name, b.Name) }},
 		kit.Key[drivesvc.Invitation]{Name: "sender", Less: func(a, b drivesvc.Invitation) int { return kit.Fold(a.InviterEmail, b.InviterEmail) }},
 	)
 	return c
@@ -666,9 +713,10 @@ func sharingCmd() *cobra.Command {
 	sub := &cobra.Command{
 		Use:   "list",
 		Short: "List what you have shared with other people",
-		Long: "List the files and folders you have handed to named people.\n\n" +
+		Long: "List what you have handed to named people: files, folders and photo albums.\n\n" +
 			"A public link is the other way to share, and `links list` has those. To check\n" +
-			"a single item instead, run `items share get PATH`.",
+			"a single thing instead, run `items share get PATH`, or `photos albums share\n" +
+			"get REF` for an album.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			items, err := c.App.Drive.SharedByMe(c.Ctx)
 			if err != nil {

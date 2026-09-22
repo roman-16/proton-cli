@@ -16,13 +16,68 @@ import (
 // that has one changes that one - which is what keeps a URL already sent from
 // going dead the moment somebody adjusts its expiry.
 //
-// A link is addressed the way everything else in Drive is: by the path of the
-// item it opens.
+// A link is addressed the way the thing it opens is: a file or folder by its
+// path, a photo by the ID its listing showed. `links list` is every link the
+// account has open, whichever of the two it opens.
 
 func linksCmd() *cobra.Command {
 	c := &cobra.Command{Use: "links", Short: "Links that open a file or folder for anyone"}
-	c.AddCommand(linksCreateCmd(), linksGetCmd(), linksListCmd(), linksRevokeCmd())
+	c.AddCommand(linksCreateCmd(filesLinked()), linksGetCmd(filesLinked()),
+		linksListCmd(), linksRevokeCmd(filesLinked()))
 	return c
+}
+
+// photosLinksCmd is the same collection for the photo library, where a link
+// opens one photo.
+//
+// There is no such command for an album: Proton shares an album with named
+// people and publishes no URL for one, so `photos albums share` is the whole of
+// what an album can be handed out by.
+func photosLinksCmd() *cobra.Command {
+	c := &cobra.Command{Use: "links", Short: "Links that open a photo for anyone"}
+	c.AddCommand(linksCreateCmd(photosLinked()), linksGetCmd(photosLinked()),
+		linksRevokeCmd(photosLinked()))
+	return c
+}
+
+// linked is a collection whose things a public link can be made for: what one
+// is called, how it is named on the command line, and whether a link into it
+// can be widened to allow uploads.
+type linked struct {
+	noun string
+	arg  string
+	// label is what `get` calls the reference it shows back.
+	label string
+	// note is what a reader of this collection's `create` needs telling and a
+	// reader of the other one does not.
+	note string
+	// takes says a link into it can be widened to accept uploads.
+	takes   bool
+	address func() addressing
+}
+
+func filesLinked() linked {
+	return linked{noun: "a file or folder", arg: "PATH", label: "Path", takes: true,
+		address: func() addressing { return &inTree{} }}
+}
+
+// A photo is one file and nothing can be put into it, so a link to one has no
+// access to choose: it shows the photo.
+func photosLinked() linked {
+	return linked{noun: "a photo", arg: "REF", label: "ID",
+		note: "An album has no public link. Share one with the people you want to see it,\n" +
+			"with `photos albums share add`.",
+		address: func() addressing {
+			return aPhoto{notAPhoto: "%q is an album, and Proton has no public link for an album."}
+		}}
+}
+
+// long is a command's help, with whatever this collection needs said after it.
+func (l linked) long(body string) string {
+	if l.note == "" {
+		return body
+	}
+	return body + "\n\n" + l.note
 }
 
 func linkFields(l *drivesvc.ShareLink) []ui.Field {
@@ -35,20 +90,20 @@ func linkFields(l *drivesvc.ShareLink) []ui.Field {
 	}
 }
 
-func linksCreateCmd() *cobra.Command {
+func linksCreateCmd(l linked) *cobra.Command {
 	access := kit.Viewing()
 	var expires string
-	var t tree
+	a := l.address()
 	password := kit.LinkPassword()
 	c := &cobra.Command{
-		Use:   "create PATH",
-		Short: "Make a link that opens a file or folder for anyone",
-		Long: "Make a link that opens a file or folder for anyone.\n\n" +
+		Use:   "create " + l.arg,
+		Short: "Make a link that opens " + l.noun + " for anyone",
+		Long: l.long("Make a link that opens " + l.noun + " for anyone.\n\n" +
 			"An item carries one link, so running it again changes that link rather than\n" +
 			"making a second one, and a URL you have already shared keeps working.\n\n" +
 			"The password is read from a file, never from a flag value, and may be at most\n" +
 			"50 characters. --clear-link-password takes it off again, and --expires never\n" +
-			"makes an expiring link permanent.",
+			"makes an expiring link permanent."),
 		RunE: kit.Run([]kit.Step{password.Supply}, func(c *kit.Invocation) error {
 			opts := drivesvc.LinkOptions{}
 			if kit.Changed(c.Cmd) {
@@ -72,17 +127,17 @@ func linksCreateCmd() *cobra.Command {
 				}
 				opts.SetPassword, opts.CustomPassword = true, custom
 			}
-			dc, err := t.context(c)
+			target, err := addressed(c, a)
 			if err != nil {
 				return err
 			}
 			var link *drivesvc.ShareLink
 			if err := kit.Mutate(c, ui.ResultSpec{
 				Action: ui.Created, Kind: "links", Count: 1,
-				Detail: "for " + c.Args[0], AnswerFollows: true,
+				Detail: "for " + target.Ref, AnswerFollows: true,
 			}, func() error {
 				var err error
-				link, err = c.App.Drive.EnsureLink(c.Ctx, dc, c.Args[0], opts)
+				link, err = c.App.Drive.EnsureLink(c.Ctx, target, opts)
 				return err
 			}); err != nil {
 				return err
@@ -95,44 +150,46 @@ func linksCreateCmd() *cobra.Command {
 			return kit.Show(c, ui.RecordSpec{Object: link, Fields: linkFields(link)})
 		}),
 	}
-	access.Register(c)
+	if l.takes {
+		access.Register(c)
+	}
 	c.Flags().StringVar(&expires, "expires", "",
 		"Stop working after DURATION (e.g. 7d, 2w, 6mo), or never")
 	password.Declare(c)
-	t.register(c, manages)
+	a.register(c)
 	return c
 }
 
-func linksGetCmd() *cobra.Command {
-	var t tree
+func linksGetCmd(l linked) *cobra.Command {
+	a := l.address()
 	c := &cobra.Command{
-		Use:   "get PATH",
-		Short: "Show the link on a file or folder, URL and all",
-		Long: "Show the link on a file or folder, URL and all.\n\n" +
+		Use:   "get " + l.arg,
+		Short: "Show the link on " + l.noun + ", URL and all",
+		Long: "Show the link on " + l.noun + ", URL and all.\n\n" +
 			"Use it to recover a URL you mislaid, rather than revoking the link and making\n" +
 			"a new one. The URL appears here and in no listing.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
-			dc, err := t.context(c)
+			target, err := addressed(c, a)
 			if err != nil {
 				return err
 			}
-			st, err := c.App.Drive.ShareStatusOf(c.Ctx, dc, c.Args[0])
+			st, err := c.App.Drive.ShareStatusOf(c.Ctx, target)
 			if err != nil {
 				return err
 			}
 			if len(st.Links) == 0 {
-				return kit.Fail("%s has no public link.", st.Path).
-					Hint(kit.Program + " drive links create " + c.Args[0])
+				return kit.Fail("%s has no public link.", st.Ref).
+					Hint(kit.Program + " " + target.Linking + " create " + c.Args[0])
 			}
 			link := st.Links[0]
 			fields := append([]ui.Field{
-				{Label: "Path", Value: st.Path},
+				{Label: l.label, Value: st.Ref},
 				{Label: "Type", Value: st.Type},
 			}, linkFields(&link)...)
 			return kit.Show(c, ui.RecordSpec{Object: link, Fields: fields})
 		}),
 	}
-	t.register(c, manages)
+	a.register(c)
 	return c
 }
 
@@ -144,7 +201,7 @@ func linksListCmd() *cobra.Command {
 		Short: "List the links you have made",
 		Long: "List the links you have made.\n\n" +
 			"The URLs are not shown: each one opens its item for anybody holding it. To\n" +
-			"read a URL, use `links get`.",
+			"read a URL, use `links get`, or `photos links get` for a link on a photo.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			links, err := c.App.Drive.LinksMade(c.Ctx)
 			if err != nil {
@@ -180,32 +237,32 @@ func linksListCmd() *cobra.Command {
 	return c
 }
 
-func linksRevokeCmd() *cobra.Command {
-	var t tree
+func linksRevokeCmd(l linked) *cobra.Command {
+	a := l.address()
 	c := &cobra.Command{
-		Use:   "revoke PATH",
-		Short: "Stop the link on a file or folder working",
-		Long: "Stop the link on a file or folder working.\n\n" +
+		Use:   "revoke " + l.arg,
+		Short: "Stop the link on " + l.noun + " working",
+		Long: "Stop the link on " + l.noun + " working.\n\n" +
 			"The item is untouched; only the link stops working. This cannot take back\n" +
 			"what somebody already read.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
-			dc, err := t.context(c)
+			target, err := addressed(c, a)
 			if err != nil {
 				return err
 			}
-			n, err := c.App.Drive.CountLinks(c.Ctx, dc, c.Args[0])
+			n, err := c.App.Drive.CountLinks(c.Ctx, target)
 			if err != nil {
 				return err
 			}
 			return kit.Mutate(c, ui.ResultSpec{
 				Action: ui.Revoked, Kind: "links", Count: n,
-				Detail: "for " + c.Args[0],
+				Detail: "for " + target.Ref,
 			}, func() error {
-				_, err := c.App.Drive.RemoveLinks(c.Ctx, dc, c.Args[0])
+				_, err := c.App.Drive.RemoveLinks(c.Ctx, target)
 				return err
 			})
 		}),
 	}
-	t.register(c, manages)
+	a.register(c)
 	return c
 }

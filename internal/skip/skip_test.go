@@ -82,9 +82,9 @@ func TestANilTallyAnswersForItself(t *testing.T) {
 func TestEveryHidingKindIsAKind(t *testing.T) {
 	known := map[Kind]bool{}
 	for _, k := range []Kind{
-		KindAddress, KindCalendar, KindContact, KindEvent, KindFolder, KindInvitation,
-		KindItem, KindKey, KindMember, KindProfile, KindReminder, KindShare, KindVault,
-		KindVolume,
+		KindAddress, KindAlbum, KindCalendar, KindContact, KindEvent, KindFolder,
+		KindInvitation, KindItem, KindKey, KindMember, KindProfile, KindReminder,
+		KindShare, KindVault, KindVolume,
 	} {
 		known[k] = true
 	}

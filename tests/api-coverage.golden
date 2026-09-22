@@ -69,6 +69,7 @@ GET /domains/available
 GET /domains/premium
 GET /domains/{id}
 GET /drive/me/settings
+GET /drive/photos/albums/shared-with-me
 GET /drive/photos/volumes/{id}/albums
 GET /drive/photos/volumes/{id}/albums/{id}/children
 GET /drive/shares

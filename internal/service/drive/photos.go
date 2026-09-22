@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/url"
 	"strconv"
 	"strings"
@@ -144,8 +145,8 @@ func (s *Service) PhotosList(ctx context.Context, dc *Context, tag int, filter b
 }
 
 // AlbumsList returns the photo albums. The list endpoint omits the (encrypted)
-// album name, so each album's link is fetched and its name decrypted with the
-// photos-root key.
+// album name, so the links are read back together and their names decrypted
+// with the photos-root key.
 func (s *Service) AlbumsList(ctx context.Context, dc *Context) ([]Album, error) {
 	_, rootKR, err := s.photosRoot(ctx, dc)
 	if err != nil {
@@ -160,79 +161,148 @@ func (s *Service) AlbumsList(ctx context.Context, dc *Context) ([]Album, error) 
 	if err := s.C.Decode(ctx, proton.Request{Method: "GET", Path: fmt.Sprintf("/drive/photos/volumes/%s/albums", dc.VolumeID)}, &r); err != nil {
 		return nil, err
 	}
-	out := make([]Album, 0, len(r.Albums))
+	counts := make(map[string]int, len(r.Albums))
+	ids := make([]string, 0, len(r.Albums))
 	for _, a := range r.Albums {
-		name := ""
-		if link, err := s.getLink(ctx, dc.ShareID, a.LinkID); err == nil {
-			if n, derr := decryptName(link.Name, rootKR); derr == nil {
-				name = n
-			}
+		counts[a.LinkID] = a.PhotoCount
+		ids = append(ids, a.LinkID)
+	}
+	out := make([]Album, 0, len(ids))
+	for _, batch := range chunk(ids, linkBatch) {
+		links, err := s.linkMetadata(ctx, dc.ShareID, batch)
+		if err != nil {
+			return nil, err
 		}
-		out = append(out, Album{LinkID: a.LinkID, Name: name, PhotoCount: a.PhotoCount})
+		for _, link := range links {
+			name, err := decryptName(link.Name, rootKR)
+			if err != nil {
+				// Recorded and not counted: the album is in the listing, addressable
+				// by the ID beside it, and the empty name is the screen saying so.
+				slog.DebugContext(ctx, "drive: an album's name could not be decrypted",
+					"link", link.LinkID, "share", dc.ShareID, "error", err)
+			}
+			out = append(out, Album{LinkID: link.LinkID, Name: name, PhotoCount: counts[link.LinkID]})
+		}
 	}
 	return out, nil
 }
 
 // AlbumItems lists the photos in an album.
 func (s *Service) AlbumItems(ctx context.Context, dc *Context, albumLinkID string) ([]Photo, error) {
+	entries, err := s.albumPhotos(ctx, dc, albumLinkID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Photo, 0, len(entries))
+	for _, p := range entries {
+		out = append(out, Photo{LinkID: p.LinkID, CaptureTime: p.CaptureTime, Hash: p.Hash, Tags: tagNames(p.Tags)})
+	}
+	return out, nil
+}
+
+// sharedAlbum is an album somebody shared with this account, as the photo
+// library answers for it: which album it is, and the share it is held by.
+type sharedAlbum struct {
+	VolumeID string
+	ShareID  string
+	LinkID   string
+	Locked   bool
+}
+
+// albumsSharedWithMe names the albums other people have shared with this
+// account.
+//
+// Proton answers for them here rather than among the shares, so they are asked
+// for separately and matched up by share ID with whatever the share listing
+// held.
+func (s *Service) albumsSharedWithMe(ctx context.Context) ([]sharedAlbum, error) {
 	// The endpoint hands back the anchor its next answer starts from.
 	anchor := ""
-	return proton.All(ctx, func(ctx context.Context, _ int) ([]Photo, bool, error) {
-		q := proton.Request{Method: "GET", Path: fmt.Sprintf("/drive/photos/volumes/%s/albums/%s/children", dc.VolumeID, albumLinkID)}
+	return proton.All(ctx, func(ctx context.Context, _ int) ([]sharedAlbum, bool, error) {
+		q := proton.Request{Method: "GET", Path: "/drive/photos/albums/shared-with-me"}
 		if anchor != "" {
 			q.Query = map[string][]string{"AnchorID": {anchor}}
 		}
 		var r struct {
-			Photos []struct {
-				LinkID      string
-				CaptureTime int64
-				Hash        string
-				Tags        []int
-			}
+			Albums   []sharedAlbum
 			AnchorID string
 			More     bool
 		}
 		if err := s.C.Decode(ctx, q, &r); err != nil {
 			return nil, false, err
 		}
-		out := make([]Photo, 0, len(r.Photos))
-		for _, p := range r.Photos {
-			out = append(out, Photo{LinkID: p.LinkID, CaptureTime: p.CaptureTime, Hash: p.Hash, Tags: tagNames(p.Tags)})
+		anchor = r.AnchorID
+		return r.Albums, r.More && r.AnchorID != "", nil
+	})
+}
+
+// albumPhoto is one photo an album holds, as the album's own endpoint answers:
+// which photo it is and what the library knows about it, but nothing that would
+// open it.
+type albumPhoto struct {
+	LinkID      string
+	CaptureTime int64
+	Hash        string
+	Tags        []int
+}
+
+// albumPhotos names what an album holds.
+func (s *Service) albumPhotos(ctx context.Context, dc *Context, albumLinkID string) ([]albumPhoto, error) {
+	// The endpoint hands back the anchor its next answer starts from.
+	anchor := ""
+	return proton.All(ctx, func(ctx context.Context, _ int) ([]albumPhoto, bool, error) {
+		q := proton.Request{Method: "GET", Path: fmt.Sprintf("/drive/photos/volumes/%s/albums/%s/children", dc.VolumeID, albumLinkID)}
+		if anchor != "" {
+			q.Query = map[string][]string{"AnchorID": {anchor}}
+		}
+		var r struct {
+			Photos   []albumPhoto
+			AnchorID string
+			More     bool
+		}
+		if err := s.C.Decode(ctx, q, &r); err != nil {
+			return nil, false, err
 		}
 		anchor = r.AnchorID
-		return out, r.More && r.AnchorID != "", nil
+		return r.Photos, r.More && r.AnchorID != "", nil
 	})
+}
+
+// albumChildren reads an album's photos as links, which is what a tree walk
+// needs of them: the album endpoint says which photos are in it, and the links
+// themselves carry the names and the keys.
+func (s *Service) albumChildren(ctx context.Context, dc *Context, albumLinkID string) ([]Link, error) {
+	entries, err := s.albumPhotos(ctx, dc, albumLinkID)
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]string, 0, len(entries))
+	for _, p := range entries {
+		ids = append(ids, p.LinkID)
+	}
+	out := make([]Link, 0, len(ids))
+	for _, batch := range chunk(ids, linkBatch) {
+		links, err := s.linkMetadata(ctx, dc.ShareID, batch)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, links...)
+	}
+	return out, nil
 }
 
 // PhotoDownload streams and decrypts a photo by its link ID.
 func (s *Service) PhotoDownload(ctx context.Context, dc *Context, linkID string, w io.Writer, opts DownloadOptions) (string, error) {
-	root, rootKR, err := s.photosRoot(ctx, dc)
+	res, err := s.ResolveRef(ctx, dc, linkID)
 	if err != nil {
 		return "", err
 	}
-	link, err := s.getLink(ctx, dc.ShareID, linkID)
-	if err != nil {
-		return "", err
-	}
-	parentKR := rootKR
-	if link.ParentLinkID != "" && link.ParentLinkID != root.LinkID {
-		parentLink, err := s.getLink(ctx, dc.ShareID, link.ParentLinkID)
-		if err != nil {
-			return "", err
-		}
-		if parentKR, err = unlockNode(parentLink, rootKR, dc.Addr.Read); err != nil {
-			return "", err
-		}
-	}
-	name, err := decryptName(link.Name, parentKR)
-	if err != nil {
+	name := res.Name
+	if name == "" {
 		name = linkID
 	}
-	nodeKR, err := unlockNode(link, parentKR, dc.Addr.Read)
-	if err != nil {
-		return "", err
-	}
-	return name, s.downloadFile(ctx, dc, link, nodeKR, activeRevisionID(link), link.Size, w, opts)
+	link := res.Link
+	return name, s.downloadFile(ctx, dc, link, res.NodeKR, activeRevisionID(link), link.Size, w, opts)
 }
 
 // PhotoUpload uploads a file to the photos volume, marking the revision as a
@@ -584,26 +654,18 @@ func (s *Service) favoriteMovedParams(ctx context.Context, dc *Context, link *Li
 }
 
 // photoParentKR returns the key ring that wraps a photo's node passphrase and
-// name. Timeline photos use the photos-root key ring; album-only photos use the
-// key ring of their parent album. Cross-volume (shared-album) photos, whose
-// parent lives in another share, surface a clear unsupported error.
+// name: the photos-root key ring for a photo in the timeline, and the album's
+// for one that lives only in an album.
 func (s *Service) photoParentKR(ctx context.Context, dc *Context, link *Link, rootKR *pgp.KeyRing) (*pgp.KeyRing, error) {
-	parentID := link.ParentLinkID
-	if parentID == "" && link.PhotoProperties != nil && len(link.PhotoProperties.Albums) > 0 {
-		parentID = link.PhotoProperties.Albums[0].AlbumLinkID
-	}
-	if parentID == "" || parentID == dc.RootLinkID {
+	albumID := heldBy(link, dc.RootLinkID)
+	if albumID == "" {
 		return rootKR, nil
 	}
-	parentLink, err := s.getLink(ctx, dc.ShareID, parentID)
+	album, err := s.ResolveRef(ctx, dc, albumID)
 	if err != nil {
-		return nil, fmt.Errorf("favoriting cross-volume/shared-album photos is not supported (parent %s): %w", parentID, err)
+		return nil, fmt.Errorf("open the album %s is in: %w", link.LinkID, err)
 	}
-	kr, err := unlockNode(parentLink, rootKR, dc.Addr.Read)
-	if err != nil {
-		return nil, fmt.Errorf("favoriting cross-volume/shared-album photos is not supported (unlock parent %s): %w", parentID, err)
-	}
-	return kr, nil
+	return album.NodeKR, nil
 }
 
 // photoContentHash returns the photo's content hash (HMAC of its SHA-1 digest

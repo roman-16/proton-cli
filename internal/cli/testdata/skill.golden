@@ -186,6 +186,9 @@ One line per group, with the verbs under it. Arguments, flags and examples are i
 - `proton drive links` - Links that open a file or folder for anyone: create, get, list, revoke
 - `proton drive photos` - Your photo library: delete, download, favorite, list, trash, unfavorite, upload
 - `proton drive photos albums` - Photo albums: add, create, delete, list, remove, update
+- `proton drive photos albums share` - The people you share an album with: add, confirm, get, remove, resend, update
+- `proton drive photos links` - Links that open a photo for anyone: create, get, revoke
+- `proton drive photos share` - The people you share a photo with: add, confirm, get, remove, resend, update
 - `proton drive settings` - How Drive behaves: get, list, set
 - `proton drive shared` - Files and folders other people have shared with you: add, leave, list, remove
 - `proton drive sharing` - What you have shared with other people: list

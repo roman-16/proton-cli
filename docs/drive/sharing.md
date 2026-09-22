@@ -8,9 +8,9 @@ Holds `list`.
 
 ## `list`
 
-List the files and folders you have handed to named people.
+List what you have handed to named people: files, folders and photo albums.
 
-A public link is the other way to share, and `links list` has those. To check a single item instead, run `items share get PATH`.
+A public link is the other way to share, and `links list` has those. To check a single thing instead, run `items share get PATH`, or `photos albums share get REF` for an album.
 
 ```
 proton drive sharing list
