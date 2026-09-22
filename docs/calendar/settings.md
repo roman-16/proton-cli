@@ -4,7 +4,7 @@ How Calendar behaves.
 
 Every command under `proton calendar settings`, with the arguments and flags it takes. For these commands in use, see [the calendar guide](README.md).
 
-Holds `calendars`, `get`, `list` and `set`.
+Holds `calendars`, `get`, `links`, `list` and `set`.
 
 ## `calendars`
 
@@ -195,6 +195,107 @@ proton calendar settings get
 ```bash
 proton calendar settings get
 ```
+
+## `links`
+
+Links that open a calendar for anyone.
+
+Holds `create`, `get`, `list`, `revoke` and `update`.
+
+### `links create`
+
+Publish a calendar as a link anyone can follow.
+
+The link is an .ics feed, so any calendar app can follow it and stays up to date. A limited link shows only whether you are busy; a full one shows every detail of every event, and Proton reads them to serve it.
+
+--name is yours alone and is never shown to anyone following the link. A calendar carries at most five links.
+
+```
+proton calendar settings links create REF
+```
+
+```bash
+proton calendar settings links create Work
+proton calendar settings links create Work --access full --name 'Team feed'
+```
+
+| Flag | Description |
+| --- | --- |
+| `--access string` | What they may do with it: limited, full (default `limited`) |
+| `--name string` | Name for the new link, which only you see |
+
+### `links get`
+
+Show one link, URL and all.
+
+Use this to recover a URL you mislaid, rather than revoking the link and making a new one. The URL appears here and in no listing.
+
+```
+proton calendar settings links get REF
+```
+
+```bash
+proton calendar settings links get 'Team feed'
+```
+
+### `links list`
+
+List the links you have published.
+
+The URLs are not shown: each one opens its calendar for anybody holding it. To read a URL, use `links get`.
+
+```
+proton calendar settings links list
+```
+
+```bash
+proton calendar settings links list
+proton calendar settings links list --calendar Work
+```
+
+| Flag | Description |
+| --- | --- |
+| `--calendar string` | Which calendar, by name or ID (default: all of them) |
+| `--desc` | Reverse the order |
+| `--limit int` | How many links per page; 0 for all of them |
+| `--page int` | Which page of results, counting from zero |
+| `--sort string` | Order by: calendar, created, name (default `calendar`) |
+
+### `links revoke`
+
+Stop a link working.
+
+The calendar is untouched; only the link stops opening it. Whatever somebody already copied out of it stays copied.
+
+```
+proton calendar settings links revoke REF...
+```
+
+```bash
+proton calendar settings links revoke 'Team feed'
+```
+
+### `links update`
+
+Rename a link.
+
+The name is yours alone and is never shown to anyone following the link. --clear-name takes it off again.
+
+What a link shows, and the URL it is opened at, cannot be changed: make another link for that.
+
+```
+proton calendar settings links update REF
+```
+
+```bash
+proton calendar settings links update 'Team feed' --name 'Team, read-only'
+proton calendar settings links update 'Team feed' --clear-name
+```
+
+| Flag | Description |
+| --- | --- |
+| `--clear-name` | Remove the link's name |
+| `--name string` | New name, which only you see |
 
 ## `list`
 

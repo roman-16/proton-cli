@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
@@ -90,6 +91,9 @@ type member struct {
 type bootstrap struct {
 	Keys       []struct{ PrivateKey string }
 	Passphrase struct {
+		// ID names the passphrase the calendar's keys are locked with. Handing
+		// that passphrase to a link means saying which one it is.
+		ID                string
 		MemberPassphrases []struct {
 			MemberID, Passphrase, Signature string
 		}
@@ -154,6 +158,12 @@ type calKeys struct {
 	// encrypted to theirs - so it is kept rather than discarded once the
 	// passphrase itself is in hand.
 	passphraseKey *pgp.SessionKey
+	// passphrase is what the calendar's keys are locked with, and passphraseID
+	// names it. Publishing the calendar as a link hands both over: the
+	// passphrase masked with a key of the link's own, under the name Proton
+	// files it by.
+	passphrase   []byte
+	passphraseID string
 }
 
 // unlockCalendar opens a calendar's keys.
@@ -198,8 +208,18 @@ func (s *Service) unlockCalendar(ctx context.Context, calendarID string) (*calKe
 			// The session key is what a new member is given, so it is taken here
 			// where the passphrase is already being opened rather than by
 			// decrypting the same message a second time later.
-			if split, err := msg.SplitMessage(); err == nil {
-				passphraseKey, _ = addr.Read.DecryptSessionKey(split.GetBinaryKeyPacket())
+			//
+			// Recorded and not counted: reading the calendar needs none of it, so
+			// nothing is missing from any answer. What it costs is sharing, which
+			// refuses on screen with a sentence of its own - and this is the only
+			// place that can say which of the two steps was the one that failed.
+			split, err := msg.SplitMessage()
+			if err == nil {
+				passphraseKey, err = addr.Read.DecryptSessionKey(split.GetBinaryKeyPacket())
+			}
+			if err != nil {
+				slog.DebugContext(ctx, "the key to a calendar's passphrase would not open",
+					"calendar", calendarID, "error", err)
 			}
 			break
 		}
@@ -230,6 +250,7 @@ func (s *Service) unlockCalendar(ctx context.Context, calendarID string) (*calKe
 		return &calKeys{
 			calKR: calKR, addr: addr, memberID: me.ID, email: me.Email,
 			addressID: me.AddressID, passphraseKey: passphraseKey,
+			passphrase: calPass, passphraseID: b.Passphrase.ID,
 		}, nil
 	})
 }

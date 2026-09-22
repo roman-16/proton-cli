@@ -241,8 +241,26 @@ var examples = map[string][]string{
 		"proton calendar settings calendars update Personal --busy off",
 	},
 	"proton calendar settings calendars delete": {"proton calendar settings calendars delete Work"},
-	"proton calendar settings get":              {"proton calendar settings get"},
-	"proton calendar settings list":             {"proton calendar settings list"},
+	"proton calendar settings links create": {
+		"proton calendar settings links create Work",
+		"proton calendar settings links create Work --access full --name 'Team feed'",
+	},
+	"proton calendar settings links get": {
+		"proton calendar settings links get 'Team feed'",
+	},
+	"proton calendar settings links list": {
+		"proton calendar settings links list",
+		"proton calendar settings links list --calendar Work",
+	},
+	"proton calendar settings links update": {
+		"proton calendar settings links update 'Team feed' --name 'Team, read-only'",
+		"proton calendar settings links update 'Team feed' --clear-name",
+	},
+	"proton calendar settings links revoke": {
+		"proton calendar settings links revoke 'Team feed'",
+	},
+	"proton calendar settings get":  {"proton calendar settings get"},
+	"proton calendar settings list": {"proton calendar settings list"},
 	"proton calendar settings set": {
 		"proton calendar settings set view week",
 		"proton calendar settings set primary-timezone Europe/Vienna",

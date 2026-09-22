@@ -265,6 +265,26 @@ proton calendar invitations accept Work
 
 Until you accept, you see the calendar's name and who sent it, and nothing that is on it.
 
+### Publish a calendar as a link
+
+```bash
+proton calendar settings links create Work --name 'Team feed'
+proton calendar settings links create Work --access full --name 'Team feed'
+proton calendar settings links list
+proton calendar settings links get 'Team feed'
+proton calendar settings links revoke 'Team feed'
+```
+
+A link is an `.ics` feed that any calendar app can follow, and it stays up to date. **Anyone holding the URL can open it**, with no Proton account.
+
+`--access limited`, the default, shows only whether you are busy. `--access full` shows every detail of every event, and Proton reads them to serve the feed.
+
+The URL is shown when the link is made and by `links get`, never in a listing. `--name` is yours alone, and whoever follows the link never sees it.
+
+A calendar carries at most five links. What a link shows cannot be changed afterwards: revoke it and publish another.
+
+On another account, follow one the way you would any published calendar - see [Subscribe to a published calendar](#subscribe-to-a-published-calendar).
+
 ## Settings
 
 ```bash

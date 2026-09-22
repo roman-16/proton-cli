@@ -13,6 +13,7 @@ Signing in runs [Secure Remote Password](https://en.wikipedia.org/wiki/Secure_Re
 - The verifier for a Pass extra password you set, which Proton checks a password against and cannot read one out of.
 - When you change a password or set a recovery phrase: the same kind of verifier for the new secret, and your keys locked again with it. The secret itself does not leave, and the keys are the ones you already had.
 - Opening a public link with `--link` or `--shared` carries your session, so Proton knows which account opened it, and the owner sees one more visit.
+- The key that opens a calendar you publish with `calendar settings links create --access full`. It travels in the link, and Proton reads those events to serve the feed. A limited link carries no such key.
 - Once a day, on an install no package manager owns, a request to GitHub asking which release is newest. It carries nothing about you or your account, and `PROTON_NO_UPDATE_CHECK` ends it ([Updating](../install.md#updating)).
 
 **What never leaves:** your password, your second password if you have one, your Pass extra password, your key password, and an unlocked private key.

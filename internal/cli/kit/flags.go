@@ -63,6 +63,7 @@ var Flags = map[string]Flag{
 	"cc":                     {Means: "a carbon-copy recipient"},
 	"city":                   {Means: "a city"},
 	"clear-link-password":    {Means: "take the password off a public link"},
+	"clear-name":             {Means: "remove the name"},
 	"clear-signature":        {Means: "remove the signature"},
 	"code":                   {Means: "the code Proton sent to an address or a phone"},
 	"color":                  {Means: "the colour to set, by name"},

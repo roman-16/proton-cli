@@ -123,7 +123,7 @@ func settingsCmd() *cobra.Command {
 			},
 		})
 	})
-	c.AddCommand(calendarsCmd())
+	c.AddCommand(calendarsCmd(), linksCmd())
 	return c
 }
 

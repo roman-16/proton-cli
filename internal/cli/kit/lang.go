@@ -116,7 +116,7 @@ var Verbs = map[string]string{
 	// Session
 	"login":  "authenticate and save a session",
 	"logout": "discard a saved session",
-	"revoke": "invalidate a session server-side",
+	"revoke": "stop something handed out working: a session, a public link",
 
 	// The tool itself
 	"changelog":  "print what each release changed",
@@ -224,6 +224,7 @@ var SettingsPages = map[string]string{
 	"account settings security-keys":   "Account and password",
 	"account settings two-factor":      "Account and password",
 	"calendar settings calendars":      "Calendars",
+	"calendar settings links":          "Calendars",
 	"mail settings addresses":          "Identity and addresses",
 	"mail settings autoreply":          "Forward and auto-reply",
 	"mail settings domains":            "Domain names",

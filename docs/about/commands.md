@@ -76,6 +76,11 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton calendar settings calendars share update`](../calendar/settings.md#calendars-share-update) | Change what somebody may do with a calendar |
 | [`proton calendar settings calendars update`](../calendar/settings.md#calendars-update) | Rename or recolor a calendar, or change what it gives new events |
 | [`proton calendar settings get`](../calendar/settings.md#get) | Show the calendar settings now in effect |
+| [`proton calendar settings links create`](../calendar/settings.md#links-create) | Publish a calendar as a link anyone can follow |
+| [`proton calendar settings links get`](../calendar/settings.md#links-get) | Show one link, URL and all |
+| [`proton calendar settings links list`](../calendar/settings.md#links-list) | List the links you have published |
+| [`proton calendar settings links revoke`](../calendar/settings.md#links-revoke) | Stop a link working |
+| [`proton calendar settings links update`](../calendar/settings.md#links-update) | Rename a link |
 | [`proton calendar settings list`](../calendar/settings.md#list) | List the calendar settings that can be changed |
 | [`proton calendar settings set`](../calendar/settings.md#set) | Change one calendar setting |
 | [`proton contacts create`](../contacts/contacts.md#create) | Create a contact |

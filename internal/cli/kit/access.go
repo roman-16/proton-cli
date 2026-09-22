@@ -17,6 +17,10 @@ const (
 	Viewer = "viewer"
 	// Editor may change it.
 	Editor = "editor"
+	// Limited sees only whether the calendar's owner is busy.
+	Limited = "limited"
+	// Full sees every detail of every event.
+	Full = "full"
 )
 
 // AccessUsage is the one thing --access says, wherever it appears.
@@ -30,6 +34,13 @@ func AccessFlag(values ...string) *Enum {
 // Viewing declares --access for a thing that is either read or changed, which
 // is what Drive and Calendar offer.
 func Viewing() *Enum { return AccessFlag(Viewer, Editor) }
+
+// Watching declares --access for a published calendar, where nobody edits and
+// the question is how much of it is shown. It opens on the narrower answer,
+// which is the one that gives least away.
+func Watching() *Enum {
+	return &Enum{Name: "access", Usage: AccessUsage, Values: []string{Limited, Full}, Default: Limited}
+}
 
 // CanEdit reads the chosen rung as the boolean Drive and Calendar store.
 func CanEdit(e *Enum) (bool, error) {

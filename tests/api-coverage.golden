@@ -2,6 +2,7 @@ DELETE /account/v4/personal-access-token/{id}
 DELETE /calendar/v1/{id}
 DELETE /calendar/v1/{id}/invitations/{id}
 DELETE /calendar/v1/{id}/members/{id}
+DELETE /calendar/v1/{id}/urls/{id}
 DELETE /core/v4/labels
 DELETE /core/v4/labels/{id}
 DELETE /domains/{id}
@@ -47,6 +48,7 @@ GET /calendar/v1/{id}/members/all
 GET /calendar/v1/{id}/modelevents/latest
 GET /calendar/v1/{id}/modelevents/{id}
 GET /calendar/v1/{id}/settings
+GET /calendar/v1/{id}/urls
 GET /calendar/v2/{id}/bootstrap
 GET /contacts/v4/contacts/emails
 GET /contacts/v4/contacts/export
@@ -144,6 +146,7 @@ POST /calendar/v1
 POST /calendar/v1/subscription/validate
 POST /calendar/v1/{id}/keys
 POST /calendar/v1/{id}/members
+POST /calendar/v1/{id}/urls
 POST /contacts/v4/contacts
 POST /core/v4/auth/info
 POST /core/v4/keys/address
@@ -224,6 +227,7 @@ PUT /calendar/v1/{id}/invitations/{id}/reject
 PUT /calendar/v1/{id}/members/{id}
 PUT /calendar/v1/{id}/members/{id}/permission
 PUT /calendar/v1/{id}/settings
+PUT /calendar/v1/{id}/urls/{id}
 PUT /contacts/v4/contacts/delete
 PUT /contacts/v4/contacts/emails/label
 PUT /contacts/v4/contacts/emails/unlabel
