@@ -2,8 +2,11 @@ package live
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"testing"
+
+	"github.com/roman-16/proton-cli/tests/account"
 )
 
 // Labels and folders, which Proton stores as one thing and this CLI keeps apart
@@ -133,21 +136,175 @@ func TestMailFoldersNestedReportsParent(t *testing.T) {
 	cleanupRun(t, fmt.Sprintf("Delete parent folder: proton mail settings folders delete %s", parentID),
 		"mail", "settings", "folders", "delete", "--", parentID)
 
+	// The parent is named rather than given as an ID, which is what every
+	// reference into another collection accepts.
 	childName := testID() + "-child"
-	childID := strings.TrimSpace(runOK(t, "mail", "settings", "folders", "create", "--name", childName, "--parent", parentID, "--color", "#8080FF"))
+	childID := strings.TrimSpace(runOK(t, "mail", "settings", "folders", "create", "--name", childName, "--parent", parentName, "--color", "#8080FF"))
 	cleanupRun(t, fmt.Sprintf("Delete child folder: proton mail settings folders delete %s", childID),
 		"mail", "settings", "folders", "delete", "--", childID)
 
-	data := runJSON(t, "api", "GET", "/core/v4/labels", "--query", "Type=3")
-	labels, _ := data["Labels"].([]interface{})
-	var gotParent string
-	for _, l := range labels {
-		m := l.(map[string]interface{})
-		if m["Name"] == childName {
-			gotParent, _ = m["ParentID"].(string)
+	if got := folderParent(t, childName); got != parentID {
+		t.Errorf("child folder parent = %q, want %q", got, parentID)
+	}
+
+	// A folder leaves the one that held it, which nothing but naming no parent
+	// at all can express.
+	runOK(t, "mail", "settings", "folders", "update", "--parent", "none", childID)
+	if got := folderParent(t, childName); got != "" {
+		t.Errorf("a folder moved to the top level reports parent %q", got)
+	}
+}
+
+// Naming folders puts them in front of the folders they sit beside, and the
+// listing is where that shows.
+//
+// A free account keeps three folders and one of them is the fixture's, so two
+// is the whole of what this may make.
+func TestMailFoldersReorder(t *testing.T) {
+	second := testID() + "-b"
+	secondID := strings.TrimSpace(runOK(t, "mail", "settings", "folders", "create",
+		"--name", second, "--color", "#8080FF"))
+	cleanupRun(t, fmt.Sprintf("Delete folder: proton mail settings folders delete %s", secondID),
+		"mail", "settings", "folders", "delete", "--", secondID)
+
+	first := testID() + "-a"
+	firstID := strings.TrimSpace(runOK(t, "mail", "settings", "folders", "create",
+		"--name", first, "--color", "#8080FF"))
+	cleanupRun(t, fmt.Sprintf("Delete folder: proton mail settings folders delete %s", firstID),
+		"mail", "settings", "folders", "delete", "--", firstID)
+
+	runOK(t, "mail", "settings", "folders", "reorder", first, second)
+	got := folderOrder(t, "")
+	if len(got) < 2 || got[0] != first || got[1] != second {
+		t.Errorf("the folders are in the order %v, want %q and %q in front", got, first, second)
+	}
+}
+
+// A folder inside another is ordered among that folder's own children, which is
+// a list of its own.
+//
+// The pair goes inside the fixture's folder, which is what leaves room for both
+// of them: three folders is the whole of what a free account keeps.
+func TestMailFoldersReorderInsideAFolder(t *testing.T) {
+	parent := pinned(t, account.Primary, "folder", "Projects")
+	parentName, _ := parent["name"].(string)
+	parentID, _ := parent["id"].(string)
+
+	var children []string
+	for _, suffix := range []string{"-b", "-a"} {
+		name := testID() + suffix
+		id := strings.TrimSpace(runOK(t, "mail", "settings", "folders", "create",
+			"--name", name, "--parent", parentName, "--color", "#8080FF"))
+		cleanupRun(t, fmt.Sprintf("Delete folder: proton mail settings folders delete %s", id),
+			"mail", "settings", "folders", "delete", "--", id)
+		children = append(children, name)
+	}
+
+	runOK(t, "mail", "settings", "folders", "reorder", children[1])
+	want := []string{children[1], children[0]}
+	if got := folderOrder(t, parentID); !equalStrings(got, want) {
+		t.Errorf("what is inside the folder reads %v, want %v", got, want)
+	}
+
+	// A listing shows each folder before what is inside it.
+	var seen []string
+	for _, row := range runJSONArray(t, "mail", "settings", "folders", "list") {
+		m := row.(map[string]interface{})
+		if m["name"] == parentName || parentOf(m) == parentID {
+			seen = append(seen, fmt.Sprint(m["name"]))
 		}
 	}
-	if gotParent != parentID {
-		t.Errorf("child folder ParentID = %q, want %q", gotParent, parentID)
+	if !equalStrings(seen, append([]string{parentName}, want...)) {
+		t.Errorf("the listing reads %v, want the folder ahead of what is inside it", seen)
 	}
+}
+
+// Labels are one list, and --alphabetical is the whole of it sorted by name.
+//
+// A free account keeps three labels and one of them is the fixture's, so two is
+// the whole of what this may make.
+func TestMailLabelsReorder(t *testing.T) {
+	var names []string
+	for _, suffix := range []string{"-b", "-a"} {
+		name := testID() + suffix
+		id := strings.TrimSpace(runOK(t, "mail", "settings", "labels", "create",
+			"--name", name, "--color", "#8080FF"))
+		cleanupRun(t, fmt.Sprintf("Delete label: proton mail settings labels delete %s", id),
+			"mail", "settings", "labels", "delete", "--", id)
+		names = append(names, name)
+	}
+
+	runOK(t, "mail", "settings", "labels", "reorder", names[1])
+	if got := labelOrder(t)[0]; got != names[1] {
+		t.Errorf("the first label is %q, want %q", got, names[1])
+	}
+
+	runOK(t, "mail", "settings", "labels", "reorder", "--alphabetical")
+	got := labelOrder(t)
+	sorted := append([]string(nil), got...)
+	sort.SliceStable(sorted, func(i, j int) bool {
+		return strings.ToLower(sorted[i]) < strings.ToLower(sorted[j])
+	})
+	if !equalStrings(got, sorted) {
+		t.Errorf("the labels are in the order %v, which is not alphabetical", got)
+	}
+}
+
+// folderOrder is what one folder holds, in the order the account keeps it. The
+// top level is a folder like any other here, named by the empty parent.
+func folderOrder(t *testing.T, parentID string) []string {
+	t.Helper()
+	return folderNames(runJSONArray(t, "mail", "settings", "folders", "list"), parentID)
+}
+
+func folderNames(rows []interface{}, parentID string) []string {
+	var out []string
+	for _, row := range rows {
+		if m := row.(map[string]interface{}); parentOf(m) == parentID {
+			out = append(out, fmt.Sprint(m["name"]))
+		}
+	}
+	return out
+}
+
+// parentOf is the folder a row sits in, and "" for one at the top level, which
+// reports no parent at all.
+func parentOf(row map[string]interface{}) string {
+	if v, ok := row["parent"]; ok {
+		return fmt.Sprint(v)
+	}
+	return ""
+}
+
+func labelOrder(t *testing.T) []string {
+	t.Helper()
+	var out []string
+	for _, row := range runJSONArray(t, "mail", "settings", "labels", "list") {
+		out = append(out, fmt.Sprint(row.(map[string]interface{})["name"]))
+	}
+	return out
+}
+
+// folderParent is where the listing says one folder sits.
+func folderParent(t *testing.T, name string) string {
+	t.Helper()
+	for _, row := range runJSONArray(t, "mail", "settings", "folders", "list") {
+		if m := row.(map[string]interface{}); m["name"] == name {
+			return parentOf(m)
+		}
+	}
+	t.Fatalf("folder %q is not in the list", name)
+	return ""
+}
+
+func equalStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }

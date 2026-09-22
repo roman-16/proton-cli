@@ -775,6 +775,10 @@ var examples = map[string][]string{
 		"proton mail settings labels update Work --name Office",
 		"proton mail settings labels update Work --color enzian",
 	},
+	"proton mail settings labels reorder": {
+		"proton mail settings labels reorder Work",
+		"proton mail settings labels reorder --alphabetical",
+	},
 	"proton mail settings labels delete": {"proton mail settings labels delete Work"},
 	"proton mail settings folders list":  {"proton mail settings folders list"},
 	"proton mail settings folders create": {
@@ -784,7 +788,12 @@ var examples = map[string][]string{
 	},
 	"proton mail settings folders update": {
 		"proton mail settings folders update Receipts --name Invoices",
+		"proton mail settings folders update 2026 --parent none",
 		"proton mail settings folders update Receipts --notify",
+	},
+	"proton mail settings folders reorder": {
+		"proton mail settings folders reorder Receipts",
+		"proton mail settings folders reorder --alphabetical",
 	},
 	"proton mail settings folders delete": {"proton mail settings folders delete Receipts"},
 	"proton mail settings addresses list": {"proton mail settings addresses list"},

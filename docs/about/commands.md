@@ -265,7 +265,8 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton mail settings folders create`](../mail/settings.md#folders-create) | Create a folder |
 | [`proton mail settings folders delete`](../mail/settings.md#folders-delete) | Delete folders |
 | [`proton mail settings folders list`](../mail/settings.md#folders-list) | List your folders |
-| [`proton mail settings folders update`](../mail/settings.md#folders-update) | Rename or recolor a folder |
+| [`proton mail settings folders reorder`](../mail/settings.md#folders-reorder) | Set the order your folders are kept in |
+| [`proton mail settings folders update`](../mail/settings.md#folders-update) | Rename a folder, recolor it, or move it |
 | [`proton mail settings forwarding accept`](../mail/settings.md#forwarding-accept) | Accept forwardings sent to you |
 | [`proton mail settings forwarding create`](../mail/settings.md#forwarding-create) | Forward one of your addresses to another address |
 | [`proton mail settings forwarding decline`](../mail/settings.md#forwarding-decline) | Decline forwardings sent to you |
@@ -286,6 +287,7 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton mail settings labels create`](../mail/settings.md#labels-create) | Create a label |
 | [`proton mail settings labels delete`](../mail/settings.md#labels-delete) | Delete labels |
 | [`proton mail settings labels list`](../mail/settings.md#labels-list) | List your labels |
+| [`proton mail settings labels reorder`](../mail/settings.md#labels-reorder) | Set the order your labels are kept in |
 | [`proton mail settings labels update`](../mail/settings.md#labels-update) | Rename or recolor a label |
 | [`proton mail settings list`](../mail/settings.md#list) | List the mail settings that can be changed |
 | [`proton mail settings senders allow`](../mail/settings.md#senders-allow) | Always let someone reach the inbox |

@@ -45,6 +45,28 @@ func TestANameIsWithheldFromUnderAWrapping(t *testing.T) {
 	}
 }
 
+// A name is spelled the way its owner spelled it. Everything else opening a
+// message is a sentence and is capitalised to read as one.
+func TestAShownFailureSpellsANameTheWayItIsWritten(t *testing.T) {
+	for _, tc := range []struct {
+		err  error
+		want string
+	}{
+		{Naming("yaasa", Problemf("a reorder sets the order of folders that sit in the same folder.")),
+			"yaasa: A reorder sets the order of folders that sit in the same folder."},
+		{Naming("bank login", errors.New("unsupported item type")),
+			"bank login: Unsupported item type."},
+		{Naming("GitHub", Problemf("%s carries no two-factor secret.", "GitHub")),
+			"GitHub carries no two-factor secret."},
+		{errors.New("no key"), "No key."},
+		{nil, ""},
+	} {
+		if got := Shown(tc.err); got != tc.want {
+			t.Errorf("the reader is shown %q, want %q", got, tc.want)
+		}
+	}
+}
+
 func TestWithheldLeavesAnOrdinaryFailureAlone(t *testing.T) {
 	if got := Withheld(errors.New("no key")); got != "no key" {
 		t.Errorf("rewrote a failure carrying no name: %q", got)

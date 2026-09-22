@@ -247,6 +247,7 @@ PUT /core/v4/addresses/{id}/disable
 PUT /core/v4/addresses/{id}/enable
 PUT /core/v4/addresses/{id}/encryption
 PUT /core/v4/keys/private
+PUT /core/v4/labels/order
 PUT /core/v4/labels/{id}
 PUT /core/v4/settings/2fa/totp
 PUT /core/v4/settings/email

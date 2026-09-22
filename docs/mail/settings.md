@@ -537,7 +537,7 @@ proton mail settings filters update Receipts --sieve ./receipts.sieve
 
 Folders, which a message lives in.
 
-Holds `create`, `delete`, `list` and `update`.
+Holds `create`, `delete`, `list`, `reorder` and `update`.
 
 ### `folders create`
 
@@ -558,7 +558,7 @@ proton mail settings folders create --name Receipts --notify=false
 | `--color string` | Accent color, by name (purple) or hex (#8080FF) (default `#8080FF`) |
 | `--name string` | Name for the new folder |
 | `--notify` | Tell you when mail arrives here (default `true`) |
-| `--parent string` | Put it inside this folder, by ID |
+| `--parent string` | Put it inside this folder |
 
 ### `folders delete`
 
@@ -589,9 +589,32 @@ proton mail settings folders list
 | `--limit int` | How many folders per page; 0 for all of them |
 | `--page int` | Which page of results, counting from zero |
 
+### `folders reorder`
+
+Set the order your folders are kept in.
+
+Name the folders that should come first, in order; the rest keep the order they are in. --alphabetical sorts them all instead.
+
+A folder is ordered among the folders it sits beside, so name folders from one place at a time. --alphabetical covers every level.
+
+```
+proton mail settings folders reorder [REF...]
+```
+
+```bash
+proton mail settings folders reorder Receipts
+proton mail settings folders reorder --alphabetical
+```
+
+| Flag | Description |
+| --- | --- |
+| `--alphabetical` | Sort them all alphabetically instead of naming any |
+
 ### `folders update`
 
-Rename or recolor a folder.
+Rename a folder, recolor it, or move it.
+
+--parent takes the folder to put it inside, or none to bring it back to the top level. --notify says whether mail landing here is worth telling you about.
 
 ```
 proton mail settings folders update REF
@@ -599,6 +622,7 @@ proton mail settings folders update REF
 
 ```bash
 proton mail settings folders update Receipts --name Invoices
+proton mail settings folders update 2026 --parent none
 proton mail settings folders update Receipts --notify
 ```
 
@@ -607,7 +631,7 @@ proton mail settings folders update Receipts --notify
 | `--color string` | New accent color, by name (purple) or hex (#8080FF) |
 | `--name string` | New name |
 | `--notify` | Tell you when mail arrives here (default `true`) |
-| `--parent string` | Move it inside this folder, by ID |
+| `--parent string` | Move it inside this folder, or none for the top level |
 
 ## `forwarding`
 
@@ -936,7 +960,7 @@ proton mail settings imports undo jane@fastmail.com
 
 Labels, which a message carries.
 
-Holds `create`, `delete`, `list` and `update`.
+Holds `create`, `delete`, `list`, `reorder` and `update`.
 
 ### `labels create`
 
@@ -984,6 +1008,25 @@ proton mail settings labels list
 | --- | --- |
 | `--limit int` | How many labels per page; 0 for all of them |
 | `--page int` | Which page of results, counting from zero |
+
+### `labels reorder`
+
+Set the order your labels are kept in.
+
+Name the labels that should come first, in order; the rest keep the order they are in. --alphabetical sorts them all instead.
+
+```
+proton mail settings labels reorder [REF...]
+```
+
+```bash
+proton mail settings labels reorder Work
+proton mail settings labels reorder --alphabetical
+```
+
+| Flag | Description |
+| --- | --- |
+| `--alphabetical` | Sort them all alphabetically instead of naming any |
 
 ### `labels update`
 

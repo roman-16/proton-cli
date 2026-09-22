@@ -127,6 +127,17 @@ func TestContradictoryFlagsAreRefused(t *testing.T) {
 	refuses(t, 1, []string{"account", "sessions", "revoke", "--others", "some-uid"}, "--others")
 }
 
+// An order is named or it is alphabetical, and a command line that asks for
+// both, or for neither, says nothing about what the order should be.
+func TestAReorderAsksForOneOrderOrTheOther(t *testing.T) {
+	for _, noun := range []string{"folders", "labels"} {
+		refuses(t, 1, []string{"mail", "settings", noun, "reorder", "--alphabetical", "Work"},
+			"not both")
+		refuses(t, 1, []string{"mail", "settings", noun, "reorder"},
+			"Nothing to reorder", "--alphabetical")
+	}
+}
+
 // A page nobody could serve is wrong wherever it is typed, and every listing
 // judges it the same way - the flags are one declaration rather than a habit
 // each command picked up.

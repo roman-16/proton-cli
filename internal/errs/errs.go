@@ -258,6 +258,32 @@ func Naming(name string, err error) error {
 	return &Private{Name: name, Err: err}
 }
 
+// Shown is an error as the person whose account it is should read it: a
+// sentence, opening with their own name for the thing where one is attached and
+// spelled the way they spelled it.
+//
+// A message is capitalised to open a sentence, and a name is not a sentence: a
+// folder called "yaasa" is called that, and "Yaasa" is a different word for a
+// thing they would have to go and look for. Only the error knows that its first
+// word came out of the account, which is why this reads the error rather than
+// the string it renders to.
+func Shown(err error) string {
+	if err == nil {
+		return ""
+	}
+	msg := err.Error()
+	for e := err; e != nil; e = errors.Unwrap(e) {
+		p, ok := e.(*Private)
+		if !ok || p.Name == "" {
+			continue
+		}
+		if rest, named := strings.CutPrefix(msg, p.Name+": "); named {
+			return p.Name + ": " + Sentence(rest)
+		}
+	}
+	return Sentence(msg)
+}
+
 // Withheld is an error as a reader who is not the account's owner may have it:
 // what went wrong, with every name out of the account standing aside.
 //

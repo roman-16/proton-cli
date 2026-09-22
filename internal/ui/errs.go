@@ -26,7 +26,7 @@ func WriteError(w io.Writer, err error, style Style, short bool) {
 	if err == nil {
 		return
 	}
-	_, _ = fmt.Fprintf(w, "%s %s\n", style.Paint(Danger, "Error:"), errs.Sentence(err.Error()))
+	_, _ = fmt.Fprintf(w, "%s %s\n", style.Paint(Danger, "Error:"), errs.Shown(err))
 
 	hints := remedies(err, short)
 	if len(hints) == 0 {

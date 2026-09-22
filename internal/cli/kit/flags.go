@@ -47,6 +47,7 @@ var Flags = map[string]Flag{
 	"album":                  {Means: "the photo album to act in", Picks: "drive photos albums"},
 	"all":                    {Means: "act on everything in the command's scope, rather than a subset"},
 	"all-day":                {Means: "an event with no time of day"},
+	"alphabetical":           {Means: "sort them all alphabetically instead of naming any"},
 	"anniversary":            {Means: "a date being commemorated"},
 	"answer":                 {Means: "a reply to an invitation"},
 	"attach":                 {Means: "a file to attach"},

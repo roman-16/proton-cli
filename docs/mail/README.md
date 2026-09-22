@@ -355,14 +355,27 @@ Each JSON line names the thread in `conversation_id`, so a consumer can act on t
 
 ```bash
 proton mail settings folders create --name Projects
-proton mail settings folders create --name Clients --parent PARENT_FOLDER_ID
+proton mail settings folders create --name Clients --parent Projects
 proton mail settings labels create --name Important --color "#8080FF"
 proton mail settings labels delete Important        # by name, or by ID
 ```
 
 Colours have to be one of Proton's 20 accent colours. An invalid one prints the palette and is refused before anything is sent.
 
+A folder goes inside another with `--parent`, which takes the folder's name, short ID or ID. `--parent none` brings it back to the top level.
+
 Deleting a folder or label asks first. The messages it held are not deleted.
+
+### Order
+
+`folders list` and `labels list` show them in the order Proton keeps them, which is the order every Proton client shows.
+
+```bash
+proton mail settings folders reorder Projects        # put it first
+proton mail settings labels reorder --alphabetical   # sort them all
+```
+
+`reorder` moves the ones you name to the front, in the order you name them, and the rest keep the order they are in. A folder is ordered among the folders it sits beside, so name folders from one place at a time; `--alphabetical` covers every level.
 
 Folders carry a **NOTIFY** switch, which is whether mail landing there is worth telling you about. It shows in `folders list`, `--notify` sets it, and it decides what `messages watch` covers by default. Labels have no such switch.
 
