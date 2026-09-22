@@ -101,6 +101,9 @@ GET /drive/volumes/{id}/events/latest
 GET /drive/volumes/{id}/events/{id}
 GET /drive/volumes/{id}/photos
 GET /drive/volumes/{id}/trash
+GET /importer/v1/importers
+GET /importer/v1/mail/importers/authinfo
+GET /importer/v1/reports
 GET /mail/v4/attachments/{id}
 GET /mail/v4/conversations
 GET /mail/v4/conversations/{id}

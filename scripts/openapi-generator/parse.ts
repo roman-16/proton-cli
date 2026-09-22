@@ -16,18 +16,23 @@ const SKIP_FILES = new Set([
   "docs.ts",
 ]);
 
+// Where the web clients declare their requests. Most of the API is in the shared
+// package; Easy Switch - importing mail, calendars and contacts from another
+// provider - is declared in its own package and nowhere else.
+const API_PACKAGES = ["packages/shared/lib", "packages/activation/src"];
+
 export function parseAll(
   webClientsDir: string,
   driveSdkDir: string
 ): { routes: Route[]; enums: Map<string, EnumInfo> } {
-  const sharedLib = path.join(webClientsDir, "packages/shared/lib");
-
   const project = new Project({
     tsConfigFilePath: path.join(webClientsDir, "tsconfig.base.json"),
     skipAddingFilesFromTsConfig: true,
   });
 
-  addFilesRecursive(project, sharedLib);
+  for (const pkg of API_PACKAGES) {
+    addFilesRecursive(project, path.join(webClientsDir, pkg));
+  }
 
   // Build the constant/enum registry from all source files
   for (const sf of project.getSourceFiles()) {
@@ -35,11 +40,14 @@ export function parseAll(
     collectEnums(sf);
   }
 
-  // Parse endpoints from api/ files only
+  // Parse endpoints from api/ files only. A test beside them asserts what a
+  // request is built from and declares the same literals, so it would be read
+  // as a second source for routes that are already there.
   const apiFiles = project
     .getSourceFiles()
     .filter((sf) => sf.getFilePath().includes("/api/") && !sf.getFilePath().includes("/helpers/"))
-    .filter((sf) => !SKIP_FILES.has(path.basename(sf.getFilePath())));
+    .filter((sf) => !SKIP_FILES.has(path.basename(sf.getFilePath())))
+    .filter((sf) => !sf.getFilePath().endsWith(".test.ts"));
 
   // A request is declared by the object a function returns, whether or not the
   // module lets anyone else call it: upstream keeps helpers behind exported

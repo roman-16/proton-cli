@@ -45,6 +45,7 @@ const (
 	LinkPasswordFileUsage  = "Read the public link's password from a file, or - for stdin"
 	ClearLinkPasswordUsage = "Remove the public link's password"
 	EOPasswordFileUsage    = "Read the password for recipients outside Proton from a file, or - for stdin"
+	IMAPPasswordFileUsage  = "Read the other mailbox's password from a file, or - for stdin"
 )
 
 // LinkPassword is what somebody must type to open a Drive public link, for the
@@ -81,6 +82,20 @@ func EOPassword() *Password {
 	return &Password{
 		name: "eo-password", label: "A password for recipients outside Proton", min: 8,
 		fileUsage: EOPasswordFileUsage,
+	}
+}
+
+// IMAPPassword is what opens a mailbox somewhere else, for the commands that
+// have Proton connect to one.
+//
+// It is the one secret here that is nobody's at Proton: it travels to Proton,
+// which holds it for as long as the import runs and connects outward with it.
+// Nothing bounds it, because what a valid one looks like is the other
+// provider's answer and not Proton's.
+func IMAPPassword() *Password {
+	return &Password{
+		name: "imap-password", label: "The other mailbox's password",
+		fileUsage: IMAPPasswordFileUsage,
 	}
 }
 

@@ -48,6 +48,11 @@ var Verbs = map[string]string{
 	"trash":   "remove reversibly",
 	"restore": "undo a removal",
 	"empty":   "remove everything from a trash",
+	"undo":    "take back everything a piece of work brought in",
+
+	// Work Proton carries out over time
+	"cancel": "stop work that is under way",
+	"resume": "set stopped work going again",
 
 	// Moving
 	"move": "put into another container",
@@ -145,6 +150,7 @@ var Verbs = map[string]string{
 // side of it.
 var Irreversible = map[string]bool{
 	"api": true, "delete": true, "empty": true, "leave": true, "uninstall": true,
+	"undo": true,
 }
 
 // Opaque marks a command whose effect the CLI models nothing of, and so the one
@@ -186,7 +192,8 @@ var Mutating = map[string]bool{
 	"api":    true,
 	"create": true, "update": true, "set": true, "delete": true, "trash": true,
 	"restore": true, "empty": true, "move": true, "copy": true, "upload": true,
-	"import": true, "merge": true,
+	"import": true, "merge": true, "undo": true,
+	"cancel": true, "resume": true,
 	"send": true, "reply": true, "forward": true, "unschedule": true,
 	"legitimate": true, "phishing": true,
 	"read": true, "unread": true, "label": true, "unlabel": true, "star": true,
@@ -233,6 +240,7 @@ var SettingsPages = map[string]string{
 	"mail settings filters":            "Filters",
 	"mail settings forwarding":         "Forward and auto-reply",
 	"mail settings folders":            "Folders and labels",
+	"mail settings imports":            "Import via Easy Switch",
 	"mail settings labels":             "Folders and labels",
 	"mail settings senders":            "Spam, block, and allow lists",
 	"mail settings smtp-tokens":        "IMAP/SMTP",

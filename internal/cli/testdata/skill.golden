@@ -69,6 +69,7 @@ These are the listings that can be narrowed, and what narrows them. The same fla
 - `proton mail settings filters list --limit int --page int`
 - `proton mail settings folders list --limit int --page int`
 - `proton mail settings forwarding list --desc --limit int --page int --sort string`
+- `proton mail settings imports list --desc --limit int --page int --sort string`
 - `proton mail settings labels list --limit int --page int`
 - `proton mail settings senders list --desc --limit int --page int --sort string`
 - `proton mail settings smtp-tokens list --desc --limit int --page int --sort string`
@@ -216,6 +217,7 @@ One line per group, with the verbs under it. Arguments, flags and examples are i
 - `proton mail settings filters` - Server-side Sieve filters: apply, create, delete, disable, enable, get, list, reorder, update
 - `proton mail settings folders` - Folders, which a message lives in: create, delete, list, update
 - `proton mail settings forwarding` - Mail forwarded to and from your addresses: accept, create, decline, delete, disable, enable, get, list, resend
+- `proton mail settings imports` - Mail brought in from another provider: cancel, create, delete, get, list, resume, undo
 - `proton mail settings labels` - Labels, which a message carries: create, delete, list, update
 - `proton mail settings senders` - Who always reaches the inbox, and who never does: allow, block, list, remove, spam
 - `proton mail settings smtp-tokens` - Tokens that let a device send from your address: create, delete, get, list

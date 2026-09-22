@@ -6,18 +6,35 @@ import (
 	"unicode"
 )
 
-// The list is Proton's own, so a passphrase made here is one Pass could have
-// made. It is the EFF long wordlist, less the word Proton leaves out.
+// The list is Pass's own, so a passphrase made here is one Pass could have made.
+// It is the EFF long wordlist as Proton ships it, less one word left out here.
 func TestTheWordlistIsProtons(t *testing.T) {
-	if len(Words) != 7775 {
-		t.Errorf("the wordlist holds %d words, want 7775", len(Words))
+	if len(Words) != 7774 {
+		t.Errorf("the wordlist holds %d words, want 7774", len(Words))
 	}
 	for _, w := range Words {
 		if w == "racism" {
-			t.Error("the wordlist holds a word Proton's own leaves out")
+			t.Error("the wordlist holds the word left out here")
 		}
 		if w != strings.ToLower(w) || strings.ContainsFunc(w, unicode.IsSpace) {
 			t.Errorf("%q is not a plain lowercase word", w)
+		}
+	}
+}
+
+// A separator is what tells one word from the next, so no word may carry one.
+//
+// The EFF list hyphenates four of its words, and a passphrase holding one reads
+// as more words than were asked for and splits into more than were asked for -
+// which is what anything counting them, a person included, would get wrong.
+func TestNoWordCarriesASeparator(t *testing.T) {
+	var separators strings.Builder
+	for _, s := range Separators {
+		separators.WriteString(s)
+	}
+	for _, w := range Words {
+		if i := strings.IndexAny(w, separators.String()); i >= 0 {
+			t.Errorf("%q carries %q, which is a separator", w, w[i:i+1])
 		}
 	}
 }

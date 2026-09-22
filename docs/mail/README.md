@@ -301,7 +301,7 @@ proton mail messages send --eml ./message.eml --to someone-else@proton.me
 
 Any flag you also pass overrides what the file says, and no signature is appended: the file is already a finished message.
 
-There is no way to place an old message into your archive.
+A file cannot be placed straight into your archive. Mail comes in from another mailbox instead - see [Bring mail over from another account](#bring-mail-over-from-another-account).
 
 ## Watch for new mail
 
@@ -526,6 +526,54 @@ proton mail settings addresses reorder alice@pm.me work@example.com alice@proton
 ```
 
 The first address is the default: `addresses list` shows it first, and mail leaves from it when no `--from` is given. Name the addresses that should come first, in order; the rest keep the order they are in. A disabled or external address, or one that cannot send or receive, cannot be the default.
+
+## Bring mail over from another account
+
+```bash
+proton mail settings imports create jane@fastmail.com --imap-password-file /run/secrets/fastmail
+proton mail settings imports list
+proton mail settings imports get jane@fastmail.com
+```
+
+`create` starts an import of another mailbox over IMAP and returns. The import carries on for as long as it takes, and `list` and `get` say how far it has got.
+
+**The other mailbox's password is sent to Proton**, which connects to the mailbox and keeps the password until the import is over. Most providers want an app password here rather than the one you sign in with. The password is read from a file, never a flag - `-` reads standard input.
+
+`--server` and `--port` are looked up from the address. Give them for a provider Proton does not know:
+
+```bash
+proton mail settings imports create jane@example.com --imap-password-file /run/secrets/mailbox \
+  --server imap.example.com --port 993
+```
+
+Every folder comes over. `--skip` leaves one out, and everything inside it, by name or by glob. `--after` and `--before` bound what is fetched by the day it arrived, and `--to` picks which of your addresses the mail belongs to:
+
+```bash
+proton mail settings imports create jane@fastmail.com --imap-password-file /run/secrets/fastmail \
+  --skip Spam --skip 'Archive/*' --after 2024-01-01 --to jane@proton.me
+```
+
+A folder that matches one of yours lands in it, the rest keep their own names, and Gmail's folders arrive as labels. Everything that arrives carries one label, named after the other mailbox unless `--label` says otherwise.
+
+```console
+$ proton mail settings imports get jane@fastmail.com
+Account:   jane@fastmail.com
+Via:       imap
+Server:    imap.fastmail.com:993
+State:     importing
+Messages:  2841/9302
+Started:   2026-04-15 09:12
+Folders:   INBOX → Inbox 1204
+           Archive → Archive 1637 of 6902
+           Sent → Sent 0 of 1196
+ID:        b3Kd91mQ
+```
+
+`cancel` stops an import that is running and keeps what already arrived. `resume` sets a stopped one going again, with `--imap-password-file` where the other mailbox refused the connection. A delayed import is waiting on the other provider and picks itself up.
+
+**`undo` removes everything an import brought in** - the messages, and the folders and labels made for them. Nothing brings them back; fetching the mailbox again is a new import. `delete` forgets the record and leaves the mail where it is.
+
+Imports started in Proton's own settings are listed here too, including from a Google or Microsoft account. Starting one of those needs a browser.
 
 ## Send from a printer or another service
 

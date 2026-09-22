@@ -437,9 +437,13 @@ func TestResultMachineDryRunIsFlagged(t *testing.T) {
 }
 
 // Only what cannot be taken back may be declared Forever, and both removals,
-// leaving a share and uninstalling have to be. This is the list the guard reads
-// at run time, so a wrong entry here is a `delete` that never asks or a `move`
-// that always does.
+// leaving a share, uninstalling and undoing an import have to be. This is the
+// list the guard reads at run time, so a wrong entry here is a `delete` that
+// never asks or a `move` that always does.
+//
+// Undoing an import belongs here for what it removes: Proton deletes every
+// message the import created, and nothing this CLI or Proton's own clients can
+// do puts them back - importing the mailbox again is a new import.
 func TestOnlyIrreversibleActionsAreForever(t *testing.T) {
 	forever := map[string]bool{}
 	for _, a := range Actions {
@@ -447,7 +451,9 @@ func TestOnlyIrreversibleActionsAreForever(t *testing.T) {
 			forever[a.Key] = true
 		}
 	}
-	want := map[string]bool{"deleted": true, "emptied": true, "left": true, "uninstalled": true}
+	want := map[string]bool{
+		"deleted": true, "emptied": true, "left": true, "uninstalled": true, "undone": true,
+	}
 	for key := range want {
 		if !forever[key] {
 			t.Errorf("%q cannot be undone and has to be Forever", key)

@@ -4,7 +4,7 @@ How Mail behaves.
 
 Every command under `proton mail settings`, with the arguments and flags it takes. For these commands in use, see [the mail guide](README.md).
 
-Holds `addresses`, `autoreply`, `domains`, `filters`, `folders`, `forwarding`, `get`, `labels`, `list`, `senders`, `set` and `smtp-tokens`.
+Holds `addresses`, `autoreply`, `domains`, `filters`, `folders`, `forwarding`, `get`, `imports`, `labels`, `list`, `senders`, `set` and `smtp-tokens`.
 
 ## `addresses`
 
@@ -778,6 +778,158 @@ proton mail settings get
 
 ```bash
 proton mail settings get
+```
+
+## `imports`
+
+Mail brought in from another provider.
+
+An import carries on after the command returns, for as long as it takes. `list` and `get` say how far it has got.
+
+Every import on the account is listed, including one of a Google or Microsoft account. Starting one of those needs a browser, so start it in Proton's own settings and follow it here.
+
+Holds `cancel`, `create`, `delete`, `get`, `list`, `resume` and `undo`.
+
+### `imports cancel`
+
+Stop an import that is running.
+
+What it has already brought over stays where it landed, and the import stays on the list as a record of what it did. `undo` removes the mail.
+
+An import reads as cancelling until it has stopped.
+
+```
+proton mail settings imports cancel REF...
+```
+
+```bash
+proton mail settings imports cancel jane@fastmail.com
+```
+
+### `imports create`
+
+Bring another mailbox in over IMAP.
+
+EMAIL is the mailbox to import from, and --imap-password-file is what opens it. That password is sent to Proton, which connects to the mailbox and keeps the password until the import is over. Most providers want an app password here rather than the one you sign in with.
+
+--server and --port are looked up from the address, and have to be given for a provider that is not known.
+
+Every folder is imported unless --skip leaves it out, which leaves out what is inside it too. A folder that matches one of yours lands in it and the rest keep their own names; Gmail's folders arrive as labels. Mail outside --after and --before is left behind, by the day it arrived.
+
+Everything that arrives carries one label, named after the other mailbox unless --label says otherwise.
+
+The import carries on after this returns. `get` says how far it has got, and `undo` takes back everything it brought in.
+
+```
+proton mail settings imports create EMAIL
+```
+
+```bash
+proton mail settings imports create jane@fastmail.com --imap-password-file /run/secrets/fastmail
+proton mail settings imports create jane@fastmail.com --imap-password-file - --to jane@proton.me
+proton mail settings imports create jane@fastmail.com --imap-password-file /run/secrets/fastmail --after 2024-01-01 --label Fastmail
+proton mail settings imports create jane@fastmail.com --imap-password-file /run/secrets/fastmail --skip Spam --skip 'Archive/*'
+proton mail settings imports create jane@example.com --imap-password-file /run/secrets/mailbox --server imap.example.com --port 993
+```
+
+| Flag | Description |
+| --- | --- |
+| `--after string` | First day to include (YYYY-MM-DD) |
+| `--allow-self-signed` | Accept a certificate Proton cannot verify |
+| `--before string` | Last day to include (YYYY-MM-DD) |
+| `--imap-password-file string` | Read the other mailbox's password from a file, or - for stdin |
+| `--label string` | Label to put on everything that arrives |
+| `--port int` | Port the IMAP server answers on |
+| `--server string` | IMAP server of the other mailbox |
+| `--skip stringArray` | Folder of the other mailbox to leave out, as a name or a glob (repeatable) |
+| `--to string` | Your address the imported mail belongs to |
+
+### `imports delete`
+
+Forget the record of a finished import.
+
+The mail it brought over stays where it is. What goes is the row: how much arrived, when, and the offer to undo it.
+
+```
+proton mail settings imports delete REF...
+```
+
+```bash
+proton mail settings imports delete jane@fastmail.com
+```
+
+### `imports get`
+
+Show one import, folder by folder.
+
+FOLDERS is each folder of the other mailbox, where its mail lands here, and how much of it has.
+
+An import that stopped says why. A delayed one is waiting on the other provider and picks itself up; a paused one needs `resume`.
+
+```
+proton mail settings imports get REF
+```
+
+```bash
+proton mail settings imports get jane@fastmail.com
+```
+
+### `imports list`
+
+List the imports on the account, newest first.
+
+MESSAGES counts what has arrived, against how many there are to fetch. SIZE is filled in once an import is over. VIA is how the other mailbox is reached: imap, google or outlook.
+
+```
+proton mail settings imports list
+```
+
+```bash
+proton mail settings imports list
+```
+
+| Flag | Description |
+| --- | --- |
+| `--desc` | Reverse the order |
+| `--limit int` | How many imports per page; 0 for all of them |
+| `--page int` | Which page of results, counting from zero |
+| `--sort string` | Order by: date, account, state, size (default `date`) |
+
+### `imports resume`
+
+Set a stopped import going again, from where it got to.
+
+One that stopped because the other mailbox refused the connection needs the password again, as --imap-password-file. One that stopped because this account is nearly full needs room made first.
+
+A delayed import needs nothing: it picks itself up.
+
+```
+proton mail settings imports resume REF
+```
+
+```bash
+proton mail settings imports resume jane@fastmail.com
+proton mail settings imports resume jane@fastmail.com --imap-password-file /run/secrets/fastmail
+```
+
+| Flag | Description |
+| --- | --- |
+| `--imap-password-file string` | Read the other mailbox's password from a file, or - for stdin |
+
+### `imports undo`
+
+Take back everything an import brought in.
+
+The messages it imported go, and so do the folders and labels it made for them. Nothing brings them back: the mail is still in the mailbox it came from, and fetching it again is a new import.
+
+Only a finished import can be taken back, and only for as long as it is offered.
+
+```
+proton mail settings imports undo REF...
+```
+
+```bash
+proton mail settings imports undo jane@fastmail.com
 ```
 
 ## `labels`

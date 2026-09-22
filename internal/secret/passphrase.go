@@ -9,8 +9,13 @@ import (
 // A passphrase is words rather than characters: something long enough to be
 // worth having and short enough to read out loud.
 //
-// The list is Proton's, which is the EFF long wordlist with the one word Pass
-// leaves out, so a passphrase made here is one Pass could have made.
+// The list is Pass's own, the EFF long wordlist as Proton ships it, less one
+// word nobody wants to find in their passphrase - so every word here is one Pass
+// could have picked.
+//
+// Every word is letters and nothing else. A separator is what tells one word
+// from the next, so a word carrying one would make a passphrase of five words
+// read as six.
 
 //go:embed wordlist.txt
 var wordlist string

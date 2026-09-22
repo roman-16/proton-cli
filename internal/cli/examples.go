@@ -868,6 +868,22 @@ var examples = map[string][]string{
 		"proton mail settings smtp-tokens create billing@example.com --name 'Office printer' --output json",
 	},
 	"proton mail settings smtp-tokens delete": {"proton mail settings smtp-tokens delete 'Office printer'"},
+	"proton mail settings imports list":       {"proton mail settings imports list"},
+	"proton mail settings imports get":        {"proton mail settings imports get jane@fastmail.com"},
+	"proton mail settings imports create": {
+		"proton mail settings imports create jane@fastmail.com --imap-password-file /run/secrets/fastmail",
+		"proton mail settings imports create jane@fastmail.com --imap-password-file - --to jane@proton.me",
+		"proton mail settings imports create jane@fastmail.com --imap-password-file /run/secrets/fastmail --after 2024-01-01 --label Fastmail",
+		"proton mail settings imports create jane@fastmail.com --imap-password-file /run/secrets/fastmail --skip Spam --skip 'Archive/*'",
+		"proton mail settings imports create jane@example.com --imap-password-file /run/secrets/mailbox --server imap.example.com --port 993",
+	},
+	"proton mail settings imports cancel": {"proton mail settings imports cancel jane@fastmail.com"},
+	"proton mail settings imports resume": {
+		"proton mail settings imports resume jane@fastmail.com",
+		"proton mail settings imports resume jane@fastmail.com --imap-password-file /run/secrets/fastmail",
+	},
+	"proton mail settings imports undo":   {"proton mail settings imports undo jane@fastmail.com"},
+	"proton mail settings imports delete": {"proton mail settings imports delete jane@fastmail.com"},
 
 	// ── pass ──
 	"proton pass vaults share add": {

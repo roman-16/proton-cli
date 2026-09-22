@@ -43,6 +43,7 @@ var Fields = map[string]Policy{
 	"reason":    Keep,   // one of a fixed set of words, declared where it is raised
 	"format":    Keep,   // an attestation statement format, from WebAuthn's closed set
 	"kind":      Keep,   // the singular noun for what a skip was about
+	"state":     Keep,   // a number Proton reports a state by, from its own closed set
 	"ref":       Handle, // the thing a skip was about, whatever kind it is
 	// which of the three ways a mailing list offered to be left, from a closed
 	// set - never the address or the link behind it

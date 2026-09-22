@@ -114,6 +114,26 @@ var unreachable = map[string]string{
 // chose to leave, so it is named here and reported on every run rather than
 // passing quietly. The list is something to shorten.
 var untested = map[string]string{
+	// Everything that starts an import and everything that acts on one running.
+	// Proton connects to the other mailbox itself, so reaching any of these needs
+	// a mailbox on an IMAP server outside Proton - and Proton Mail speaks no IMAP
+	// without Bridge, so no test account can be the source. A server a run could
+	// stand up locally is no use either: the connection is made from Proton's
+	// machines and not from this one.
+	//
+	// What is tested is the listing of imports, the listing of what they left
+	// behind, the server lookup a create does first, and every refusal settled
+	// before the network. The mapping a start sends is covered offline, against
+	// the folder shapes Proton documents.
+	"POST /importer/v1/importers":                     "needs a mailbox on an IMAP server outside Proton, which no test account has",
+	"GET /importer/v1/mail/importers/{id}":            "the same: only an importer that connected somewhere has folders to list",
+	"POST /importer/v1/importers/start":               "the same: there is nothing to start without one",
+	"PUT /importer/v1/importers/{id}":                 "the same: re-supplying credentials needs an importer holding some",
+	"PUT /importer/v1/importers/cancel":               "the same: only a running import can be stopped",
+	"PUT /importer/v1/importers/resume":               "the same: only a paused import can be picked up",
+	"POST /importer/v1/reports/{id}/undo":             "the same: only a finished import can be taken back",
+	"DELETE /importer/v1/mail/importers/reports/{id}": "the same: only a finished import leaves a record to forget",
+
 	// Both halves of confirming a mailbox. Proton meters everything under a
 	// mailbox's /verify the way a brute-force guard does, so a suite that spends
 	// a code attempt on every run fails on that quota rather than on anything

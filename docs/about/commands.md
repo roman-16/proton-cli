@@ -275,6 +275,13 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton mail settings forwarding list`](../mail/settings.md#forwarding-list) | List forwardings in both directions |
 | [`proton mail settings forwarding resend`](../mail/settings.md#forwarding-resend) | Ask the forwardee again |
 | [`proton mail settings get`](../mail/settings.md#get) | Show the mail settings now in effect |
+| [`proton mail settings imports cancel`](../mail/settings.md#imports-cancel) | Stop an import that is running |
+| [`proton mail settings imports create`](../mail/settings.md#imports-create) | Bring another mailbox in over IMAP |
+| [`proton mail settings imports delete`](../mail/settings.md#imports-delete) | Forget the record of a finished import |
+| [`proton mail settings imports get`](../mail/settings.md#imports-get) | Show one import, folder by folder |
+| [`proton mail settings imports list`](../mail/settings.md#imports-list) | List the imports on the account |
+| [`proton mail settings imports resume`](../mail/settings.md#imports-resume) | Set a stopped import going again |
+| [`proton mail settings imports undo`](../mail/settings.md#imports-undo) | Take back everything an import brought in |
 | [`proton mail settings labels create`](../mail/settings.md#labels-create) | Create a label |
 | [`proton mail settings labels delete`](../mail/settings.md#labels-delete) | Delete labels |
 | [`proton mail settings labels list`](../mail/settings.md#labels-list) | List your labels |
