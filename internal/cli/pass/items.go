@@ -75,6 +75,7 @@ func itemsMoveCmd() *cobra.Command {
 		}),
 	}
 	c.Flags().StringVar(&into, "into", "", "Which vault to put it in, by name or ID")
+	kit.Completes(c, "into", nil, "pass vaults")
 	return c
 }
 

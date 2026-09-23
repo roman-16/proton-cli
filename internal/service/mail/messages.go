@@ -84,10 +84,15 @@ func (s *Service) List(ctx context.Context, opts ListOptions) ([]Message, int, e
 func listQuery(opts ListOptions, recipients bool) url.Values {
 	folder := opts.Folder
 	if folder == "" {
-		folder = "inbox"
+		folder = labelInbox
 	}
 	q := url.Values{}
-	q.Set("LabelID", ResolveFolder(folder))
+	if isCategory(folder) {
+		q.Add("LabelID[]", labelInbox)
+		q.Add("LabelID[]", folder)
+	} else {
+		q.Set("LabelID", folder)
+	}
 	if opts.ID != "" {
 		q.Set("ID", opts.ID)
 	}
@@ -158,22 +163,19 @@ func sortField(key string) string {
 func starredOnly[T any](ctx context.Context, opts ListOptions,
 	list func(context.Context, ListOptions) ([]T, int, error), labels func(T) []string,
 ) ([]T, int, error) {
-	within := ""
-	if opts.Folder != "" {
-		within = ResolveFolder(opts.Folder)
-	}
+	within := opts.Folder
 	starred := opts
 	starred.Starred = false
-	starred.Folder = "starred"
+	starred.Folder = labelStarred
 	starred.Page, starred.PageSize = 0, 0
 	rows, _, err := list(ctx, starred)
 	if err != nil {
 		return nil, 0, err
 	}
-	if within != "" && within != labelAllMail && within != labelStarred {
+	if within != "" && within != labelStarred {
 		kept := make([]T, 0, len(rows))
 		for _, row := range rows {
-			if hasLabel(labels(row), within) {
+			if inPlace(labels(row), within) {
 				kept = append(kept, row)
 			}
 		}

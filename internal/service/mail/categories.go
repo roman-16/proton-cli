@@ -11,10 +11,6 @@ import (
 
 const labelTypeSystem = 4
 
-var categoryOrder = []string{
-	labelPrimary, labelSocial, labelPromotions, labelNewsletters, labelTransactions, labelUpdates,
-}
-
 type Category struct {
 	ID     string `json:"id"`
 	Name   string `json:"name"`
@@ -31,8 +27,6 @@ func IsPrimary(ref string) bool {
 	return ref == labelPrimary || strings.EqualFold(ref, "primary")
 }
 
-func isCategory(id string) bool { return slices.Contains(categoryOrder, id) }
-
 func (s *Service) Categories(ctx context.Context) ([]Category, error) {
 	var r struct{ Labels []rawLabel }
 	if err := s.C.Decode(ctx, proton.Request{
@@ -41,20 +35,16 @@ func (s *Service) Categories(ctx context.Context) ([]Category, error) {
 	}, &r); err != nil {
 		return nil, err
 	}
-	names := make(map[string]string, len(systemFolders))
-	for name, id := range systemFolders {
-		names[id] = name
-	}
-	out := make([]Category, 0, len(categoryOrder))
-	for _, id := range categoryOrder {
-		i := slices.IndexFunc(r.Labels, func(l rawLabel) bool { return l.ID == id })
-		if i < 0 {
+	out := make([]Category, 0, len(builtIns))
+	for _, b := range builtIns {
+		i := slices.IndexFunc(r.Labels, func(l rawLabel) bool { return l.ID == b.id })
+		if !b.tab || i < 0 {
 			continue
 		}
 		l := r.Labels[i]
 		shown := l.Display == 1
 		out = append(out, Category{
-			ID: id, Name: names[id], Shown: shown, Notify: shown && l.Notify == 1, stored: l,
+			ID: b.id, Name: b.name, Shown: shown, Notify: shown && l.Notify == 1, stored: l,
 		})
 	}
 	return out, nil

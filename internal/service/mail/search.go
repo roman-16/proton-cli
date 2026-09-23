@@ -152,9 +152,9 @@ func (x *indexSession) syncBeforeSearch(ctx context.Context) {
 // matching is every indexed message the filters describe.
 func matching(in []stored, opts ListOptions) []stored {
 	terms := search.Terms(opts.Keyword)
-	folder := ResolveFolder(opts.Folder)
-	if opts.Folder == "" {
-		folder = ""
+	folder := opts.Folder
+	if folder == "" {
+		folder = labelInbox
 	}
 	after, before := bounds(opts)
 	now := time.Now().Unix()
@@ -162,7 +162,7 @@ func matching(in []stored, opts ListOptions) []stored {
 	for _, m := range in {
 		switch {
 		case m.Expires > 0 && m.Expires <= now:
-		case folder != "" && folder != labelAllMail && !hasLabel(m.Labels, folder):
+		case !inPlace(m.Labels, folder):
 		case opts.Unread && m.Unread == 0:
 		case opts.Read && m.Unread != 0:
 		case opts.Starred && !hasLabel(m.Labels, labelStarred):

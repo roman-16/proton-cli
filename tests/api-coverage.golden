@@ -111,6 +111,7 @@ GET /importer/v1/mail/importers/authinfo
 GET /importer/v1/reports
 GET /mail/v4/attachments/{id}
 GET /mail/v4/conversations
+GET /mail/v4/conversations/count
 GET /mail/v4/conversations/{id}
 GET /mail/v4/filters
 GET /mail/v4/filters/{id}
@@ -118,6 +119,7 @@ GET /mail/v4/forwardings/incoming
 GET /mail/v4/forwardings/outgoing
 GET /mail/v4/incomingdefaults
 GET /mail/v4/messages
+GET /mail/v4/messages/count
 GET /mail/v4/messages/{id}
 GET /mail/v4/newsletter-subscriptions
 GET /mail/v4/settings

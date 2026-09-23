@@ -327,3 +327,20 @@ func TestALinkPasswordIsNotAFlagValue(t *testing.T) {
 		"https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL", "--link-password", "hunter2"},
 		"Unknown flag: --link-password")
 }
+
+// Emptying clears a folder whole, so only the folders a person can clear in the
+// web are taken, and which those are is known from the name alone.
+func TestAFolderTheWebNeverEmptiesIsRefused(t *testing.T) {
+	for _, folder := range []string{"inbox", "drafts", "sent", "starred", "archive", "all", "scheduled", "social"} {
+		refuses(t, 1, []string{"mail", "messages", "empty", "--folder", folder}, "cannot be emptied")
+	}
+}
+
+// A built-in folder that mail cannot be moved into is refused by its name, and
+// starred is the label it is.
+func TestAMoveIntoAFolderThatTakesNoneIsRefused(t *testing.T) {
+	for _, folder := range []string{"drafts", "sent", "all", "scheduled", "snoozed"} {
+		refuses(t, 1, []string{"mail", "messages", "move", "--into", folder, "--unread"}, "cannot be moved into")
+	}
+	refuses(t, 3, []string{"mail", "messages", "move", "--into", "starred", "--unread"}, "is a label, not a folder")
+}

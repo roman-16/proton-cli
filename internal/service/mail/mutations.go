@@ -148,7 +148,7 @@ func (s *Service) ConversationsTrash(ctx context.Context, ids []string) error {
 func (s *Service) ConversationsDelete(ctx context.Context, ids []string, scopeLabelID string) error {
 	return s.C.Decode(ctx, proton.Request{
 		Method: "PUT", Path: "/mail/v4/conversations/delete",
-		Body: map[string]any{"IDs": ids, "LabelID": orAllMail(scopeLabelID)},
+		Body: map[string]any{"IDs": ids, "LabelID": scopeOf(scopeLabelID)},
 	}, nil)
 }
 
@@ -162,13 +162,16 @@ func (s *Service) ConversationsMarkRead(ctx context.Context, ids []string) error
 func (s *Service) ConversationsMarkUnread(ctx context.Context, ids []string, scopeLabelID string) error {
 	return s.C.Decode(ctx, proton.Request{
 		Method: "PUT", Path: "/mail/v4/conversations/unread",
-		Body: map[string]any{"IDs": ids, "LabelID": orAllMail(scopeLabelID)},
+		Body: map[string]any{"IDs": ids, "LabelID": scopeOf(scopeLabelID)},
 	}, nil)
 }
 
-func orAllMail(labelID string) string {
-	if labelID == "" {
+func scopeOf(labelID string) string {
+	switch {
+	case labelID == "":
 		return labelAllMail
+	case isCategory(labelID):
+		return labelInbox
 	}
 	return labelID
 }
@@ -183,7 +186,7 @@ func orAllMail(labelID string) string {
 // before it.
 func (s *Service) EmptyFolder(ctx context.Context, folder string) error {
 	q := url.Values{}
-	q.Set("LabelID", ResolveFolder(folder))
+	q.Set("LabelID", folder)
 	return s.C.Decode(ctx, proton.Request{
 		Method: "DELETE", Path: "/mail/v4/messages/empty", Query: q,
 		Transient: []proton.Refusal{mailboxBusy},

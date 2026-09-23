@@ -17,7 +17,7 @@ import (
 func messagesCmd() *cobra.Command {
 	c := &cobra.Command{Use: "messages", Short: "Individual messages"}
 	c.AddCommand(
-		listCmd(), watchCmd(), getCmd(), sendCmd(), replyCmd(), forwardCmd(), exportCmd(),
+		listCmd(), countCmd(false), watchCmd(), getCmd(), sendCmd(), replyCmd(), forwardCmd(), exportCmd(),
 		emptyCmd(), updateCmd(), unsubscribeCmd(), receiptCmd(),
 		moveCmd(), labelCmd(), unlabelCmd(), starCmd(), unstarCmd(), markCmd(),
 		trashCmd(), deleteCmd(), unscheduleCmd(), attachmentsCmd(),
@@ -45,7 +45,7 @@ func listCmd() *cobra.Command {
 			"own index, which lags a change by a few seconds and does not cover bodies,\n" +
 			"or through the copy `index create mail` builds, which does.\n\n" +
 			"Looks in the inbox unless told otherwise. Use --folder all to search\n" +
-			"everything.\n\n" +
+			"everything, or everything but spam and trash while almost-all-mail is on.\n\n" +
 			"Newest first, or largest first with --sort size; --desc reverses either.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			opts, err := f.list(c.Ctx, c)
@@ -280,7 +280,8 @@ func moveCmd() *cobra.Command {
 		Short: "Move messages to a folder",
 		Long: "Move messages to a folder.\n\n" +
 			"A message is in exactly one folder, so this takes it out of the one it was\n" +
-			"in. To tag it while leaving it where it is, use `label` instead.",
+			"in. To tag it while leaving it where it is, use `label` instead.\n\n" +
+			"--into takes inbox, archive, spam, trash, a tab or one of your own folders.",
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			dest, err := c.App.Mail.ResolveFolderTarget(c.Ctx, into)
 			if err != nil {
@@ -300,7 +301,7 @@ func moveCmd() *cobra.Command {
 	}
 	c.Flags().StringVar(&into, "into", "", "Destination folder, by name or ID")
 	_ = c.MarkFlagRequired("into")
-	registerFolderCompletion(c, "into")
+	completeMoveTargets(c)
 	f.register(c)
 	return c
 }
@@ -565,7 +566,7 @@ func scheduled(c *kit.Invocation, all bool) ([]string, []mailsvc.Message, error)
 		rows = append(rows, mailsvc.Message{ID: id})
 	}
 	if all {
-		msgs, _, err := c.App.Mail.List(c.Ctx, mailsvc.ListOptions{Folder: "scheduled"})
+		msgs, _, err := c.App.Mail.List(c.Ctx, mailsvc.ListOptions{Folder: mailsvc.ScheduledLabelID})
 		if err != nil {
 			return nil, nil, err
 		}
@@ -603,17 +604,11 @@ func registerFolder(c *cobra.Command, target *string, def, shown string) {
 		usage += " (default: " + shown + ")"
 	}
 	c.Flags().StringVar(target, "folder", def, usage)
-	registerFolderCompletion(c, "folder")
+	kit.Completes(c, "folder", mailsvc.SystemFolderNames())
 }
 
-// registerFolderCompletion offers the built-in folder names. A custom folder is
-// not offered because listing them would need a request, and completion that
-// pauses to authenticate is worse than completion that is incomplete.
-func registerFolderCompletion(c *cobra.Command, flag string) {
-	_ = c.RegisterFlagCompletionFunc(flag,
-		func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
-			return mailsvc.SystemFolderNames(), cobra.ShellCompDirectiveNoFileComp
-		})
+func completeMoveTargets(c *cobra.Command) {
+	kit.Completes(c, "into", mailsvc.MoveTargetNames(), "mail settings folders")
 }
 
 // addressOnlyHint explains an empty result that a different flag would have
@@ -656,13 +651,18 @@ func emptyCmd() *cobra.Command {
 		Short: "Delete everything in a folder, permanently",
 		Long: "Delete everything in a folder, permanently.\n\n" +
 			"Proton clears the folder without reporting what was in it, so nothing is\n" +
-			"listed first. This takes no filters and always asks for confirmation.",
+			"listed first. This takes no filters and always asks for confirmation.\n\n" +
+			"Only " + emptiableFolders() + " and your own folders and labels can be\n" +
+			"emptied.",
 		// Which folder to clear is on the command line or it is nowhere, so it is
 		// settled before the sign-in rather than after it.
 		RunE: kit.Run([]kit.Step{func(*kit.Invocation) error {
 			if folder == "" {
 				return kit.Fail("Which folder?").
 					Hint("--folder trash", "--folder spam")
+			}
+			if !mailsvc.Emptiable(folder) {
+				return notEmptiable(folder)
 			}
 			return nil
 		}}, func(c *kit.Invocation) error {
@@ -684,7 +684,19 @@ func emptyCmd() *cobra.Command {
 		}),
 	}
 	registerFolder(c, &folder, "", "")
+	kit.Completes(c, "folder", mailsvc.EmptiableFolderNames())
 	return c
+}
+
+func emptiableFolders() string { return strings.Join(mailsvc.EmptiableFolderNames(), ", ") }
+
+func notEmptiable(folder string) error {
+	try := kit.Program + " mail messages trash --folder " + folder + " --all"
+	if strings.EqualFold(strings.TrimSpace(folder), "scheduled") {
+		try = kit.Program + " mail messages unschedule --all"
+	}
+	return kit.Fail("%q cannot be emptied - only %s and your own folders and labels can.",
+		folder, emptiableFolders()).Hint(try)
 }
 
 // ── self-destructing messages ──

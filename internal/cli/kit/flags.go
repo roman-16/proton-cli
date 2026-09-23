@@ -31,12 +31,12 @@ type Flag struct {
 	// wording: "Set the postal address" on a create and "Replace the postal
 	// address" on the update beside it are one meaning.
 	Means string
-	// Picks is the collection whose things the value names, for the flags whose
-	// value is a reference. It is a command line, so completion asks the same
+	// Picks is every collection whose things the value names, for the flags whose
+	// value is a reference. Each is a command line, so completion asks the same
 	// cache an argument asks. It is empty for a value that names something this
 	// CLI does not hold - a local path, an address, a duration, a free word - and
 	// such a value is left to the shell or to the flag's own declared domain.
-	Picks string
+	Picks []string
 }
 
 // Flags is every flag name used by more than one command.
@@ -44,7 +44,7 @@ var Flags = map[string]Flag{
 	"access":                 {Means: "what somebody may do with a shared thing"},
 	"address":                {Means: "a postal or street address"},
 	"after":                  {Means: "the first day a selection includes"},
-	"album":                  {Means: "the photo album to act in", Picks: "drive photos albums"},
+	"album":                  {Means: "the photo album to act in", Picks: []string{"drive photos albums"}},
 	"all":                    {Means: "act on everything in the command's scope, rather than a subset"},
 	"all-day":                {Means: "an event with no time of day"},
 	"alphabetical":           {Means: "sort them all alphabetically instead of naming any"},
@@ -60,7 +60,7 @@ var Flags = map[string]Flag{
 	"birthday":               {Means: "a date of birth"},
 	"body":                   {Means: "the text a message carries"},
 	"body-only":              {Means: "emit only the body"},
-	"calendar":               {Means: "the calendar to act in", Picks: "calendar settings calendars"},
+	"calendar":               {Means: "the calendar to act in", Picks: []string{"calendar settings calendars"}},
 	"catch-all":              {Means: "where mail sent to a name the domain has not got arrives, or none"},
 	"cc":                     {Means: "a carbon-copy recipient"},
 	"city":                   {Means: "a city"},
@@ -70,7 +70,7 @@ var Flags = map[string]Flag{
 	"code":                   {Means: "the code Proton sent to an address or a phone"},
 	"color":                  {Means: "the colour to set, by name"},
 	"company":                {Means: "the company somebody works for"},
-	"computer":               {Means: "the computer whose files to act in", Picks: "drive computers"},
+	"computer":               {Means: "the computer whose files to act in", Picks: []string{"drive computers"}},
 	"country":                {Means: "a country"},
 	"county":                 {Means: "an administrative county"},
 	"days":                   {Means: "the days a schedule is active"},
@@ -98,7 +98,7 @@ var Flags = map[string]Flag{
 	"field":                  {Means: "a custom field, as NAME=VALUE"},
 	"first-name":             {Means: "a given name"},
 	"floor":                  {Means: "a floor within a building"},
-	"folder":                 {Means: "the mail location to look in", Picks: "mail settings folders"},
+	"folder":                 {Means: "the mail location to look in", Picks: []string{"mail settings folders", "mail settings labels"}},
 	"force":                  {Means: "overwrite what is already there"},
 	"format":                 {Means: "the file layout to write"},
 	"from":                   {Means: "the sender: compose sets it, a filter matches it"},
@@ -107,7 +107,7 @@ var Flags = map[string]Flag{
 	"generate-password":      {Means: "make the password rather than being given one"},
 	"has-attachments":        {Means: "select mail that carries attachments"},
 	"holder":                 {Means: "the name on a payment card"},
-	"holidays":               {Means: "the country whose public holidays a calendar holds", Picks: "calendar settings holidays"},
+	"holidays":               {Means: "the country whose public holidays a calendar holds", Picks: []string{"calendar settings holidays"}},
 	"html":                   {Means: "treat the text as HTML rather than escaping it"},
 	"icon":                   {Means: "the icon to set, by name"},
 	"if":                     {Means: "a condition matching mail must meet"},
@@ -119,7 +119,7 @@ var Flags = map[string]Flag{
 	"job-title":              {Means: "a job title"},
 	"key":                    {Means: "an armoured PGP key"},
 	"keyword":                {Means: "full-text search term"},
-	"label":                  {Means: "the label to attach or detach", Picks: "mail settings labels"},
+	"label":                  {Means: "the label to attach or detach", Picks: []string{"mail settings labels"}},
 	"language":               {Means: "a language"},
 	"larger-than":            {Means: "select files above a size"},
 	"last-name":              {Means: "a family name"},
@@ -130,7 +130,7 @@ var Flags = map[string]Flag{
 	"link-password-file":     {Means: "where to read a public link's password from; - is stdin"},
 	"linkedin":               {Means: "a LinkedIn handle"},
 	"location":               {Means: "where something is"},
-	"mailbox":                {Means: "where mail to an alias should arrive", Picks: "pass settings mailboxes"},
+	"mailbox":                {Means: "where mail to an alias should arrive", Picks: []string{"pass settings mailboxes"}},
 	"manager":                {Means: "the password manager that wrote a file being read in"},
 	"mark-read":              {Means: "mark matching mail as read"},
 	"match":                  {Means: "whether every condition must hold or any one of them"},
@@ -154,7 +154,7 @@ var Flags = map[string]Flag{
 	"organization":           {Means: "an organization name"},
 	"others":                 {Means: "act on every session but this one"},
 	"page":                   {Means: "which page of results"},
-	"parent":                 {Means: "the containing folder", Picks: "mail settings folders"},
+	"parent":                 {Means: "the containing folder", Picks: []string{"mail settings folders"}},
 	"passphrase-file":        {Means: "where to read the passphrase that locks a file; - is stdin"},
 	"passport-number":        {Means: "a passport number"},
 	"password-file":          {Means: "where to read the account password from; - is stdin"},
@@ -184,7 +184,7 @@ var Flags = map[string]Flag{
 	"security":               {Means: "a Wi-Fi security protocol"},
 	"send-at":                {Means: "when to deliver"},
 	"separator":              {Means: "what stands between the words of a passphrase"},
-	"shared":                 {Means: "the item somebody shared with you to act in", Picks: "drive shared"},
+	"shared":                 {Means: "the item somebody shared with you to act in", Picks: []string{"drive shared"}},
 	"sieve":                  {Means: "a Sieve script"},
 	"smaller-than":           {Means: "select files below a size"},
 	"social-security-number": {Means: "a social security number"},
@@ -197,7 +197,7 @@ var Flags = map[string]Flag{
 	"status":                 {Means: "whether an event is going ahead: confirmed, tentative or cancelled"},
 	"strip-quotes":           {Means: "drop quoted reply blocks"},
 	"subject":                {Means: "the subject line: compose sets it, a filter matches it"},
-	"suffix":                 {Means: "the domain part of an alias", Picks: "pass settings domains"},
+	"suffix":                 {Means: "the domain part of an alias", Picks: []string{"pass settings domains"}},
 	"summary":                {Means: "one line per item instead of the whole thing"},
 	"tag":                    {Means: "the photo tag to select"},
 	"timezone":               {Means: "an IANA time zone"},
@@ -209,8 +209,8 @@ var Flags = map[string]Flag{
 	"until":                  {Means: "where a range stops"},
 	"url":                    {Means: "a URL"},
 	"username":               {Means: "a login username"},
-	"vault":                  {Means: "the Pass vault to act in", Picks: "pass vaults"},
-	"via":                    {Means: "one of your addresses, which mail arrived at or left from", Picks: "mail settings addresses"},
+	"vault":                  {Means: "the Pass vault to act in", Picks: []string{"pass vaults"}},
+	"via":                    {Means: "one of your addresses, which mail arrived at or left from", Picks: []string{"mail settings addresses"}},
 	"views":                  {Means: "how many openings a link allows"},
 	"wait":                   {Means: "how long before a requested emergency access opens"},
 	"website":                {Means: "a website address"},

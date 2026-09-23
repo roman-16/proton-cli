@@ -71,25 +71,6 @@ func TestDecryptBody(t *testing.T) {
 	}
 }
 
-func TestResolveFolder(t *testing.T) {
-	tests := []struct{ in, want string }{
-		{"inbox", "0"},
-		{"INBOX", "0"},
-		{"trash", "3"},
-		{"all", "5"},
-		{"starred", "10"},
-		{"Sent", "7"},
-		{"scheduled", "12"},
-		{"Scheduled", "12"},
-		{"some-custom-label-id==", "some-custom-label-id=="}, // passthrough
-	}
-	for _, tc := range tests {
-		if got := ResolveFolder(tc.in); got != tc.want {
-			t.Errorf("ResolveFolder(%q) = %q, want %q", tc.in, got, tc.want)
-		}
-	}
-}
-
 func TestOppositeKind(t *testing.T) {
 	if OppositeKind("conversation") != "message" {
 		t.Error("OppositeKind(conversation) should be message")
@@ -116,7 +97,7 @@ func TestListQueryDefaults(t *testing.T) {
 func TestListQueryFieldMapping(t *testing.T) {
 	opts := ListOptions{
 		Keyword: "invoice", From: "a@x.com", To: "b@x.com",
-		Subject: "hi", Folder: "inbox", PageSize: 10, Unread: true,
+		Subject: "hi", Folder: labelInbox, PageSize: 10, Unread: true,
 	}
 	q := listQuery(opts, false)
 	checks := map[string]string{
@@ -285,7 +266,11 @@ func TestOrganisingVerbsUseTheRightLabel(t *testing.T) {
 		want string
 	}{
 		{"move to a folder alias", func(s *Service) error {
-			return s.Label(context.Background(), []string{"a"}, ResolveFolder("archive"))
+			box, err := s.ResolveMailbox(context.Background(), "archive")
+			if err != nil {
+				return err
+			}
+			return s.Label(context.Background(), []string{"a"}, box.ID)
 		}, labelArchive},
 		{"trash", func(s *Service) error {
 			return s.Trash(context.Background(), []string{"a"})
@@ -303,18 +288,6 @@ func TestOrganisingVerbsUseTheRightLabel(t *testing.T) {
 				t.Errorf("LabelID = %q, want %q", got, tc.want)
 			}
 		})
-	}
-}
-
-// A raw label ID passes through, so anything the account has works wherever a
-// built-in name does.
-func TestResolveFolderPassesUnknownThrough(t *testing.T) {
-	const custom = "aBcD1234=="
-	if got := ResolveFolder(custom); got != custom {
-		t.Errorf("ResolveFolder(%q) = %q, want passthrough", custom, got)
-	}
-	if got := ResolveFolder("ARCHIVE"); got != labelArchive {
-		t.Errorf("ResolveFolder is case-insensitive: got %q", got)
 	}
 }
 

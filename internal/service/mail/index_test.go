@@ -263,7 +263,7 @@ func TestABuildIndexesEveryMessageAndItsBody(t *testing.T) {
 		t.Errorf("status = %+v, want a complete index of 5 with every body", st)
 	}
 
-	msgs, total, cover, err := s.Search(t.Context(), ListOptions{Keyword: "body of msg-03", Folder: "all"})
+	msgs, total, cover, err := s.Search(t.Context(), ListOptions{Keyword: "body of msg-03", Folder: labelAllMail})
 	if err != nil {
 		t.Fatalf("search: %v", err)
 	}
@@ -301,7 +301,7 @@ func TestEveryMessageIsIndexedBeforeAnyBodyIsFetched(t *testing.T) {
 	}
 
 	// Everything but the text answers already.
-	msgs, _, cover, err := s.Search(t.Context(), ListOptions{From: "jane@example.com", Folder: "all"})
+	msgs, _, cover, err := s.Search(t.Context(), ListOptions{From: "jane@example.com", Folder: labelAllMail})
 	if err != nil {
 		t.Fatalf("search: %v", err)
 	}
@@ -342,7 +342,7 @@ func TestAQuotedReplyIsIndexedWithoutWhatItQuotes(t *testing.T) {
 	if body := inTheIndex(t, s)["reply"].Body; strings.Contains(body, "pineapple") {
 		t.Errorf("the reply was indexed with the quote it carries: %q", body)
 	}
-	msgs, _, _, err := s.Search(t.Context(), ListOptions{Keyword: "pineapple", Folder: "all"})
+	msgs, _, _, err := s.Search(t.Context(), ListOptions{Keyword: "pineapple", Folder: labelAllMail})
 	if err != nil {
 		t.Fatalf("search: %v", err)
 	}
@@ -442,7 +442,7 @@ func TestASyncAppliesWhatTheFeedReports(t *testing.T) {
 
 	// And the search follows: the moved message answers for the trash rather
 	// than the inbox it was built from.
-	inbox, _, _, err := s.Search(t.Context(), ListOptions{Subject: "msg-01", Folder: "inbox"})
+	inbox, _, _, err := s.Search(t.Context(), ListOptions{Subject: "msg-01", Folder: labelInbox})
 	if err != nil {
 		t.Fatalf("search: %v", err)
 	}
@@ -463,7 +463,7 @@ func TestAnIndexStillDownloadingBodiesSaysHowMuchItCovers(t *testing.T) {
 	}
 
 	s.C = m
-	_, _, cover, err := s.Search(t.Context(), ListOptions{Keyword: "body", Folder: "all"})
+	_, _, cover, err := s.Search(t.Context(), ListOptions{Keyword: "body", Folder: labelAllMail})
 	if err != nil {
 		t.Fatalf("search: %v", err)
 	}
@@ -551,7 +551,7 @@ func TestAnEditedMessageIsIndexedAgain(t *testing.T) {
 	if edited.Subject != "Notes" || !strings.Contains(edited.Body, "Thursday") {
 		t.Errorf("the index holds %q / %q, want what the message says now", edited.Subject, edited.Body)
 	}
-	msgs, _, _, err := s.Search(t.Context(), ListOptions{Keyword: "Thursday", Folder: "all"})
+	msgs, _, _, err := s.Search(t.Context(), ListOptions{Keyword: "Thursday", Folder: labelAllMail})
 	if err != nil {
 		t.Fatalf("search: %v", err)
 	}
@@ -589,7 +589,7 @@ func TestAMessageWhoseBodyCouldNotBeFetchedIsIndexedByItsEnvelope(t *testing.T) 
 	if fresh.settled() {
 		t.Error("a body that was never fetched was settled as though it had been")
 	}
-	msgs, _, _, err := s.Search(t.Context(), ListOptions{Subject: "msg-new", Folder: "inbox"})
+	msgs, _, _, err := s.Search(t.Context(), ListOptions{Subject: "msg-new", Folder: labelInbox})
 	if err != nil {
 		t.Fatalf("search: %v", err)
 	}
@@ -763,7 +763,7 @@ func TestASearchLeavesTheSummarySayingWhatTheLogHolds(t *testing.T) {
 	}
 
 	s.C = m
-	if _, _, _, err := s.Search(t.Context(), ListOptions{Subject: "msg", Folder: "all"}); err != nil {
+	if _, _, _, err := s.Search(t.Context(), ListOptions{Subject: "msg", Folder: labelAllMail}); err != nil {
 		t.Fatalf("search: %v", err)
 	}
 	if st := status(t, s); st.Bodies != 2 {
@@ -794,7 +794,7 @@ func TestABodyThatWillNotOpenIsIndexedByEverythingElse(t *testing.T) {
 		t.Errorf("a second build made %d requests again, want it to ask for nothing",
 			(again-fetched)+(walked-pages))
 	}
-	msgs, _, _, err := s.Search(t.Context(), ListOptions{Subject: "msg-00", Folder: "all"})
+	msgs, _, _, err := s.Search(t.Context(), ListOptions{Subject: "msg-00", Folder: labelAllMail})
 	if err != nil {
 		t.Fatalf("search: %v", err)
 	}
@@ -813,7 +813,7 @@ func TestWithoutAnIndexProtonAnswers(t *testing.T) {
 		t.Fatal("a service with no index read the mailbox before it was asked anything")
 	}
 
-	_, _, cover, err := s.Search(t.Context(), ListOptions{Keyword: "body of msg-00", Folder: "all"})
+	_, _, cover, err := s.Search(t.Context(), ListOptions{Keyword: "body of msg-00", Folder: labelAllMail})
 	if err != nil {
 		t.Fatalf("search: %v", err)
 	}

@@ -4,7 +4,7 @@ Individual messages.
 
 Every command under `proton mail messages`, with the arguments and flags it takes. For these commands in use, see [the mail guide](README.md).
 
-Holds `attachments`, `delete`, `empty`, `export`, `forward`, `get`, `label`, `list`, `mark`, `move`, `receipt`, `reply`, `send`, `star`, `trash`, `unlabel`, `unschedule`, `unstar`, `unsubscribe`, `update` and `watch`.
+Holds `attachments`, `count`, `delete`, `empty`, `export`, `forward`, `get`, `label`, `list`, `mark`, `move`, `receipt`, `reply`, `send`, `star`, `trash`, `unlabel`, `unschedule`, `unstar`, `unsubscribe`, `update` and `watch`.
 
 ## `attachments`
 
@@ -52,6 +52,27 @@ proton mail messages attachments list 5bH2mQxK --include-inline
 | --- | --- |
 | `--include-inline` | Include inline attachments, such as signature graphics |
 
+## `count`
+
+Count the messages in each folder and label.
+
+UNREAD is how many are unread, and TOTAL how many there are. Without --folder every folder and label has a row, and while categories are on, so does each category the inbox shows as a tab.
+
+To count what a filter matches, the last line of `list` says how many.
+
+```
+proton mail messages count
+```
+
+```bash
+proton mail messages count
+proton mail messages count --folder Receipts
+```
+
+| Flag | Description |
+| --- | --- |
+| `--folder string` | Folder or label to count |
+
 ## `delete`
 
 Delete messages permanently.
@@ -89,6 +110,8 @@ proton mail messages delete --folder spam --all --yes
 Delete everything in a folder, permanently.
 
 Proton clears the folder without reporting what was in it, so nothing is listed first. This takes no filters and always asks for confirmation.
+
+Only snoozed, spam, trash and your own folders and labels can be emptied.
 
 ```
 proton mail messages empty
@@ -242,7 +265,7 @@ List messages in a folder.
 
 Takes the same filters as trash, move, label and export, so you can preview a selection here before acting on it. A text filter goes through Proton's own index, which lags a change by a few seconds and does not cover bodies, or through the copy `index create mail` builds, which does.
 
-Looks in the inbox unless told otherwise. Use --folder all to search everything.
+Looks in the inbox unless told otherwise. Use --folder all to search everything, or everything but spam and trash while almost-all-mail is on.
 
 Newest first, or largest first with --sort size; --desc reverses either.
 
@@ -387,6 +410,8 @@ proton mail messages mark unread 'Invoice #2291'
 Move messages to a folder.
 
 A message is in exactly one folder, so this takes it out of the one it was in. To tag it while leaving it where it is, use `label` instead.
+
+--into takes inbox, archive, spam, trash, a tab or one of your own folders.
 
 ```
 proton mail messages move [REF...]

@@ -83,7 +83,7 @@ func (s *Service) attachmentBytes(ctx context.Context, a *draftAttachment) ([]by
 // DraftsList lists the Drafts folder. The folder is the one thing about the
 // question that is settled; the page and the order are the caller's.
 func (s *Service) DraftsList(ctx context.Context, opts ListOptions) ([]Message, int, error) {
-	opts.Folder = "drafts"
+	opts.Folder = labelDrafts
 	return s.List(ctx, opts)
 }
 
@@ -93,7 +93,7 @@ func (s *Service) ResolveDraft(ctx context.Context, r string) (string, error) {
 	if ref.Full(r) {
 		return r, nil
 	}
-	msgs, _, err := s.List(ctx, ListOptions{Keyword: r, Folder: "drafts", PageSize: 20})
+	msgs, _, err := s.List(ctx, ListOptions{Keyword: r, Folder: labelDrafts, PageSize: 20})
 	if err != nil {
 		return "", err
 	}

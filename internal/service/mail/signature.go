@@ -23,10 +23,15 @@ type mailSettings struct {
 	PMSignature        int
 	PMSignatureContent string
 	MailCategoryView   any
+	AlmostAllMail      any
 }
 
-func (m mailSettings) categoryViewOn() bool {
-	switch v := m.MailCategoryView.(type) {
+func (m mailSettings) categoryViewOn() bool { return switchedOn(m.MailCategoryView) }
+
+func (m mailSettings) almostAllMail() bool { return switchedOn(m.AlmostAllMail) }
+
+func switchedOn(v any) bool {
+	switch v := v.(type) {
 	case bool:
 		return v
 	case float64:

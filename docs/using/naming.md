@@ -41,7 +41,7 @@ Work      -- 5bH2mQxK
 Personal  -- 9xL4pQrT
 ```
 
-`--folder`, `--label`, `--into`, `--parent`, `--vault`, `--calendar`, `--album`, `--computer`, `--shared`, `--mailbox` and `--suffix` all complete this way.
+`--folder`, `--label`, `--parent`, `--vault`, `--calendar`, `--album`, `--computer`, `--shared`, `--mailbox`, `--suffix` and `--into` all complete this way, and `--folder` and the mail `--into` offer the built-in folders too. In Drive, `--into` takes a path.
 
 ```console
 $ proton mail conversations list

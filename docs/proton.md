@@ -32,7 +32,7 @@ Generate a shell completion script.
 
 Completion knows the whole command tree, every flag, and the values each enumerated flag accepts - so it offers item types, output formats, setting keys, colours and icons as you type them.
 
-Where a reference is wanted it offers back what your listings showed: the short ID, and the subject, name or address beside it. A flag whose value names one of your things answers the same way, so --into, --vault and --folder offer what you have. It reads what this machine remembers rather than asking Proton, so a collection you have not listed yet offers nothing and says which listing would fill it.
+Where a reference is wanted it offers back what your listings showed: the short ID, and the subject, name or address beside it. A flag whose value names one of your things answers the same way, so --vault, --folder and, outside Drive, --into offer what you have. It reads what this machine remembers rather than asking Proton, so a collection you have not listed yet offers nothing and says which listing would fill it.
 
 One script covers both proton and proton-cli.
 

@@ -2,6 +2,7 @@ package mail
 
 import (
 	"context"
+	"reflect"
 	"slices"
 	"testing"
 	"time"
@@ -33,7 +34,7 @@ func TestAKeywordSearchesTheBody(t *testing.T) {
 		indexed("a", "The north trail is open again", "your parking permit is enclosed", 100, labelInbox),
 		indexed("b", "Weekly notes", "nothing of the sort", 200, labelInbox),
 	}
-	got := matching(in, ListOptions{Keyword: "parking permit", Folder: "all"})
+	got := matching(in, ListOptions{Keyword: "parking permit", Folder: labelAllMail})
 	if len(got) != 1 || got[0].ID != "a" {
 		t.Errorf("matched %v, want the message whose body says it", ids(got))
 	}
@@ -202,13 +203,13 @@ func TestStarredIsAskedAsTheLabelItIs(t *testing.T) {
 	}
 	labels := func(m Message) []string { return m.Labels }
 
-	rows, total, err := starredOnly(t.Context(), ListOptions{Starred: true, Folder: "inbox", PageSize: 25},
+	rows, total, err := starredOnly(t.Context(), ListOptions{Starred: true, Folder: labelInbox, PageSize: 25},
 		list, labels)
 	if err != nil {
 		t.Fatalf("starredOnly: %v", err)
 	}
 	switch {
-	case asked.Folder != "starred":
+	case asked.Folder != labelStarred:
 		t.Errorf("asked Proton for %q, want the starred label", asked.Folder)
 	case asked.Starred:
 		t.Error("the starred flag was sent to Proton, which has nothing to do with it")
@@ -220,7 +221,7 @@ func TestStarredIsAskedAsTheLabelItIs(t *testing.T) {
 	}
 
 	// Without a folder beside it, everything starred answers.
-	rows, total, err = starredOnly(t.Context(), ListOptions{Starred: true, Folder: "all"}, list, labels)
+	rows, total, err = starredOnly(t.Context(), ListOptions{Starred: true, Folder: labelAllMail}, list, labels)
 	if err != nil {
 		t.Fatalf("starredOnly: %v", err)
 	}
@@ -317,4 +318,14 @@ func threadIDs(threads []Conversation) []string {
 		out = append(out, c.ID)
 	}
 	return out
+}
+
+func TestTheIndexKeepsATabToTheInbox(t *testing.T) {
+	in := []stored{
+		indexed("kept", "Photos", "", 200, labelInbox, labelSocial),
+		indexed("filed", "Photos", "", 100, labelArchive, labelSocial),
+	}
+	if got := ids(matching(in, ListOptions{Folder: labelSocial})); !reflect.DeepEqual(got, []string{"kept"}) {
+		t.Errorf("--folder social matched %v, want only what is still in the inbox", got)
+	}
 }

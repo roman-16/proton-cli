@@ -167,6 +167,18 @@ func InstallArguments(root *cobra.Command) {
 	walk(root)
 }
 
+const (
+	completionWords = "kit-completion-words"
+	completionPicks = "kit-completion-picks"
+)
+
+func Completes(c *cobra.Command, flag string, words []string, collections ...string) {
+	_ = c.Flags().SetAnnotation(flag, completionWords, words)
+	if len(collections) > 0 {
+		_ = c.Flags().SetAnnotation(flag, completionPicks, collections)
+	}
+}
+
 // installFlagCompletion offers back what the listings showed for every flag whose
 // value names something this CLI holds.
 //
@@ -176,13 +188,17 @@ func InstallArguments(root *cobra.Command) {
 // declaration here only fills what is still empty.
 func installFlagCompletion(c *cobra.Command) {
 	c.LocalFlags().VisitAll(func(f *pflag.Flag) {
-		collection := Flags[f.Name].Picks
-		if _, answers := c.GetFlagCompletionFunc(f.Name); collection == "" || answers {
+		words := f.Annotations[completionWords]
+		collections := f.Annotations[completionPicks]
+		if collections == nil {
+			collections = Flags[f.Name].Picks
+		}
+		if _, answers := c.GetFlagCompletionFunc(f.Name); answers || len(words)+len(collections) == 0 {
 			return
 		}
 		_ = c.RegisterFlagCompletionFunc(f.Name,
 			func(cmd *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-				return offer(cmd, collection, toComplete)
+				return offer(cmd, words, collections, toComplete)
 			})
 	})
 }
@@ -206,31 +222,43 @@ func complete(cmd *cobra.Command, arg Argument, toComplete string) ([]string, co
 	if collection == "" {
 		return nil, cobra.ShellCompDirectiveDefault
 	}
-	return offer(cmd, collection, toComplete)
+	return offer(cmd, nil, []string{collection}, toComplete)
 }
 
-// offer answers one press of the tab key from what a collection's listings have
-// shown on this machine.
-func offer(cmd *cobra.Command, collection, toComplete string) ([]string, cobra.ShellCompDirective) {
+// offer answers one press of the tab key: the words the command gave the flag,
+// then what the collections' listings have shown on this machine.
+func offer(cmd *cobra.Command, words, collections []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	var out []string
+	seen := map[string]bool{}
+	for _, w := range words {
+		if strings.HasPrefix(strings.ToLower(w), strings.ToLower(toComplete)) && !seen[w] {
+			seen[w] = true
+			out = append(out, w)
+		}
+	}
 	cache := app.Seen(profileFor(cmd))
-	found := cache.Candidates(collection, toComplete)
-	if len(found) == 0 {
-		if toComplete != "" {
+	for _, collection := range collections {
+		for _, c := range cache.Candidates(collection, toComplete) {
+			if seen[c.Value] {
+				continue
+			}
+			seen[c.Value] = true
+			if c.About == "" {
+				out = append(out, c.Value)
+				continue
+			}
+			out = append(out, c.Value+"\t"+c.About)
+		}
+	}
+	if len(out) == 0 {
+		if toComplete != "" || len(collections) == 0 {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
 		// Silence here reads as a broken completion rather than as an empty one,
 		// and the way out is a command the person has not thought to run.
 		return cobra.AppendActiveHelp(nil,
-				"Nothing seen yet - run `"+Program+" "+collection+" list` first"),
+				"Nothing seen yet - run `"+Program+" "+collections[0]+" list` first"),
 			cobra.ShellCompDirectiveNoFileComp
-	}
-	out := make([]string, 0, len(found))
-	for _, c := range found {
-		if c.About == "" {
-			out = append(out, c.Value)
-			continue
-		}
-		out = append(out, c.Value+"\t"+c.About)
 	}
 	// Newest first is the order they were read off the screen in, which is the
 	// order they are wanted in; alphabetical would bury the listing just run.

@@ -306,3 +306,17 @@ func TestMailConversationsListReadAndWithAttachments(t *testing.T) {
 		t.Errorf("--has-attachments did not find the thread that has them (%s) among %v", thread, rowIDs(found))
 	}
 }
+
+// Threads are counted as threads, and the count is the total the folder's own
+// listing reports.
+func TestMailConversationsCount(t *testing.T) {
+	row, ok := countRows(t, "mail", "conversations", "count", "--folder", "sent")["sent"]
+	if !ok {
+		t.Fatal("no row for sent")
+	}
+	total, _ := row["total"].(float64)
+	listed, _ := runJSON(t, "mail", "conversations", "list", "--folder", "sent", "--limit", "1")["total"].(float64)
+	if total != listed {
+		t.Errorf("sent counts %v threads and lists %v", total, listed)
+	}
+}

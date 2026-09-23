@@ -38,6 +38,7 @@ var Verbs = map[string]string{
 	// Reading
 	"list":  "enumerate a collection",
 	"get":   "show one thing in full",
+	"count": "say how many there are in each place, and how many are unread",
 	"watch": "stay attached and report each thing as it happens",
 
 	// Writing

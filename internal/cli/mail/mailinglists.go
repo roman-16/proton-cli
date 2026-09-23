@@ -426,7 +426,7 @@ func mailingListsUpdateCmd() *cobra.Command {
 	}
 	c.Flags().StringVar(&into, "into", "", "Folder its mail goes to, by name or ID")
 	c.Flags().BoolVar(&markRead, "mark-read", false, "Have its mail arrive read")
-	registerFolderCompletion(c, "into")
+	completeMoveTargets(c)
 	return c
 }
 

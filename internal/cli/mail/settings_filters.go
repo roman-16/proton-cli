@@ -231,8 +231,7 @@ func filtersCreateCmd() *cobra.Command {
 	c.Flags().StringArrayVar(&conditions, "if", nil,
 		"A condition matching mail must meet, as FIELD [not] COMPARATOR VALUE (repeatable)")
 	match.Register(c)
-	c.Flags().StringVar(&moveTo, "into", "",
-		"Move matching mail into this folder (archive, inbox, spam, trash, or one of yours)")
+	registerFilterDestination(c, &moveTo)
 	c.Flags().StringArrayVar(&labels, "label", nil, "Apply this label to matching mail (repeatable)")
 	c.Flags().BoolVar(&markRead, "mark-read", false, "Mark matching mail as read")
 	c.Flags().BoolVar(&star, "star", false, "Star matching mail")
@@ -392,8 +391,7 @@ func filtersUpdateCmd() *cobra.Command {
 	c.Flags().StringArrayVar(&conditions, "if", nil,
 		"A condition matching mail must meet, as FIELD [not] COMPARATOR VALUE (repeatable)")
 	match.Register(c)
-	c.Flags().StringVar(&moveTo, "into", "",
-		"Move matching mail into this folder (archive, inbox, spam, trash, or one of yours)")
+	registerFilterDestination(c, &moveTo)
 	c.Flags().StringArrayVar(&labels, "label", nil, "Apply this label to matching mail (repeatable)")
 	c.Flags().BoolVar(&markRead, "mark-read", false, "Mark matching mail as read")
 	c.Flags().BoolVar(&star, "star", false, "Star matching mail")
@@ -498,4 +496,12 @@ func filterVerbCmd(use, short string, action ui.Action, apply func(*kit.Invocati
 			})
 		}),
 	}
+}
+
+var filterDestinations = []string{"archive", "inbox", "spam", "trash"}
+
+func registerFilterDestination(c *cobra.Command, moveTo *string) {
+	c.Flags().StringVar(moveTo, "into", "",
+		"Move matching mail into this folder ("+strings.Join(filterDestinations, ", ")+", or one of yours)")
+	kit.Completes(c, "into", filterDestinations, "mail settings folders")
 }

@@ -159,3 +159,26 @@ func TestInstallArgumentsLeavesTheOthersAlone(t *testing.T) {
 		t.Errorf("a command's own completion was replaced: %v", got)
 	}
 }
+
+func TestAFlagOffersTheWordsItsCommandGaveItFirst(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	root := testTree()
+	list := find(t, root, "mail", "messages", "list")
+	var folder, label string
+	list.Flags().StringVar(&folder, "folder", "", "")
+	list.Flags().StringVar(&label, "label", "", "")
+	Completes(list, "folder", []string{"inbox", "spam", "Starred"})
+
+	InstallArguments(root)
+
+	complete, ok := list.GetFlagCompletionFunc("folder")
+	if !ok {
+		t.Fatal("--folder was given words and no completion")
+	}
+	if got, _ := complete(list, nil, "s"); len(got) != 2 || got[0] != "spam" || got[1] != "Starred" {
+		t.Errorf("--folder s offers %v, want the words that start with it, in order", got)
+	}
+	if _, ok := list.GetFlagCompletionFunc("label"); !ok {
+		t.Error("--label lost the completion its collection gives it")
+	}
+}

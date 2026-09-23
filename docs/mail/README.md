@@ -14,7 +14,7 @@ proton mail messages get "Invoice #2291"     # headers, body, attachment list
 proton mail messages get REF --body-only > body.txt
 ```
 
-Folders are `inbox`, `sent`, `drafts`, `trash`, `spam`, `archive`, `starred`, `scheduled`, `snoozed`, `all`, or any label. Proton's inbox tabs are folders too: `primary`, `social`, `promotions`, `newsletters`, `transactions`, `updates`.
+Folders are `inbox`, `sent`, `drafts`, `trash`, `spam`, `archive`, `starred`, `scheduled`, `snoozed`, `all`, or any label. Proton's inbox tabs are folders too: `primary`, `social`, `promotions`, `newsletters`, `transactions`, `updates`. A tab holds the inbox's mail sorted into it, and `all` is everything, or everything but spam and trash while `almost-all-mail` is on.
 
 Listings come back newest first. `--sort size` orders by how much room a message takes, largest first, and `--desc` reverses either order. A listing ordered by size shows a SIZE column.
 
@@ -25,6 +25,19 @@ proton mail messages list --folder all --sort size --limit 10
 `get` shows the plain-text body by default. `--render html` gives you the original markup, `--render raw` the untouched body, and `--strip-quotes` drops quoted reply blocks.
 
 A `Signature:` line reports the verdict of the signature check against the sender's key.
+
+## Count unread mail
+
+```bash
+proton mail conversations count
+proton mail messages count --folder Receipts
+```
+
+Every folder and label gets a row with how much it holds and how much of that is unread. While categories are on, so does each tab the inbox shows.
+
+`conversations count` counts threads, and a thread counts as unread while any message in it is. `messages count` counts messages. `--folder` counts one folder or label.
+
+To count what a filter matches, read the last line of `list`: in `25 of 42 messages`, 42 match.
 
 ## Spot a message Proton distrusts
 
@@ -57,7 +70,7 @@ proton mail messages mark phishing REF        # report it, and file it as spam
 
 ## Search
 
-Searching is `list` with a filter. `list` looks in the inbox; **`--folder all` searches everything.**
+Searching is `list` with a filter. `list` looks in the inbox; **`--folder all` searches everything**, spam and trash included unless `almost-all-mail` is on.
 
 ```bash
 proton mail messages list --keyword invoice --folder all
@@ -185,7 +198,7 @@ proton mail drafts send REF
 
 ## Organize
 
-A message lives in exactly **one folder** and carries any number of **labels**. So moving and labelling are different verbs, and passing a label to `move` is an error rather than a silent relabel.
+A message lives in exactly **one folder** and carries any number of **labels**. So moving and labelling are different verbs, and passing a label to `move` is an error rather than a silent relabel. `move --into` takes `inbox`, `archive`, `spam`, `trash`, a tab or one of your own folders.
 
 ```bash
 proton mail messages move REF --into archive     # it leaves where it was
@@ -205,7 +218,7 @@ proton mail messages delete --folder spam --all
 
 Add `--dry-run` to see the list first. `--limit` caps how many a verb touches and defaults to 150. See [Filters and bulk changes](../using/filters.md).
 
-**`empty` is not `delete --all`.** A filtered delete shows what it will touch. `empty` clears the folder whole, takes no filter, and always asks.
+**`empty` is not `delete --all`.** A filtered delete shows what it will touch. `empty` clears the folder whole, takes no filter, and always asks. It clears `trash`, `spam`, `snoozed` and your own folders and labels, and refuses any other folder.
 
 ```bash
 proton mail messages empty --folder trash

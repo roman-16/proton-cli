@@ -77,7 +77,7 @@ func mailboxColumns(folder bool) []ui.Column[mailsvc.Label] {
 	return cols
 }
 
-// mailboxes looks up one of the two trees by ID, name or - for a folder - path.
+// mailboxes looks up one of the two trees by ID or name.
 func mailboxes(c *kit.Invocation, noun string, folder bool) *kit.Lookup[mailsvc.Label] {
 	return &kit.Lookup[mailsvc.Label]{
 		Kind: inflect.Singular(noun),

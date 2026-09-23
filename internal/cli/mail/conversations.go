@@ -21,7 +21,7 @@ import (
 func conversationsCmd() *cobra.Command {
 	c := &cobra.Command{Use: "conversations", Short: "Whole threads"}
 	c.AddCommand(
-		convListCmd(), convGetCmd(), conversationExportCmd(),
+		convListCmd(), countCmd(true), convGetCmd(), conversationExportCmd(),
 		convReplyCmd(), convForwardCmd(),
 		convMoveCmd(), convLabelCmd(), convUnlabelCmd(),
 		convStarCmd(), convUnstarCmd(), convMarkCmd(),
@@ -42,7 +42,7 @@ func convListCmd() *cobra.Command {
 			"Proton's own index, which lags a change by a few seconds, or through the\n" +
 			"copy `index create mail` builds, which also reads bodies.\n\n" +
 			"Looks in the inbox unless told otherwise. Use --folder all to search\n" +
-			"everything.\n\n" +
+			"everything, or everything but spam and trash while almost-all-mail is on.\n\n" +
 			"Newest first, or largest first with --sort size; --desc reverses either.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			opts, err := f.list(c.Ctx, c)
@@ -201,7 +201,7 @@ func convMoveCmd() *cobra.Command {
 	}
 	c.Flags().StringVar(&into, "into", "", "Destination folder, by name or ID")
 	_ = c.MarkFlagRequired("into")
-	registerFolderCompletion(c, "into")
+	completeMoveTargets(c)
 	f.register(c)
 	return c
 }

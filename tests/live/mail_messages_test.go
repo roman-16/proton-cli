@@ -788,3 +788,103 @@ func rowIDs(rows []interface{}) []string {
 	}
 	return out
 }
+
+// countRows reads a count table by the name each row carries.
+func countRows(t *testing.T, args ...string) map[string]map[string]interface{} {
+	t.Helper()
+	out := map[string]map[string]interface{}{}
+	for _, row := range runJSONArray(t, args...) {
+		m := row.(map[string]interface{})
+		name, _ := m["name"].(string)
+		out[name] = m
+	}
+	return out
+}
+
+// Every built-in folder has a row, and so does a folder of your own, and no
+// place is more unread than it is full.
+func TestMailMessagesCount(t *testing.T) {
+	name, _ := pinned(t, account.Primary, "folder", "Projects")["name"].(string)
+	rows := countRows(t, "mail", "messages", "count")
+	for _, want := range []string{"inbox", "drafts", "scheduled", "snoozed", "sent", "starred",
+		"archive", "spam", "trash", "all", name} {
+		if _, ok := rows[want]; !ok {
+			t.Errorf("no row for %q among %v", want, keysOfRows(rows))
+		}
+	}
+	for place, row := range rows {
+		unread, _ := row["unread"].(float64)
+		total, _ := row["total"].(float64)
+		if unread < 0 || unread > total {
+			t.Errorf("%s: %v unread of %v", place, unread, total)
+		}
+	}
+}
+
+func keysOfRows(rows map[string]map[string]interface{}) []string {
+	out := make([]string, 0, len(rows))
+	for k := range rows {
+		out = append(out, k)
+	}
+	return out
+}
+
+// A message moved into a folder is counted there, and the count is the total the
+// folder's own listing reports.
+func TestMailMessagesCountFollowsMailIntoAFolder(t *testing.T) {
+	name, _ := pinned(t, account.Primary, "folder", "Projects")["name"].(string)
+	if name == "" {
+		t.Fatal("the folder fixture has no name")
+	}
+	msgID := mutableMail(t)
+	runOK(t, "mail", "messages", "move", "--into", name, "--", msgID)
+	cleanupRun(t, "Put the message back: proton mail messages move --into inbox "+msgID,
+		"mail", "messages", "move", "--into", "inbox", "--", msgID)
+
+	row := countRows(t, "mail", "messages", "count", "--folder", name)[name]
+	total, _ := row["total"].(float64)
+	listed, _ := runJSON(t, "mail", "messages", "list", "--folder", name, "--limit", "1")["total"].(float64)
+	if total < 1 || total != listed {
+		t.Errorf("%s counts %v messages and lists %v, with one just moved in", name, total, listed)
+	}
+}
+
+// A tab is the inbox's mail sorted into it, so a message filed away leaves the
+// tab even though it keeps its category.
+func TestMailMessagesListACategoryLeavesFiledMailOut(t *testing.T) {
+	requireCategories(t)
+	msgID := mutableMail(t)
+	runOK(t, "mail", "messages", "move", "--into", "social", "--", msgID)
+	cleanupRun(t, "Put the message back: proton mail messages move --into primary "+msgID,
+		"mail", "messages", "move", "--into", "primary", "--", msgID)
+	cleanupRun(t, "Put the message back: proton mail messages move --into inbox "+msgID,
+		"mail", "messages", "move", "--into", "inbox", "--", msgID)
+	if !slices.Contains(rowIDs(listAll(t, "mail", "messages", "list", "--folder", "social")), msgID) {
+		t.Fatal("the message moved into social is not under --folder social")
+	}
+
+	runOK(t, "mail", "messages", "move", "--into", "archive", "--", msgID)
+	if slices.Contains(rowIDs(listAll(t, "mail", "messages", "list", "--folder", "social")), msgID) {
+		t.Error("an archived message is still listed under --folder social")
+	}
+}
+
+// With almost-all-mail on, all is Proton's almost-all-mail label, and its count
+// is the total its listing reports.
+func TestMailMessagesListAllFollowsAlmostAllMail(t *testing.T) {
+	original, _ := runJSON(t, "mail", "settings", "get")["almost_all_mail"].(string)
+	if original != "on" {
+		cleanupRun(t, "Restore: proton mail settings set almost-all-mail "+original,
+			"mail", "settings", "set", "almost-all-mail", original)
+		runOK(t, "mail", "settings", "set", "almost-all-mail", "on")
+	}
+	row := countRows(t, "mail", "messages", "count", "--folder", "all")["all"]
+	if row["id"] != "15" {
+		t.Errorf("all is %v with almost-all-mail on, want Proton's almost-all-mail label", row["id"])
+	}
+	total, _ := row["total"].(float64)
+	listed, _ := runJSON(t, "mail", "messages", "list", "--folder", "all", "--limit", "1")["total"].(float64)
+	if total != listed {
+		t.Errorf("all counts %v messages and lists %v", total, listed)
+	}
+}

@@ -155,6 +155,14 @@ proton calendar reminders watch --output json |
 
 A watcher reports what happens while it is watching. It never replays what arrived before it started.
 
+### Unread count in a status bar
+
+```bash
+proton mail conversations count --folder inbox --output json | jq '.folders_or_labels[0].unread'
+```
+
+Waybar, polybar, i3blocks and tmux can each run that on an interval. A minute apart is plenty; see [Rate limits](#before-you-automate) before polling faster.
+
 ### Run a watch under systemd
 
 ```ini

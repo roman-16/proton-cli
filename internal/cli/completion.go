@@ -30,10 +30,10 @@ colours and icons as you type them.
 
 Where a reference is wanted it offers back what your listings showed: the short
 ID, and the subject, name or address beside it. A flag whose value names one of
-your things answers the same way, so --into, --vault and --folder offer what you
-have. It reads what this machine remembers rather than asking Proton, so a
-collection you have not listed yet offers nothing and says which listing would
-fill it.
+your things answers the same way, so --vault, --folder and, outside Drive,
+--into offer what you have. It reads what this machine remembers rather than
+asking Proton, so a collection you have not listed yet offers nothing and says
+which listing would fill it.
 
 One script covers both ` + kit.Program + ` and ` + kit.Alias + `.
 

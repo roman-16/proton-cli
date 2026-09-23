@@ -582,6 +582,10 @@ var examples = map[string][]string{
 	},
 
 	// ── mail: messages ──
+	"proton mail messages count": {
+		"proton mail messages count",
+		"proton mail messages count --folder Receipts",
+	},
 	"proton mail messages list": {
 		"proton mail messages list",
 		"proton mail messages list --unread",
@@ -710,6 +714,10 @@ var examples = map[string][]string{
 	},
 
 	// ── mail: conversations ──
+	"proton mail conversations count": {
+		"proton mail conversations count",
+		"proton mail conversations count --folder inbox --output json",
+	},
 	"proton mail conversations list": {
 		"proton mail conversations list",
 		"proton mail conversations list --unread --folder inbox",

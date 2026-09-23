@@ -197,6 +197,7 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton index watch`](../index/index.md#watch) | Keep every index current until you stop it |
 | [`proton mail conversations attachments download`](../mail/conversations.md#attachments-download) | Download and decrypt attachments from a thread |
 | [`proton mail conversations attachments list`](../mail/conversations.md#attachments-list) | List every attachment in a thread |
+| [`proton mail conversations count`](../mail/conversations.md#count) | Count the threads in each folder and label |
 | [`proton mail conversations delete`](../mail/conversations.md#delete) | Delete threads permanently |
 | [`proton mail conversations export`](../mail/conversations.md#export) | Write a whole thread out as .eml files or one mbox |
 | [`proton mail conversations forward`](../mail/conversations.md#forward) | Forward the newest message in a thread |
@@ -225,6 +226,7 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton mail mailing-lists update`](../mail/mailing-lists.md#update) | Set what happens to a mailing list's mail |
 | [`proton mail messages attachments download`](../mail/messages.md#attachments-download) | Download and decrypt attachments |
 | [`proton mail messages attachments list`](../mail/messages.md#attachments-list) | List a message's attachments |
+| [`proton mail messages count`](../mail/messages.md#count) | Count the messages in each folder and label |
 | [`proton mail messages delete`](../mail/messages.md#delete) | Delete messages permanently |
 | [`proton mail messages empty`](../mail/messages.md#empty) | Delete everything in a folder, permanently |
 | [`proton mail messages export`](../mail/messages.md#export) | Write messages out as .eml or mbox files |

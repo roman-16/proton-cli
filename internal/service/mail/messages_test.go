@@ -2,6 +2,7 @@ package mail
 
 import (
 	"context"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -200,5 +201,18 @@ func TestAsFullCarriesTheVerdict(t *testing.T) {
 	}
 	if !full.SpamFlagged() {
 		t.Error("the filters' own verdict disappeared once it was overruled")
+	}
+}
+
+func TestATabIsAskedForBesideTheInbox(t *testing.T) {
+	q := listQuery(ListOptions{Folder: labelSocial}, false)
+	if got := q["LabelID[]"]; !reflect.DeepEqual(got, []string{labelInbox, labelSocial}) {
+		t.Errorf("LabelID[] = %v, want the inbox and the tab", got)
+	}
+	if q.Has("LabelID") {
+		t.Errorf("a tab also sent LabelID=%q", q.Get("LabelID"))
+	}
+	if q := listQuery(ListOptions{Folder: labelArchive}, false); q.Get("LabelID") != labelArchive || q.Has("LabelID[]") {
+		t.Errorf("a folder is asked for alone, got %v", q)
 	}
 }

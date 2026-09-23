@@ -165,3 +165,15 @@ func equalStrings(a, b []string) bool {
 	}
 	return true
 }
+
+func TestAThreadActsOnItsInboxMessagesForATab(t *testing.T) {
+	for scope, want := range map[string]string{"": labelAllMail, labelSocial: labelInbox, labelArchive: labelArchive} {
+		f := &fakeDoer{}
+		if err := New(f, testKeys(nil)).ConversationsDelete(context.Background(), []string{"c"}, scope); err != nil {
+			t.Fatalf("ConversationsDelete: %v", err)
+		}
+		if got := bodyLabelID(t, f.last); got != want {
+			t.Errorf("scope %q: LabelID %q, want %q", scope, got, want)
+		}
+	}
+}

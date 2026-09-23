@@ -52,6 +52,8 @@ const (
 	labelStarred   = "10"
 	labelScheduled = "12"
 	labelSnoozed   = "16"
+
+	labelAlmostAllMail = "15"
 	// Proton's inbox categories, which the web shows as tabs across the top.
 	labelSocial       = "20"
 	labelPromotions   = "21"
@@ -384,7 +386,7 @@ func (s *Service) Resolve(ctx context.Context, r string) (string, error) {
 // message up.
 func (s *Service) FindMessage(ctx context.Context, r string) (Message, error) {
 	if ref.Full(r) {
-		msgs, _, err := s.List(ctx, ListOptions{ID: r, Folder: "all", PageSize: 1})
+		msgs, _, err := s.List(ctx, ListOptions{ID: r, Folder: labelAllMail, PageSize: 1})
 		if err != nil {
 			return Message{}, err
 		}
@@ -395,7 +397,7 @@ func (s *Service) FindMessage(ctx context.Context, r string) (Message, error) {
 		// with the identity we do have rather than refusing to act.
 		return Message{ID: r}, nil
 	}
-	msgs, _, err := s.List(ctx, ListOptions{Keyword: r, Folder: "all", PageSize: 20})
+	msgs, _, err := s.List(ctx, ListOptions{Keyword: r, Folder: labelAllMail, PageSize: 20})
 	if err != nil {
 		return Message{}, err
 	}
@@ -408,7 +410,7 @@ func (s *Service) ResolveScheduled(ctx context.Context, r string) (string, error
 	if ref.Full(r) {
 		return r, nil
 	}
-	msgs, _, err := s.List(ctx, ListOptions{Keyword: r, Folder: "scheduled", PageSize: 20})
+	msgs, _, err := s.List(ctx, ListOptions{Keyword: r, Folder: labelScheduled, PageSize: 20})
 	if err != nil {
 		return "", err
 	}
@@ -433,7 +435,7 @@ func (s *Service) ResolveConversation(ctx context.Context, r string) (string, er
 // FindConversation resolves a reference to the thread itself.
 func (s *Service) FindConversation(ctx context.Context, r string) (Conversation, error) {
 	if ref.Full(r) {
-		convs, _, err := s.ConversationsList(ctx, ListOptions{ID: r, Folder: "all", PageSize: 1})
+		convs, _, err := s.ConversationsList(ctx, ListOptions{ID: r, Folder: labelAllMail, PageSize: 1})
 		if err != nil {
 			return Conversation{}, err
 		}
@@ -442,7 +444,7 @@ func (s *Service) FindConversation(ctx context.Context, r string) (Conversation,
 		}
 		return Conversation{ID: r}, nil
 	}
-	convs, _, err := s.ConversationsList(ctx, ListOptions{Keyword: r, Folder: "all", PageSize: 20})
+	convs, _, err := s.ConversationsList(ctx, ListOptions{Keyword: r, Folder: labelAllMail, PageSize: 20})
 	if err != nil {
 		return Conversation{}, err
 	}

@@ -195,3 +195,67 @@ func TestACompletionWritesNoRunLog(t *testing.T) {
 		t.Errorf("a completion wrote to %s: %d entries before, %d after", logs, len(before), len(after))
 	}
 }
+
+const (
+	receipts = "7Kd91mQxT2wLpN8vRs4kZc1yXd7fGh3jAe6bUi0oQm2nWr5tYvAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+	work     = "kQ81mDx4T9wLpN4vRs8kZc1yXd7fGh3jAe6bUi0oQm2nWr5tYvAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+	vault    = "Vt4nQ8sLT9wLpN4vRs8kZc1yXd7fGh3jAe6bUi0oQm2nWr5tYvAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+)
+
+// offers reports which of the words a completion put on offer, by the value a
+// line starts with.
+func offers(lines []string, words ...string) map[string]bool {
+	got := map[string]bool{}
+	for _, line := range lines {
+		value, _, _ := strings.Cut(line, "\t")
+		for _, w := range words {
+			if value == w {
+				got[w] = true
+			}
+		}
+	}
+	return got
+}
+
+// A folder or label your listings showed completes beside the built-in folders,
+// and each command offers only the places it takes.
+func TestAFolderCompletesTheBuiltInsBesideYourOwn(t *testing.T) {
+	seen(t, "places",
+		entry("mail settings folders", receipts, "Receipts"),
+		entry("mail settings labels", work, "Work"))
+	for _, tc := range []struct {
+		words        []string
+		want, refuse []string
+	}{
+		{[]string{"mail", "messages", "list", "--folder", ""},
+			[]string{"inbox", "all", "Receipts", "Work"}, nil},
+		{[]string{"mail", "messages", "empty", "--folder", ""},
+			[]string{"trash", "spam", "snoozed", "Receipts", "Work"}, []string{"inbox", "all"}},
+		{[]string{"mail", "messages", "move", "--into", ""},
+			[]string{"inbox", "archive", "primary", "Receipts"}, []string{"Work", "drafts", "starred"}},
+		{[]string{"mail", "settings", "filters", "create", "--into", ""},
+			[]string{"archive", "inbox", "spam", "trash", "Receipts"}, []string{"Work"}},
+	} {
+		got := offers(completing(t, "places", tc.words...), append(tc.want, tc.refuse...)...)
+		for _, w := range tc.want {
+			if !got[w] {
+				t.Errorf("%v does not offer %q", tc.words, w)
+			}
+		}
+		for _, w := range tc.refuse {
+			if got[w] {
+				t.Errorf("%v offers %q, which it does not take", tc.words, w)
+			}
+		}
+	}
+}
+
+// Pass puts an item into a vault, so a vault a listing showed is what --into
+// offers there.
+func TestAVaultCompletesWherePassPutsAnItem(t *testing.T) {
+	seen(t, "vaults", entry("pass vaults", vault, "Work"))
+	got := offers(completing(t, "vaults", "pass", "items", "move", "github.com", "--into", "W"), "Work")
+	if !got["Work"] {
+		t.Error("pass items move --into does not offer the vault a listing showed")
+	}
+}

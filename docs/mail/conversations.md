@@ -4,7 +4,7 @@ Whole threads.
 
 Every command under `proton mail conversations`, with the arguments and flags it takes. For these commands in use, see [the mail guide](README.md).
 
-Holds `attachments`, `delete`, `export`, `forward`, `get`, `label`, `list`, `mark`, `move`, `reply`, `snooze`, `star`, `trash`, `unlabel`, `unsnooze` and `unstar`.
+Holds `attachments`, `count`, `delete`, `export`, `forward`, `get`, `label`, `list`, `mark`, `move`, `reply`, `snooze`, `star`, `trash`, `unlabel`, `unsnooze` and `unstar`.
 
 ## `attachments`
 
@@ -46,6 +46,27 @@ proton mail conversations attachments list 'Quarterly numbers'
 | Flag | Description |
 | --- | --- |
 | `--include-inline` | Include inline attachments |
+
+## `count`
+
+Count the threads in each folder and label.
+
+UNREAD is how many are unread, and TOTAL how many there are. A thread counts as unread while any message in it is. Without --folder every folder and label has a row, and while categories are on, so does each category the inbox shows as a tab.
+
+To count what a filter matches, the last line of `list` says how many.
+
+```
+proton mail conversations count
+```
+
+```bash
+proton mail conversations count
+proton mail conversations count --folder inbox --output json
+```
+
+| Flag | Description |
+| --- | --- |
+| `--folder string` | Folder or label to count |
 
 ## `delete`
 
@@ -189,7 +210,7 @@ List threads in a folder.
 
 Takes the same filters as the verbs that organise threads, so you can preview a selection here before acting on it. A text filter goes through Proton's own index, which lags a change by a few seconds, or through the copy `index create mail` builds, which also reads bodies.
 
-Looks in the inbox unless told otherwise. Use --folder all to search everything.
+Looks in the inbox unless told otherwise. Use --folder all to search everything, or everything but spam and trash while almost-all-mail is on.
 
 Newest first, or largest first with --sort size; --desc reverses either.
 

@@ -5,6 +5,7 @@ Usage:
 
 Commands:
   attachments  Files attached to a message
+  count        Count the messages in each folder and label
   delete       Delete messages permanently
   empty        Delete everything in a folder, permanently
   export       Write messages out as .eml or mbox files

@@ -78,7 +78,7 @@ func (s *Service) WatchedIn(ctx context.Context, folder string) ([]Mailbox, erro
 	if err != nil {
 		return nil, err
 	}
-	in = append(in, Mailbox{ID: labelStarred, Name: "starred", Folder: true, System: true})
+	in = append(in, Mailbox{ID: labelStarred, Name: "starred", System: true})
 	for _, f := range folders {
 		if f.Notifies() {
 			in = append(in, Mailbox{ID: f.ID, Name: f.Name, Folder: true})
@@ -283,7 +283,7 @@ func (m *rawListMessage) matches(opts WatchOptions) bool {
 	}
 	watched := false
 	for _, box := range opts.In {
-		if hasLabel(m.LabelIDs, box.ID) && (!isCategory(box.ID) || hasLabel(m.LabelIDs, labelInbox)) {
+		if inPlace(m.LabelIDs, box.ID) {
 			watched = true
 			break
 		}
