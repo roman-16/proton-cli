@@ -310,6 +310,8 @@ func calendarsUpdateCmd() *cobra.Command {
 	c.Flags().StringArrayVar(&allDayReminders, "remind-all-day", nil,
 		"Default reminder for a new all-day event (repeatable)")
 	c.Flags().BoolVar(&noRemind, "no-remind", false, "Give new events no reminder by default")
+	kit.Exclusive(c, "remind", "no-remind")
+	kit.Exclusive(c, "remind-all-day", "no-remind")
 	color.Register(c)
 	busy.Register(c)
 	return c

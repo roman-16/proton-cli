@@ -54,7 +54,7 @@ func (r *Recovery) Declare(c *cobra.Command) {
 		for _, other := range methods[i+1:] {
 			for _, a := range chosen {
 				for _, b := range other {
-					c.MarkFlagsMutuallyExclusive(a, b)
+					Exclusive(c, a, b)
 				}
 			}
 		}

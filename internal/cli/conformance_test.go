@@ -475,6 +475,18 @@ func TestAClearFlagSitsBesideWhatItClears(t *testing.T) {
 	}
 }
 
+func TestFlagsThatContradictAreDeclaredThroughKit(t *testing.T) {
+	allowed := map[string]bool{"../cli/kit/exclusive.go": true}
+	offenders := grepGo(t, []string{"../cli"}, func(src string) bool {
+		return strings.Contains(src, ".MarkFlagsMutuallyExclusive\n")
+	})
+	for _, f := range offenders {
+		if !allowed[f] {
+			t.Errorf("%s marks flags exclusive itself; declare them with kit.Exclusive, which refuses them in one sentence", f)
+		}
+	}
+}
+
 func TestSharedFlagsAreRegisteredFromOnePlace(t *testing.T) {
 	leaves, _ := partition(t)
 	for _, c := range leaves {
@@ -1455,12 +1467,13 @@ var layers = map[string][]string{
 	// log, and what may be written in one is declared in redact rather than
 	// restated by each handler. Putting the policy above every destination is
 	// what makes "the log holds nothing sensitive" one rule instead of two.
-	"ui": {"units", "progress", "errs", "ref", "redact"},
+	"ui": {"units", "progress", "errs", "inflect", "ref", "redact"},
 	// proton reaches units for the reason ui does: it announces a wait to the
 	// person sitting through it, and how long a span is put to a reader is
 	// declared once rather than spelled a second way here.
 	"proton":   {"errs", "units", "crypto/aead", "hv", "hv/hvexit"},
-	"errs":     {},
+	"errs":     {"inflect"},
+	"inflect":  {},
 	"units":    {},
 	"progress": {},
 	"mailtext": {},

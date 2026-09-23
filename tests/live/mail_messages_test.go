@@ -1,11 +1,13 @@
 package live
 
 import (
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/roman-16/proton-cli/tests/account"
+	"github.com/roman-16/proton-cli/tests/fixture"
 )
 
 // Messages: listing them, finding one, reading it, and moving it about.
@@ -703,4 +705,67 @@ func TestMailMessagesEmptyClearsAFolder(t *testing.T) {
 	}) {
 		t.Error("after emptying, the trash should not hold the message")
 	}
+}
+
+func TestMailMessagesListHasAttachments(t *testing.T) {
+	attached, _, _, _ := attachedMail(t)
+	plainMail(t)
+
+	found := listAll(t, "mail", "messages", "list", "--folder", "all", "--has-attachments",
+		"--subject", fixture.Attachments.Subject)
+	if !slices.Contains(rowIDs(found), attached) {
+		t.Errorf("--has-attachments did not find the message that has them (%s) among %v", attached, rowIDs(found))
+	}
+	none := listAll(t, "mail", "messages", "list", "--folder", "all", "--has-attachments",
+		"--subject", fixture.Plain.Subject)
+	if len(none) != 0 {
+		t.Errorf("--has-attachments matched %v, which carry none", rowIDs(none))
+	}
+}
+
+func TestMailMessagesListVia(t *testing.T) {
+	plain, _, _ := plainMail(t)
+	found := listAll(t, "mail", "messages", "list", "--folder", "all", "--via", selfEmail(),
+		"--subject", fixture.Plain.Subject)
+	if !slices.Contains(rowIDs(found), plain) {
+		t.Errorf("--via %s did not find the mail it sent itself (%s) among %v", selfEmail(), plain, rowIDs(found))
+	}
+
+	forwarder := paidForwarder(t)
+	everything, _ := runJSONPaid(t, "mail", "messages", "list", "--folder", "all", "--limit", "1")["total"].(float64)
+	onForwarder, _ := runJSONPaid(t, "mail", "messages", "list", "--folder", "all", "--via", forwarder,
+		"--limit", "1")["total"].(float64)
+	if onForwarder >= everything {
+		t.Errorf("--via %s counted %v of the paid account's %v messages, want only the mail on that address",
+			forwarder, onForwarder, everything)
+	}
+
+	_, stderr, code := run(t, "mail", "messages", "list", "--folder", "all", "--via", secondaryEmail())
+	if code != 3 {
+		t.Errorf("--via someone else's address exited %d, want 3: %s", code, truncateOutput(stderr))
+	}
+	for _, want := range []string{"No address of yours matching", "--to " + secondaryEmail()} {
+		if !strings.Contains(stderr, want) {
+			t.Errorf("the refusal does not say %q: %s", want, truncateOutput(stderr))
+		}
+	}
+}
+
+func TestMailMessagesListRead(t *testing.T) {
+	for _, row := range runJSONArray(t, "mail", "messages", "list", "--folder", "all", "--read", "--limit", "20") {
+		m, _ := row.(map[string]interface{})
+		if unread, _ := m["unread"].(float64); unread != 0 {
+			t.Errorf("--read listed %v, which is unread", m["id"])
+		}
+	}
+}
+
+func rowIDs(rows []interface{}) []string {
+	out := make([]string, 0, len(rows))
+	for _, row := range rows {
+		m, _ := row.(map[string]interface{})
+		id, _ := m["id"].(string)
+		out = append(out, id)
+	}
+	return out
 }

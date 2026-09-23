@@ -402,6 +402,7 @@ func eventsUpdateCmd() *cobra.Command {
 	d.register(c, "Replace")
 	c.Flags().BoolVar(&d.allDay, "all-day", false, "Turn it into an event with no time of day")
 	c.Flags().BoolVar(&d.noReminders, "no-remind", false, "Remove the reminders")
+	kit.Exclusive(c, "remind", "no-remind")
 	c.Flags().BoolVar(&onwards, "onwards", false, "Also change every later occurrence of the series")
 	return c
 }
@@ -426,9 +427,6 @@ func (d *details) patch(c *kit.Invocation, calendarID string, reached *reach) (c
 	}
 	if c.Changed("all-day") {
 		p.AllDay = &d.allDay
-	}
-	if c.Changed("remind") && c.Changed("no-remind") {
-		return p, "", kit.Fail("--remind and --no-remind contradict each other.")
 	}
 	if c.Changed("status") {
 		word, err := d.status.Value()

@@ -238,9 +238,9 @@ func filtersCreateCmd() *cobra.Command {
 	c.Flags().BoolVar(&star, "star", false, "Star matching mail")
 	c.Flags().StringVar(&sieve, "sieve", "", "Sieve script (- reads stdin)")
 	c.Flags().BoolVar(&disabled, "disabled", false, "Create it without turning it on")
-	c.MarkFlagsMutuallyExclusive("if", "sieve")
-	c.MarkFlagsMutuallyExclusive("sieve", "into")
-	c.MarkFlagsMutuallyExclusive("sieve", "label")
+	kit.Exclusive(c, "if", "sieve")
+	kit.Exclusive(c, "sieve", "into")
+	kit.Exclusive(c, "sieve", "label")
 	return c
 }
 
@@ -398,9 +398,9 @@ func filtersUpdateCmd() *cobra.Command {
 	c.Flags().BoolVar(&markRead, "mark-read", false, "Mark matching mail as read")
 	c.Flags().BoolVar(&star, "star", false, "Star matching mail")
 	c.Flags().StringVar(&sieve, "sieve", "", "New Sieve script (- reads stdin)")
-	c.MarkFlagsMutuallyExclusive("if", "sieve")
-	c.MarkFlagsMutuallyExclusive("sieve", "into")
-	c.MarkFlagsMutuallyExclusive("sieve", "label")
+	kit.Exclusive(c, "if", "sieve")
+	kit.Exclusive(c, "sieve", "into")
+	kit.Exclusive(c, "sieve", "label")
 	return c
 }
 

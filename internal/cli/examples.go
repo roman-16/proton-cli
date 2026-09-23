@@ -574,6 +574,8 @@ var examples = map[string][]string{
 		"proton mail messages list --folder archive --limit 50",
 		"proton mail messages list --starred --output json",
 		"proton mail messages list --from billing@example.com --folder all",
+		"proton mail messages list --via work@example.com --folder all",
+		"proton mail messages list --has-attachments --from billing@example.com --folder all",
 		"proton mail messages list --keyword invoice --after 2026-01-01 --folder all",
 		"proton mail messages list --keyword 'parking permit' --folder all",
 		"proton mail messages list --folder all --sort size --limit 10",
@@ -609,6 +611,7 @@ var examples = map[string][]string{
 	"proton mail messages move": {
 		"proton mail messages move 'Invoice #2291' --into archive",
 		"proton mail messages move --from newsletter@example.com --older-than 90d --into archive",
+		"proton mail messages move --folder inbox --read --older-than 30d --into archive",
 	},
 	"proton mail messages trash": {
 		"proton mail messages trash 'Invoice #2291'",
@@ -697,6 +700,7 @@ var examples = map[string][]string{
 		"proton mail conversations list",
 		"proton mail conversations list --unread --folder inbox",
 		"proton mail conversations list --from jane@example.com --folder all",
+		"proton mail conversations list --has-attachments --folder all",
 		"proton mail conversations list --sort size --desc",
 	},
 	"proton mail conversations get": {

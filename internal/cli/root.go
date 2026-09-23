@@ -201,7 +201,7 @@ func newRoot() *cobra.Command {
 		cmd.SetContext(newCtx)
 		root.SetContext(newCtx)
 		a.Began(cmd)
-		return nil
+		return kit.Judge(cmd)
 	}
 
 	// The groups make `--help` read as a map of the product rather than as an

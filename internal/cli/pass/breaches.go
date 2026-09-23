@@ -48,9 +48,15 @@ func breachColumns() []ui.Column[passsvc.MonitoredAddress] {
 		}},
 		{Header: "TYPE", Cell: func(a passsvc.MonitoredAddress) string { return a.Type }},
 		{Header: "BREACHES", Right: true, Cell: func(a passsvc.MonitoredAddress) string {
-			return strconv.Itoa(a.Breaches)
+			if a.Breaches == nil {
+				return "?"
+			}
+			return strconv.Itoa(*a.Breaches)
 		}},
 		{Header: "LAST", Cell: func(a passsvc.MonitoredAddress) string {
+			if a.Breaches == nil {
+				return "?"
+			}
 			return units.Time(a.LastBreach)
 		}},
 		{Header: "STATE", Cell: func(a passsvc.MonitoredAddress) string { return a.State }},
@@ -76,16 +82,38 @@ func breachesListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return held.Answer(c, ui.TableSpec[passsvc.MonitoredAddress]{
+			if err := held.Answer(c, ui.TableSpec[passsvc.MonitoredAddress]{
 				Noun: "watched addresses", Columns: breachColumns(),
-			}, rows)
+			}, rows); err != nil {
+				return err
+			}
+			uncounted(c, rows)
+			return nil
 		}),
 	}
 	held.Register(c, "watched addresses",
-		kit.Key[passsvc.MonitoredAddress]{Name: "breaches", Less: func(a, b passsvc.MonitoredAddress) int { return kit.Ints(int64(b.Breaches), int64(a.Breaches)) }},
+		kit.Key[passsvc.MonitoredAddress]{Name: "breaches", Less: passsvc.ByBreaches},
 		kit.Key[passsvc.MonitoredAddress]{Name: "email", Less: func(a, b passsvc.MonitoredAddress) int { return kit.Fold(a.Email, b.Email) }},
 	)
 	return c
+}
+
+func uncounted(c *kit.Invocation, rows []passsvc.MonitoredAddress) {
+	var missing []string
+	for _, row := range rows {
+		if row.Breaches == nil {
+			missing = append(missing, row.Email)
+		}
+	}
+	switch len(missing) {
+	case 0:
+	case 1:
+		c.Warn("The breach count of %s did not come back. `%s pass breaches get %s` asks again.",
+			missing[0], kit.Program, missing[0])
+	default:
+		c.Warn("The breach counts of %s did not come back. `%s pass breaches get` on each asks again.",
+			ui.Listing(missing), kit.Program)
+	}
 }
 
 func breachesGetCmd() *cobra.Command {
@@ -111,6 +139,8 @@ func breachesGetCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			counted := len(report.Breaches) + report.Withheld
+			address.Breaches = &counted
 			view := struct {
 				passsvc.MonitoredAddress
 				Breaches []passsvc.Breach `json:"breach_list"`
@@ -126,7 +156,7 @@ func breachesGetCmd() *cobra.Command {
 				Fields: append([]ui.Field{
 					{Label: "Address", Value: address.Email, Handle: true},
 					{Label: "Type", Value: address.Type},
-					{Label: "Breaches", Value: strconv.Itoa(address.Breaches)},
+					{Label: "Breaches", Value: strconv.Itoa(counted)},
 					{Label: "State", Value: address.State},
 				}, breachFields(report.Breaches)...),
 			})

@@ -35,44 +35,6 @@ func TestFooter(t *testing.T) {
 	}
 }
 
-// Every collection noun in the CLI has to survive the singulariser, since it
-// feeds both the confirmation wording and the JSON "kind".
-func TestSingularCoversEveryCollectionNoun(t *testing.T) {
-	for plural, want := range map[string]string{
-		"messages":       "message",
-		"message bodies": "message body",
-		"bodies":         "body",
-		"entries":        "entry",
-		"conversations":  "conversation",
-		"drafts":         "draft",
-		"attachments":    "attachment",
-		"addresses":      "address",
-		"folders":        "folder",
-		"labels":         "label",
-		"filters":        "filter",
-		"items":          "item",
-		"folders/":       "folders/",
-		"revisions":      "revision",
-		"invitations":    "invitation",
-		"photos":         "photo",
-		"albums":         "album",
-		"events":         "event",
-		"calendars":      "calendar",
-		"contacts":       "contact",
-		"groups":         "group",
-		"keys":           "key",
-		"vaults":         "vault",
-		"aliases":        "alias",
-		"sessions":       "session",
-		"profiles":       "profile",
-		"settings":       "setting",
-	} {
-		if got := Singular(plural); got != want {
-			t.Errorf("Singular(%q) = %q, want %q", plural, got, want)
-		}
-	}
-}
-
 func TestQuantityAgreesInNumber(t *testing.T) {
 	for _, tc := range []struct {
 		n      int

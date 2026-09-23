@@ -85,6 +85,7 @@ type State struct {
 	// settled by reading the account again rather than by following the feed,
 	// which is why it is the build that clears it.
 	Stale bool `json:"stale,omitempty"`
+	Shape int  `json:"shape,omitempty"`
 	// Oldest is the far end of what is indexed, which is what a search over a
 	// half-built index has to say about what it did not cover.
 	Oldest  int64 `json:"oldest,omitempty"`

@@ -16,7 +16,7 @@ proton mail messages get REF --body-only > body.txt
 
 Folders are `inbox`, `sent`, `drafts`, `trash`, `spam`, `archive`, `starred`, `scheduled`, `snoozed`, `all`, or any label. Proton's inbox tabs are folders too: `social`, `promotions`, `updates`, `newsletters`, `transactions`.
 
-Listings come back newest first. `--sort size` orders by how much room a message takes, largest first, and `--desc` reverses either order. A listing ordered by size shows a SIZE column and is answered by Proton, so it does not search bodies.
+Listings come back newest first. `--sort size` orders by how much room a message takes, largest first, and `--desc` reverses either order. A listing ordered by size shows a SIZE column.
 
 ```bash
 proton mail messages list --folder all --sort size --limit 10
@@ -63,9 +63,14 @@ Searching is `list` with a filter. `list` looks in the inbox; **`--folder all` s
 proton mail messages list --keyword invoice --folder all
 proton mail messages list --from billing@example.com --after 2026-01-01 --folder all
 proton mail messages list --subject "Q1 report" --folder archive
+proton mail messages list --via work@example.com --has-attachments --folder all
 ```
 
 `--from` and `--to` match addresses. `--keyword` matches the subject, a display name and an address.
+
+`--via` takes one of your own addresses, by email or ID, and matches the mail that arrived at it or left from it. It finds what `--to` misses: mail that came by Bcc, through a mailing list or a catch-all. A plus-alias is not one of your addresses, so find its mail with `--to`.
+
+`--has-attachments` and `--read` narrow by what a message carries and whether you have read it. On a thread, `--read` means nothing in it is unread.
 
 Bodies are not searched. To search what a message says, build an index on this machine: [Local index](../index/README.md). With one, `--keyword` covers bodies and `--from` covers display names.
 

@@ -31,16 +31,15 @@ type Enum struct {
 	target string
 }
 
-// checked is anything Run validates before the first step: a flag whose accepted
-// values are declared, and which is therefore wrong or right regardless of who is
-// asking.
+// checked is anything Judge validates: a flag whose accepted values are
+// declared, and which is therefore wrong or right regardless of who is asking.
 type checked interface {
 	validate() error
 }
 
 // The registry records declared domains twice over: by command and flag name, so
 // the conformance test can check that each constrained flag has one, and by
-// command alone, so Run can validate them all before doing anything else.
+// command alone, so Judge can validate them all before anything else runs.
 //
 // The command is kept rather than its path, because a flag is declared while the
 // command is still on its own: two commands both called `export` have the same
@@ -87,12 +86,13 @@ func (e *Enum) validate() error {
 	return err
 }
 
-// validateFlags checks every constrained flag on cmd.
+// Judge checks every constrained flag on cmd.
 //
-// Run calls this before the first step, which is what keeps an impossible value
-// from costing a sign-in: `--format htm` is wrong whoever you are, so reporting a
-// missing password instead would be answering a question nobody asked.
-func validateFlags(cmd *cobra.Command) error {
+// The root calls this before anything else about the command runs, which is
+// what keeps an impossible value from costing a sign-in: `--format htm` is wrong
+// whoever you are, so reporting a missing password instead would be answering a
+// question nobody asked.
+func Judge(cmd *cobra.Command) error {
 	enumMu.Lock()
 	checks := checksByCmd[cmd]
 	enumMu.Unlock()

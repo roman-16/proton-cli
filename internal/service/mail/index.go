@@ -47,6 +47,7 @@ const (
 	// once, and it is what keeps a build from spending its whole time waiting
 	// for one round trip after another.
 	bodiesAtOnce = 10
+	indexShape   = 1
 )
 
 // stored is one message as the index holds it: everything a listing shows,
@@ -71,6 +72,7 @@ type stored struct {
 	Flags          int64       `json:"flags,omitempty"`
 	Labels         []string    `json:"labels"`
 	Attachments    int         `json:"attachments,omitempty"`
+	AddressID      string      `json:"address,omitempty"`
 	Expires        int64       `json:"expires,omitempty"`
 	Body           string      `json:"body,omitempty"`
 	// Opened says the body was fetched and read. A message whose body would not
@@ -126,6 +128,7 @@ func (s stored) envelopeIs(other stored) bool {
 		s.SenderAddress == other.SenderAddress && s.Time == other.Time &&
 		s.Order == other.Order && s.Unread == other.Unread && s.Flags == other.Flags &&
 		s.Attachments == other.Attachments && s.Expires == other.Expires &&
+		s.AddressID == other.AddressID && s.Size == other.Size &&
 		sameLabels(s.Labels, other.Labels) &&
 		slices.Equal(s.To, other.To) && slices.Equal(s.CC, other.CC) &&
 		slices.Equal(s.BCC, other.BCC)
@@ -200,6 +203,10 @@ func (s *Service) openIndex(ctx context.Context) (*indexSession, error) {
 	log, err := s.index.Load(ctx, search.AppMail)
 	if err != nil {
 		return nil, err
+	}
+	if log.State.Complete && log.State.Shape != indexShape {
+		slog.DebugContext(ctx, "mail: the index holds records of another shape, so it will be read again")
+		log.State.Stale = true
 	}
 	return &indexSession{s: s, log: log, oldest: map[string]int64{}, owed: map[string]int64{}}, nil
 }
@@ -431,7 +438,7 @@ func (x *indexSession) walkMailbox(ctx context.Context, sink progress.Sink) (sea
 	if err != nil {
 		return done, err
 	}
-	log.State.Complete, log.State.Stale = true, false
+	log.State.Complete, log.State.Stale, log.State.Shape = true, false, indexShape
 	sink.Done()
 	return done, x.save(ctx)
 }
@@ -750,7 +757,8 @@ func indexedFrom(m rawListMessage) stored {
 		SenderName: m.Sender.Name, SenderAddress: m.Sender.Address,
 		To: addressees(m.ToList), CC: addressees(m.CCList), BCC: addressees(m.BCCList),
 		Time: m.Time, Order: m.Order, Size: m.Size, Unread: m.Unread, Flags: m.Flags,
-		Labels: m.LabelIDs, Attachments: m.NumAttachments, Expires: m.ExpirationTime,
+		Labels: m.LabelIDs, Attachments: m.NumAttachments, AddressID: m.AddressID,
+		Expires: m.ExpirationTime,
 	}
 }
 

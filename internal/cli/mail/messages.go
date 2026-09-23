@@ -46,9 +46,7 @@ func listCmd() *cobra.Command {
 			"or through the copy `index create mail` builds, which does.\n\n" +
 			"Looks in the inbox unless told otherwise. Use --folder all to search\n" +
 			"everything.\n\n" +
-			"Newest first, or largest first with --sort size; --desc reverses either.\n" +
-			"Ordering by size is Proton's to do, so it is not answered from a local\n" +
-			"index and does not search bodies.",
+			"Newest first, or largest first with --sort size; --desc reverses either.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			opts, err := f.list(c.Ctx, c)
 			if err != nil {

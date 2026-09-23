@@ -58,11 +58,11 @@ These are the listings that can be narrowed, and what narrows them. The same fla
 - `proton drive trash list --desc --limit int --page int --sort string`
 - `proton drive volumes list --desc --limit int --page int --sort string`
 - `proton mail conversations attachments list REF --include-inline`
-- `proton mail conversations list --after string --before string --desc --folder string --from string --keyword string --limit int --newer-than string --older-than string --page int --sort string --starred --subject string --to string --unread`
+- `proton mail conversations list --after string --before string --desc --folder string --from string --has-attachments --keyword string --limit int --newer-than string --older-than string --page int --read --sort string --starred --subject string --to string --unread --via string`
 - `proton mail drafts list --desc --limit int --page int --sort string`
 - `proton mail mailing-lists list --desc --limit int --page int --sort string --unsubscribed`
 - `proton mail messages attachments list REF --include-inline`
-- `proton mail messages list --after string --before string --desc --folder string --from string --keyword string --limit int --newer-than string --older-than string --page int --sort string --starred --subject string --to string --unread`
+- `proton mail messages list --after string --before string --desc --folder string --from string --has-attachments --keyword string --limit int --newer-than string --older-than string --page int --read --sort string --starred --subject string --to string --unread --via string`
 - `proton mail protected attachments list LINK --eo-password-file string --include-inline`
 - `proton mail settings addresses list --limit int --page int`
 - `proton mail settings domains list --desc --limit int --page int --sort string`

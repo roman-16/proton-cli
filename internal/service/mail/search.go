@@ -40,10 +40,6 @@ type Coverage struct {
 	// Stale says Proton could not describe what has happened to the mailbox, so
 	// the copy answered as it stands and nothing knows what it is missing.
 	Stale bool
-	// Declined says there is an index and it could not answer this question, so
-	// Proton did. It is a different thing to say than having no index at all -
-	// what was lost is the same, and what to do about it is not.
-	Declined bool
 }
 
 // Search answers a question about messages: from the index when there is one,
@@ -55,10 +51,7 @@ func (s *Service) Search(ctx context.Context, opts ListOptions) ([]Message, int,
 		return msgs, total, cover, err
 	}
 	matched := matching(in, opts)
-	sortMessages(matched)
-	if opts.Reverse {
-		slices.Reverse(matched)
-	}
+	orderMessages(matched, opts)
 	page, total := pageOf(matched, opts)
 	out := make([]Message, 0, len(page))
 	for _, m := range page {
@@ -70,20 +63,17 @@ func (s *Service) Search(ctx context.Context, opts ListOptions) ([]Message, int,
 // SearchConversations is the same question about threads.
 //
 // A thread is its messages, so it is worked out from them rather than asked for
-// separately: what matches is any message of it, and what is shown about it is
-// what its messages say - which is the same thing Proton's own conversation
-// listing is built from.
+// separately: what matches is any message of it, a read thread being one with
+// nothing unread in it, and what is shown about it is what its messages say -
+// which is the same thing Proton's own conversation listing is built from.
 func (s *Service) SearchConversations(ctx context.Context, opts ListOptions) ([]Conversation, int, Coverage, error) {
 	in, cover, ok := s.searchable(ctx, opts)
 	if !ok {
 		convs, total, err := s.ConversationsList(ctx, opts)
 		return convs, total, cover, err
 	}
-	threads := threadsOf(in, matching(in, opts))
-	sort.SliceStable(threads, func(i, j int) bool { return threads[i].Time > threads[j].Time })
-	if opts.Reverse {
-		slices.Reverse(threads)
-	}
+	threads := matchingThreads(in, opts)
+	orderThreads(threads, opts)
 	page, total := pageOf(threads, opts)
 	return page, total, cover, nil
 }
@@ -97,13 +87,6 @@ func (s *Service) SearchConversations(ctx context.Context, opts ListOptions) ([]
 func (s *Service) searchable(ctx context.Context, opts ListOptions) ([]stored, Coverage, bool) {
 	if !opts.Narrowed() || !s.Indexed() {
 		return nil, Coverage{}, false
-	}
-	// A copy built before sizes were recorded holds none, and one built since
-	// holds them only for the messages it has read since. Neither can order a
-	// whole mailbox by size, and ordering by a field half the records are silent
-	// about would put the silent ones at one end and call it an answer.
-	if opts.Sort == SortBySize {
-		return nil, Coverage{Declined: true}, false
 	}
 	x, err := s.openIndex(ctx)
 	if err != nil {
@@ -181,7 +164,10 @@ func matching(in []stored, opts ListOptions) []stored {
 		case m.Expires > 0 && m.Expires <= now:
 		case folder != "" && folder != labelAllMail && !hasLabel(m.Labels, folder):
 		case opts.Unread && m.Unread == 0:
+		case opts.Read && m.Unread != 0:
 		case opts.Starred && !hasLabel(m.Labels, labelStarred):
+		case opts.HasAttachments && m.Attachments == 0:
+		case opts.AddressID != "" && m.AddressID != opts.AddressID:
 		case opts.ID != "" && m.ID != opts.ID:
 		case after > 0 && m.Time < after, before > 0 && m.Time > before:
 		case !search.Matches(terms, keywordFields(m)...):
@@ -224,6 +210,34 @@ func sortMessages(msgs []stored) {
 		}
 		return msgs[i].Order > msgs[j].Order
 	})
+}
+
+func orderMessages(msgs []stored, opts ListOptions) {
+	sortMessages(msgs)
+	if opts.Sort == SortBySize {
+		sort.SliceStable(msgs, func(i, j int) bool { return msgs[i].Size > msgs[j].Size })
+	}
+	if opts.Reverse {
+		slices.Reverse(msgs)
+	}
+}
+
+func matchingThreads(in []stored, opts ListOptions) []Conversation {
+	threads := threadsOf(in, matching(in, opts))
+	if opts.Read {
+		return slices.DeleteFunc(threads, func(c Conversation) bool { return c.NumUnread > 0 })
+	}
+	return threads
+}
+
+func orderThreads(threads []Conversation, opts ListOptions) {
+	sort.SliceStable(threads, func(i, j int) bool { return threads[i].Time > threads[j].Time })
+	if opts.Sort == SortBySize {
+		sort.SliceStable(threads, func(i, j int) bool { return threads[i].Size > threads[j].Size })
+	}
+	if opts.Reverse {
+		slices.Reverse(threads)
+	}
 }
 
 // pageOf cuts the page the caller asked for out of the whole result and reports
@@ -282,6 +296,7 @@ func thread(id string, msgs []stored) Conversation {
 		}
 		c.NumUnread += m.Unread
 		c.NumAttachments += m.Attachments
+		c.Size += m.Size
 		if !seenSender[m.SenderAddress] {
 			seenSender[m.SenderAddress] = true
 			c.Senders = append(c.Senders, map[string]any{"Name": m.SenderName, "Address": m.SenderAddress})

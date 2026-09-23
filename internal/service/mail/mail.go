@@ -112,9 +112,7 @@ type Message struct {
 	NumAttachments int      `json:"num_attachments"`
 	Labels         []string `json:"labels"`
 	// Size is how many bytes the message takes up, which is what --sort size
-	// orders by. It is absent rather than zero where it is not known: a mail
-	// index built before the copy recorded sizes answers everything else about a
-	// message and nothing about this.
+	// orders by.
 	Size int64 `json:"size,omitempty"`
 
 	// What Proton concluded about the message. Each is written only when it is
@@ -252,9 +250,12 @@ type ListOptions struct {
 	// After and Before bound the range by date: the first and last day to
 	// include, both of them whole and both of them included. The zero time is an
 	// end nobody named.
-	After, Before time.Time
-	Unread        bool
-	Starred       bool
+	After, Before  time.Time
+	Unread         bool
+	Read           bool
+	Starred        bool
+	HasAttachments bool
+	AddressID      string
 
 	// Sort is the key Proton orders the answer by - "time" or "size", and "time"
 	// when nothing asked. Reverse turns the order round: both keys run from the
@@ -292,7 +293,8 @@ const pageMax = 150
 // unmatched filter.
 func (o ListOptions) Narrowed() bool {
 	return o.Keyword != "" || o.From != "" || o.To != "" || o.Subject != "" ||
-		!o.After.IsZero() || !o.Before.IsZero() || o.Unread || o.Starred
+		!o.After.IsZero() || !o.Before.IsZero() || o.Unread || o.Read || o.Starred ||
+		o.HasAttachments || o.AddressID != ""
 }
 
 // decryptBody decrypts an armored PGP body with decKR and, when verKR is

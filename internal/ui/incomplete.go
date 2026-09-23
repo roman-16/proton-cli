@@ -1,5 +1,7 @@
 package ui
 
+import "github.com/roman-16/proton-cli/internal/inflect"
+
 // IncompleteSpec is what an answer could not include.
 //
 // Items decrypt on this machine, one at a time, and one that will not open is no
@@ -56,7 +58,7 @@ func (u *UI) incomplete(spec IncompleteSpec, sentence string) {
 // Sentence is the wording for a listing, which depends on whether what went
 // missing took anything with it.
 func (spec IncompleteSpec) Sentence() string {
-	subject := Quantity(spec.Count, spec.Kind+"s")
+	subject := Quantity(spec.Count, inflect.Plural(spec.Kind))
 	switch {
 	case spec.Hides && spec.Count == 1:
 		return subject + " could not be opened, so nothing inside it is listed."
@@ -71,7 +73,7 @@ func (spec IncompleteSpec) Sentence() string {
 // Caveat is the wording for a change: what the run could not read was left out
 // of what it did.
 func (spec IncompleteSpec) Caveat() string {
-	subject := Quantity(spec.Count, spec.Kind+"s")
+	subject := Quantity(spec.Count, inflect.Plural(spec.Kind))
 	switch {
 	case spec.Hides && spec.Count == 1:
 		return subject + " could not be opened, so nothing inside it was included."

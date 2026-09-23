@@ -3,6 +3,8 @@ package ui
 import (
 	"fmt"
 	"strings"
+
+	"github.com/roman-16/proton-cli/internal/inflect"
 )
 
 // Consequence is how much a mutation is worth stopping for.
@@ -222,7 +224,7 @@ func (s ResultSpec) message() string {
 		b.WriteString("Nothing to ")
 		b.WriteString(s.Action.Verb)
 	case s.Name != "" && s.Count == 1 && s.Kind != "":
-		b.WriteString(Singular(s.Kind))
+		b.WriteString(inflect.Singular(s.Kind))
 		b.WriteString(` "`)
 		b.WriteString(s.Name)
 		b.WriteString(`"`)
@@ -253,7 +255,7 @@ func (s ResultSpec) wouldLine(opening string, withTable bool) string {
 	if s.Name != "" && s.Count == 1 {
 		subject = s.Name
 		if s.Kind != "" {
-			subject = Singular(s.Kind) + ` "` + s.Name + `"`
+			subject = inflect.Singular(s.Kind) + ` "` + s.Name + `"`
 		}
 	}
 	line := fmt.Sprintf("%s %s %s", opening, s.Action.Verb, subject)
@@ -321,7 +323,7 @@ func (s ResultSpec) object() map[string]any {
 		"dry_run": s.DryRun,
 	}
 	if s.Kind != "" {
-		obj["kind"] = Singular(s.Kind)
+		obj["kind"] = inflect.Singular(s.Kind)
 	}
 	if len(s.IDs) > 0 {
 		obj["ids"] = s.IDs

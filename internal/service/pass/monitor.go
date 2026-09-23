@@ -1,9 +1,12 @@
 package pass
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
+	"slices"
 	"sort"
 	"time"
 
@@ -44,8 +47,9 @@ type MonitoredAddress struct {
 	Email     string `json:"email"`
 	// Type is which of the three kinds this is.
 	Type string `json:"type"`
-	// Breaches is how many breaches the address has appeared in.
-	Breaches int `json:"breaches"`
+	// Breaches is how many breaches the address has appeared in, and nil where
+	// the count did not come back.
+	Breaches *int `json:"breaches"`
 	// LastBreach is when the most recent one happened, as a Unix time, or zero
 	// when the address is clean.
 	LastBreach int64 `json:"last_breach,omitempty"`
@@ -181,9 +185,23 @@ func (s *Service) Monitored(ctx context.Context) ([]MonitoredAddress, error) {
 		out[i].settle()
 	}
 	// Worst first, because the reason to run this is to find what to deal with.
-	sort.SliceStable(out, func(i, j int) bool { return out[i].Breaches > out[j].Breaches })
+	slices.SortStableFunc(out, ByBreaches)
 	return out, nil
 }
+
+func ByBreaches(a, b MonitoredAddress) int { return cmp.Compare(breachRank(b), breachRank(a)) }
+
+func breachRank(a MonitoredAddress) int {
+	switch {
+	case a.Breaches == nil:
+		return 1
+	case *a.Breaches == 0:
+		return 0
+	}
+	return *a.Breaches + 1
+}
+
+func known(count int) *int { return &count }
 
 // watchedAddresses is the addresses Proton holds a record of: the account's own
 // and the ones added by hand.
@@ -210,7 +228,7 @@ func (s *Service) watchedAddresses(ctx context.Context) ([]MonitoredAddress, err
 				id, kind, verified = a.CustomEmailID, AddressCustom, a.Verified
 			}
 			row := MonitoredAddress{
-				AddressID: id, Email: a.Email, Type: kind, Breaches: a.BreachCounter,
+				AddressID: id, Email: a.Email, Type: kind, Breaches: known(a.BreachCounter),
 				Monitored: a.Flags&monitoringDisabled == 0, Verified: verified,
 			}
 			if a.LastBreachTime != nil {
@@ -234,43 +252,58 @@ func (s *Service) watchedAliases(ctx context.Context) ([]MonitoredAddress, error
 	if err != nil {
 		return nil, err
 	}
+	rows := aliasRows(items)
+	s.fillAliasBreaches(ctx, rows)
+	return rows, nil
+}
 
-	var (
-		out    []MonitoredAddress
-		counts []func(context.Context) error
-	)
+func aliasRows(items []Item) []MonitoredAddress {
+	var out []MonitoredAddress
 	for _, it := range items {
 		if it.Type != "alias" || it.Alias == "" {
 			continue
 		}
-		out = append(out, MonitoredAddress{
+		row := MonitoredAddress{
 			AddressID: ref.Join(it.ShareID, it.ItemID), Email: it.Alias, Type: AddressAlias,
 			Monitored: it.monitored, Verified: true,
 			shareID: it.ShareID, itemID: it.ItemID,
-		})
-		if !it.breached {
-			continue
 		}
-		counts = append(counts, s.countAliasBreaches(&out[len(out)-1]))
+		if !it.breached {
+			row.Breaches = known(0)
+		}
+		out = append(out, row)
+	}
+	return out
+}
+
+func (s *Service) fillAliasBreaches(ctx context.Context, rows []MonitoredAddress) {
+	var counts []func(context.Context) error
+	for i := range rows {
+		if rows[i].Breaches == nil {
+			counts = append(counts, s.countAliasBreaches(&rows[i]))
+		}
 	}
 	_ = fetch.Together(ctx, counts...)
-	return out, nil
 }
 
 // countAliasBreaches fills in how many breaches an alias is in and when the last
 // one was, which is on the far side of a request of its own.
 //
 // An alias whose count will not come back is still an alias that has been in a
-// breach, so the row stays and the shortfall is recorded: dropping it would turn
-// a failed request into an address that looks clean.
+// breach, so the row stays with its count unknown: dropping it, or calling the
+// count zero, would turn a failed request into an address that looks clean.
 func (s *Service) countAliasBreaches(row *MonitoredAddress) func(context.Context) error {
 	return func(ctx context.Context) error {
 		report, err := s.BreachesFor(ctx, *row)
 		if err != nil {
-			skip.Record(ctx, skip.KindAddress, row.AddressID, skip.Unreadable, err)
+			// Recorded and not counted: the row is listed, and its count reads as
+			// unknown on the screen and in JSON.
+			slog.DebugContext(ctx, "pass: an alias's breach count did not come back",
+				"kind", string(skip.KindAddress), "reason", string(skip.Unreadable),
+				"ref", row.AddressID, "error", err)
 			return nil
 		}
-		row.Breaches = len(report.Breaches) + report.Withheld
+		row.Breaches = known(len(report.Breaches) + report.Withheld)
 		for _, b := range report.Breaches {
 			if b.Published > row.LastBreach {
 				row.LastBreach = b.Published
@@ -386,6 +419,7 @@ func (s *Service) WatchAddress(ctx context.Context, email string) (*MonitoredAdd
 	}
 	added := &MonitoredAddress{
 		AddressID: r.Email.CustomEmailID, Email: r.Email.Email, Type: AddressCustom,
+		Breaches: known(r.Email.BreachCounter),
 		Verified: r.Email.Verified, Monitored: r.Email.Flags&monitoringDisabled == 0,
 	}
 	added.settle()

@@ -351,7 +351,7 @@ func (r Report) log() string {
 	if r.Kept == 0 {
 		return "No run has been recorded yet."
 	}
-	held := fmt.Sprintf("%s over %s on disk", count(r.Kept, "run"), count(r.Days, "day"))
+	held := fmt.Sprintf("%s over %s on disk", ui.Quantity(r.Kept, "runs"), ui.Quantity(r.Days, "days"))
 	if len(r.Runs) == r.Kept {
 		return held + "."
 	}
@@ -359,13 +359,6 @@ func (r Report) log() string {
 		return held + "; this is the last one that failed."
 	}
 	return held + "; nothing failed, so this is the last one."
-}
-
-func count(n int, thing string) string {
-	if n == 1 {
-		return "1 " + thing
-	}
-	return fmt.Sprintf("%d %ss", n, thing)
 }
 
 // heading names a run the way a reader looks for one: which run, what it was,

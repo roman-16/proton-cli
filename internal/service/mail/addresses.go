@@ -123,13 +123,7 @@ func (s *Service) ResolveAddress(ctx context.Context, r string) (*Address, error
 			return &a, nil
 		}
 	}
-	picked, err := ref.Pick("address", r, addrs,
-		func(a Address) string { return a.ID },
-		func(a Address) string { return a.Email })
-	if err != nil {
-		return nil, err
-	}
-	return &picked, nil
+	return nil, &errs.NotFound{Kind: "address", Ref: r}
 }
 
 // AddressCreate adds an address to the account and gives it its first key.

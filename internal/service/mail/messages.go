@@ -30,6 +30,7 @@ type rawListMessage struct {
 	NumAttachments int
 	LabelIDs       []string
 	Flags          int64
+	AddressID      string
 	// Size is the whole message in bytes, which --sort size orders by.
 	Size int64
 	// Order is where Proton puts the message among the others of its second,
@@ -96,6 +97,15 @@ func listQuery(opts ListOptions, recipients bool) url.Values {
 	q.Set("Desc", map[bool]string{true: "0", false: "1"}[opts.Reverse])
 	if opts.Unread {
 		q.Set("Unread", "1")
+	}
+	if opts.Read {
+		q.Set("Unread", "0")
+	}
+	if opts.HasAttachments {
+		q.Set("Attachments", "1")
+	}
+	if opts.AddressID != "" {
+		q.Set("AddressID", opts.AddressID)
 	}
 	if opts.Keyword != "" {
 		q.Set("Keyword", opts.Keyword)

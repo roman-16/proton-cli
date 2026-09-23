@@ -127,6 +127,30 @@ func TestContradictoryFlagsAreRefused(t *testing.T) {
 	refuses(t, 1, []string{"account", "sessions", "revoke", "--others", "some-uid"}, "--others")
 }
 
+func TestFlagsThatContradictAreRefusedInOneSentence(t *testing.T) {
+	for _, tt := range []struct {
+		args   []string
+		phrase string
+	}{
+		{[]string{"mail", "messages", "list", "--read", "--unread"}, "--read and --unread"},
+		{[]string{"mail", "conversations", "trash", "--unread", "--read"}, "--read and --unread"},
+		{[]string{"drive", "items", "list", "--computer", "Laptop", "--shared", "Photos"},
+			"--computer and --shared"},
+		{[]string{"mail", "settings", "filters", "create", "--name", "Receipts",
+			"--if", "subject contains receipt", "--sieve", "-"}, "--if and --sieve"},
+		{[]string{"mail", "settings", "addresses", "update", "me@proton.me",
+			"--signature", "Best, Jane", "--clear-signature"}, "--signature and --clear-signature"},
+		{[]string{"calendar", "events", "update", "some-event", "--remind", "15m", "--no-remind"},
+			"--remind and --no-remind"},
+		{[]string{"calendar", "settings", "calendars", "update", "Work", "--remind", "15m", "--no-remind"},
+			"--remind and --no-remind"},
+		{[]string{"calendar", "settings", "calendars", "update", "Work", "--remind-all-day", "1d", "--no-remind"},
+			"--remind-all-day and --no-remind"},
+	} {
+		refuses(t, 1, tt.args, tt.phrase+" contradict each other.")
+	}
+}
+
 // An order is named or it is alphabetical, and a command line that asks for
 // both, or for neither, says nothing about what the order should be.
 func TestAReorderAsksForOneOrderOrTheOther(t *testing.T) {
@@ -293,7 +317,7 @@ func TestANewRevisionInALinkIsRefused(t *testing.T) {
 func TestNamingTwoDriveTreesAtOnceIsRefused(t *testing.T) {
 	refuses(t, 1, []string{"drive", "items", "list", "/", "--shared", "Project",
 		"--link", "https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL"},
-		"[link shared] were all set")
+		"--shared and --link contradict each other.")
 }
 
 // A link's password is a secret like every other one here, so it is read from a

@@ -137,6 +137,20 @@ func TestListQueryFieldMapping(t *testing.T) {
 	}
 }
 
+func TestListQuerySelectsByAddressAttachmentsAndReadState(t *testing.T) {
+	q := listQuery(ListOptions{Read: true, HasAttachments: true, AddressID: "addr-1"}, false)
+	for k, want := range map[string]string{"Unread": "0", "Attachments": "1", "AddressID": "addr-1"} {
+		if q.Get(k) != want {
+			t.Errorf("%s = %q, want %q", k, q.Get(k), want)
+		}
+	}
+	for _, k := range []string{"Unread", "Attachments", "AddressID"} {
+		if q := listQuery(ListOptions{}, true); q.Has(k) {
+			t.Errorf("a query that asked for nothing carries %s=%q", k, q.Get(k))
+		}
+	}
+}
+
 func TestListQueryRecipientsForConversations(t *testing.T) {
 	q := listQuery(ListOptions{To: "b@x.com", PageSize: 5}, true)
 	if q.Get("Recipients") != "b@x.com" {

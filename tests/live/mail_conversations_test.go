@@ -3,9 +3,12 @@ package live
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/roman-16/proton-cli/tests/fixture"
 )
 
 // Conversations: a thread is not the sum of its messages.
@@ -286,4 +289,20 @@ func conversationHasLabel(convID, labelID string) bool {
 		return false
 	}
 	return strings.Contains(stdout, `"`+labelID+`"`)
+}
+
+func TestMailConversationsListReadAndWithAttachments(t *testing.T) {
+	for _, row := range runJSONArray(t, "mail", "conversations", "list", "--folder", "all", "--read", "--limit", "20") {
+		c, _ := row.(map[string]interface{})
+		if unread, _ := c["num_unread"].(float64); unread != 0 {
+			t.Errorf("--read listed thread %v, which has %v unread", c["id"], unread)
+		}
+	}
+
+	_, thread, _, _ := attachedMail(t)
+	found := listAll(t, "mail", "conversations", "list", "--folder", "all", "--has-attachments",
+		"--subject", fixture.Attachments.Subject)
+	if !slices.Contains(rowIDs(found), thread) {
+		t.Errorf("--has-attachments did not find the thread that has them (%s) among %v", thread, rowIDs(found))
+	}
 }

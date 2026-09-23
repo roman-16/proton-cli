@@ -2,9 +2,11 @@ package mail
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/roman-16/proton-cli/internal/cli/kit"
+	"github.com/roman-16/proton-cli/internal/errs"
 	mailsvc "github.com/roman-16/proton-cli/internal/service/mail"
 	"github.com/roman-16/proton-cli/internal/units"
 	"github.com/spf13/cobra"
@@ -18,13 +20,16 @@ import (
 
 // filters are the ways to say "which messages" without naming them.
 type filters struct {
-	unread  bool
-	starred bool
-	from    string
-	to      string
-	subject string
-	keyword string
-	folder  string
+	unread         bool
+	read           bool
+	starred        bool
+	hasAttachments bool
+	from           string
+	to             string
+	via            string
+	subject        string
+	keyword        string
+	folder         string
 	// whereByDefault is the folder used when none was given. It is kept apart
 	// from folder so that a default never counts as something the user asked
 	// for: a bulk verb refuses an empty selection, and a folder nobody named
@@ -54,9 +59,13 @@ func (f *filters) registerNarrowing(c *cobra.Command, folder string) {
 	f.whereByDefault = folder
 	fl := c.Flags()
 	fl.BoolVar(&f.unread, "unread", false, "Match unread messages")
+	fl.BoolVar(&f.read, "read", false, "Match read messages")
+	kit.Exclusive(c, "read", "unread")
 	fl.BoolVar(&f.starred, "starred", false, "Match starred messages")
+	fl.BoolVar(&f.hasAttachments, "has-attachments", false, "Match messages with attachments")
 	fl.StringVar(&f.from, "from", "", "Match the sender's address")
 	fl.StringVar(&f.to, "to", "", "Match a recipient's address")
+	fl.StringVar(&f.via, "via", "", "Match mail that arrived at, or left from, this address of yours")
 	fl.StringVar(&f.subject, "subject", "", "Match text in the subject")
 	fl.StringVar(&f.keyword, "keyword", "", "Match text in the subject, a name or an address, and in bodies once a mail index exists")
 	f.days.Register(c)
@@ -80,8 +89,8 @@ const defaultLimit = 150
 // empty answer means an empty folder or an unmatched filter. The folder is not
 // part of it: opening a different folder is still a listing.
 func (f *filters) narrowed() bool {
-	return f.unread || f.starred || f.from != "" || f.to != "" || f.subject != "" ||
-		f.keyword != "" || f.days.Set() || f.age.Set()
+	return f.unread || f.read || f.starred || f.hasAttachments || f.from != "" || f.to != "" ||
+		f.via != "" || f.subject != "" || f.keyword != "" || f.days.Set() || f.age.Set()
 }
 
 // set reports whether the user asked for a filtered selection at all.
@@ -108,6 +117,14 @@ func (f *filters) list(ctx context.Context, c *kit.Invocation) (mailsvc.ListOpti
 		}
 		folder = box.ID
 	}
+	addressID := ""
+	if f.via != "" {
+		address, err := ownAddress(ctx, c, f.via)
+		if err != nil {
+			return mailsvc.ListOptions{}, err
+		}
+		addressID = address.ID
+	}
 	after, before := f.days.Days()
 	key, err := f.order.Key()
 	if err != nil {
@@ -115,7 +132,8 @@ func (f *filters) list(ctx context.Context, c *kit.Invocation) (mailsvc.ListOpti
 	}
 	opts := mailsvc.ListOptions{
 		Keyword: f.keyword, From: f.from, To: f.to, Subject: f.subject,
-		Folder: folder, Unread: f.unread, Starred: f.starred,
+		Folder: folder, Unread: f.unread, Read: f.read, Starred: f.starred,
+		HasAttachments: f.hasAttachments, AddressID: addressID,
 		After: after, Before: before,
 		Sort: key, Reverse: f.order.Desc,
 		Page: f.page.Number, PageSize: f.page.Size,
@@ -137,6 +155,20 @@ func (f *filters) list(ctx context.Context, c *kit.Invocation) (mailsvc.ListOpti
 		opts.After = time.Now().Add(-d)
 	}
 	return opts, nil
+}
+
+func ownAddress(ctx context.Context, c *kit.Invocation, ref string) (mailsvc.Address, error) {
+	expanded, err := kit.Expand(c.App, ref)
+	if err != nil {
+		return mailsvc.Address{}, err
+	}
+	address, err := addressList(c).Find(ctx, expanded)
+	var missing *errs.NotFound
+	if errors.As(err, &missing) {
+		missing.Where = "of yours"
+		missing.Try = append(missing.Try, "--to "+ref+" matches mail sent to it.")
+	}
+	return address, err
 }
 
 // filterHint names the filters this command actually has, so the error a user
@@ -247,22 +279,15 @@ func selectConversations(c *kit.Invocation, f *filters) (kit.Selection[mailsvc.C
 // on the screen distinguishes "there is no such message" from "the part of your
 // mailbox that has it is not indexed".
 //
-// There are five ways it is short, and they are not the same thing to do
+// There are four ways it is short, and they are not the same thing to do
 // something about. No index at all means Proton answered, which is subjects,
-// names and addresses and not a word of what any message says. An index that
-// declined the question means the same loss with a different remedy: the order
-// that was asked for is the one it cannot apply. A mailbox still being read is
-// missing older mail outright. A mailbox whose bodies are still arriving holds
+// names and addresses and not a word of what any message says. A mailbox still
+// being read is missing older mail outright. A mailbox whose bodies are still arriving holds
 // every message and can be searched by everything except what the ones at the
 // far end say. An index Proton could not describe the changes to is missing
 // nothing anybody can name, which is exactly why it has to be said.
 func shortIndex(c *kit.Invocation, cover mailsvc.Coverage, opts mailsvc.ListOptions) {
 	switch {
-	case cover.Declined && opts.Keyword != "":
-		c.Warn("The mail index on this machine does not record message size, so Proton " +
-			"searched subjects, names and addresses and no bodies. Drop --sort size to " +
-			"search bodies again.")
-	case cover.Declined:
 	case !cover.Indexed && opts.Keyword != "":
 		c.Warn("There is no mail index on this machine, so Proton searched subjects, names "+
 			"and addresses and no bodies. `%s index create mail` makes bodies searchable.",

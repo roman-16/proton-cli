@@ -120,7 +120,7 @@ func (p *Password) Declare(c *cobra.Command) {
 		return
 	}
 	f.BoolVar(&p.clear, "clear-"+p.name, false, p.clearUsage)
-	c.MarkFlagsMutuallyExclusive(p.name+"-file", "clear-"+p.name)
+	Exclusive(c, p.name+"-file", "clear-"+p.name)
 }
 
 // Supply claims standard input if the path says so, before anything else can

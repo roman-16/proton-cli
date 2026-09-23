@@ -3,6 +3,8 @@ package ui
 import (
 	"fmt"
 	"strings"
+
+	"github.com/roman-16/proton-cli/internal/inflect"
 )
 
 // FooterSpec describes what a collection actually returned, so one generator can
@@ -65,7 +67,7 @@ func Footer(s FooterSpec) string {
 // form rather than a sentence.
 func Quantity(n int, plural string) string {
 	if n == 1 {
-		return "1 " + Singular(plural)
+		return "1 " + inflect.Singular(plural)
 	}
 	return fmt.Sprintf("%d %s", n, plural)
 }
@@ -92,20 +94,3 @@ func Listing(names []string) string {
 // write as `.count` or `.messages[]`. Most nouns are a single word and come
 // through unchanged.
 func Key(noun string) string { return strings.ReplaceAll(noun, " ", "_") }
-
-// Singular derives the singular of a collection noun. Collection names in this
-// CLI are ordinary English plurals, so three suffix rules cover all of them:
-// "addresses"/"aliases" lose "es", "entries"/"bodies" trade "ies" for "y", and
-// everything else loses "s".
-func Singular(plural string) string {
-	switch {
-	case strings.HasSuffix(plural, "ses"), strings.HasSuffix(plural, "xes"),
-		strings.HasSuffix(plural, "ches"), strings.HasSuffix(plural, "shes"):
-		return strings.TrimSuffix(plural, "es")
-	case strings.HasSuffix(plural, "ies"):
-		return strings.TrimSuffix(plural, "ies") + "y"
-	case strings.HasSuffix(plural, "s"):
-		return strings.TrimSuffix(plural, "s")
-	}
-	return plural
-}

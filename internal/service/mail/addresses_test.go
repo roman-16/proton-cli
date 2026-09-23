@@ -166,6 +166,53 @@ func TestPlusAliasBase(t *testing.T) {
 	}
 }
 
+type listedAddresses []map[string]any
+
+func (l listedAddresses) Do(context.Context, proton.Request) (*proton.Response, error) {
+	return &proton.Response{Status: 200, Body: []byte(`{"Code":1000}`)}, nil
+}
+
+func (l listedAddresses) Decode(_ context.Context, req proton.Request, out any) error {
+	if req.Path != "/core/v4/addresses" {
+		return fmt.Errorf("unexpected request %s %s", req.Method, req.Path)
+	}
+	body, err := json.Marshal(map[string]any{"Code": 1000, "Addresses": l})
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(body, out)
+}
+
+func TestResolveAddressFindsOnlyWhatWasNamed(t *testing.T) {
+	one := listedAddresses{{"ID": "me-id", "Email": "me@proton.me", "Order": 1}}
+	several := append(listedAddresses{}, one[0], map[string]any{"ID": "work-id", "Email": "work@example.com", "Order": 2})
+	for _, tc := range []struct {
+		name   string
+		listed listedAddresses
+		ref    string
+		want   string
+	}{
+		{"an address by its email", several, "WORK@example.com", "work-id"},
+		{"a plus-alias of an address", several, "me+shop@proton.me", "me-id"},
+		{"a typo on an account with one address", one, "typo@example.com", ""},
+		{"a typo on an account with several", several, "typo@example.com", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := New(tc.listed, nil).ResolveAddress(t.Context(), tc.ref)
+			if tc.want != "" {
+				if err != nil || got.ID != tc.want {
+					t.Fatalf("ResolveAddress(%q) = %v, %v; want %s", tc.ref, got, err, tc.want)
+				}
+				return
+			}
+			var notFound *errs.NotFound
+			if !errors.As(err, &notFound) || exitCodeOf(err) != 3 {
+				t.Errorf("ResolveAddress(%q) = %v, %v; want an address that is not found", tc.ref, got, err)
+			}
+		})
+	}
+}
+
 // exitCodeOf reports the exit code an error carries, or 0.
 func exitCodeOf(err error) int {
 	type exitCoder interface{ ExitCode() int }

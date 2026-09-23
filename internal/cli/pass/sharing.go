@@ -9,6 +9,7 @@ import (
 
 	"github.com/roman-16/proton-cli/internal/cli/kit"
 	"github.com/roman-16/proton-cli/internal/errs"
+	"github.com/roman-16/proton-cli/internal/inflect"
 	passsvc "github.com/roman-16/proton-cli/internal/service/pass"
 	"github.com/roman-16/proton-cli/internal/ui"
 	"github.com/roman-16/proton-cli/internal/units"
@@ -209,8 +210,8 @@ func offer(c *kit.Invocation, shareID, itemID, email, role string) (passsvc.Stag
 func warnHeld(c *kit.Invocation, noun string) {
 	c.Warn("%s has no Proton account, so there is no key to send yet. Proton has "+
 		"emailed an invitation to create one. Nothing reaches them until they have an "+
-		"account and you run `%s pass %ss share confirm %s %s`, and nothing will remind you.",
-		c.Args[1], kit.Program, noun, c.Args[0], c.Args[1])
+		"account and you run `%s pass %s share confirm %s %s`, and nothing will remind you.",
+		c.Args[1], kit.Program, inflect.Plural(noun), c.Args[0], c.Args[1])
 }
 
 // Handing the keys over is its own verb because a CLI has no moment to do it in.

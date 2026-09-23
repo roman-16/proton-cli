@@ -158,19 +158,12 @@ func StepExpand(c *Invocation) error {
 
 // Run wires a command body to cobra, running the declared steps first.
 //
-// Before any step, every enum flag the command declared is checked. Local
-// validation preceding the network is a rule rather than a habit: a value that
-// could never have been sent should not first cost a sign-in to discover.
-//
-// Which is why no step asserts that an account exists, and why none of them
-// unlocks the account's keys: both requirements belong to the request, and the
-// client holds them there, so a command body judges what it can judge first and
-// only then finds out whether anyone is signed in.
+// No step asserts that an account exists, and none of them unlocks the
+// account's keys: both requirements belong to the request, and the client holds
+// them there, so a command body judges what it can judge first and only then
+// finds out whether anyone is signed in.
 func Run(steps []Step, h Handler) func(*cobra.Command, []string) error {
 	return func(cmd *cobra.Command, args []string) error {
-		if err := validateFlags(cmd); err != nil {
-			return err
-		}
 		// Everything from here on is the command's own work, so a failure with no
 		// words on it is this CLI's rather than the caller's - which is the one
 		// distinction the exit code cannot make for itself, since cobra's

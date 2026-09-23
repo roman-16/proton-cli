@@ -2,6 +2,7 @@ package mail
 
 import (
 	"context"
+	"slices"
 	"testing"
 	"time"
 )
@@ -226,4 +227,94 @@ func TestStarredIsAskedAsTheLabelItIs(t *testing.T) {
 	if total != 3 || len(rows) != 3 {
 		t.Errorf("got %d of %d across the account, want all three", len(rows), total)
 	}
+}
+
+func TestTheIndexNarrowsByReadStateAttachmentsAndAddress(t *testing.T) {
+	read := indexed("read", "One", "", 100, labelInbox)
+	unread := indexed("unread", "One", "", 200, labelInbox)
+	unread.Unread = 1
+	attached := indexed("attached", "One", "", 300, labelInbox)
+	attached.Attachments = 2
+	work := indexed("work", "One", "", 400, labelInbox)
+	work.AddressID = "work-id"
+	in := []stored{read, unread, attached, work}
+	for _, tc := range []struct {
+		name string
+		opts ListOptions
+		want []string
+	}{
+		{"read", ListOptions{Read: true}, []string{"read", "attached", "work"}},
+		{"unread", ListOptions{Unread: true}, []string{"unread"}},
+		{"with attachments", ListOptions{HasAttachments: true}, []string{"attached"}},
+		{"on one address", ListOptions{AddressID: "work-id"}, []string{"work"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := ids(matching(in, tc.opts)); !slices.Equal(got, tc.want) {
+				t.Errorf("matched %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestAThreadIsReadOnlyWhenNothingInItIsUnread(t *testing.T) {
+	first := indexed("a", "Plans", "", 100, labelInbox)
+	first.ConversationID = "mixed"
+	reply := indexed("b", "Re: Plans", "", 200, labelInbox)
+	reply.ConversationID, reply.Unread = "mixed", 1
+	settled := indexed("c", "Done", "", 300, labelInbox)
+	settled.ConversationID = "settled"
+	in := []stored{first, reply, settled}
+
+	if got := matchingThreads(in, ListOptions{Read: true}); len(got) != 1 || got[0].ID != "settled" {
+		t.Errorf("read threads = %v, want only the one with nothing unread", threadIDs(got))
+	}
+	if got := matchingThreads(in, ListOptions{Unread: true}); len(got) != 1 || got[0].ID != "mixed" {
+		t.Errorf("unread threads = %v, want the one with an unread message", threadIDs(got))
+	}
+}
+
+func TestTheIndexOrdersBySizeEitherWay(t *testing.T) {
+	small := indexed("small", "One", "", 300, labelInbox)
+	small.Size = 10
+	large := indexed("large", "One", "", 100, labelInbox)
+	large.Size = 900
+	mid := indexed("mid", "One", "", 200, labelInbox)
+	mid.Size = 500
+	msgs := []stored{small, large, mid}
+
+	orderMessages(msgs, ListOptions{Sort: SortBySize})
+	if got := ids(msgs); !slices.Equal(got, []string{"large", "mid", "small"}) {
+		t.Errorf("by size = %v, want largest first", got)
+	}
+	orderMessages(msgs, ListOptions{Sort: SortBySize, Reverse: true})
+	if got := ids(msgs); !slices.Equal(got, []string{"small", "mid", "large"}) {
+		t.Errorf("by size reversed = %v, want smallest first", got)
+	}
+	orderMessages(msgs, ListOptions{})
+	if got := ids(msgs); !slices.Equal(got, []string{"small", "mid", "large"}) {
+		t.Errorf("by time = %v, want newest first", got)
+	}
+}
+
+func TestAThreadIsAsLargeAsItsMessages(t *testing.T) {
+	first := indexed("a", "Plans", "", 100, labelInbox)
+	first.ConversationID, first.Size = "long", 400
+	reply := indexed("b", "Re: Plans", "", 200, labelInbox)
+	reply.ConversationID, reply.Size = "long", 600
+	single := indexed("c", "Plans", "", 300, labelInbox)
+	single.ConversationID, single.Size = "short", 700
+
+	threads := matchingThreads([]stored{first, reply, single}, ListOptions{Subject: "Plans"})
+	orderThreads(threads, ListOptions{Sort: SortBySize})
+	if len(threads) != 2 || threads[0].ID != "long" || threads[0].Size != 1000 {
+		t.Errorf("threads by size = %+v, want the thread of 1000 bytes first", threads)
+	}
+}
+
+func threadIDs(threads []Conversation) []string {
+	out := make([]string, 0, len(threads))
+	for _, c := range threads {
+		out = append(out, c.ID)
+	}
+	return out
 }

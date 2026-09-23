@@ -17,11 +17,11 @@ proton mail messages trash 5bH2mQxK --unread --folder spam                  # bo
 | `--larger-than` · `--smaller-than` | By size |
 | `--pattern` | The name, against a glob |
 | `--keyword` | Text in what a thing says, as well as what it is called |
-| `--unread` · `--starred` · `--type` | By state or kind |
+| `--read` · `--unread` · `--starred` · `--type` | By state or kind |
 | `--all` | Everything in scope, rather than a subset |
 | `--limit` | How many a bulk verb may affect, or a listing holds |
 
-Each command's own page lists the filters it takes. Mail adds `--from`, `--to`, `--subject`, `--after` and `--before`.
+Each command's own page lists the filters it takes. Mail adds `--from`, `--to`, `--via`, `--subject`, `--has-attachments`, `--after` and `--before`.
 
 What `--keyword` reads inside things - a message body, a file's text - is what an index on this machine holds: [Local index](../index/README.md).
 
@@ -45,7 +45,7 @@ A command needs at least one reference or one filter:
 ```console
 $ proton mail messages trash
 Error: Nothing selected.
-Try:   pass a REF, or a filter such as --unread, --starred, --from or --older-than.
+Try:   pass a REF, or a filter such as --unread, --starred, --from, --subject or --older-than.
        Use --all to target a whole folder.
 ```
 

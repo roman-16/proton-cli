@@ -700,6 +700,52 @@ func TestARecordThatWentBadIsReadFromTheMailboxAgain(t *testing.T) {
 	}
 }
 
+func TestAnIndexOfAnotherShapeIsReadFromTheMailboxAgain(t *testing.T) {
+	m := newMailbox(t, 3)
+	s := indexService(t, m)
+	build(t, s)
+
+	statePath := filepath.Join(s.index.Dir(), "mail.json")
+	data, err := os.ReadFile(statePath)
+	if err != nil {
+		t.Fatalf("read the state: %v", err)
+	}
+	var state map[string]any
+	if err := json.Unmarshal(data, &state); err != nil {
+		t.Fatalf("parse the state: %v", err)
+	}
+	delete(state, "shape")
+	if data, err = json.Marshal(state); err != nil {
+		t.Fatalf("write the state: %v", err)
+	}
+	if err := os.WriteFile(statePath, data, 0600); err != nil {
+		t.Fatalf("write the state: %v", err)
+	}
+	for i := range m.messages {
+		m.messages[i].AddressID, m.messages[i].Size = "addr-1", int64(1000+i)
+	}
+
+	x := indexing(t, s)
+	if !x.Status().Stale {
+		t.Fatal("an index of another shape opened as current")
+	}
+	fetched := m.fetched.Load()
+	if _, err := x.Build(t.Context(), progress.Nop{}); err != nil {
+		t.Fatalf("read again: %v", err)
+	}
+	for id, in := range inTheIndex(t, s) {
+		if in.AddressID != "addr-1" || in.Size == 0 || !in.Opened {
+			t.Errorf("%s = %+v, want its address and size beside the body it had", id, in)
+		}
+	}
+	if m.fetched.Load() != fetched {
+		t.Errorf("reading it again fetched %d bodies, want none", m.fetched.Load()-fetched)
+	}
+	if st := indexing(t, s).Status(); st.Stale || !st.Complete {
+		t.Errorf("status = %+v, want a current index", st)
+	}
+}
+
 // The summary beside the log says how many bodies it holds, and a run that
 // stopped between writing bodies and writing the summary leaves it behind. Any
 // run that touches the index afterwards - a search included - puts it right,

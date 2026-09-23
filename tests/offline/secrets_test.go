@@ -79,7 +79,7 @@ func TestAPasswordSetOnSomethingIsJudgedBeforeTheNetwork(t *testing.T) {
 	refuses(t, 1, append(link, "--link-password-file", empty), "is empty")
 	refuses(t, 1, append(link, "--link-password-file", tooLong), "at most 50 characters")
 	refuses(t, 1, append(link, "--clear-link-password", "--link-password-file", tooLong),
-		"none of the others")
+		"--link-password-file and --clear-link-password contradict each other.")
 	// A duration of nothing is what an arithmetic mistake produces, so it is
 	// refused rather than read as the word for no expiry.
 	refuses(t, 1, append(link, "--expires", "0s"), "longer than nothing", "--expires never")

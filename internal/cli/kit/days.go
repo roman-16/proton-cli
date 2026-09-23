@@ -11,7 +11,7 @@ import (
 //
 // A listing over a range of days judges two things nobody needs a session to
 // judge: that each date is a date, and that the range runs forwards. Declaring the
-// pair once is what has Run refuse both of those before the first request, and
+// pair once is what has Judge refuse both of those before the first request, and
 // keeps every listing that takes a range taking the same one - a mail listing and
 // a calendar listing are the same question about two collections.
 //
@@ -62,7 +62,7 @@ func (d *DayRange) Days() (first, last time.Time) {
 }
 
 // Or returns the range asked for, over a listing whose own range is the given
-// days. Run has already validated the flags by the time a body can call it.
+// days. Judge has already validated the flags by the time a body can call it.
 //
 // An end nobody named never contradicts one they did. Given one end alone, the
 // other sits the default span away from it, so a day past the end of the default

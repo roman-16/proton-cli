@@ -92,6 +92,16 @@ func TestIndexMakesBodiesSearchable(t *testing.T) {
 	if got := found[0].(map[string]interface{})["subject"]; got != subject {
 		t.Errorf("matched %v, want the message whose body says it", got)
 	}
+
+	if got := runJSONArray(t, "mail", "messages", "list", "--keyword", token, "--folder", "all", "--sort", "size"); len(got) != 1 {
+		t.Errorf("a body keyword ordered by size matched %d messages, want 1", len(got))
+	}
+	if got := runJSONArray(t, "mail", "messages", "list", "--keyword", token, "--folder", "all", "--via", selfEmail()); len(got) != 1 {
+		t.Errorf("a body keyword on the address it came to matched %d messages, want 1", len(got))
+	}
+	if got := runJSONArray(t, "mail", "messages", "list", "--keyword", token, "--folder", "all", "--has-attachments"); len(got) != 0 {
+		t.Errorf("a body keyword with --has-attachments matched %d messages, which carry none", len(got))
+	}
 }
 
 // A thread is found by a word in any of its messages, so the same search

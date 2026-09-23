@@ -92,9 +92,6 @@ func addressesUpdateCmd() *cobra.Command {
 			"line breaks; --html passes markup through untouched.",
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			setName, setSig := c.Changed("display-name"), c.Changed("signature")
-			if clear && setSig {
-				return kit.Fail("--clear-signature and --signature contradict each other.")
-			}
 			if !setName && !setSig && !clear {
 				return kit.Fail("Nothing to change.").
 					Hint("pass --display-name, --signature or --clear-signature.")
@@ -133,6 +130,7 @@ func addressesUpdateCmd() *cobra.Command {
 	c.Flags().StringVar(&signature, "signature", "", "Signature appended to mail from this address (- reads stdin)")
 	c.Flags().BoolVar(&html, "html", false, "Treat the signature as HTML rather than escaping it")
 	c.Flags().BoolVar(&clear, "clear-signature", false, "Remove the signature")
+	kit.Exclusive(c, "signature", "clear-signature")
 	return c
 }
 

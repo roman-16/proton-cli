@@ -50,12 +50,12 @@ func (t *tree) register(c *cobra.Command, r relation) {
 	c.Flags().StringVar(&t.computer, "computer", "", "Work inside this computer's files, by name or ID")
 	c.Flags().StringVar(&t.shared, "shared", "", "Work inside an item shared with you, by name or ID")
 	if r == manages {
-		c.MarkFlagsMutuallyExclusive("computer", "shared")
+		kit.Exclusive(c, "computer", "shared")
 		return
 	}
 	t.password = kit.LinkPasswordToOpen()
 	c.Flags().StringVar(&t.link, "link", "", "Work inside a public link somebody sent you, by URL")
-	c.MarkFlagsMutuallyExclusive("computer", "shared", "link")
+	kit.Exclusive(c, "computer", "shared", "link")
 	t.password.Declare(c)
 }
 

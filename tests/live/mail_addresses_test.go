@@ -58,6 +58,14 @@ func TestMailSettingsAddressesGetByEmail(t *testing.T) {
 	assertContains(t, stdout, "Can Send:")
 }
 
+func TestMailSettingsAddressesGetRefusesAnAddressThatIsNotThere(t *testing.T) {
+	typo := testID() + "@example.com"
+	_, stderr, code := run(t, "mail", "settings", "addresses", "get", typo)
+	if code != 3 || !strings.Contains(stderr, "No address matching") {
+		t.Errorf("getting %s exited %d, want 3 and no address: %s", typo, code, truncateOutput(stderr))
+	}
+}
+
 func TestMailSettingsAddressesUpdateSignature(t *testing.T) {
 	addrID := primaryAddressID(t)
 	original := addressSignature(t, addrID)

@@ -26,7 +26,7 @@ func TestOneWayOfRecoveringAtATime(t *testing.T) {
 		{"--previous-password-file", file, "--recovery-file", "x"},
 	} {
 		refuses(t, 1, append([]string{"account", "keys", "reactivate"}, args...),
-			"are set none of the others can be")
+			"contradict each other.")
 	}
 }
 

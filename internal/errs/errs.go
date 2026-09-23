@@ -12,6 +12,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/roman-16/proton-cli/internal/inflect"
 )
 
 // ExitCoder is implemented by errors that carry a specific process exit code.
@@ -194,7 +196,11 @@ type Ambiguous struct {
 }
 
 func (e *Ambiguous) Error() string {
-	return fmt.Sprintf("%q matches %d %s.", e.Ref, len(e.Candidates), plural(e.Kind, len(e.Candidates)))
+	noun := e.Kind
+	if len(e.Candidates) != 1 {
+		noun = inflect.Plural(e.Kind)
+	}
+	return fmt.Sprintf("%q matches %d %s.", e.Ref, len(e.Candidates), noun)
 }
 
 func (e *Ambiguous) ExitCode() int { return 4 }
@@ -336,11 +342,4 @@ func opensWithIdentifier(s string) bool {
 	}
 	first, _, _ := strings.Cut(s, " ")
 	return strings.ContainsAny(first, "-_/=.@0123456789")
-}
-
-func plural(noun string, n int) string {
-	if n == 1 {
-		return noun
-	}
-	return noun + "s"
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/roman-16/proton-cli/internal/accent"
 	"github.com/roman-16/proton-cli/internal/cli/kit"
 	"github.com/roman-16/proton-cli/internal/errs"
+	"github.com/roman-16/proton-cli/internal/inflect"
 	mailsvc "github.com/roman-16/proton-cli/internal/service/mail"
 	"github.com/roman-16/proton-cli/internal/ui"
 	"github.com/spf13/cobra"
@@ -79,7 +80,7 @@ func mailboxColumns(folder bool) []ui.Column[mailsvc.Label] {
 // mailboxes looks up one of the two trees by ID, name or - for a folder - path.
 func mailboxes(c *kit.Invocation, noun string, folder bool) *kit.Lookup[mailsvc.Label] {
 	return &kit.Lookup[mailsvc.Label]{
-		Kind: ui.Singular(noun),
+		Kind: inflect.Singular(noun),
 		Load: func(ctx context.Context) ([]mailsvc.Label, error) {
 			labels, folders, err := c.App.Mail.LabelsList(ctx)
 			if err != nil {
@@ -120,10 +121,10 @@ func mailboxCreateCmd(noun string, folder bool) *cobra.Command {
 	color := &kit.Color{Name: "color", Default: accent.Default}
 	c := &cobra.Command{
 		Use:   "create",
-		Short: "Create a " + ui.Singular(noun),
+		Short: "Create a " + inflect.Singular(noun),
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			if name == "" {
-				return kit.Fail("A %s needs a name.", ui.Singular(noun)).Hint("--name Work")
+				return kit.Fail("A %s needs a name.", inflect.Singular(noun)).Hint("--name Work")
 			}
 			spec := mailsvc.LabelSpec{Name: name, Color: color.Value()}
 			if folder {
@@ -141,7 +142,7 @@ func mailboxCreateCmd(noun string, folder bool) *cobra.Command {
 			})
 		}),
 	}
-	c.Flags().StringVar(&name, "name", "", "Name for the new "+ui.Singular(noun))
+	c.Flags().StringVar(&name, "name", "", "Name for the new "+inflect.Singular(noun))
 	color.Register(c)
 	if folder {
 		c.Flags().StringVar(&parent, "parent", "", "Put it inside this folder")

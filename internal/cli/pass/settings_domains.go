@@ -196,9 +196,6 @@ func domainsUpdateCmd() *cobra.Command {
 			"domain; an alias is made for the name as the first mail arrives. One flag\n" +
 			"per mailbox, and `--catch-all none` turns it off.",
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
-			if c.Changed("display-name") && clearDisplayName {
-				return kit.Fail("--display-name and --clear-display-name contradict each other.")
-			}
 			if c.Changed("display-name") && strings.TrimSpace(displayName) == "" {
 				return kit.Fail("--display-name needs a name.").Hint("--clear-display-name takes it off")
 			}
@@ -275,6 +272,7 @@ func domainsUpdateCmd() *cobra.Command {
 	c.Flags().StringVar(&displayName, "display-name", "", "Name recipients see on mail from the domain's aliases")
 	c.Flags().BoolVar(&clearDisplayName, "clear-display-name", false, "Remove the display name")
 	c.Flags().BoolVar(&randomPrefix, "random-prefix", false, "Put a random word in front of a new alias on the domain")
+	kit.Exclusive(c, "display-name", "clear-display-name")
 	return c
 }
 

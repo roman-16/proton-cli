@@ -70,7 +70,7 @@ func ColorField(hex string) ui.Field {
 // Color is a flag holding one of Proton's accent colours.
 //
 // It is declared rather than checked by hand for the same reason an Enum is: the
-// palette is fixed, so a wrong value is wrong before anyone signs in, and Run
+// palette is fixed, so a wrong value is wrong before anyone signs in, and Judge
 // refuses it there. Twenty hex codes are too many to list in a flag's help, so
 // the domain appears in the error instead - which is where a person who guessed
 // wrong is looking.

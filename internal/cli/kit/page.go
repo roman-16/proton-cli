@@ -50,8 +50,8 @@ type Page struct {
 // Register adds --page and --limit.
 //
 // The pair validates together and locally: a negative page or limit, and a page
-// of a listing that was asked for whole, are wrong whoever is signed in, so Run
-// refuses them before the first request.
+// of a listing that was asked for whole, are wrong whoever is signed in, so
+// Judge refuses them before the first request.
 func (p *Page) Register(c *cobra.Command, noun string) {
 	c.Flags().IntVar(&p.Number, "page", 0, "Which page of results, counting from zero")
 	c.Flags().IntVar(&p.Size, "limit", p.Default, "How many "+noun+" per page; 0 for all of them")
