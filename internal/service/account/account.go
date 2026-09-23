@@ -9,15 +9,19 @@ package account
 import (
 	"context"
 
+	"github.com/roman-16/proton-cli/internal/account/keys"
 	"github.com/roman-16/proton-cli/internal/fetch"
 	"github.com/roman-16/proton-cli/internal/proton"
 )
 
 type Service struct {
 	C proton.Doer
+	// keys opens the account's own hierarchy, for the one thing this service does
+	// that touches it: handing a copy of the account's keys to a trusted contact.
+	keys keys.Get
 }
 
-func New(c proton.Doer) *Service { return &Service{C: c} }
+func New(c proton.Doer, k keys.Get) *Service { return &Service{C: c, keys: k} }
 
 // Account is the account as the CLI reports it. Field names follow
 // /core/v4/users, converted to the CLI's snake_case convention.

@@ -24,9 +24,22 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton account sessions create`](../account/sessions.md#create) | Sign another device in from this one |
 | [`proton account sessions list`](../account/sessions.md#list) | List every signed-in session |
 | [`proton account sessions revoke`](../account/sessions.md#revoke) | Invalidate sessions at Proton |
+| [`proton account settings emergency-access access`](../account/settings.md#emergency-access-access) | Sign in to an account whose emergency access is open |
+| [`proton account settings emergency-access add`](../account/settings.md#emergency-access-add) | Let somebody into your account in an emergency |
+| [`proton account settings emergency-access cancel`](../account/settings.md#emergency-access-cancel) | Take back a request in flight |
+| [`proton account settings emergency-access get`](../account/settings.md#emergency-access-get) | Show one emergency access |
+| [`proton account settings emergency-access grant`](../account/settings.md#emergency-access-grant) | Let a pending request in now, without the wait |
+| [`proton account settings emergency-access list`](../account/settings.md#emergency-access-list) | List the people you let into your account |
+| [`proton account settings emergency-access remove`](../account/settings.md#emergency-access-remove) | Remove an emergency contact |
+| [`proton account settings emergency-access request`](../account/settings.md#emergency-access-request) | Start the wait to get into an account that granted you access |
+| [`proton account settings emergency-access update`](../account/settings.md#emergency-access-update) | Change how long an emergency contact waits |
 | [`proton account settings get`](../account/settings.md#get) | Show the account settings now in effect |
 | [`proton account settings list`](../account/settings.md#list) | List the account settings that can be changed |
 | [`proton account settings password set`](../account/settings.md#password-set) | Change your password |
+| [`proton account settings recovery-contacts add`](../account/settings.md#recovery-contacts-add) | Let somebody help you recover your account |
+| [`proton account settings recovery-contacts get`](../account/settings.md#recovery-contacts-get) | Show one recovery contact |
+| [`proton account settings recovery-contacts list`](../account/settings.md#recovery-contacts-list) | List the people who can help you recover |
+| [`proton account settings recovery-contacts remove`](../account/settings.md#recovery-contacts-remove) | Remove a recovery contact |
 | [`proton account settings recovery-email disable`](../account/settings.md#recovery-email-disable) | Stop allowing password resets by email |
 | [`proton account settings recovery-email enable`](../account/settings.md#recovery-email-enable) | Allow password resets by email |
 | [`proton account settings recovery-email get`](../account/settings.md#recovery-email-get) | Show the recovery address and what it may do |

@@ -175,7 +175,9 @@ These commands ask for your password again even when you are signed in:
 - `account keys reactivate`
 - `account security-log delete` · `account security-log disable` · `account security-log enable`
 - `account sessions revoke`
+- `account settings emergency-access add` · `account settings emergency-access update` · `account settings emergency-access grant` · `account settings emergency-access cancel` · `account settings emergency-access remove`
 - `account settings password set`
+- `account settings recovery-contacts add` · `account settings recovery-contacts remove`
 - `account settings recovery-email set` · `account settings recovery-email enable` · `account settings recovery-email disable`
 - `account settings recovery-phone set` · `account settings recovery-phone enable` · `account settings recovery-phone disable`
 - `account settings recovery-phrase set` · `account settings recovery-phrase disable`

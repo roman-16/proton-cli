@@ -233,6 +233,13 @@ const AllUsage = "Act on everything in scope, rather than a subset"
 // All registers --all on a command.
 func All(f FlagSet, into *bool) { f.BoolVar(into, "all", false, AllUsage) }
 
+// IncomingUsage is the one thing --incoming says, wherever a trusted-contact
+// listing offers it.
+const IncomingUsage = "Act on access others granted you, not access you granted"
+
+// Incoming registers the shared --incoming flag.
+func Incoming(f FlagSet, into *bool) { f.BoolVar(into, "incoming", false, IncomingUsage) }
+
 // FlagSet is the slice of pflag.FlagSet the shared groups need. Declaring it as
 // an interface keeps kit from importing pflag into every caller's mental model.
 type FlagSet interface {

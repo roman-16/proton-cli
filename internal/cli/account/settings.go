@@ -168,8 +168,8 @@ func settingsCmd() *cobra.Command {
 			},
 		})
 	})
-	c.AddCommand(passwordCmd(), recoveryEmailCmd(), recoveryPhoneCmd(), recoveryPhraseCmd(),
-		secondPasswordCmd(), securityKeysCmd(), twoFactorCmd())
+	c.AddCommand(emergencyAccessCmd(), passwordCmd(), recoveryContactsCmd(), recoveryEmailCmd(),
+		recoveryPhoneCmd(), recoveryPhraseCmd(), secondPasswordCmd(), securityKeysCmd(), twoFactorCmd())
 	return c
 }
 

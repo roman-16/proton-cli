@@ -55,7 +55,7 @@ func TestSecurityReadsWhatTheAccountIsProtectedWith(t *testing.T) {
 		"2FA": {"Enabled": 3, "RegisteredKeys": [{"Name": "the yubikey", "CredentialID": [255, 239, 191]}]}
 	}`, `{"MnemonicStatus": 3}`)
 
-	got, err := New(a).Security(context.Background())
+	got, err := New(a, nil).Security(context.Background())
 	if err != nil {
 		t.Fatalf("Security: %v", err)
 	}
@@ -83,7 +83,7 @@ func TestSecurityTellsTheTwoSecondFactorsApart(t *testing.T) {
 		app     bool
 	}{{enabled: 0, app: false}, {enabled: 1, app: true}, {enabled: 2, app: false}, {enabled: 3, app: true}} {
 		a := serving(fmt.Sprintf(`{"2FA": {"Enabled": %d}}`, tc.enabled), `{}`)
-		got, err := New(a).Security(context.Background())
+		got, err := New(a, nil).Security(context.Background())
 		if err != nil {
 			t.Fatalf("Security: %v", err)
 		}
@@ -149,7 +149,7 @@ func TestTakingACredentialAwayProvesThePasswordInTheRequest(t *testing.T) {
 				"PUT " + tc.path:  json.RawMessage(`{}`),
 				"POST " + tc.path: json.RawMessage(`{}`),
 			}}
-			if err := tc.call(New(a)); err != nil {
+			if err := tc.call(New(a, nil)); err != nil {
 				t.Fatalf("call: %v", err)
 			}
 			if len(a.sent) != 1 {
@@ -172,7 +172,7 @@ func TestRemovingARecoveryAddressWritesAnEmptyOne(t *testing.T) {
 		"PUT /core/v4/settings/email": json.RawMessage(`{}`),
 		"PUT /core/v4/settings/phone": json.RawMessage(`{}`),
 	}}
-	s := New(a)
+	s := New(a, nil)
 	if err := s.SetRecoveryEmail(context.Background(), ""); err != nil {
 		t.Fatalf("SetRecoveryEmail: %v", err)
 	}
@@ -193,7 +193,7 @@ func TestVerifyingAPhoneCarriesTheNumberAndTheCode(t *testing.T) {
 	a := &answers{body: map[string]json.RawMessage{
 		"POST /core/v4/verify/phone": json.RawMessage(`{}`),
 	}}
-	if err := New(a).VerifyPhone(context.Background(), "+43 660 1234567", "482 913"); err != nil {
+	if err := New(a, nil).VerifyPhone(context.Background(), "+43 660 1234567", "482 913"); err != nil {
 		t.Fatalf("VerifyPhone: %v", err)
 	}
 	if got, want := a.sent[0].HVToken, "+436601234567:482913"; got != want {

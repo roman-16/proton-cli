@@ -84,11 +84,38 @@ var examples = map[string][]string{
 		"proton account settings set locale de_AT",
 		"proton account settings set week-start monday",
 	},
+	"proton account settings emergency-access list": {
+		"proton account settings emergency-access list",
+		"proton account settings emergency-access list --incoming",
+	},
+	"proton account settings emergency-access get": {"proton account settings emergency-access get 7Kd2p1Qa"},
+	"proton account settings emergency-access add": {
+		"proton account settings emergency-access add jane.roe@proton.me",
+		"proton account settings emergency-access add jane.roe@proton.me --wait 3d --password-file /run/secrets/proton",
+	},
+	"proton account settings emergency-access update": {
+		"proton account settings emergency-access update 7Kd2p1Qa --wait 3d --password-file /run/secrets/proton",
+	},
+	"proton account settings emergency-access request": {"proton account settings emergency-access request 4Gh2k9Lp"},
+	"proton account settings emergency-access access":  {"proton account settings emergency-access access 4Gh2k9Lp --as dads-account"},
+	"proton account settings emergency-access grant":   {"proton account settings emergency-access grant 7Kd2p1Qa --password-file /run/secrets/proton"},
+	"proton account settings emergency-access cancel":  {"proton account settings emergency-access cancel 7Kd2p1Qa"},
+	"proton account settings emergency-access remove":  {"proton account settings emergency-access remove 7Kd2p1Qa"},
 	"proton account settings password set": {
 		"proton account settings password set",
 		"proton account settings password set --password-file /run/secrets/proton --new-password-file /run/secrets/proton-new",
 	},
-	"proton account settings recovery-email get": {"proton account settings recovery-email get"},
+	"proton account settings recovery-contacts list": {
+		"proton account settings recovery-contacts list",
+		"proton account settings recovery-contacts list --incoming",
+	},
+	"proton account settings recovery-contacts get": {"proton account settings recovery-contacts get 3Np7xQ2b"},
+	"proton account settings recovery-contacts add": {
+		"proton account settings recovery-contacts add alex.roe@proton.me",
+		"proton account settings recovery-contacts add alex.roe@proton.me --password-file /run/secrets/proton",
+	},
+	"proton account settings recovery-contacts remove": {"proton account settings recovery-contacts remove 3Np7xQ2b"},
+	"proton account settings recovery-email get":       {"proton account settings recovery-email get"},
 	"proton account settings recovery-email set": {
 		"proton account settings recovery-email set jane.roe@example.com",
 		"proton account settings recovery-email set none",

@@ -17,6 +17,7 @@ import (
 
 	"github.com/roman-16/proton-cli/internal/account/fork"
 	"github.com/roman-16/proton-cli/internal/account/keys"
+	"github.com/roman-16/proton-cli/internal/account/localkey"
 	"github.com/roman-16/proton-cli/internal/account/session"
 	"github.com/roman-16/proton-cli/internal/config"
 	"github.com/roman-16/proton-cli/internal/confirm"
@@ -153,7 +154,6 @@ func New(opts Options) (*App, error) {
 		version:       opts.Version,
 		Creds:         newCredentials(u, email),
 		API:           c,
-		Account:       account.New(c),
 		UI:            u,
 		DryRun:        opts.DryRun,
 		FullIDs:       opts.FullIDs,
@@ -178,6 +178,7 @@ func New(opts Options) (*App, error) {
 	// The index is the account's own content at rest on this machine, so it is
 	// sealed to the account's keys and belongs to the profile that holds them.
 	a.Index = search.New(indexDir(profileName), a.UserID, a.indexKeys)
+	a.Account = account.New(c, a.Unlock)
 	a.Mail = mail.New(c, a.Unlock)
 	a.Mail.SetIndex(a.Index)
 	a.Drive = drive.New(c, a.Unlock)
@@ -536,6 +537,45 @@ func (a *App) LoginQR(ctx context.Context, show func(code string) error) error {
 		}
 	}
 	return a.settle(ctx)
+}
+
+// AccessInto signs the profile named by target in to the account this one holds
+// emergency access to, from the session that access yielded.
+//
+// The accessed session goes to its own profile through a client of its own, so
+// the acting profile - the emergency contact's - is left exactly as it was. The
+// key password is the delegated token, sealed the way every session's is, so the
+// accessed account opens on this machine without its owner's password.
+func (a *App) AccessInto(ctx context.Context, target profile.Name, sess account.AccessSession) (string, error) {
+	c := proton.New(proton.Options{
+		BaseURL: a.API.BaseURL(), AppVersion: a.API.AppVersion(),
+		Profile: target.String(), Logger: a.UI.Log,
+	})
+	c.SetTokens(sess.UID, sess.AccessToken, sess.RefreshToken)
+	acct, err := account.New(c, nil).Get(ctx)
+	if err != nil {
+		return "", err
+	}
+	key, err := localkey.Generate()
+	if err != nil {
+		return "", err
+	}
+	if err := localkey.Put(ctx, c, key); err != nil {
+		return "", err
+	}
+	blob, err := localkey.Wrap(sess.KeyPassword, key)
+	if err != nil {
+		return "", err
+	}
+	uid, acc, ref := c.Tokens()
+	if err := session.Save(target, &session.Session{
+		UID: uid, AccessToken: acc, RefreshToken: ref,
+		UserID: acct.ID, Email: acct.Email, EncKeyBlob: blob,
+		AppVersion: c.AppVersion(), BaseURL: c.BaseURL(),
+	}); err != nil {
+		return "", err
+	}
+	return acct.Email, nil
 }
 
 // awaitFork waits for somebody to approve the fork, and gives up when nobody

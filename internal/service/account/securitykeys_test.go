@@ -16,7 +16,7 @@ func TestSecurityKeyChallengeAsksForAKeyYouPlugIn(t *testing.T) {
 			`{"RegistrationOptions":{"publicKey":{"rp":{"id":"account.proton.me"}}}}`),
 	}}
 
-	challenge, err := New(a).SecurityKeyChallenge(context.Background())
+	challenge, err := New(a, nil).SecurityKeyChallenge(context.Background())
 	if err != nil {
 		t.Fatalf("SecurityKeyChallenge: %v", err)
 	}
@@ -36,7 +36,7 @@ func TestSecurityKeyChallengeRefusesAnEmptyAnswer(t *testing.T) {
 	a := &answers{body: map[string]json.RawMessage{
 		"GET /core/v4/settings/2fa/register": json.RawMessage(`{"Code":1000}`),
 	}}
-	if _, err := New(a).SecurityKeyChallenge(context.Background()); err == nil {
+	if _, err := New(a, nil).SecurityKeyChallenge(context.Background()); err == nil {
 		t.Error("an answer carrying no challenge was accepted")
 	}
 }
@@ -47,7 +47,7 @@ func TestSecurityKeyRegisterSendsWhatTheKeyMade(t *testing.T) {
 	}}
 	challenge := json.RawMessage(`{"publicKey":{"challenge":[1,2,3]}}`)
 
-	if err := New(a).SecurityKeyRegister(context.Background(), challenge, SecurityKeyCredential{
+	if err := New(a, nil).SecurityKeyRegister(context.Background(), challenge, SecurityKeyCredential{
 		Name:              "YubiKey 5C",
 		ClientData:        []byte("client data"),
 		AttestationObject: []byte("attestation"),
@@ -77,7 +77,7 @@ func TestSecurityKeyRegisterAlwaysNamesTheTransports(t *testing.T) {
 	a := &answers{body: map[string]json.RawMessage{
 		"POST /core/v4/settings/2fa/register": json.RawMessage(`{"Code":1000}`),
 	}}
-	if err := New(a).SecurityKeyRegister(context.Background(), json.RawMessage(`{}`),
+	if err := New(a, nil).SecurityKeyRegister(context.Background(), json.RawMessage(`{}`),
 		SecurityKeyCredential{Name: "a key"}); err != nil {
 		t.Fatalf("SecurityKeyRegister: %v", err)
 	}
@@ -93,7 +93,7 @@ func TestSecurityKeyRenameAndRemoveAddressTheCredential(t *testing.T) {
 		"PUT /core/v4/settings/2fa/_--_/rename":  json.RawMessage(`{"Code":1000}`),
 		"POST /core/v4/settings/2fa/_--_/remove": json.RawMessage(`{"Code":1000}`),
 	}}
-	service := New(a)
+	service := New(a, nil)
 
 	if err := service.SecurityKeyRename(context.Background(), "_--_", "Key in the safe"); err != nil {
 		t.Fatalf("SecurityKeyRename: %v", err)

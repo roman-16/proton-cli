@@ -35,6 +35,8 @@ DELETE /pass/v1/user/alias/custom_domain/{n}
 DELETE /pass/v1/user/alias/mailbox/{n}
 DELETE /pass/v1/user/srp
 DELETE /pass/v1/vault/{id}
+GET /account/v1/access/incoming
+GET /account/v1/access/outgoing
 GET /account/v4/personal-access-token
 GET /auth/v4/sessions
 GET /auth/v4/sessions/forks
@@ -147,6 +149,7 @@ GET /pass/v1/user/alias/mailbox
 GET /pass/v1/user/srp
 GET /pass/v1/user/srp/info
 GET /settings/calendar
+POST /account/v1/access
 POST /account/v4/personal-access-token
 POST /auth/v4/sessions
 POST /auth/v4/sessions/forks
@@ -227,6 +230,8 @@ POST /pass/v1/user/alias/mailbox
 POST /pass/v1/user/srp
 POST /pass/v1/user/srp/auth
 POST /pass/v1/vault
+PUT /account/v1/access/{id}
+PUT /account/v1/access/{id}/delete
 PUT /auth/v4/sessions/local/key
 PUT /calendar/v1/{id}/events/sync
 PUT /calendar/v1/{id}/events/{id}/attendees/{id}

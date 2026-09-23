@@ -4,7 +4,182 @@ Account-wide preferences.
 
 Every command under `proton account settings`, with the arguments and flags it takes. For these commands in use, see [the account guide](README.md).
 
-Holds `get`, `list`, `password`, `recovery-email`, `recovery-phone`, `recovery-phrase`, `second-password`, `security-keys`, `set` and `two-factor`.
+Holds `emergency-access`, `get`, `list`, `password`, `recovery-contacts`, `recovery-email`, `recovery-phone`, `recovery-phrase`, `second-password`, `security-keys`, `set` and `two-factor`.
+
+## `emergency-access`
+
+People who can get into your account if you cannot.
+
+A contact you add is handed a copy of your keys, sealed so only they can open it, and a waiting period. If they ever request access, it opens once the wait runs out - unless you grant it sooner or cancel the request. A contact has to have a Proton account of their own.
+
+`list` shows the people you granted; `list --incoming` shows accounts that granted you.
+
+Holds `access`, `add`, `cancel`, `get`, `grant`, `list`, `remove`, `request` and `update`.
+
+### `emergency-access access`
+
+Sign in to an account whose emergency access is open.
+
+--as names the profile to save the account under, which is then an ordinary profile: `proton --profile NAME mail list` reads its mail. The access has to be open first - request it and wait, or have the account grant it.
+
+```
+proton account settings emergency-access access REF
+```
+
+```bash
+proton account settings emergency-access access 4Gh2k9Lp --as dads-account
+```
+
+| Flag | Description |
+| --- | --- |
+| `--as string` | Profile to save the accessed account under |
+
+### `emergency-access add`
+
+Let somebody into your account in an emergency.
+
+Your password is asked for. --wait sets how long after a request the access opens, and defaults to 7d. The contact has to have a Proton account.
+
+```
+proton account settings emergency-access add EMAIL
+```
+
+```bash
+proton account settings emergency-access add jane.roe@proton.me
+proton account settings emergency-access add jane.roe@proton.me --wait 3d --password-file /run/secrets/proton
+```
+
+| Flag | Description |
+| --- | --- |
+| `--password-file string` | Read the account password from a file, or - for stdin |
+| `--totp string` | Two-factor code |
+| `--wait string` | How long after a request the access opens (e.g. 3d); default 7d |
+
+### `emergency-access cancel`
+
+Take back a request in flight.
+
+Your password is asked for. On one somebody made against your account, this denies it. The access itself stays; only the pending request is cancelled.
+
+```
+proton account settings emergency-access cancel REF
+```
+
+```bash
+proton account settings emergency-access cancel 7Kd2p1Qa
+```
+
+| Flag | Description |
+| --- | --- |
+| `--password-file string` | Read the account password from a file, or - for stdin |
+| `--totp string` | Two-factor code |
+
+### `emergency-access get`
+
+Show one emergency access.
+
+```
+proton account settings emergency-access get REF
+```
+
+```bash
+proton account settings emergency-access get 7Kd2p1Qa
+```
+
+### `emergency-access grant`
+
+Let a pending request in now, without the wait.
+
+Your password is asked for. The contact gets access at once, so this is a decision to make only when you meant them to have it.
+
+```
+proton account settings emergency-access grant REF
+```
+
+```bash
+proton account settings emergency-access grant 7Kd2p1Qa --password-file /run/secrets/proton
+```
+
+| Flag | Description |
+| --- | --- |
+| `--password-file string` | Read the account password from a file, or - for stdin |
+| `--totp string` | Two-factor code |
+
+### `emergency-access list`
+
+List the people you let into your account.
+
+WAIT is how long after a request the access opens. STATUS is enabled, requested, or open. --incoming lists accounts that granted you emergency access instead.
+
+```
+proton account settings emergency-access list
+```
+
+```bash
+proton account settings emergency-access list
+proton account settings emergency-access list --incoming
+```
+
+| Flag | Description |
+| --- | --- |
+| `--desc` | Reverse the order |
+| `--incoming` | Act on access others granted you, not access you granted |
+| `--limit int` | How many emergency contacts per page; 0 for all of them |
+| `--page int` | Which page of results, counting from zero |
+| `--sort string` | Order by: created, contact (default `created`) |
+
+### `emergency-access remove`
+
+Remove an emergency contact.
+
+Your password is asked for. Their copy of your keys stops working. A contact who is also a recovery contact keeps that.
+
+```
+proton account settings emergency-access remove REF...
+```
+
+```bash
+proton account settings emergency-access remove 7Kd2p1Qa
+```
+
+| Flag | Description |
+| --- | --- |
+| `--password-file string` | Read the account password from a file, or - for stdin |
+| `--totp string` | Two-factor code |
+
+### `emergency-access request`
+
+Start the wait to get into an account that granted you access.
+
+The access opens once the account's wait runs out, unless it cancels the request first. `access` is what signs in once it is open.
+
+```
+proton account settings emergency-access request REF
+```
+
+```bash
+proton account settings emergency-access request 4Gh2k9Lp
+```
+
+### `emergency-access update`
+
+Change how long an emergency contact waits.
+
+Your password is asked for. --wait is required.
+
+```
+proton account settings emergency-access update REF
+```
+
+```bash
+proton account settings emergency-access update 7Kd2p1Qa --wait 3d --password-file /run/secrets/proton
+```
+
+| Flag | Description |
+| --- | --- |
+| `--password-file string` | Read the account password from a file, or - for stdin |
+| `--totp string` | Two-factor code |
+| `--wait string` | How long after a request the access opens (e.g. 3d) |
 
 ## `get`
 
@@ -58,6 +233,90 @@ proton account settings password set --password-file /run/secrets/proton --new-p
 | Flag | Description |
 | --- | --- |
 | `--new-password-file string` | Read the password being set from a file, or - for stdin |
+| `--password-file string` | Read the account password from a file, or - for stdin |
+| `--totp string` | Two-factor code |
+
+## `recovery-contacts`
+
+People who can help you back into your account.
+
+A contact you add is handed a copy of your keys, sealed so only they can open it. If you are ever locked out, they can hand back the part that reactivates your keys. A contact has to have a Proton account of their own.
+
+`list` shows the people you chose; `list --incoming` shows accounts that chose you.
+
+Holds `add`, `get`, `list` and `remove`.
+
+### `recovery-contacts add`
+
+Let somebody help you recover your account.
+
+Your password is asked for. The contact has to have a Proton account.
+
+```
+proton account settings recovery-contacts add EMAIL
+```
+
+```bash
+proton account settings recovery-contacts add alex.roe@proton.me
+proton account settings recovery-contacts add alex.roe@proton.me --password-file /run/secrets/proton
+```
+
+| Flag | Description |
+| --- | --- |
+| `--password-file string` | Read the account password from a file, or - for stdin |
+| `--totp string` | Two-factor code |
+
+### `recovery-contacts get`
+
+Show one recovery contact.
+
+```
+proton account settings recovery-contacts get REF
+```
+
+```bash
+proton account settings recovery-contacts get 3Np7xQ2b
+```
+
+### `recovery-contacts list`
+
+List the people who can help you recover.
+
+--incoming lists accounts you can help recover instead.
+
+```
+proton account settings recovery-contacts list
+```
+
+```bash
+proton account settings recovery-contacts list
+proton account settings recovery-contacts list --incoming
+```
+
+| Flag | Description |
+| --- | --- |
+| `--desc` | Reverse the order |
+| `--incoming` | Act on access others granted you, not access you granted |
+| `--limit int` | How many recovery contacts per page; 0 for all of them |
+| `--page int` | Which page of results, counting from zero |
+| `--sort string` | Order by: created, contact (default `created`) |
+
+### `recovery-contacts remove`
+
+Remove a recovery contact.
+
+Your password is asked for. Their copy of your keys stops working. A contact who is also an emergency contact keeps that.
+
+```
+proton account settings recovery-contacts remove REF...
+```
+
+```bash
+proton account settings recovery-contacts remove 3Np7xQ2b
+```
+
+| Flag | Description |
+| --- | --- |
 | `--password-file string` | Read the account password from a file, or - for stdin |
 | `--totp string` | Two-factor code |
 

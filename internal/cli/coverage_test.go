@@ -114,6 +114,16 @@ var unreachable = map[string]string{
 // chose to leave, so it is named here and reported on every run rather than
 // passing quietly. The list is something to shorten.
 var untested = map[string]string{
+	// The emergency-access crisis flow. All three run on the paid account, because
+	// emergency access is paid-only, and each touches somebody's real account in a
+	// way a per-run test should not manufacture: requesting emergency access
+	// notifies the granting account, cancelling needs a request to have notified
+	// it, and signing in opens a session on it. The flow is built to the web client
+	// (packages/account/delegatedAccess) and is exercised by hand.
+	"PUT /account/v1/access/{id}/trigger": "requesting emergency access notifies the granting account, which is always the paid one",
+	"PUT /account/v1/access/{id}/reset":   "cancelling acts on a request in flight, and making one notifies the paid account",
+	"POST /account/v1/access/{id}/auth":   "signing in opens a session on the granting account, which is always the paid one",
+
 	// Everything that starts an import and everything that acts on one running.
 	// Proton connects to the other mailbox itself, so reaching any of these needs
 	// a mailbox on an IMAP server outside Proton - and Proton Mail speaks no IMAP

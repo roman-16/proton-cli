@@ -116,6 +116,11 @@ var Verbs = map[string]string{
 	"unpin":      "stop trusting a pinned key",
 	"reactivate": "bring keys a password reset locked back into use",
 
+	// Trusted contacts
+	"request": "start the wait to use emergency access somebody granted you",
+	"access":  "sign in to an account whose emergency access is now open",
+	"grant":   "let a pending emergency request in now, without the wait",
+
 	// Calendar
 	"respond": "reply to an invitation",
 
@@ -206,6 +211,7 @@ var Mutating = map[string]bool{
 	"snooze": true, "unsnooze": true, "apply": true, "reorder": true, "favorite": true, "unfavorite": true, "pin": true,
 	"unpin": true, "reactivate": true, "respond": true, "login": true, "logout": true,
 	"revoke": true, "uninstall": true, "transfer": true,
+	"grant": true, "request": true, "access": true,
 }
 
 // SettingsPages declares every collection that lives under a `settings` group,
@@ -226,29 +232,31 @@ var Mutating = map[string]bool{
 // The value is the page, not a boolean, so the entry carries its own reason and
 // a new collection cannot be filed here without someone having looked.
 var SettingsPages = map[string]string{
-	"account settings password":        "Account and password",
-	"account settings recovery-email":  "Recovery",
-	"account settings recovery-phone":  "Recovery",
-	"account settings recovery-phrase": "Recovery",
-	"account settings second-password": "Account and password",
-	"account settings security-keys":   "Account and password",
-	"account settings two-factor":      "Account and password",
-	"calendar settings calendars":      "Calendars",
-	"calendar settings links":          "Calendars",
-	"mail settings addresses":          "Identity and addresses",
-	"mail settings autoreply":          "Forward and auto-reply",
-	"mail settings domains":            "Domain names",
-	"mail settings filters":            "Filters",
-	"mail settings forwarding":         "Forward and auto-reply",
-	"mail settings folders":            "Folders and labels",
-	"mail settings imports":            "Import via Easy Switch",
-	"mail settings labels":             "Folders and labels",
-	"mail settings senders":            "Spam, block, and allow lists",
-	"mail settings smtp-tokens":        "IMAP/SMTP",
-	"pass settings access-tokens":      "Access tokens",
-	"pass settings domains":            "Aliases",
-	"pass settings extra-password":     "Security",
-	"pass settings mailboxes":          "Aliases",
+	"account settings password":          "Account and password",
+	"account settings emergency-access":  "Recovery",
+	"account settings recovery-contacts": "Recovery",
+	"account settings recovery-email":    "Recovery",
+	"account settings recovery-phone":    "Recovery",
+	"account settings recovery-phrase":   "Recovery",
+	"account settings second-password":   "Account and password",
+	"account settings security-keys":     "Account and password",
+	"account settings two-factor":        "Account and password",
+	"calendar settings calendars":        "Calendars",
+	"calendar settings links":            "Calendars",
+	"mail settings addresses":            "Identity and addresses",
+	"mail settings autoreply":            "Forward and auto-reply",
+	"mail settings domains":              "Domain names",
+	"mail settings filters":              "Filters",
+	"mail settings forwarding":           "Forward and auto-reply",
+	"mail settings folders":              "Folders and labels",
+	"mail settings imports":              "Import via Easy Switch",
+	"mail settings labels":               "Folders and labels",
+	"mail settings senders":              "Spam, block, and allow lists",
+	"mail settings smtp-tokens":          "IMAP/SMTP",
+	"pass settings access-tokens":        "Access tokens",
+	"pass settings domains":              "Aliases",
+	"pass settings extra-password":       "Security",
+	"pass settings mailboxes":            "Aliases",
 }
 
 // Placeholder is one argument name: what it stands for, and where the things it
