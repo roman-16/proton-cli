@@ -245,6 +245,7 @@ var SettingsPages = map[string]string{
 	"calendar settings links":            "Calendars",
 	"mail settings addresses":            "Identity and addresses",
 	"mail settings autoreply":            "Forward and auto-reply",
+	"mail settings categories":           "Messages and composing",
 	"mail settings domains":              "Domain names",
 	"mail settings filters":              "Filters",
 	"mail settings forwarding":           "Forward and auto-reply",

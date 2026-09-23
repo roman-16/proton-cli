@@ -19,6 +19,17 @@ func TestSettingValueOutsideItsDomainIsRefused(t *testing.T) {
 		{[]string{"mail", "settings", "set", "delay-send", "999"}, []string{"0-20 (seconds)"}},
 		{[]string{"mail", "settings", "set", "page-size", "3"}, []string{"50", "100", "200"}},
 		{[]string{"mail", "settings", "set", "draft-type", "text/markdown"}, []string{"text/html", "text/plain"}},
+		{[]string{"mail", "settings", "set", "font-face", "comic-sans"},
+			[]string{"font-face accepts:", "arial", "monospace", "times-new-roman", "verdana"}},
+		{[]string{"mail", "settings", "set", "font-size", "15"}, []string{"10, 12, 14, 16, 18, 20, 22, 24, 26"}},
+		{[]string{"mail", "settings", "set", "image-proxy", "3"}, []string{"image-proxy accepts: off, on"}},
+		{[]string{"mail", "settings", "set", "block-sender-confirmation", "0"},
+			[]string{"block-sender-confirmation accepts: off, on"}},
+		{[]string{"mail", "settings", "set", "category-view", "1"}, []string{"category-view accepts: off, on"}},
+		{[]string{"mail", "settings", "set", "remove-image-metadata", "1"},
+			[]string{"remove-image-metadata accepts: off, on"}},
+		{[]string{"mail", "settings", "set", "spam-action", "sometimes"},
+			[]string{"just-move", "move-and-unsubscribe", "ask"}},
 		{[]string{"account", "settings", "set", "week-start", "funday"},
 			[]string{"week-start accepts", "monday", "sunday"}},
 	} {
@@ -37,6 +48,15 @@ func TestUnknownSettingKeyIsRefusedAndPointsAtTheList(t *testing.T) {
 		"no calendar setting called", "calendar settings list")
 	refuses(t, 3, []string{"drive", "settings", "set", "no-such-key", "on"},
 		"no drive setting called", "drive settings list")
+	refuses(t, 3, []string{"mail", "settings", "set", "message-buttons", "unread-read"},
+		"no mail setting called", "mail settings list")
+}
+
+func TestPrimaryIsRefusedWhatNoCategoryChangeMayDoToIt(t *testing.T) {
+	refuses(t, 1, []string{"mail", "settings", "categories", "disable", "social", "primary"},
+		"Primary is always shown")
+	refuses(t, 1, []string{"mail", "settings", "categories", "update", "24", "--notify=false"},
+		"Primary's notifications cannot be changed")
 }
 
 func TestSettingSomethingNeedsAKeyAndAValue(t *testing.T) {

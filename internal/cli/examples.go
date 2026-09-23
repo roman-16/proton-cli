@@ -796,6 +796,19 @@ var examples = map[string][]string{
 	"proton mail settings set": {
 		"proton mail settings set pm-signature off",
 		"proton mail settings set view-mode conversations",
+		"proton mail settings set font-face georgia",
+	},
+	"proton mail settings categories list": {"proton mail settings categories list"},
+	"proton mail settings categories enable": {
+		"proton mail settings categories enable transactions",
+		"proton mail settings categories enable transactions updates",
+	},
+	"proton mail settings categories disable": {
+		"proton mail settings categories disable promotions",
+	},
+	"proton mail settings categories update": {
+		"proton mail settings categories update social --notify",
+		"proton mail settings categories update social --notify=false",
 	},
 	"proton mail settings labels list": {"proton mail settings labels list"},
 	"proton mail settings labels create": {

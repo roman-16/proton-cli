@@ -4,7 +4,7 @@ How Mail behaves.
 
 Every command under `proton mail settings`, with the arguments and flags it takes. For these commands in use, see [the mail guide](README.md).
 
-Holds `addresses`, `autoreply`, `domains`, `filters`, `folders`, `forwarding`, `get`, `imports`, `labels`, `list`, `senders`, `set` and `smtp-tokens`.
+Holds `addresses`, `autoreply`, `categories`, `domains`, `filters`, `folders`, `forwarding`, `get`, `imports`, `labels`, `list`, `senders`, `set` and `smtp-tokens`.
 
 ## `addresses`
 
@@ -255,6 +255,77 @@ proton mail settings autoreply set --body 'On holiday.' --start 2026-07-01T09:00
 | `--repeat string` | How the schedule repeats: fixed, daily, weekly, monthly, permanent (default `fixed`) |
 | `--start string` | Start of the window (grammar depends on --repeat) |
 | `--totp string` | Two-factor code |
+
+## `categories`
+
+The category tabs the inbox is sorted into.
+
+Primary is always shown, and its notifications cannot be changed. In the web it also holds the mail of every hidden category. Changing the others needs categories on: `proton mail settings set category-view on`.
+
+Holds `disable`, `enable`, `list` and `update`.
+
+### `categories disable`
+
+Hide categories from the inbox.
+
+One category besides Primary always stays shown. To stop using categories, run `proton mail settings set category-view off`.
+
+```
+proton mail settings categories disable REF...
+```
+
+```bash
+proton mail settings categories disable promotions
+```
+
+### `categories enable`
+
+Show categories as tabs in the inbox.
+
+```
+proton mail settings categories enable REF...
+```
+
+```bash
+proton mail settings categories enable transactions
+proton mail settings categories enable transactions updates
+```
+
+### `categories list`
+
+List the categories, and which show and notify.
+
+```
+proton mail settings categories list
+```
+
+```bash
+proton mail settings categories list
+```
+
+| Flag | Description |
+| --- | --- |
+| `--limit int` | How many categories per page; 0 for all of them |
+| `--page int` | Which page of results, counting from zero |
+
+### `categories update`
+
+Change whether a category notifies.
+
+A hidden category has no notifications to change: enable it first.
+
+```
+proton mail settings categories update REF
+```
+
+```bash
+proton mail settings categories update social --notify
+proton mail settings categories update social --notify=false
+```
+
+| Flag | Description |
+| --- | --- |
+| `--notify` | Tell you when mail arrives here (default `true`) |
 
 ## `domains`
 
@@ -1155,6 +1226,7 @@ proton mail settings set KEY VALUE
 ```bash
 proton mail settings set pm-signature off
 proton mail settings set view-mode conversations
+proton mail settings set font-face georgia
 ```
 
 ## `smtp-tokens`

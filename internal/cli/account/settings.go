@@ -33,7 +33,7 @@ var specs = map[string]kit.Setting{
 	"crash-reports": {
 		Path: settingsPath + "/crashreports", Field: "CrashReports",
 		Page: "Security and privacy", Desc: "Send crash reports to Proton",
-		Enum: kit.OnOffChoices(),
+		Enum: kit.OnOffNumbers(),
 	},
 	"date-format": {
 		Path: settingsPath + "/dateformat", Field: "DateFormat",
@@ -47,7 +47,7 @@ var specs = map[string]kit.Setting{
 	"telemetry": {
 		Path: settingsPath + "/telemetry", Field: "Telemetry",
 		Page: "Security and privacy", Desc: "Send anonymous usage data to Proton",
-		Enum: kit.OnOffChoices(),
+		Enum: kit.OnOffNumbers(),
 	},
 	"time-format": {
 		Path: settingsPath + "/timeformat", Field: "TimeFormat",
@@ -60,10 +60,10 @@ var specs = map[string]kit.Setting{
 		Path: settingsPath + "/weekstart", Field: "WeekStart",
 		Page: "Language and time", Desc: "First day of the week",
 		Enum: []kit.Choice{
-			{Name: "locale", N: 0},
-			{Name: "monday", N: 1},
-			{Name: "saturday", N: 6},
-			{Name: "sunday", N: 7},
+			{Name: "locale", Value: 0},
+			{Name: "monday", Value: 1},
+			{Name: "saturday", Value: 6},
+			{Name: "sunday", Value: 7},
 		},
 	},
 }
@@ -89,7 +89,7 @@ type settingsView struct {
 }
 
 func settingsCmd() *cobra.Command {
-	c := kit.Settings("account", "Account-wide preferences", specs, func(c *kit.Invocation) error {
+	c := kit.Settings("account", "Account-wide preferences", specs, settingsView{}, func(c *kit.Invocation) error {
 		var (
 			resp *proton.Response
 			user struct {

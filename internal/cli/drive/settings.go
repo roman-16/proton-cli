@@ -17,8 +17,8 @@ var specs = map[string]kit.Setting{
 		Path: settingsPath, Field: "RevisionRetentionDays",
 		Page: "Version history", Desc: "How long earlier versions of a file are kept",
 		Enum: []kit.Choice{
-			{Name: "off", N: 0}, {Name: "7d", N: 7}, {Name: "30d", N: 30},
-			{Name: "180d", N: 180}, {Name: "1y", N: 365}, {Name: "10y", N: 3650},
+			{Name: "off", Value: 0}, {Name: "7d", Value: 7}, {Name: "30d", Value: 30},
+			{Name: "180d", Value: 180}, {Name: "1y", Value: 365}, {Name: "10y", Value: 3650},
 		},
 	},
 }
@@ -28,7 +28,7 @@ type settingsView struct {
 }
 
 func settingsCmd() *cobra.Command {
-	return kit.Settings("drive", "How Drive behaves", specs, func(c *kit.Invocation) error {
+	return kit.Settings("drive", "How Drive behaves", specs, settingsView{}, func(c *kit.Invocation) error {
 		resp, err := c.App.API.Do(c.Ctx, proton.Request{Method: "GET", Path: settingsPath})
 		if err != nil {
 			return err

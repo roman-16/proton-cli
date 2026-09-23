@@ -715,7 +715,7 @@ Print each message as it arrives, until you stop it.
 
 It reports what happens while it is watching, so nothing that arrived beforehand comes up. A thread returning from snooze counts as arriving.
 
-Without --folder it covers the inbox plus every folder whose notifications are on, which `settings folders list` shows under NOTIFY.
+Without --folder it covers what Proton notifies you about: the inbox, starred mail, and every folder whose notifications are on, which `settings folders list` shows under NOTIFY. With categories on, the inbox counts only in the categories that notify and the hidden ones, whose mail shows under Primary - `settings categories list` shows which.
 
 ```
 proton mail messages watch

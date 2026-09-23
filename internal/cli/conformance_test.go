@@ -537,6 +537,27 @@ func TestCollectionsUnderSettingsMirrorASettingsPage(t *testing.T) {
 	}
 }
 
+func TestEverySettingSetTakesIsOneGetReports(t *testing.T) {
+	newRoot()
+	tables := kit.DeclaredSettings()
+	if len(tables) == 0 {
+		t.Fatal("found no settings tables; the registry is broken")
+	}
+	for path, table := range tables {
+		reported := map[string]bool{}
+		for i := range table.Reports.NumField() {
+			name, _, _ := strings.Cut(table.Reports.Field(i).Tag.Get("json"), ",")
+			reported[name] = true
+		}
+		for _, key := range table.Keys {
+			if !reported[strings.ReplaceAll(key, "-", "_")] {
+				t.Errorf("%s set takes %q, but %s get reports no %s",
+					path, key, path, strings.ReplaceAll(key, "-", "_"))
+			}
+		}
+	}
+}
+
 // ── rule 4b: a filter can be read before it is acted on ──
 
 // Whatever narrows a bulk verb narrows the listing beside it.

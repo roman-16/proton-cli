@@ -14,7 +14,7 @@ proton mail messages get "Invoice #2291"     # headers, body, attachment list
 proton mail messages get REF --body-only > body.txt
 ```
 
-Folders are `inbox`, `sent`, `drafts`, `trash`, `spam`, `archive`, `starred`, `scheduled`, `snoozed`, `all`, or any label. Proton's inbox tabs are folders too: `social`, `promotions`, `updates`, `newsletters`, `transactions`.
+Folders are `inbox`, `sent`, `drafts`, `trash`, `spam`, `archive`, `starred`, `scheduled`, `snoozed`, `all`, or any label. Proton's inbox tabs are folders too: `primary`, `social`, `promotions`, `newsletters`, `transactions`, `updates`.
 
 Listings come back newest first. `--sort size` orders by how much room a message takes, largest first, and `--desc` reverses either order. A listing ordered by size shows a SIZE column.
 
@@ -352,7 +352,7 @@ Stays attached and prints a line the moment a message lands.
 
 It reports what happens while it is watching, so nothing that arrived beforehand comes up. A thread coming back from snooze counts as landing.
 
-Without `--folder` it covers the inbox plus every folder whose notifications are on.
+Without `--folder` it covers what Proton notifies you about: the inbox, starred mail and every folder whose notifications are on. With [categories](#sort-the-inbox-into-categories) on, the inbox counts only in the categories that notify and in the hidden ones.
 
 Each JSON line names the thread in `conversation_id`, so a consumer can act on the whole thread without looking it up. See [Streams](../using/output.md#streams) and [Desktop notifications](../using/scripting.md#desktop-notifications).
 
@@ -383,6 +383,27 @@ proton mail settings labels reorder --alphabetical   # sort them all
 `reorder` moves the ones you name to the front, in the order you name them, and the rest keep the order they are in. A folder is ordered among the folders it sits beside, so name folders from one place at a time; `--alphabetical` covers every level.
 
 Folders carry a **NOTIFY** switch, which is whether mail landing there is worth telling you about. It shows in `folders list`, `--notify` sets it, and it decides what `messages watch` covers by default. Labels have no such switch.
+
+## Sort the inbox into categories
+
+```bash
+proton mail settings set category-view on
+proton mail settings categories list
+proton mail settings categories enable transactions
+proton mail settings categories update social --notify
+```
+
+With categories on, the inbox is split into tabs: `primary`, `social`, `promotions`, `newsletters`, `transactions` and `updates`. `categories list` shows which tabs are shown and which notify, and `proton mail settings set category-view-counters on` puts an unread count on each tab.
+
+Primary is always shown, and its notifications cannot be changed. At least one other category stays shown; to stop using categories, run `proton mail settings set category-view off`.
+
+In the web, the mail of a hidden category shows under Primary. `--folder primary` lists only the mail sorted into Primary itself.
+
+A message changes category the way it changes folder:
+
+```bash
+proton mail messages move 7Kd2p1Qa --into primary
+```
 
 ## Filters
 
@@ -668,6 +689,6 @@ proton mail settings addresses update me@proton.me --display-name "Roman L."
 proton mail settings addresses update me@proton.me --signature - < signature.html --html
 ```
 
-Every key has a fixed set of values, checked before anything is sent. Values can be given by name or by number.
+Every key has a fixed set of values, checked before anything is sent. A value is given by its name, or by the number Proton stores for it where there is one.
 
 Signatures are stored as HTML. Plain text is escaped and its newlines become line breaks; `--html` passes markup through.

@@ -2,9 +2,11 @@ package kit
 
 import (
 	"fmt"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/roman-16/proton-cli/internal/proton"
 	"github.com/roman-16/proton-cli/internal/ui"
@@ -29,12 +31,10 @@ import (
 // returning a collection, and `settings` itself would be doing work that its own
 // subcommands should name.
 
-// Choice is one named integer a setting accepts. The name spares anyone having
-// to remember Proton's numbers; the numbers stay accepted for scripts written
-// against the API directly.
 type Choice struct {
-	Name string
-	N    int
+	Name   string
+	Value  any
+	Bodies []map[string]any
 }
 
 // IntRange bounds an integer setting. Unit annotates the rendered domain, as in
@@ -47,8 +47,8 @@ type IntRange struct {
 // Setting describes one writable setting: where it is stored, which body field
 // carries it, which page of Proton's settings it belongs to, and what it accepts.
 //
-// At most one value domain is set. All three empty means free text, which is
-// right for an opaque value such as a locale or an IANA time zone.
+// At most one value domain is set. Neither means free text, which is right for
+// an opaque value such as a locale or an IANA time zone.
 type Setting struct {
 	Path  string
 	Field string
@@ -57,45 +57,37 @@ type Setting struct {
 
 	Enum  []Choice
 	Range *IntRange
-	Text  []string
 }
 
-// Parse converts a user-supplied value into what the API expects, rejecting
-// anything the domain does not permit.
-func (s Setting) Parse(key, raw string) (any, error) {
+// Parse finds the choice a user-supplied value names, rejecting anything the
+// domain does not permit.
+func (s Setting) Parse(key, raw string) (Choice, error) {
 	switch {
 	case len(s.Enum) > 0:
-		for _, v := range s.Enum {
-			if strings.EqualFold(raw, v.Name) {
-				return v.N, nil
+		for _, c := range s.Enum {
+			if strings.EqualFold(raw, c.Name) {
+				return c, nil
 			}
 		}
 		if n, err := strconv.Atoi(raw); err == nil {
-			for _, v := range s.Enum {
-				if v.N == n {
-					return n, nil
+			for _, c := range s.Enum {
+				if v, ok := c.Value.(int); ok && v == n {
+					return c, nil
 				}
 			}
 		}
-		return nil, Fail("%s accepts: %s", key, s.Domain())
+		return Choice{}, Fail("%s accepts: %s", key, s.Domain())
 	case s.Range != nil:
 		n, err := strconv.Atoi(raw)
 		if err != nil || n < s.Range.Min || n > s.Range.Max {
-			return nil, Fail("%s accepts %s", key, s.Domain())
+			return Choice{}, Fail("%s accepts %s", key, s.Domain())
 		}
-		return n, nil
-	case len(s.Text) > 0:
-		for _, v := range s.Text {
-			if strings.EqualFold(raw, v) {
-				return v, nil
-			}
-		}
-		return nil, Fail("%s accepts: %s", key, s.Domain())
+		return Choice{Name: strconv.Itoa(n), Value: n}, nil
 	}
 	if raw == "" {
-		return nil, Fail("%s needs a value.", key)
+		return Choice{}, Fail("%s needs a value.", key)
 	}
-	return raw, nil
+	return Choice{Name: raw, Value: raw}, nil
 }
 
 // Domain renders what the setting accepts, for help text and error messages.
@@ -108,8 +100,6 @@ func (s Setting) Domain() string {
 			return fmt.Sprintf("%d-%d (%s)", s.Range.Min, s.Range.Max, s.Range.Unit)
 		}
 		return fmt.Sprintf("%d-%d", s.Range.Min, s.Range.Max)
-	case len(s.Text) > 0:
-		return strings.Join(s.Text, ", ")
 	}
 	return "any text"
 }
@@ -117,30 +107,52 @@ func (s Setting) Domain() string {
 // Completions lists the concrete values shell completion should offer. A range or
 // free text has no finite set, so it offers nothing rather than guessing.
 func (s Setting) Completions() []string {
-	switch {
-	case len(s.Enum) > 0:
-		out := make([]string, 0, len(s.Enum))
-		for _, v := range s.Enum {
-			out = append(out, v.Name)
-		}
-		return out
-	case len(s.Text) > 0:
-		return s.Text
+	out := make([]string, 0, len(s.Enum))
+	for _, v := range s.Enum {
+		out = append(out, v.Name)
 	}
-	return nil
+	return out
 }
 
 // Name maps a raw API value back to its declared name, so reads and writes speak
-// the same vocabulary. An unrecognised value renders as its number, which is more
-// use than hiding it.
+// the same vocabulary. An unrecognised value renders as itself, which is more use
+// than hiding it.
 func (s Setting) Name(v any) string {
-	n := IntOf(v)
-	for _, e := range s.Enum {
-		if e.N == n {
-			return e.Name
+	for _, c := range s.Enum {
+		if stored(c.Value, v) {
+			return c.Name
 		}
 	}
-	return strconv.Itoa(n)
+	switch x := v.(type) {
+	case nil:
+		return ""
+	case string:
+		return x
+	case bool:
+		return strconv.FormatBool(x)
+	}
+	return strconv.Itoa(IntOf(v))
+}
+
+func stored(want, got any) bool {
+	switch w := want.(type) {
+	case nil:
+		return got == nil
+	case int:
+		switch g := got.(type) {
+		case float64:
+			return g == float64(w)
+		case int:
+			return g == w
+		}
+	case bool:
+		g, ok := got.(bool)
+		return ok && g == w
+	case string:
+		g, ok := got.(string)
+		return ok && g == w
+	}
+	return false
 }
 
 // Ordered names the values 0, 1, 2 and so on, which is how nearly all of
@@ -149,17 +161,48 @@ func (s Setting) Name(v any) string {
 func Ordered(names ...string) []Choice {
 	out := make([]Choice, len(names))
 	for i, n := range names {
-		out[i] = Choice{Name: n, N: i}
+		out[i] = Choice{Name: n, Value: i}
 	}
 	return out
 }
 
-// OnOffChoices is the domain of a plain 0/1 toggle.
-func OnOffChoices() []Choice { return Ordered("off", "on") }
+// OnOffNumbers is the domain of a plain 0/1 toggle.
+func OnOffNumbers() []Choice { return Ordered("off", "on") }
+
+func OnOffBooleans() []Choice {
+	return []Choice{{Name: "off", Value: false}, {Name: "on", Value: true}}
+}
+
+type SettingsTable struct {
+	Keys    []string
+	Reports reflect.Type
+}
+
+type settingsTable struct {
+	cmd     *cobra.Command
+	specs   map[string]Setting
+	reports reflect.Type
+}
+
+var (
+	settingsMu     sync.Mutex
+	settingsTables []settingsTable
+)
+
+func DeclaredSettings() map[string]SettingsTable {
+	settingsMu.Lock()
+	defer settingsMu.Unlock()
+	out := make(map[string]SettingsTable, len(settingsTables))
+	for _, t := range settingsTables {
+		out[t.cmd.CommandPath()] = SettingsTable{Keys: SortedKeys(t.specs), Reports: t.reports}
+	}
+	return out
+}
 
 // Settings builds the get/list/set trio for one scope. scope names the tree in
-// help and error text ("account", "mail"); show renders the current values.
-func Settings(scope, short string, specs map[string]Setting, show Handler) *cobra.Command {
+// help and error text ("account", "mail"); reports is what show renders the
+// current values as.
+func Settings(scope, short string, specs map[string]Setting, reports any, show Handler) *cobra.Command {
 	c := &cobra.Command{Use: "settings", Short: short}
 	c.AddCommand(
 		&cobra.Command{
@@ -170,6 +213,9 @@ func Settings(scope, short string, specs map[string]Setting, show Handler) *cobr
 		settingsListCmd(scope, specs),
 		settingsSetCmd(scope, specs),
 	)
+	settingsMu.Lock()
+	settingsTables = append(settingsTables, settingsTable{cmd: c, specs: specs, reports: reflect.TypeOf(reports)})
+	settingsMu.Unlock()
 	return c
 }
 
@@ -224,7 +270,7 @@ func settingsSetCmd(scope string, specs map[string]Setting) *cobra.Command {
 			spec, ok := specs[args[0]]
 			if !ok {
 				return Fail("There is no %s setting called %q.", scope, args[0]).
-					Hint(fmt.Sprintf("proton %s settings list", scope)).Exit(3)
+					Hint(fmt.Sprintf("%s %s settings list", Program, scope)).Exit(3)
 			}
 			_, err := spec.Parse(args[0], args[1])
 			return err
@@ -243,18 +289,27 @@ func settingsSetCmd(scope string, specs map[string]Setting) *cobra.Command {
 			// Already validated by Args; re-parsing is how the checked value gets
 			// here without a package-level variable to carry it.
 			spec := specs[key]
-			val, err := spec.Parse(key, raw)
+			choice, err := spec.Parse(key, raw)
 			if err != nil {
 				return err
 			}
+			bodies := choice.Bodies
+			if bodies == nil {
+				bodies = []map[string]any{{spec.Field: choice.Value}}
+			}
 			return Mutate(c, ui.ResultSpec{
 				Action: ui.Set, Count: 1, Name: key,
-				Detail: fmt.Sprintf("to %v", val),
-				Extra:  map[string]any{"key": key, "value": val},
+				Detail: "to " + choice.Name,
+				Extra:  map[string]any{"key": key, "value": choice.Name},
 			}, func() error {
-				return c.App.API.Decode(c.Ctx, proton.Request{
-					Method: "PUT", Path: spec.Path, Body: map[string]any{spec.Field: val},
-				}, nil)
+				for _, body := range bodies {
+					if err := c.App.API.Decode(c.Ctx, proton.Request{
+						Method: "PUT", Path: spec.Path, Body: body,
+					}, nil); err != nil {
+						return err
+					}
+				}
+				return nil
 			})
 		}),
 	}

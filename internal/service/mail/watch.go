@@ -3,6 +3,7 @@ package mail
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -57,11 +58,10 @@ type WatchOptions struct {
 
 // WatchedIn resolves where a watch looks.
 //
-// Named, it is that one place. Unnamed, it is the inbox together with every
-// folder whose notifications are on - the same set Proton's clients notify from,
-// and the reason `mail settings folders list` prints a NOTIFY column: what this
-// returns is a thing the reader can look up rather than a rule they have to be
-// told.
+// Named, it is that one place. Unnamed, it is the set Proton's clients notify
+// from, and the reason `mail settings folders list` prints a NOTIFY column: what
+// this returns is a thing the reader can look up rather than a rule they have to
+// be told.
 func (s *Service) WatchedIn(ctx context.Context, folder string) ([]Mailbox, error) {
 	if folder != "" {
 		box, err := s.ResolveMailbox(ctx, folder)
@@ -74,7 +74,11 @@ func (s *Service) WatchedIn(ctx context.Context, folder string) ([]Mailbox, erro
 	if err != nil {
 		return nil, err
 	}
-	in := []Mailbox{{ID: labelInbox, Name: "inbox", Folder: true, System: true}}
+	in, err := s.watchedInbox(ctx)
+	if err != nil {
+		return nil, err
+	}
+	in = append(in, Mailbox{ID: labelStarred, Name: "starred", Folder: true, System: true})
 	for _, f := range folders {
 		if f.Notifies() {
 			in = append(in, Mailbox{ID: f.ID, Name: f.Name, Folder: true})
@@ -90,7 +94,10 @@ func (s *Service) WatchedIn(ctx context.Context, folder string) ([]Mailbox, erro
 // done rather than that something went wrong.
 func (s *Service) Watch(ctx context.Context, opts WatchOptions, emit func(Message) error) error {
 	cursor, err := s.LatestEventID(ctx)
-	if err != nil {
+	switch {
+	case ctx.Err() != nil:
+		return nil
+	case err != nil:
 		return err
 	}
 	retry := 0
@@ -242,13 +249,41 @@ func (m *rawListMessage) arrived(opts WatchOptions) bool {
 	return m.matches(opts)
 }
 
+func (s *Service) watchedInbox(ctx context.Context) ([]Mailbox, error) {
+	inbox := []Mailbox{{ID: labelInbox, Name: "inbox", Folder: true, System: true}}
+	on, err := s.CategoryViewOn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !on {
+		return inbox, nil
+	}
+	categories, err := s.Categories(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(categories) == 0 {
+		// Recorded and not counted: the opening line names the inbox, and this is
+		// what says why an account with categories switched on is watched whole.
+		slog.DebugContext(ctx, "mail: category view is on and the account has no categories")
+		return inbox, nil
+	}
+	var in []Mailbox
+	for _, c := range categories {
+		if !c.Shown || c.Notify {
+			in = append(in, Mailbox{ID: c.ID, Name: c.Name, Folder: true, System: true})
+		}
+	}
+	return in, nil
+}
+
 func (m *rawListMessage) matches(opts WatchOptions) bool {
 	if m == nil {
 		return false
 	}
 	watched := false
 	for _, box := range opts.In {
-		if hasLabel(m.LabelIDs, box.ID) {
+		if hasLabel(m.LabelIDs, box.ID) && (!isCategory(box.ID) || hasLabel(m.LabelIDs, labelInbox)) {
 			watched = true
 			break
 		}

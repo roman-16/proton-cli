@@ -24,12 +24,12 @@ const settingsPath = "/settings/calendar"
 var specs = map[string]kit.Setting{
 	"auto-detect-timezone": {
 		Path: settingsPath, Field: "AutoDetectPrimaryTimezone",
-		Page: "General", Desc: "Follow the system time zone", Enum: kit.OnOffChoices(),
+		Page: "General", Desc: "Follow the system time zone", Enum: kit.OnOffNumbers(),
 	},
 	"auto-import-invite": {
 		Path: settingsPath, Field: "AutoImportInvite",
 		Page: "General", Desc: "Add emailed invitations to your calendar automatically",
-		Enum: kit.OnOffChoices(),
+		Enum: kit.OnOffNumbers(),
 	},
 	"default-calendar": {
 		Path: settingsPath, Field: "DefaultCalendarID",
@@ -49,7 +49,7 @@ var specs = map[string]kit.Setting{
 	},
 	"show-secondary-timezone": {
 		Path: settingsPath, Field: "DisplaySecondaryTimezone",
-		Page: "General", Desc: "Show the secondary time zone", Enum: kit.OnOffChoices(),
+		Page: "General", Desc: "Show the secondary time zone", Enum: kit.OnOffNumbers(),
 	},
 	"view": {
 		Path: settingsPath, Field: "ViewPreference",
@@ -58,7 +58,7 @@ var specs = map[string]kit.Setting{
 	},
 	"week-numbers": {
 		Path: settingsPath, Field: "DisplayWeekNumber",
-		Page: "General", Desc: "Show week numbers", Enum: kit.OnOffChoices(),
+		Page: "General", Desc: "Show week numbers", Enum: kit.OnOffNumbers(),
 	},
 }
 
@@ -75,7 +75,7 @@ type settingsView struct {
 }
 
 func settingsCmd() *cobra.Command {
-	c := kit.Settings("calendar", "How Calendar behaves", specs, func(c *kit.Invocation) error {
+	c := kit.Settings("calendar", "How Calendar behaves", specs, settingsView{}, func(c *kit.Invocation) error {
 		resp, err := c.App.API.Do(c.Ctx, proton.Request{Method: "GET", Path: settingsPath})
 		if err != nil {
 			return err

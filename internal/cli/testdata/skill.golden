@@ -65,6 +65,7 @@ These are the listings that can be narrowed, and what narrows them. The same fla
 - `proton mail messages list --after string --before string --desc --folder string --from string --has-attachments --keyword string --limit int --newer-than string --older-than string --page int --read --sort string --starred --subject string --to string --unread --via string`
 - `proton mail protected attachments list LINK --eo-password-file string --include-inline`
 - `proton mail settings addresses list --limit int --page int`
+- `proton mail settings categories list --limit int --page int`
 - `proton mail settings domains list --desc --limit int --page int --sort string`
 - `proton mail settings filters list --limit int --page int`
 - `proton mail settings folders list --limit int --page int`
@@ -217,6 +218,7 @@ One line per group, with the verbs under it. Arguments, flags and examples are i
 - `proton mail settings` - How Mail behaves: get, list, set
 - `proton mail settings addresses` - Your addresses, display names and signatures: create, delete, disable, enable, get, list, reorder, update
 - `proton mail settings autoreply` - The automatic reply and its schedule: disable, enable, get, set
+- `proton mail settings categories` - The category tabs the inbox is sorted into: disable, enable, list, update
 - `proton mail settings domains` - Custom domains, and where stray mail goes: create, delete, get, list, update
 - `proton mail settings filters` - Server-side Sieve filters: apply, create, delete, disable, enable, get, list, reorder, update
 - `proton mail settings folders` - Folders, which a message lives in: create, delete, list, reorder, update

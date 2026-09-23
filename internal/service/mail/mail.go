@@ -56,6 +56,7 @@ const (
 	labelSocial       = "20"
 	labelPromotions   = "21"
 	labelUpdates      = "22"
+	labelPrimary      = "24"
 	labelNewsletters  = "25"
 	labelTransactions = "26"
 )

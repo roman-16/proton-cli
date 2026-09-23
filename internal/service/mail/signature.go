@@ -22,6 +22,17 @@ const pmSignatureEnabled = 1
 type mailSettings struct {
 	PMSignature        int
 	PMSignatureContent string
+	MailCategoryView   any
+}
+
+func (m mailSettings) categoryViewOn() bool {
+	switch v := m.MailCategoryView.(type) {
+	case bool:
+		return v
+	case float64:
+		return v != 0
+	}
+	return false
 }
 
 // settings fetches and caches the account's mail settings.

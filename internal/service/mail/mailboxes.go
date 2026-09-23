@@ -49,11 +49,12 @@ var systemFolders = map[string]string{
 	"all":       labelAllMail,
 	// The inbox categories. Proton shows them as tabs, and a tab is a place mail
 	// is, so they are folders here like any other.
+	"primary":      labelPrimary,
 	"social":       labelSocial,
 	"promotions":   labelPromotions,
-	"updates":      labelUpdates,
 	"newsletters":  labelNewsletters,
 	"transactions": labelTransactions,
+	"updates":      labelUpdates,
 }
 
 // SystemFolderNames lists the built-in folder names, for help text and
@@ -62,7 +63,7 @@ func SystemFolderNames() []string {
 	return []string{
 		"inbox", "drafts", "sent", "trash", "spam", "archive", "starred",
 		"scheduled", "snoozed", "all",
-		"social", "promotions", "updates", "newsletters", "transactions",
+		"primary", "social", "promotions", "newsletters", "transactions", "updates",
 	}
 }
 

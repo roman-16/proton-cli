@@ -302,6 +302,14 @@ PUT /mail/v4/messages/unlabel
 PUT /mail/v4/messages/unread
 PUT /mail/v4/messages/{id}
 PUT /mail/v4/messages/{id}/mark/ham
+PUT /mail/v4/settings/block-sender-confirmation
+PUT /mail/v4/settings/fontface
+PUT /mail/v4/settings/fontsize
+PUT /mail/v4/settings/imageproxy
+PUT /mail/v4/settings/mail-category-view
+PUT /mail/v4/settings/mail-category-view-counters-enabled
+PUT /mail/v4/settings/remove-image-metadata
+PUT /mail/v4/settings/spam-action
 PUT /mail/v4/settings/viewmode
 PUT /pass/v1/breach/address/{id}/monitor
 PUT /pass/v1/share/{id}/alias/{id}/contact/{n}/blocked

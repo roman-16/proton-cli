@@ -23,8 +23,11 @@ func watchCmd() *cobra.Command {
 		Long: "Print each message as it arrives, until you stop it.\n\n" +
 			"It reports what happens while it is watching, so nothing that arrived\n" +
 			"beforehand comes up. A thread returning from snooze counts as arriving.\n\n" +
-			"Without --folder it covers the inbox plus every folder whose notifications\n" +
-			"are on, which `settings folders list` shows under NOTIFY.",
+			"Without --folder it covers what Proton notifies you about: the inbox,\n" +
+			"starred mail, and every folder whose notifications are on, which\n" +
+			"`settings folders list` shows under NOTIFY. With categories on, the inbox\n" +
+			"counts only in the categories that notify and the hidden ones, whose mail\n" +
+			"shows under Primary - `settings categories list` shows which.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			in, err := c.App.Mail.WatchedIn(c.Ctx, folder)
 			if err != nil {

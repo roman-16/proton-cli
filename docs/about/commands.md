@@ -261,6 +261,10 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton mail settings autoreply enable`](../mail/settings.md#autoreply-enable) | Turn the auto-reply on, keeping its schedule |
 | [`proton mail settings autoreply get`](../mail/settings.md#autoreply-get) | Show the auto-reply and its schedule |
 | [`proton mail settings autoreply set`](../mail/settings.md#autoreply-set) | Configure the auto-reply and turn it on |
+| [`proton mail settings categories disable`](../mail/settings.md#categories-disable) | Hide categories from the inbox |
+| [`proton mail settings categories enable`](../mail/settings.md#categories-enable) | Show categories as tabs in the inbox |
+| [`proton mail settings categories list`](../mail/settings.md#categories-list) | List the categories, and which show and notify |
+| [`proton mail settings categories update`](../mail/settings.md#categories-update) | Change whether a category notifies |
 | [`proton mail settings domains create`](../mail/settings.md#domains-create) | Add a custom domain to the account |
 | [`proton mail settings domains delete`](../mail/settings.md#domains-delete) | Remove a custom domain |
 | [`proton mail settings domains get`](../mail/settings.md#domains-get) | Show a domain's DNS entries and their status |

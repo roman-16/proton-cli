@@ -20,7 +20,7 @@ import (
 // path is.
 func TestMailMessagesWatchReportsAnArrival(t *testing.T) {
 	subject := testID() + "-watched"
-	w, err := watchAs(account.Primary, "mail", "messages", "watch")
+	w, err := watchAs(account.Primary, "mail", "messages", "watch", "--folder", "inbox")
 	if err != nil {
 		t.Fatalf("start watch: %v", err)
 	}
@@ -49,7 +49,7 @@ func TestMailMessagesWatchDoesNotReplayThePast(t *testing.T) {
 	early := testID() + "-early"
 	sendTestMailSecondary(t, early)
 
-	w, err := watchAs(account.Primary, "mail", "messages", "watch")
+	w, err := watchAs(account.Primary, "mail", "messages", "watch", "--folder", "inbox")
 	if err != nil {
 		t.Fatalf("start watch: %v", err)
 	}
@@ -66,5 +66,52 @@ func TestMailMessagesWatchDoesNotReplayThePast(t *testing.T) {
 	})
 	if strings.Contains(line, early) {
 		t.Fatalf("watch reopened the earlier message %q before reporting %q", early, line)
+	}
+}
+
+func notifiedAbout(t *testing.T) string {
+	t.Helper()
+	var in []string
+	var tabs []category
+	if runJSON(t, "mail", "settings", "get")["category_view"] == "on" {
+		tabs = categories(t)
+	}
+	for _, c := range tabs {
+		if !c.shown || c.notify {
+			in = append(in, c.name)
+		}
+	}
+	if len(tabs) == 0 {
+		in = append(in, "inbox")
+	}
+	in = append(in, "starred")
+	for _, row := range runJSONArray(t, "mail", "settings", "folders", "list") {
+		folder := row.(map[string]interface{})
+		if folder["notify"] == true {
+			in = append(in, folder["name"].(string))
+		}
+	}
+	if len(in) == 1 {
+		return in[0]
+	}
+	return strings.Join(in[:len(in)-1], ", ") + " and " + in[len(in)-1]
+}
+
+func TestMailMessagesWatchCoversWhatProtonNotifiesAbout(t *testing.T) {
+	for _, view := range []string{"off", "on"} {
+		t.Run("categories "+view, func(t *testing.T) {
+			withCategoryView(t, view)
+			want := "Watching " + notifiedAbout(t) + ". Ctrl+C to stop."
+
+			w, err := watchAs(account.Primary, "mail", "messages", "watch")
+			if err != nil {
+				t.Fatalf("start watch: %v", err)
+			}
+			defer w.stop(t)
+			w.waitReady(t, 10*time.Second)
+			if w.opening != want {
+				t.Errorf("watch opened with %q, want %q", w.opening, want)
+			}
+		})
 	}
 }

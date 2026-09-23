@@ -32,9 +32,10 @@ type watch struct {
 	buf   *bytes.Buffer
 	// ready closes once the opening line has reached stderr, which is how a
 	// test knows the watch has authenticated and begun.
-	ready chan struct{}
-	once  sync.Once
-	done  chan error
+	ready   chan struct{}
+	opening string
+	once    sync.Once
+	done    chan error
 
 	// profile, args and started are what the trace needs to record the
 	// invocation once the watch has stopped.
@@ -105,8 +106,11 @@ func watchAs(profile string, args ...string) (*watch, error) {
 		scanner := bufio.NewScanner(errPipe)
 		for scanner.Scan() {
 			w.errb.WriteString(scanner.Text() + "\n")
-			if strings.HasPrefix(scanner.Text(), "Watching ") {
-				w.once.Do(func() { close(w.ready) })
+			if line := scanner.Text(); strings.HasPrefix(line, "Watching ") {
+				w.once.Do(func() {
+					w.opening = line
+					close(w.ready)
+				})
 			}
 		}
 	}()

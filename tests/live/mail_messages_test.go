@@ -411,6 +411,25 @@ func TestMailMessagesMoveDest(t *testing.T) {
 	runOK(t, "mail", "messages", "move", "--into", "inbox", "--", msgID)
 }
 
+func TestMailMessagesMoveIntoPrimary(t *testing.T) {
+	requireCategories(t)
+	msgID := mutableMail(t)
+
+	runOK(t, "mail", "messages", "move", "--into", "primary", "--", msgID)
+	found := false
+	for _, m := range runJSON(t, "mail", "messages", "list", "--folder", "primary", "--limit", "50")["messages"].([]interface{}) {
+		if m.(map[string]interface{})["id"].(string) == msgID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("message should appear under primary after moving it there")
+	}
+
+	runOK(t, "mail", "messages", "move", "--into", "inbox", "--", msgID)
+}
+
 func TestMailMessagesTrash(t *testing.T) {
 	msgID := mutableMail(t)
 
