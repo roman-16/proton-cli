@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/roman-16/proton-cli/internal/account/plan"
 	"github.com/roman-16/proton-cli/internal/dns"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
@@ -241,7 +242,7 @@ func (a *domainAPI) Decode(_ context.Context, req proton.Request, out any) error
 func TestADomainListingWithoutAPlanSaysWhatIsMissing(t *testing.T) {
 	api := &domainAPI{
 		refusal:      &proton.APIError{HTTPStatus: 500, Message: "Internal server error"},
-		organization: &proton.APIError{HTTPStatus: 422, Code: noOrganization, Message: "not a member"},
+		organization: &proton.APIError{HTTPStatus: 422, Code: plan.NoOrganization, Message: "not a member"},
 	}
 	_, err := New(api, nil).DomainsList(context.Background())
 	var problem *errs.Problem

@@ -46,8 +46,10 @@ const (
 // exceptions that have to be argued for, not a list to grow when a test is
 // inconvenient to write.
 //
-// "The accounts do not have the plan for it" is not one of them any more: the
-// suite signs a paid account in on every run. What is left is what no run of
+// "The accounts do not have the plan for it" is not one of them: the suite signs
+// a paid account in on every run, and its plan reaches everything the CLI asks a
+// subscription for except what needs several people in one organization - a gap
+// argued in untested like any other. What is left here is what no run of
 // anything could do.
 var unreachable = map[string]string{
 	"DELETE /auth/v4/sessions": "revoking every other session would end the run",
@@ -100,14 +102,6 @@ var unreachable = map[string]string{
 	"GET /mail/v4/eo/message":         "the same: without a link there is no token to ask with",
 	"GET /mail/v4/eo/attachment/{id}": "the same",
 	"POST /mail/v4/eo/reply":          "the same, and an answer would go to a real mailbox",
-
-	// Asking what the account's plan allows. It is sent only once a listing of
-	// custom domains has already failed, and the only account whose listing fails
-	// is one with no organization - which answers this with a refusal rather than
-	// an answer, and a refusal is not coverage. An account that has an
-	// organization never fails the listing, so no run can be in the state where
-	// this is both sent and answered.
-	"GET /core/v4/organizations": "only a failed domain listing asks, and an account whose listing fails has no organization to answer about",
 }
 
 // untested are the requests a run could make and does not. Each is a gap somebody
@@ -220,6 +214,13 @@ var untested = map[string]string{
 	"POST /mail/v4/newsletter-subscriptions/{id}/filter":      "the same record: a standing rule needs a list to put it on",
 	"DELETE /mail/v4/newsletter-subscriptions/{id}":           "the same record, which has to exist before it can be forgotten",
 	"GET /calendar/v1/{id}/events/{id}/attendees":             "reaching it needs an event with more attendees than a page holds, which would mean inviting a hundred addresses from these accounts",
+
+	// Asking when somebody is busy. Proton's calendar asks only from a plan with
+	// room for several people, and so does the CLI; the paid account is on
+	// Unlimited, which has room for one, so every run is refused before the
+	// request. What is tested is that refusal on both kinds of account, and the
+	// answers the CLI reads, against the shapes Proton was seen to send.
+	"GET /calendar/v1/{id}/busy-schedule": "only Duo, Family, Visionary and business plans may ask, and the paid test account is on Unlimited",
 
 	// Deleting an address. Proton allows one a year, and the paid account - the
 	// one account that may delete at all - refuses the command outright, so

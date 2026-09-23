@@ -2,9 +2,11 @@ package kit
 
 import (
 	"fmt"
+	"net/mail"
 	"slices"
 	"strings"
 
+	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/ref"
 	"github.com/spf13/cobra"
 )
@@ -33,7 +35,8 @@ func arity(args []Argument) (least, most int) {
 }
 
 // counting refuses the wrong number of arguments before anything else looks at
-// them, then hands what is left to whatever the command judges for itself.
+// them, then holds each to its placeholder, then hands what is left to whatever
+// the command judges for itself.
 func counting(declared []Argument, own cobra.PositionalArgs) cobra.PositionalArgs {
 	least, most := arity(declared)
 	return func(c *cobra.Command, args []string) error {
@@ -44,6 +47,9 @@ func counting(declared []Argument, own cobra.PositionalArgs) cobra.PositionalArg
 			return surplus(c, declared, args)
 		}
 		if err := offered(c, args); err != nil {
+			return err
+		}
+		if err := held(c, declared, args); err != nil {
 			return err
 		}
 		if own == nil {
@@ -74,6 +80,63 @@ func offered(c *cobra.Command, args []string) error {
 		}
 	}
 	return nil
+}
+
+// held holds every argument to the check its placeholder declares.
+//
+// The placeholder is the one declaration of what an argument is, so an address
+// is judged the same way on every command that takes one, and a command cannot
+// forget to. The refusal carries the command's own first example, which is a
+// line that works, and a command that also takes None shows that line too.
+func held(c *cobra.Command, declared []Argument, args []string) error {
+	for i, value := range args {
+		name := At(declared, i).Name
+		check := Placeholders[name].Check
+		if check == nil {
+			continue
+		}
+		takesNone := c.Annotations[TakesNone] == name
+		if takesNone && strings.EqualFold(value, None) {
+			continue
+		}
+		problem := check(value)
+		if problem == nil {
+			continue
+		}
+		if line := firstExample(c); line != "" {
+			problem = problem.Hint(line)
+		}
+		if line := exampleEndingIn(c, None); takesNone && line != "" {
+			problem = problem.Hint(line)
+		}
+		return problem
+	}
+	return nil
+}
+
+// IsAddress reports whether s is an email address written bare: no name in
+// front of it, no angle brackets around it, nothing after it.
+func IsAddress(s string) bool {
+	parsed, err := mail.ParseAddress(s)
+	return err == nil && parsed.Address == s
+}
+
+// address is the check an EMAIL argument is held to.
+func address(value string) *errs.Problem {
+	if IsAddress(value) {
+		return nil
+	}
+	return Fail("%q is not an email address.", value)
+}
+
+// sender is the check a SENDER argument is held to: an address, or a whole
+// domain written with the @ in front, whose name has to be one an address could
+// end in.
+func sender(value string) *errs.Problem {
+	if IsAddress(value) || (strings.HasPrefix(value, "@") && IsAddress("x"+value)) {
+		return nil
+	}
+	return Fail("%q is neither an email address nor a domain written as @example.com.", value)
 }
 
 // missing names the first argument that was not given, and what it stands for.
@@ -133,10 +196,29 @@ func counted(n int) string {
 // firstExample is the command's own first line of documentation, which is a
 // command line that works.
 func firstExample(c *cobra.Command) string {
-	for _, line := range strings.Split(c.Example, "\n") {
-		if line = strings.TrimSpace(line); strings.HasPrefix(line, Program+" ") {
+	if lines := examples(c); len(lines) > 0 {
+		return lines[0]
+	}
+	return ""
+}
+
+// exampleEndingIn is the command's first example whose last word is word.
+func exampleEndingIn(c *cobra.Command, word string) string {
+	for _, line := range examples(c) {
+		if fields := strings.Fields(line); fields[len(fields)-1] == word {
 			return line
 		}
 	}
 	return ""
+}
+
+// examples are the command lines a command's documentation shows, in order.
+func examples(c *cobra.Command) []string {
+	var out []string
+	for _, line := range strings.Split(c.Example, "\n") {
+		if line = strings.TrimSpace(line); strings.HasPrefix(line, Program+" ") {
+			out = append(out, line)
+		}
+	}
+	return out
 }

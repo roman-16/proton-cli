@@ -68,7 +68,7 @@ proton calendar events delete 4f2a1b9c@2026-05-04T09:00 --onwards
 
 Write events out as an .ics file.
 
-With neither --after nor --before it covers the next 30 days, starting today. With one of them, the other is 30 days away from it.
+With neither --after nor --before it covers the next 30 days, starting today. With one of them, it covers the 30 days starting or ending there.
 
 A recurring series is written once, with its rule, so another client reads it back as the same series.
 
@@ -131,7 +131,7 @@ curl -s https://example.com/team.ics | proton calendar events import -
 
 List what is on your calendars between two dates.
 
-With neither --after nor --before it covers the next 30 days, starting today. With one of them, the other is 30 days away from it.
+With neither --after nor --before it covers the next 30 days, starting today. With one of them, it covers the 30 days starting or ending there.
 
 --keyword matches the title, the location, the description, the organizer and the people invited. On its own it covers every event there has been and the next three years of every repeating one; with --after or --before it covers those days instead.
 

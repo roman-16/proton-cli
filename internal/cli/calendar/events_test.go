@@ -271,3 +271,60 @@ func TestEventColumnsRenderAnAllDayRow(t *testing.T) {
 		}
 	}
 }
+
+// A whole day lasts a day on the day the clocks change too, which a length taken
+// in hours between two midnights would make 23 or 25 of them.
+func TestAWholeDayLastsADayWhenTheClocksChange(t *testing.T) {
+	loc, err := time.LoadLocation("Europe/Vienna")
+	if err != nil {
+		t.Fatalf("Europe/Vienna: %v", err)
+	}
+	for _, tc := range []struct {
+		name       string
+		start, end time.Time
+		want       string
+	}{
+		{"the clocks going forward",
+			time.Date(2026, 3, 29, 0, 0, 0, 0, loc), time.Date(2026, 3, 30, 0, 0, 0, 0, loc), "1d"},
+		{"the clocks going back",
+			time.Date(2026, 10, 25, 0, 0, 0, 0, loc), time.Date(2026, 10, 26, 0, 0, 0, 0, loc), "1d"},
+		{"a week across one",
+			time.Date(2026, 3, 27, 0, 0, 0, 0, loc), time.Date(2026, 4, 3, 0, 0, 0, 0, loc), "7d"},
+	} {
+		if got := length(tc.start, tc.end, true); got != tc.want {
+			t.Errorf("%s: an all-day length of %q, want %q", tc.name, got, tc.want)
+		}
+	}
+	night := length(time.Date(2026, 3, 29, 1, 0, 0, 0, loc), time.Date(2026, 3, 29, 4, 0, 0, 0, loc), false)
+	if night != "2h" {
+		t.Errorf("a timed length across the change = %q, want the 2h that passed", night)
+	}
+}
+
+// Whom an event invites is judged before the calendar is resolved, so a
+// mistyped attendee costs no sign-in to find out about.
+func TestAnAttendeeIsJudgedBeforeAnythingIsAskedOfProton(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		attendees []string
+		want      string
+	}{
+		{"an address", []string{"jane@example.com"}, ""},
+		{"an optional one and a required one", []string{"jane@example.com:optional", "alex@example.com:required"}, ""},
+		{"nobody at all", []string{""}, ""},
+		{"something that is not an address", []string{"jane"}, `"jane" is not an email address`},
+		{"a name in front of an address", []string{"Jane <jane@example.com>"}, "is not an email address"},
+		{"a role that is neither", []string{"jane@example.com:optinal"}, "write optional or required"},
+	} {
+		attendees := tc.attendees
+		err := judgeAttendees(&attendees)(&kit.Invocation{})
+		switch {
+		case tc.want == "" && err != nil:
+			t.Errorf("%s was refused: %v", tc.name, err)
+		case tc.want != "" && err == nil:
+			t.Errorf("%s was accepted, want a refusal saying %q", tc.name, tc.want)
+		case tc.want != "" && !strings.Contains(err.Error(), tc.want):
+			t.Errorf("%s was refused with %q, want it to say %q", tc.name, err, tc.want)
+		}
+	}
+}

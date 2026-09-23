@@ -157,10 +157,7 @@ func addressesCreateCmd() *cobra.Command {
 			if err := reauth.Supply(c); err != nil {
 				return err
 			}
-			local, domain, err := splitAddress(c.Args[0])
-			if err != nil {
-				return err
-			}
+			local, domain := splitAddress(c.Args[0])
 			return kit.Create(c, ui.ResultSpec{
 				Action: ui.Created, Kind: "addresses", Name: local + "@" + domain,
 			}, func() (string, error) {
@@ -178,16 +175,10 @@ func addressesCreateCmd() *cobra.Command {
 }
 
 // splitAddress reads EMAIL as Proton files it, which is a local part and a
-// domain. It is judged from the command line, so a malformed one costs nothing.
-func splitAddress(email string) (local, domain string, err error) {
-	whole := strings.TrimSpace(email)
-	local, domain, found := strings.Cut(whole, "@")
-	if !found || local == "" || domain == "" ||
-		strings.Contains(domain, "@") || strings.ContainsAny(whole, " \t") {
-		return "", "", kit.Fail("%q is not an email address.", email).
-			Hint("write it in full, as work@example.com")
-	}
-	return local, domain, nil
+// domain. EMAIL has already been held to being a bare address, so it has one @.
+func splitAddress(email string) (local, domain string) {
+	local, domain, _ = strings.Cut(email, "@")
+	return local, domain
 }
 
 func addressesEnableCmd() *cobra.Command {

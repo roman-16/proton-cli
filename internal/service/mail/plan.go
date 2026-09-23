@@ -2,16 +2,11 @@ package mail
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 
+	"github.com/roman-16/proton-cli/internal/account/plan"
 	"github.com/roman-16/proton-cli/internal/errs"
-	"github.com/roman-16/proton-cli/internal/proton"
 )
-
-// noOrganization is Proton's answer for an account that is not in one, which is
-// every account without a plan.
-const noOrganization = 2501
 
 // orNoPlan replaces Proton's refusal when the account could not have had the
 // thing in the first place.
@@ -25,17 +20,11 @@ const noOrganization = 2501
 // things asking are: a custom domain, and a token that sends from an address on
 // one. What names them opens the sentence, so it is plural and capitalised.
 func (s *Service) orNoPlan(ctx context.Context, refusal error, what string) error {
-	var r struct {
-		Organization struct{ MaxDomains int }
-	}
-	err := s.C.Decode(ctx, proton.Request{
-		Method: "GET", Path: "/core/v4/organizations", Reads: true,
-	}, &r)
-	var api *proton.APIError
+	current, err := plan.Read(ctx, s.C)
 	switch {
-	case err == nil && r.Organization.MaxDomains > 0:
+	case err == nil && current.MaxDomains > 0:
 		return refusal
-	case err == nil, errors.As(err, &api) && api.Code == noOrganization:
+	case err == nil:
 		return errs.Problemf("%s need a paid Mail plan.", what)
 	}
 	// Recorded and not counted: Proton's own refusal is on the screen either way,

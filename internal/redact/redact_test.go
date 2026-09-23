@@ -109,6 +109,7 @@ func TestARouteKeepsWhatItCalledAndLosesWhatItCalledItAbout(t *testing.T) {
 			"/drive/shares/{id}/links/{id}",
 		},
 		{"/mail/v4/messages?PageSize=5&Keyword=divorce", "/mail/v4/messages"},
+		{"/calendar/v1/jane.roe@her-own-domain.at/busy-schedule", "/calendar/v1/{id}/busy-schedule"},
 	} {
 		if got, _ := r.Apply("path", c.in); got != c.want {
 			t.Errorf("%s became %q, want %q", c.in, got, c.want)

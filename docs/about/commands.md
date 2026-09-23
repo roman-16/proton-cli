@@ -67,6 +67,7 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton account settings two-factor generate`](../account/settings.md#two-factor-generate) | Make a two-factor secret for an authenticator app |
 | [`proton account settings two-factor get`](../account/settings.md#two-factor-get) | Show what this account is asked for at sign-in |
 | [`proton api`](../api/api.md) | Send a raw authenticated request to the Proton API |
+| [`proton calendar busy-times list`](../calendar/busy-times.md#list) | List when people are busy in a date range |
 | [`proton calendar events create`](../calendar/events.md#create) | Create an event |
 | [`proton calendar events delete`](../calendar/events.md#delete) | Delete events |
 | [`proton calendar events export`](../calendar/events.md#export) | Write events out as an .ics file |

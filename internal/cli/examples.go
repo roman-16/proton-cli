@@ -205,6 +205,11 @@ var examples = map[string][]string{
 		"proton calendar events list --calendar Work",
 		"proton calendar events list --keyword dentist",
 	},
+	"proton calendar busy-times list": {
+		"proton calendar busy-times list jane.roe@example.com",
+		"proton calendar busy-times list jane.roe@example.com alex.roe@example.com --after 2026-05-04 --before 2026-05-08",
+		"proton calendar busy-times list jane.roe@example.com --output json",
+	},
 	"proton calendar reminders list": {
 		"proton calendar reminders list",
 		"proton calendar reminders list --after 2026-04-20 --before 2026-04-21",

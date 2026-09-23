@@ -162,19 +162,10 @@ func emails(addrs []mailsvc.Address) string {
 	return strings.Join(out, " ")
 }
 
-// EMAIL is read the way Proton files an address, and a malformed one is wrong
-// before anybody is signed in.
-func TestSplitAddressReadsAnAddressOrRefusesIt(t *testing.T) {
-	local, domain, err := splitAddress(" work@example.com ")
-	if err != nil {
-		t.Fatalf("splitAddress: %v", err)
-	}
+// EMAIL is read the way Proton files an address: a local part and a domain.
+func TestSplitAddressReadsTheLocalPartAndTheDomain(t *testing.T) {
+	local, domain := splitAddress("work@example.com")
 	if local != "work" || domain != "example.com" {
 		t.Errorf("split into %q and %q", local, domain)
-	}
-	for _, bad := range []string{"work", "@example.com", "work@", "work@a@b", "wo rk@example.com", ""} {
-		if _, _, err := splitAddress(bad); err == nil {
-			t.Errorf("%q was read as an email address", bad)
-		}
 	}
 }

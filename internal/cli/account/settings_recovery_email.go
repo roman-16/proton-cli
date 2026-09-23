@@ -1,7 +1,6 @@
 package account
 
 import (
-	"net/mail"
 	"strings"
 
 	"github.com/roman-16/proton-cli/internal/cli/kit"
@@ -60,8 +59,9 @@ func recoveryEmailGetCmd() *cobra.Command {
 func recoveryEmailSetCmd() *cobra.Command {
 	var reauth kit.Reauth
 	c := &cobra.Command{
-		Use:   "set EMAIL",
-		Short: "Set the recovery address",
+		Use:         "set EMAIL",
+		Annotations: map[string]string{kit.TakesNone: "EMAIL"},
+		Short:       "Set the recovery address",
 		Long: "Set the recovery address.\n\n" +
 			"Your password is asked for. `set none` removes the address, and with it any\n" +
 			"way to reset your password by email.\n\n" +
@@ -71,10 +71,7 @@ func recoveryEmailSetCmd() *cobra.Command {
 			if err := reauth.Supply(c); err != nil {
 				return err
 			}
-			address, err := recoveryAddress(c.Args[0])
-			if err != nil {
-				return err
-			}
+			address := recoveryAddress(c.Args[0])
 			security, err := c.App.Account.Security(c.Ctx)
 			if err != nil {
 				return err
@@ -207,19 +204,13 @@ func recoveryEmailDisableCmd() *cobra.Command {
 	return c
 }
 
-// recoveryAddress judges what was typed before anything is sent: an address
-// Proton would refuse, and the word that takes the one there is away.
-func recoveryAddress(arg string) (string, error) {
+// recoveryAddress is the address the argument sets, which is none at all for the
+// word that takes the one there away.
+func recoveryAddress(arg string) string {
 	if strings.EqualFold(arg, kit.None) {
-		return "", nil
+		return ""
 	}
-	parsed, err := mail.ParseAddress(arg)
-	if err != nil || parsed.Address != arg {
-		return "", kit.Fail("%q is not an email address.", arg).
-			Hint("proton account settings recovery-email set jane.roe@example.com",
-				"proton account settings recovery-email set none")
-	}
-	return arg, nil
+	return arg
 }
 
 func refuseNoRecoveryEmail() error {

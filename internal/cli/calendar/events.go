@@ -92,11 +92,23 @@ func eventColumns() []ui.Column[calsvc.Event] {
 			return e.Start.Format("15:04")
 		}},
 		{Header: "DURATION", Right: true, Cell: func(e calsvc.Event) string {
-			return units.Duration(e.End.Sub(e.Start))
+			return length(e.Start, e.End, e.AllDay)
 		}},
 		{Header: "TITLE", Flex: true, Handle: true, Cell: func(e calsvc.Event) string { return e.Title }},
 		{Header: "LOCATION", Flex: true, Cell: func(e calsvc.Event) string { return e.Location }},
 	}
+}
+
+// length is how long something on a calendar lasts, the way a reader counts it:
+// an all-day stretch in days. Measured in hours between local midnights, the day
+// the clocks go forward would last 23 of them.
+func length(start, end time.Time, allDay bool) string {
+	if !allDay {
+		return units.Duration(end.Sub(start))
+	}
+	y, m, d := start.Date()
+	ey, em, ed := end.Date()
+	return units.Duration(time.Date(ey, em, ed, 0, 0, 0, 0, time.UTC).Sub(time.Date(y, m, d, 0, 0, 0, 0, time.UTC)))
 }
 
 func eventsListCmd() *cobra.Command {
@@ -108,7 +120,7 @@ func eventsListCmd() *cobra.Command {
 		Short: "List events in a date range",
 		Long: "List what is on your calendars between two dates.\n\n" +
 			"With neither --after nor --before it covers the next 30 days, starting today.\n" +
-			"With one of them, the other is 30 days away from it.\n\n" +
+			"With one of them, it covers the 30 days starting or ending there.\n\n" +
 			"--keyword matches the title, the location, the description, the organizer\n" +
 			"and the people invited. On its own it covers every event there has been\n" +
 			"and the next three years of every repeating one; with --after or --before\n" +
@@ -185,7 +197,7 @@ func eventsGetCmd() *cobra.Command {
 					{Label: "Title", Value: ev.Title, Handle: true},
 					{Label: "Start", Value: when},
 					{Label: "End", Value: until},
-					{Label: "Duration", Value: units.Duration(ev.End.Sub(ev.Start))},
+					{Label: "Duration", Value: length(ev.Start, ev.End, ev.AllDay)},
 					{Label: "Location", Value: ev.Location},
 					{Label: "Description", Value: ev.Description},
 					{Label: "Recurrence", Value: ev.RRule},
@@ -286,7 +298,7 @@ func eventsCreateCmd() *cobra.Command {
 			"Without --end or --duration an event lasts as long as the calendar it is made\n" +
 			"in says a new event lasts, which `settings calendars get` shows; an all-day\n" +
 			"event lasts a day.\n\n" + colorParagraph,
-		RunE: kit.Run([]kit.Step{d.check(true)}, func(c *kit.Invocation) error {
+		RunE: kit.Run([]kit.Step{d.check(true), judgeAttendees(&attendees)}, func(c *kit.Invocation) error {
 			if d.title == "" || d.start == "" {
 				return kit.Fail("An event needs a title and a start.").
 					Hint(`--title Dentist --start 2026-04-16T14:00`)
@@ -723,6 +735,28 @@ func (d *details) check(needsStart bool) kit.Step {
 	}
 }
 
+// judgeAttendees refuses an --attendee nobody could be invited as, before the
+// calendar is resolved: an address that is not one, or a role that is neither
+// of the two. An empty value invites nobody, and is left out.
+func judgeAttendees(attendees *[]string) kit.Step {
+	return func(*kit.Invocation) error {
+		for _, raw := range *attendees {
+			email, _, roleErr := calsvc.ParseAttendee(raw)
+			switch {
+			case email == "" && roleErr == nil:
+				continue
+			case !kit.IsAddress(email):
+				return kit.Fail("--attendee: %q is not an email address.", email).
+					Hint("--attendee jane@example.com")
+			case roleErr != nil:
+				return kit.Fail("--attendee %s: after the colon, write optional or required.", strings.TrimSpace(raw)).
+					Hint("--attendee " + email + ":optional")
+			}
+		}
+		return nil
+	}
+}
+
 // wantsATimeOfDay is what --all-day=false asks for and cannot supply itself.
 func wantsATimeOfDay(day string) error {
 	return kit.Fail("--all-day=false gives the event a time of day, so --start has to say which.").
@@ -1023,7 +1057,7 @@ func eventsExportCmd() *cobra.Command {
 		Short: "Write events out as an .ics file",
 		Long: "Write events out as an .ics file.\n\n" +
 			"With neither --after nor --before it covers the next 30 days, starting today.\n" +
-			"With one of them, the other is 30 days away from it.\n\n" +
+			"With one of them, it covers the 30 days starting or ending there.\n\n" +
 			"A recurring series is written once, with its rule, so another client reads\n" +
 			"it back as the same series.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {

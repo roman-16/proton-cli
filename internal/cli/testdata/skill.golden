@@ -39,6 +39,7 @@ An all-day event's `end` is the midnight after its last day (`all_day` marks one
 
 These are the listings that can be narrowed, and what narrows them. The same flags choose what a bulk verb in that collection acts on, so a selection can be worked out on `list` and then handed to `trash`, `move`, `label` or `export`. Everything else a command takes is in its `--help`.
 
+- `proton calendar busy-times list EMAIL... --after string --before string --limit int --page int`
 - `proton calendar events list --after string --before string --calendar string --keyword string --limit int --page int`
 - `proton calendar invitations list --desc --limit int --page int --sort string`
 - `proton calendar reminders list --after string --before string --calendar string --limit int --page int`
@@ -171,6 +172,7 @@ One line per group, with the verbs under it. Arguments, flags and examples are i
 
 ### calendar - Calendars and events
 
+- `proton calendar busy-times` - When other people are busy: list
 - `proton calendar events` - Events in your calendars: create, delete, export, get, import, list, respond, update
 - `proton calendar invitations` - Calendars other people have offered you: accept, decline, list
 - `proton calendar reminders` - The notifications your events will raise: list, watch

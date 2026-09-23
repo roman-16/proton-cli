@@ -1,8 +1,8 @@
 # Calendar
 
-Events, recurrence, reminders and invitations in Proton Calendar, plus `.ics` in and out. Everything is encrypted with your calendar key and signed with your address key.
+Events, recurrence, reminders and invitations in Proton Calendar, when other people are busy, and `.ics` in and out. Everything is encrypted with your calendar key and signed with your address key.
 
-This page is what people actually do. For every command and flag, see the reference: [events](events.md), [reminders](reminders.md), [invitations](invitations.md), [settings](settings.md).
+This page is what people actually do. For every command and flag, see the reference: [events](events.md), [busy times](busy-times.md), [reminders](reminders.md), [invitations](invitations.md), [settings](settings.md).
 
 ## See what's on
 
@@ -14,7 +14,7 @@ proton calendar events get "Team sync"
 
 Every calendar is included unless `--calendar` narrows it.
 
-`--after` and `--before` are the first and last **whole** days to include, read in your own zone, and both are included. Without them you get the next 30 days, starting today. Name one and the other is 30 days away from it, so `--after 2027-01-01` lists that January.
+`--after` and `--before` are the first and last **whole** days to include, read in your own zone, and both are included. Without them you get the next 30 days, starting today. Name one and you get the 30 days starting or ending there, so `--after 2027-01-01` lists January 1 to 30.
 
 An event is on a day when it touches any part of it, so a query for one day inside a three-day event returns it.
 
@@ -91,7 +91,7 @@ A colour per event is a paid feature. On a free account the colour is stored and
 
 Proton users are added directly. External addresses get an emailed invitation.
 
-A bare address is required: `--attendee jane@example.com:optional` is not accepted.
+A bare address invites somebody as required, and `--attendee jane@example.com:optional` as optional. A value that is not an address, or a role other than `optional` or `required`, is refused before anything is sent.
 
 ### Recurrence
 
@@ -121,6 +121,30 @@ The four hours a year where a clock reading means two instants or none are refus
 $ proton calendar events create --title 'Night shift' --start 2026-10-25T02:30
 Error: 02:30 happens twice on 2026-10-25 in Europe/Vienna, when the clocks go back; say which one, as 2026-10-25T02:30:00+02:00 or 2026-10-25T02:30:00+01:00
 ```
+
+## See when people are busy
+
+Before you invite people, see when they are busy:
+
+```console
+$ proton calendar busy-times list jane.roe@example.com alex.roe@example.com max@example.org --after 2026-05-04 --before 2026-05-08
+EMAIL                 DATE        TIME     DURATION
+────────────────────  ──────────  ───────  ────────
+jane.roe@example.com  2026-05-04  09:00          1h
+alex.roe@example.com  2026-05-04  14:00       1h30m
+jane.roe@example.com  2026-05-05  all day        1d
+alex.roe@example.com  2026-05-07  10:30         30m
+4 busy times.
+! Availability unknown for max@example.org: Proton will not say when they are busy.
+```
+
+It needs a Duo, Family, Visionary or business plan. On any other plan it is refused.
+
+A busy time says when somebody is busy, never what with. Without `--after` and `--before` you get the next 7 days, starting today.
+
+Anyone outside Proton, and anyone else Proton will not show, is listed as unknown rather than left out. With `--output json` they are under `unknown`.
+
+Whether your own events make you look busy to others is set per calendar with `--busy`; see [Your calendars](#your-calendars).
 
 ## Change or answer one
 
@@ -229,7 +253,7 @@ proton calendar settings calendars delete Work
 
 Each calendar carries its own defaults for the events made in it.
 
-- `--busy` says whether events there make you look busy to people checking your availability.
+- `--busy` says whether events there make you look busy to [people checking your availability](#see-when-people-are-busy).
 - `--no-remind` gives new events none.
 - `--default` makes it the calendar new events go into when `--calendar` names none.
 

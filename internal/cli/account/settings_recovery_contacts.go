@@ -98,18 +98,14 @@ func recoveryContactsAddCmd() *cobra.Command {
 		Long: "Let somebody help you recover your account.\n\n" +
 			"Your password is asked for. The contact has to have a Proton account.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
-			email, err := contactAddress(c.Args[0])
-			if err != nil {
-				return err
-			}
+			email := c.Args[0]
 			if err := reauth.Supply(c); err != nil {
 				return err
 			}
-			var da acctsvc.DelegatedAccess
 			return kit.Mutate(c, ui.ResultSpec{
 				Action: ui.Added, Kind: "recovery contacts", Count: 1, Name: email,
 			}, func() error {
-				da, err = c.App.Account.AddDelegatedAccess(c.Ctx, acctsvc.KindRecovery, email, 0)
+				da, err := c.App.Account.AddDelegatedAccess(c.Ctx, acctsvc.KindRecovery, email, 0)
 				if err == nil {
 					c.Note("ID %s", da.ID)
 				}

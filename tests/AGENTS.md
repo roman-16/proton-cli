@@ -218,7 +218,7 @@ The live suite is the only thing that would notice Proton changing an answer, an
 - **what the suite reaches** - `tests/api-coverage.golden`, recorded from a real run. Only requests Proton **answered** count: an endpoint listed on the strength of a 401 is a gap wearing the clothes of coverage. `just coverage-one PATTERN` adds what one slice reached, which is how a change that opened a new endpoint records it; `just coverage` rewrites the file from a full run, which is the only thing that can take a stale line away.
 - **what the CLI can send** - read from the source by `TestEveryRequestTheCLICanSendIsOneTheSuiteSends`, which needs no account and runs in `just test-fast` on every push.
 
-A request the CLI can send that the golden does not hold **fails the build**. Two ways out, both argued in that test's own file: `unreachable` for what no run could do, and `untested` for a gap somebody chose to leave, reported on every run rather than passing quietly. "The accounts do not have the plan for it" is no longer one of them.
+A request the CLI can send that the golden does not hold **fails the build**. Two ways out, both argued in that test's own file: `unreachable` for what no run could do, and `untested` for a gap somebody chose to leave, reported on every run rather than passing quietly. "The accounts do not have the plan for it" excuses nothing the paid account reaches: it is on Unlimited, which covers every subscription the CLI asks for except one with several people in the organization. What only such a plan may ask is the one plan gap, and it sits in `untested`.
 
 The honest limit: a path built in a variable is invisible to the extractor, which is why the whole `kit.Settings` write path escapes it. Write the path in the request literal.
 

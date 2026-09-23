@@ -168,11 +168,15 @@ func (r *Redactor) address(value string) string {
 // also eats the name of the endpoint - which is the most useful thing in the
 // record. The shapes an ID comes in are declared once, where references are read
 // and written, and borrowing that is what stops the two disagreeing.
+//
+// An address names what a request is about as surely as an ID does - asking when
+// somebody is busy puts theirs in the path - and no endpoint's own name has an @
+// in it, so a segment holding one stands in the same way.
 func (r *Redactor) route(value string) string {
 	path, _, _ := strings.Cut(value, "?")
 	segments := strings.Split(path, "/")
 	for i, s := range segments {
-		if ref.Full(s) {
+		if ref.Full(s) || strings.Contains(s, "@") {
 			segments[i] = "{id}"
 		}
 	}

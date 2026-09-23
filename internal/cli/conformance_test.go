@@ -138,6 +138,25 @@ func TestUsageUsesOnlyDeclaredPlaceholders(t *testing.T) {
 	}
 }
 
+// A command that takes the word for none names the argument that takes it, and
+// that argument has to be one its usage line shows and a check holds - otherwise
+// the declaration lets through nothing, and reads as though it did.
+func TestNoneIsTakenOnlyByAnArgumentACheckHolds(t *testing.T) {
+	leaves, _ := partition(t)
+	for _, c := range leaves {
+		name, declared := c.Annotations[kit.TakesNone]
+		if !declared {
+			continue
+		}
+		if !slices.Contains(argTokens(c.Use), name) {
+			t.Errorf("%s: takes none for %s, which %q does not show", cmdPath(c), name, c.Use)
+		}
+		if kit.Placeholders[name].Check == nil {
+			t.Errorf("%s: takes none for %s, which no check holds", cmdPath(c), name)
+		}
+	}
+}
+
 // How many arguments a command takes is said once, on the usage line its help
 // screen shows, and kit is what reads it. A command that declared an arity of
 // its own would be a command that can disagree with the line above its own

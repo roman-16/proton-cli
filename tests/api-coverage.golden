@@ -69,6 +69,7 @@ GET /core/v4/keys/all
 GET /core/v4/labels
 GET /core/v4/logs/auth
 GET /core/v4/members/me
+GET /core/v4/organizations
 GET /core/v4/settings
 GET /core/v4/settings/2fa/totp/secret
 GET /core/v4/users

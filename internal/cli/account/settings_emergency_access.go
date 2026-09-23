@@ -2,7 +2,6 @@ package account
 
 import (
 	"context"
-	"net/mail"
 	"time"
 
 	"github.com/roman-16/proton-cli/internal/cli/kit"
@@ -117,10 +116,7 @@ func emergencyAddCmd() *cobra.Command {
 			"Your password is asked for. --wait sets how long after a request the\n" +
 			"access opens, and defaults to 7d. The contact has to have a Proton account.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
-			email, err := contactAddress(c.Args[0])
-			if err != nil {
-				return err
-			}
+			email := c.Args[0]
 			delay, err := waitDuration(wait)
 			if err != nil {
 				return err
@@ -452,14 +448,4 @@ func waitDuration(wait string) (time.Duration, error) {
 		return 0, kit.Fail("--wait has to be a positive span of time.").Hint("--wait 7d")
 	}
 	return d, nil
-}
-
-// contactAddress judges an email before anything is sent.
-func contactAddress(arg string) (string, error) {
-	parsed, err := mail.ParseAddress(arg)
-	if err != nil || parsed.Address != arg {
-		return "", kit.Fail("%q is not an email address.", arg).
-			Hint("proton account settings emergency-access add jane.roe@proton.me")
-	}
-	return arg, nil
 }

@@ -16,6 +16,7 @@ import { copyFile, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promi
 import { dirname, join, posix, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { sidebar } from "../sidebar.ts";
 import { branch, edit } from "../site.ts";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -81,6 +82,26 @@ const slugOf = (path: string) =>
   );
 
 const pageURL = (path: string) => `/${slugOf(path)}/`;
+
+/*
+ * Every page is one the sidebar lists. A page left out of it is still built, but
+ * only a search leads anybody to it, and nothing else would say so.
+ */
+const listedIn = (entries: readonly unknown[]): string[] =>
+  entries.flatMap((entry): string[] => {
+    if (typeof entry === "string") return [entry];
+    if (entry && typeof entry === "object") {
+      if ("slug" in entry && typeof entry.slug === "string") return [entry.slug];
+      if ("items" in entry && Array.isArray(entry.items)) return listedIn(entry.items);
+    }
+    return [];
+  });
+
+const listed = new Set(listedIn(sidebar));
+const unlisted = sources.map(slugOf).filter((slug) => !listed.has(slug));
+if (unlisted.length > 0) {
+  throw new Error(`web/sidebar.ts lists no page for ${unlisted.join(", ")}`);
+}
 
 /*
  * A link is resolved the way a reader on GitHub resolves it - against the

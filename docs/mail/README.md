@@ -611,7 +611,7 @@ proton mail settings imports get jane@fastmail.com
 
 **The other mailbox's password is sent to Proton**, which connects to the mailbox and keeps the password until the import is over. Most providers want an app password here rather than the one you sign in with. The password is read from a file, never a flag - `-` reads standard input.
 
-`--server` and `--port` are looked up from the address. Give them for a provider Proton does not know:
+`--server` and `--port` are looked up from the address. Give them for a provider Proton does not know, or for a login that is not an address:
 
 ```bash
 proton mail settings imports create jane@example.com --imap-password-file /run/secrets/mailbox \

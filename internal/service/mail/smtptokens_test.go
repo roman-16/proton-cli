@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/roman-16/proton-cli/internal/account/plan"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
 )
@@ -40,7 +41,7 @@ func (a *smtpAPI) Decode(_ context.Context, req proton.Request, out any) error {
 	case req.Path == "/core/v4/addresses":
 		return json.Unmarshal([]byte(a.addresses), out)
 	case req.Path == "/core/v4/organizations":
-		return &proton.APIError{HTTPStatus: 422, Code: noOrganization, Message: "not a member"}
+		return &proton.APIError{HTTPStatus: 422, Code: plan.NoOrganization, Message: "not a member"}
 	}
 	return nil
 }

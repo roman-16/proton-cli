@@ -905,9 +905,9 @@ proton mail settings imports cancel jane@fastmail.com
 
 Bring another mailbox in over IMAP.
 
-EMAIL is the mailbox to import from, and --imap-password-file is what opens it. That password is sent to Proton, which connects to the mailbox and keeps the password until the import is over. Most providers want an app password here rather than the one you sign in with.
+LOGIN signs in to the mailbox to import from, and is usually its address; --imap-password-file is what opens it. That password is sent to Proton, which connects to the mailbox and keeps the password until the import is over. Most providers want an app password here rather than the one you sign in with.
 
---server and --port are looked up from the address, and have to be given for a provider that is not known.
+--server and --port are looked up from the address, and have to be given for a provider that is not known, or for a login that is not an address.
 
 Every folder is imported unless --skip leaves it out, which leaves out what is inside it too. A folder that matches one of yours lands in it and the rest keep their own names; Gmail's folders arrive as labels. Mail outside --after and --before is left behind, by the day it arrived.
 
@@ -916,7 +916,7 @@ Everything that arrives carries one label, named after the other mailbox unless 
 The import carries on after this returns. `get` says how far it has got, and `undo` takes back everything it brought in.
 
 ```
-proton mail settings imports create EMAIL
+proton mail settings imports create LOGIN
 ```
 
 ```bash
@@ -1144,7 +1144,7 @@ A whole domain works too, written with the @: `@example.com`.
 Deciding again about the same sender replaces the earlier decision rather than colliding with it.
 
 ```
-proton mail settings senders allow EMAIL...
+proton mail settings senders allow SENDER...
 ```
 
 ```bash
@@ -1160,7 +1160,7 @@ A whole domain works too, written with the @: `@example.com`.
 Deciding again about the same sender replaces the earlier decision rather than colliding with it.
 
 ```
-proton mail settings senders block EMAIL...
+proton mail settings senders block SENDER...
 ```
 
 ```bash
@@ -1192,7 +1192,7 @@ proton mail settings senders list
 Drop a standing decision, letting the spam filter decide again.
 
 ```
-proton mail settings senders remove EMAIL...
+proton mail settings senders remove SENDER...
 ```
 
 ```bash
@@ -1208,7 +1208,7 @@ A whole domain works too, written with the @: `@example.com`.
 Deciding again about the same sender replaces the earlier decision rather than colliding with it.
 
 ```
-proton mail settings senders spam EMAIL...
+proton mail settings senders spam SENDER...
 ```
 
 ```bash

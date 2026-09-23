@@ -8,6 +8,8 @@
 // conformance test says so.
 package kit
 
+import "github.com/roman-16/proton-cli/internal/errs"
+
 // Program is the command, and Alias is its second name: the same binary under
 // the project's name, so a line written either way runs.
 //
@@ -261,8 +263,8 @@ var SettingsPages = map[string]string{
 	"pass settings mailboxes":            "Aliases",
 }
 
-// Placeholder is one argument name: what it stands for, and where the things it
-// may name are found.
+// Placeholder is one argument name: what it stands for, where the things it may
+// name are found, and what a value typed for it has to look like.
 type Placeholder struct {
 	// Means is the sentence that explains the name.
 	Means string
@@ -273,7 +275,18 @@ type Placeholder struct {
 	// argument is left to the shell, which knows about files and does not need
 	// telling not to.
 	Picks string
+	// Check refuses a value that cannot be what the name stands for, saying what
+	// is wrong with it. Every command whose usage line names the placeholder is
+	// held to it before anything else runs, so a mistyped address costs no
+	// sign-in to find out about. It is nil for a name only a lookup can judge - a
+	// reference, a path, a setting key - and for free text.
+	Check func(value string) *errs.Problem
 }
+
+// TakesNone is how a command declares that a checked argument also takes None,
+// the word that takes the value away: `recovery-email set none` removes the
+// address. The annotation's value is the placeholder it applies to.
+const TakesNone = "takes-none"
 
 // The two collections an argument can name that are not the same wherever the
 // argument appears. Neither reads as a command line, so neither can be mistaken
@@ -307,10 +320,11 @@ var Placeholders = map[string]Placeholder{
 	"CONTACT_REF":       {Means: "a contact, when the command already addresses something else", Picks: "contacts"},
 	"DEST":              {Means: "a Drive folder to write into"},
 	"DOMAIN":            {Means: "a domain name"},
-	"EMAIL":             {Means: "an email address"},
+	"EMAIL":             {Means: "an email address", Check: address},
 	"ENDPOINT":          {Means: "a Proton API path"},
 	"KEY":               {Means: "a setting key"},
 	"LINK":              {Means: "a password-protected message, by the link you were sent or the id in it"},
+	"LOGIN":             {Means: "what signs in to another mailbox, usually its address"},
 	"METHOD":            {Means: "an HTTP method"},
 	"NEW_NAME":          {Means: "the name to change something to"},
 	"PASSKEY_REF":       {Means: "a passkey stored against the addressed login", Picks: PicksHolding},
@@ -319,6 +333,7 @@ var Placeholders = map[string]Placeholder{
 	"PHOTO_REF":         {Means: "a photo, when the command already addresses an album", Picks: "drive photos"},
 	"REF":               {Means: "a full ID, a short ID, or a human handle", Picks: PicksAddressed},
 	"REVISION_REF":      {Means: "a revision of the addressed file or item", Picks: PicksHolding},
+	"SENDER":            {Means: "an email address, or a whole domain written as @example.com", Check: sender},
 	"SHELL":             {Means: "a shell to write the script for"},
 	"SRC":               {Means: "a local file or directory to read"},
 	"URL":               {Means: "a public link, as it was sent to you"},

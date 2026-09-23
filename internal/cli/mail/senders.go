@@ -75,7 +75,7 @@ func sendersListCmd() *cobra.Command {
 }
 func senderVerb(use, short, destination string, action ui.Action) *cobra.Command {
 	return &cobra.Command{
-		Use:   use + " EMAIL...",
+		Use:   use + " SENDER...",
 		Short: short,
 		Long: short + ".\n\n" +
 			"A whole domain works too, written with the @: `@example.com`.\n\n" +
@@ -101,7 +101,7 @@ func senderVerb(use, short, destination string, action ui.Action) *cobra.Command
 
 func sendersRemoveCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "remove EMAIL...",
+		Use:   "remove SENDER...",
 		Short: "Drop a standing decision, letting the spam filter decide again",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			targets := kit.Dedupe(c.Args)

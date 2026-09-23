@@ -18,7 +18,7 @@ One guide each, task by task, with the reference for that app beside it.
 | --- | --- |
 | [Mail](mail/README.md) | Reading, sending, searching, organizing, filters, auto-reply |
 | [Drive](drive/README.md) | Upload and download, revisions, sharing, public links, trash, photos |
-| [Calendar](calendar/README.md) | Events, recurrence, reminders, invitations, `.ics` |
+| [Calendar](calendar/README.md) | Events, recurrence, reminders, invitations, busy times, `.ics` |
 | [Pass](pass/README.md) | Items, vaults, aliases, secure links, two-factor codes |
 | [Contacts](contacts/README.md) | Contacts, groups, pinned keys, vCard import and export |
 | [Account](account/README.md) | Signing in, sessions, several accounts side by side, settings |

@@ -452,23 +452,23 @@ func TestTriggerDurationReadsWhatOtherClientsWrite(t *testing.T) {
 // An attendee says how much their presence matters by what follows the colon,
 // and a bare address is required - which is what inviting someone ordinarily
 // means.
-func TestAttendeeRoleReadsTheSuffix(t *testing.T) {
+func TestParseAttendeeReadsTheSuffix(t *testing.T) {
 	for _, c := range []struct{ in, email, role string }{
 		{"jane@example.com", "jane@example.com", roleRequired},
 		{"jane@example.com:optional", "jane@example.com", roleOptional},
 		{"jane@example.com:required", "jane@example.com", roleRequired},
 		{"  jane@example.com : optional ", "jane@example.com", roleOptional},
 	} {
-		email, role, err := attendeeRole(c.in)
+		email, role, err := ParseAttendee(c.in)
 		if err != nil {
-			t.Errorf("attendeeRole(%q): %v", c.in, err)
+			t.Errorf("ParseAttendee(%q): %v", c.in, err)
 			continue
 		}
 		if email != c.email || role != c.role {
-			t.Errorf("attendeeRole(%q) = %q/%q, want %q/%q", c.in, email, role, c.email, c.role)
+			t.Errorf("ParseAttendee(%q) = %q/%q, want %q/%q", c.in, email, role, c.email, c.role)
 		}
 	}
-	if _, _, err := attendeeRole("jane@example.com:maybe"); err == nil {
+	if _, _, err := ParseAttendee("jane@example.com:maybe"); err == nil {
 		t.Error("an unknown role should be refused rather than silently ignored")
 	}
 }
@@ -477,7 +477,7 @@ func TestAttendeeRoleReadsTheSuffix(t *testing.T) {
 // back into a command.
 func TestAttendeeTextRoundTrips(t *testing.T) {
 	for _, in := range []string{"jane@example.com", "jane@example.com:optional"} {
-		email, role, err := attendeeRole(in)
+		email, role, err := ParseAttendee(in)
 		if err != nil {
 			t.Fatalf("%q: %v", in, err)
 		}

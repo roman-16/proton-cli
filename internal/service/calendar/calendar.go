@@ -291,10 +291,22 @@ func decryptEvent(cards []map[string]any, keyPacket string, decryptionKR, verifi
 // defaultDays is how many days a listing covers when it is not told which.
 const defaultDays = 30
 
+// busyDays is how many days a listing of busy times covers when it is not told
+// which: a week, the most Proton's own calendar shows them for at once, and what
+// a week costs is four requests for each person asked about.
+const busyDays = 7
+
 // DefaultDays are the first and last day a listing covers when it is not told
 // which: today, and the rest of the month ahead.
-func DefaultDays() (first, last time.Time) {
+func DefaultDays() (first, last time.Time) { return fromToday(defaultDays) }
+
+// BusyDays are the first and last day a listing of busy times covers when it is
+// not told which: today, and the rest of the week ahead.
+func BusyDays() (first, last time.Time) { return fromToday(busyDays) }
+
+// fromToday are the first and last of n days, starting today.
+func fromToday(n int) (first, last time.Time) {
 	now := time.Now()
 	first = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-	return first, first.AddDate(0, 0, defaultDays-1)
+	return first, first.AddDate(0, 0, n-1)
 }

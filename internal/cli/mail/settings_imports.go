@@ -170,15 +170,16 @@ func importsCreateCmd() *cobra.Command {
 	var skip []string
 	var selfSigned bool
 	c := &cobra.Command{
-		Use:   "create EMAIL",
+		Use:   "create LOGIN",
 		Short: "Bring another mailbox in over IMAP",
 		Long: "Bring another mailbox in over IMAP.\n\n" +
-			"EMAIL is the mailbox to import from, and --imap-password-file is what\n" +
-			"opens it. That password is sent to Proton, which connects to the mailbox\n" +
-			"and keeps the password until the import is over. Most providers want an\n" +
-			"app password here rather than the one you sign in with.\n\n" +
+			"LOGIN signs in to the mailbox to import from, and is usually its address;\n" +
+			"--imap-password-file is what opens it. That password is sent to Proton,\n" +
+			"which connects to the mailbox and keeps the password until the import is\n" +
+			"over. Most providers want an app password here rather than the one you\n" +
+			"sign in with.\n\n" +
 			"--server and --port are looked up from the address, and have to be given\n" +
-			"for a provider that is not known.\n\n" +
+			"for a provider that is not known, or for a login that is not an address.\n\n" +
 			"Every folder is imported unless --skip leaves it out, which leaves out\n" +
 			"what is inside it too. A folder that matches one of yours lands in it and\n" +
 			"the rest keep their own names; Gmail's folders arrive as labels. Mail\n" +

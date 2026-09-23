@@ -2,6 +2,7 @@ package kit
 
 import (
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 
@@ -138,5 +139,83 @@ func TestAnArgumentFromAFixedListIsHeldToIt(t *testing.T) {
 	}
 	if want := "`proton completion` accepts: bash, zsh."; err.Error() != want {
 		t.Errorf("said %q, want %q", err.Error(), want)
+	}
+}
+
+// An address is judged the same way on every command that takes one, before the
+// command sees it, and the refusal shows the command's own way of writing one.
+func TestAnEmailArgumentHasToBeABareAddress(t *testing.T) {
+	add := &cobra.Command{Use: "add REF EMAIL", Example: "proton calendar settings calendars share add Work jane@proton.me"}
+	root := &cobra.Command{Use: Program}
+	root.AddCommand(add)
+	InstallArguments(root)
+
+	for _, good := range []string{"jane@proton.me", "jane.roe+team@example.com"} {
+		if err := add.Args(add, []string{"Work", good}); err != nil {
+			t.Errorf("%q was refused: %v", good, err)
+		}
+	}
+	for _, bad := range []string{"jane", "jane@", "@proton.me", "Jane <jane@proton.me>", "jane roe@proton.me", "none"} {
+		err := add.Args(add, []string{"Work", bad})
+		var problem *errs.Problem
+		if !errors.As(err, &problem) {
+			t.Errorf("%q was accepted", bad)
+			continue
+		}
+		if want := `"` + bad + `" is not an email address.`; problem.Error() != want {
+			t.Errorf("said %q, want %q", problem.Error(), want)
+		}
+		if hints := problem.Hints(); len(hints) != 1 || hints[0] != add.Example {
+			t.Errorf("offered %v, want the command's own example", hints)
+		}
+	}
+}
+
+// A sender is an address or a whole domain, and a domain is written the way an
+// address ends.
+func TestASenderIsAnAddressOrADomain(t *testing.T) {
+	block := &cobra.Command{Use: "block SENDER...", Example: "proton mail settings senders block spammer@example.com"}
+	root := &cobra.Command{Use: Program}
+	root.AddCommand(block)
+	InstallArguments(root)
+
+	if err := block.Args(block, []string{"spammer@example.com", "@example.com"}); err != nil {
+		t.Errorf("an address and a domain were refused: %v", err)
+	}
+	for _, bad := range []string{"example.com", "@", "@exa mple.com", "spammer"} {
+		if err := block.Args(block, []string{bad}); err == nil {
+			t.Errorf("%q was accepted as a sender", bad)
+		}
+	}
+}
+
+// The word that takes a value away is an argument only where the command says
+// so, and its refusal shows that way of writing it too.
+func TestNoneIsTakenWhereTheCommandSaysSo(t *testing.T) {
+	set := &cobra.Command{
+		Use:         "set EMAIL",
+		Annotations: map[string]string{TakesNone: "EMAIL"},
+		Example:     "proton account settings recovery-email set jane.roe@example.com\nproton account settings recovery-email set none",
+	}
+	root := &cobra.Command{Use: Program}
+	root.AddCommand(set)
+	InstallArguments(root)
+
+	for _, none := range []string{"none", "NONE"} {
+		if err := set.Args(set, []string{none}); err != nil {
+			t.Errorf("%q was refused: %v", none, err)
+		}
+	}
+	err := set.Args(set, []string{"jane"})
+	var problem *errs.Problem
+	if !errors.As(err, &problem) {
+		t.Fatal("a value that is neither was accepted")
+	}
+	want := []string{
+		"proton account settings recovery-email set jane.roe@example.com",
+		"proton account settings recovery-email set none",
+	}
+	if !slices.Equal(problem.Hints(), want) {
+		t.Errorf("offered %v, want %v", problem.Hints(), want)
 	}
 }

@@ -80,7 +80,8 @@ func (e Event) Recurring() bool { return e.RRule != "" || e.Occurrence != "" }
 // eventsPageSize is the largest page the events endpoint serves.
 const eventsPageSize = 100
 
-// queryTypes are the four windows the events endpoint can be asked for.
+// queryTypes are the four windows the events endpoint can be asked for, and the
+// busy-times endpoint the same four.
 //
 // Type is not a kind of event, it is a two-by-two selector: part-day or full-day,
 // crossed with starting inside the window or having started before it and
@@ -88,6 +89,10 @@ const eventsPageSize = 100
 // every recurring series whose first occurrence is in the past - which is how a
 // series reaches a later window at all.
 var queryTypes = []string{"0", "1", "2", "3"}
+
+// fullDay reports whether a query type is one of the two that answer with
+// full-day events, whose times are the dates they name held as UTC midnights.
+func fullDay(typ string) bool { return typ == "2" || typ == "3" }
 
 type rawNotification struct {
 	Type    int
@@ -359,11 +364,16 @@ func (s *Service) rawEventsBetween(ctx context.Context, calendarID string, w ica
 // endpoint's own idea of which events touch the edge of a range is not this CLI's.
 // What is fetched only has to contain the answer; the window decides it.
 //
-// The endpoint refuses a negative timestamp, and nothing is stored before the
-// epoch, so a range is cut there rather than asked for.
+// Nothing before the epoch is asked for; see sinceEpoch.
 func fetchBounds(w ical.Window) (from, to time.Time) {
 	first, until := w.Bounds()
-	from, to = first.AddDate(0, 0, -1), until.AddDate(0, 0, 1)
+	return sinceEpoch(first.AddDate(0, 0, -1), until.AddDate(0, 0, 1))
+}
+
+// sinceEpoch is a range cut where the calendar's endpoints begin. They refuse a
+// negative timestamp, and nothing is stored before the epoch, so the part of a
+// range before it is not asked for.
+func sinceEpoch(from, to time.Time) (time.Time, time.Time) {
 	if from.Unix() < 0 {
 		from = time.Unix(0, 0)
 	}
@@ -381,16 +391,22 @@ func fetchBounds(w ical.Window) (from, to time.Time) {
 // answering.
 const fetchSpan = 42 * 24 * time.Hour
 
-// span is one stretch of instants the endpoint is asked for.
+// span is one stretch of instants an endpoint is asked for.
 type span struct{ from, to time.Time }
 
-// fetchSpans cuts the instants the endpoint is asked for into ranges it accepts.
-// Consecutive spans meet, so nothing between the bounds goes unasked.
+// fetchSpans cuts the instants the events endpoint is asked for into ranges it
+// accepts.
 func fetchSpans(w ical.Window) []span {
 	from, to := fetchBounds(w)
+	return cutSpans(from, to, fetchSpan)
+}
+
+// cutSpans cuts a range into stretches no wider than an endpoint accepts.
+// Consecutive stretches meet, so nothing between the ends goes unasked.
+func cutSpans(from, to time.Time, width time.Duration) []span {
 	var out []span
-	for start := from; start.Before(to); start = start.Add(fetchSpan) {
-		end := start.Add(fetchSpan)
+	for start := from; start.Before(to); start = start.Add(width) {
+		end := start.Add(width)
 		if end.After(to) {
 			end = to
 		}
@@ -822,7 +838,7 @@ func (s *Service) resolveAttendees(ctx context.Context, uid string, emails []str
 	written := make([]string, 0, len(emails))
 	roles := make(map[string]string, len(emails))
 	for _, raw := range emails {
-		e, role, err := attendeeRole(raw)
+		e, role, err := ParseAttendee(raw)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
@@ -958,12 +974,17 @@ const (
 	roleOptional = "OPT-PARTICIPANT"
 )
 
-// attendeeRole splits "jane@example.com" or "jane@example.com:optional" into the
+// ParseAttendee splits "jane@example.com" or "jane@example.com:optional" into the
 // address and how much their presence matters.
 //
 // The address is split on the last colon, not the first, so that a scheme or a
 // port somebody pasted in does not eat the address.
-func attendeeRole(raw string) (email, role string, err error) {
+//
+// It is exported for the command that takes --attendee to judge each value with
+// before anything is sent, so the refusal here is one no command line reaches.
+// The address comes back even with a role that is neither of the two, for that
+// command to show the value spelled the way it would be taken.
+func ParseAttendee(raw string) (email, role string, err error) {
 	email = strings.TrimSpace(raw)
 	i := strings.LastIndex(email, ":")
 	if i < 0 {
@@ -977,7 +998,7 @@ func attendeeRole(raw string) (email, role string, err error) {
 	case "required":
 		return email, roleRequired, nil
 	}
-	return "", "", fmt.Errorf("attendee %q: after the colon write required or optional", raw)
+	return email, "", fmt.Errorf("attendee %q: after the colon write required or optional", raw)
 }
 
 // AttendeeText renders a participant the way --attendee spells them, so a
