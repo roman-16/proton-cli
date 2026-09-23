@@ -4,19 +4,21 @@ How Calendar behaves.
 
 Every command under `proton calendar settings`, with the arguments and flags it takes. For these commands in use, see [the calendar guide](README.md).
 
-Holds `calendars`, `get`, `links`, `list` and `set`.
+Holds `calendars`, `get`, `holidays`, `links`, `list` and `set`.
 
 ## `calendars`
 
 The calendars you keep events in.
 
-Holds `create`, `delete`, `get`, `list`, `share` and `update`.
+Holds `create`, `delete`, `get`, `leave`, `list`, `share` and `update`.
 
 ### `calendars create`
 
-Create a calendar, or subscribe to one published elsewhere.
+Create a calendar, subscribe to one, or add public holidays.
 
 --url takes the address of an .ics file. Proton fetches it on a schedule and fills the calendar from it, so those events are read-only. An address Proton cannot read is refused before the calendar is made.
+
+--holidays takes a country by name or code, as `settings holidays list` shows them. The calendar takes the name Proton gives it, and its events are read-only. A country with holidays in more than one language needs --language.
 
 ```
 proton calendar settings calendars create
@@ -26,11 +28,15 @@ proton calendar settings calendars create
 proton calendar settings calendars create --name Work
 proton calendar settings calendars create --name Personal --color pacific
 proton calendar settings calendars create --name Timetable --url https://example.com/team.ics
+proton calendar settings calendars create --holidays Austria
+proton calendar settings calendars create --holidays Switzerland --language Français
 ```
 
 | Flag | Description |
 | --- | --- |
 | `--color string` | Accent color, by name (purple) or hex (#8080FF) (default `#8080FF`) |
+| `--holidays string` | Add this country's public holidays instead of making an empty calendar |
+| `--language string` | Which language the holidays are in, for a country with more than one |
 | `--name string` | Name for the new calendar |
 | `--url string` | Subscribe to the calendar published at this address instead of making an empty one |
 
@@ -38,7 +44,7 @@ proton calendar settings calendars create --name Timetable --url https://example
 
 Delete calendars, and every event in them.
 
-Asks for your password even when you are signed in. With no terminal to ask, pass --password-file, which takes - for stdin.
+Asks for your password even when you are signed in, except for a holidays calendar. With no terminal to ask, pass --password-file, which takes - for stdin. A calendar somebody shared with you is left with `leave` instead.
 
 ```
 proton calendar settings calendars delete REF...
@@ -63,6 +69,20 @@ proton calendar settings calendars get REF
 
 ```bash
 proton calendar settings calendars get Work
+```
+
+### `calendars leave`
+
+Leave calendars somebody shared with you.
+
+Only the calendar's owner can give it to you again.
+
+```
+proton calendar settings calendars leave REF...
+```
+
+```bash
+proton calendar settings calendars leave Team
 ```
 
 ### `calendars list`
@@ -161,7 +181,7 @@ proton calendar settings calendars share update Work jane@proton.me --access vie
 
 Rename or recolor a calendar, or change what it gives new events.
 
-Defaults are set per calendar, so a work calendar can open half-hour meetings with a reminder while a personal one does not.
+Defaults are set per calendar, so a work calendar can open half-hour meetings with a reminder while a personal one does not. --default-duration and --default apply only to a personal calendar of your own, and a holidays calendar takes only --color, --remind-all-day, --no-remind and --busy.
 
 ```
 proton calendar settings calendars update REF
@@ -172,12 +192,15 @@ proton calendar settings calendars update Work --name Office
 proton calendar settings calendars update Work --color enzian
 proton calendar settings calendars update Work --default-duration 30m --remind 15m
 proton calendar settings calendars update Personal --busy off
+proton calendar settings calendars update Work --default
+proton calendar settings calendars update 'Holidays in Austria' --remind-all-day 1d
 ```
 
 | Flag | Description |
 | --- | --- |
 | `--busy string` | Whether events here make you look busy to others: on, off |
 | `--color string` | New accent color, by name (purple) or hex (#8080FF) |
+| `--default` | Make new events go here when nothing names another calendar |
 | `--default-duration string` | How long a new event lasts unless it says otherwise (e.g. 30m, 1h) |
 | `--name string` | New name |
 | `--no-remind` | Give new events no reminder by default |
@@ -195,6 +218,34 @@ proton calendar settings get
 ```bash
 proton calendar settings get
 ```
+
+## `holidays`
+
+Public holidays calendars you can add.
+
+Holds `list`.
+
+### `holidays list`
+
+List the public holidays calendars you can add.
+
+These are what `calendars create --holidays` takes, by country name or code. A country with holidays in more than one language has a row for each, and ADDED says which of them you have.
+
+```
+proton calendar settings holidays list
+```
+
+```bash
+proton calendar settings holidays list
+proton calendar settings holidays list --output json
+```
+
+| Flag | Description |
+| --- | --- |
+| `--desc` | Reverse the order |
+| `--limit int` | How many holidays calendars per page; 0 for all of them |
+| `--page int` | Which page of results, counting from zero |
+| `--sort string` | Order by: country (default `country`) |
 
 ## `links`
 

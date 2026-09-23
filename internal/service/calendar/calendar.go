@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
-	"sync"
 	"time"
 
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
@@ -24,44 +23,48 @@ import (
 // Proton's own clients write new events against.
 //
 // It is the last resort behind everything this machine can say about its own
-// zone, so it is asked for at most once and only when the rest of the chain came
-// up empty - a Windows or container install still gets a real anchor rather than
-// a bare UTC instant.
+// zone, so it is asked for only when the rest of the chain came up empty - a
+// Windows or container install still gets a real anchor rather than a bare UTC
+// instant.
 func (s *Service) PrimaryZone(ctx context.Context) string {
-	s.zoneOnce.Do(func() {
-		var r struct {
-			CalendarUserSettings struct{ PrimaryTimezone string }
-		}
-		if err := s.C.Decode(ctx, proton.Request{Method: "GET", Path: "/settings/calendar"}, &r); err != nil {
-			return
-		}
-		if name := r.CalendarUserSettings.PrimaryTimezone; name != "" {
-			if _, err := time.LoadLocation(name); err == nil {
-				s.zone = name
-			}
-		}
-	})
-	return s.zone
+	settings, err := s.userSettings(ctx)
+	if err != nil || settings.PrimaryTimezone == "" {
+		return ""
+	}
+	if _, err := time.LoadLocation(settings.PrimaryTimezone); err != nil {
+		return ""
+	}
+	return settings.PrimaryTimezone
 }
 
-// zoneCache is embedded in Service.
-type zoneCache struct {
-	zoneOnce sync.Once
-	zone     string
+// userSettings are the account-wide calendar settings two answers depend on: the
+// zone the grid is drawn in, and the calendar a new event goes into.
+type userSettings struct {
+	PrimaryTimezone   string
+	DefaultCalendarID string
+}
+
+func (s *Service) userSettings(ctx context.Context) (userSettings, error) {
+	return s.settings.Do("", func() (userSettings, error) {
+		var r struct{ CalendarUserSettings userSettings }
+		err := s.C.Decode(ctx, proton.Request{Method: "GET", Path: "/settings/calendar"}, &r)
+		return r.CalendarUserSettings, err
+	})
 }
 
 type Service struct {
 	C         proton.Doer
 	keys      keys.Get
 	canonical map[string]canonicalAddr
-	zoneCache
 
 	// What one invocation asks Proton for, asked for once. A calendar's own record,
-	// its unlocked keys and the list of calendars are each wanted by several steps
-	// of a single command.
+	// its unlocked keys, the list of calendars and the calendar settings are each
+	// wanted by several steps of a single command.
 	bootstraps fetch.Memo[*bootstrap]
 	unlocked   fetch.Memo[*calKeys]
 	calendars  fetch.Memo[[]Calendar]
+	settings   fetch.Memo[userSettings]
+	directory  fetch.Memo[[]directoryEntry]
 
 	// index is this machine's copy of the events, which is what can answer a
 	// question about what one says rather than about when it is.
@@ -72,7 +75,8 @@ func New(c proton.Doer, k keys.Get) *Service { return &Service{C: c, keys: k} }
 
 // member is one account's membership of one calendar. Proton keeps the display
 // name, colour and description here rather than on the calendar, because they are
-// each member's own.
+// each member's own - and so are what the member may do, whether the calendar is
+// in use, and where it sorts among the others.
 type member struct {
 	ID          string
 	CalendarID  string
@@ -81,6 +85,9 @@ type member struct {
 	Name        string
 	Color       string
 	Description string
+	Permissions int
+	Flags       int
+	Priority    int
 }
 
 // bootstrap is everything needed to open a calendar: the membership that names

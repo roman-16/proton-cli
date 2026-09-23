@@ -82,14 +82,21 @@ type CalendarShare struct {
 // memberStatuses are Proton's own numbering of where an invitation stands.
 var memberStatuses = map[int]string{0: "pending", 1: "active", 2: "declined"}
 
+// The two answers to what somebody may do with a calendar, spelled the way
+// --access reads.
+const (
+	accessEditor = "editor"
+	accessViewer = "viewer"
+)
+
 // accessWord names a permission bundle the way --access reads. It tests the bit
 // rather than comparing the number, because these are flags: a combination this
 // version has not seen still says whether it can write.
 func accessWord(p int) string {
 	if p&permWrite != 0 {
-		return "editor"
+		return accessEditor
 	}
-	return "viewer"
+	return accessViewer
 }
 
 // CalendarShare gives a calendar to somebody, and returns the membership it made.

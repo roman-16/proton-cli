@@ -100,6 +100,9 @@ func linksCreateCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if err := cal.Shareable(); err != nil {
+				return err
+			}
 			var link *calsvc.LinkURL
 			if err := kit.Mutate(c, ui.ResultSpec{
 				Action: ui.Created, Kind: "links", Count: 1, Name: name,
@@ -256,6 +259,9 @@ func publishedLinks(c *kit.Invocation, calendar string) ([]calsvc.Link, error) {
 	}
 	cal, err := calendarList(c).Find(c.Ctx, calendar)
 	if err != nil {
+		return nil, err
+	}
+	if err := cal.Shareable(); err != nil {
 		return nil, err
 	}
 	return c.App.Calendar.Links(c.Ctx, cal)

@@ -111,7 +111,8 @@ func (s *Service) Links(ctx context.Context, cal Calendar) ([]Link, error) {
 	return out, nil
 }
 
-// LinksAll reads every link on every calendar.
+// LinksAll reads every link on every calendar that can carry one, which is a
+// personal calendar of your own.
 //
 // A calendar that will not open costs its own links and not the answer: the
 // links on the others are still worth showing, and the record is what says the
@@ -123,6 +124,9 @@ func (s *Service) LinksAll(ctx context.Context) ([]Link, error) {
 	}
 	var out []Link
 	for _, cal := range cals {
+		if cal.Shareable() != nil {
+			continue
+		}
 		links, err := s.Links(ctx, cal)
 		if err != nil {
 			skip.Record(ctx, skip.KindCalendar, cal.ID, skip.Unreadable, err)

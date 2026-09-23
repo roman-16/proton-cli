@@ -2,13 +2,28 @@ package calendar
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log/slog"
+	"slices"
+	"sort"
 	"strings"
 
 	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
+	"github.com/roman-16/proton-cli/internal/fetch"
 	"github.com/roman-16/proton-cli/internal/proton"
 	"github.com/roman-16/proton-cli/internal/ref"
+)
+
+// The kinds of calendar Proton's own clients sort an account's calendars into:
+// your own, one somebody else owns and shared with you, one filled from an
+// address Proton fetches, and one of the public holidays Proton keeps.
+const (
+	KindPersonal   = "personal"
+	KindShared     = "shared"
+	KindSubscribed = "subscribed"
+	KindHolidays   = "holidays"
 )
 
 type Calendar struct {
@@ -16,32 +31,58 @@ type Calendar struct {
 	Name        string `json:"name"`
 	Color       string `json:"color"`
 	Description string `json:"description,omitempty"`
-	MemberCount int    `json:"member_count"`
-	// Kind is what fills the calendar: your own events, an address Proton
-	// fetches, or a holiday feed Proton maintains. The last two are read-only
-	// here, because what they hold belongs to whoever publishes it.
-	Kind string `json:"kind"`
+	Kind        string `json:"kind"`
+	// Owner and Access say, for a calendar somebody shared with you, whose it is
+	// and whether you may change what is on it.
+	Owner  string `json:"owner,omitempty"`
+	Access string `json:"access,omitempty"`
+
+	memberID string
+	priority int
+	active   bool
 }
 
-// calendarKinds are Proton's own numbering.
-var calendarKinds = map[int]string{0: "personal", 1: "subscribed", 2: "holidays"}
+// Proton's numbering of a calendar's type.
+const (
+	typePersonal   = 0
+	typeSubscribed = 1
+	typeHolidays   = 2
+)
 
-// kindOf names a calendar's type, falling back to the number for one this
+// The bits of a membership's flags that say whether the calendar is in use:
+// Proton marks one active, and marks one its owner or an administrator switched
+// off.
+const (
+	flagActive             = 1
+	flagSelfDisabled       = 32
+	flagSuperOwnerDisabled = 64
+)
+
+// kindOf names a calendar's kind, falling back to the number for a type this
 // version has not been told about rather than calling it personal.
-func kindOf(t int) string {
-	if name, ok := calendarKinds[t]; ok {
-		return name
+func kindOf(typ int, owned bool) string {
+	switch typ {
+	case typePersonal:
+		if owned {
+			return KindPersonal
+		}
+		return KindShared
+	case typeSubscribed:
+		return KindSubscribed
+	case typeHolidays:
+		return KindHolidays
 	}
-	return fmt.Sprintf("type %d", t)
+	return fmt.Sprintf("type %d", typ)
 }
 
-// CalendarsList reads per-user prefs (Name/Color/Description) from Members[0].
+// CalendarsList reads the calendars on the account.
 func (s *Service) CalendarsList(ctx context.Context) ([]Calendar, error) {
 	return s.calendars.Do("", func() ([]Calendar, error) {
 		var r struct {
 			Calendars []struct {
 				ID      string
 				Type    int
+				Owner   struct{ Email string }
 				Members []member
 			}
 		}
@@ -50,19 +91,186 @@ func (s *Service) CalendarsList(ctx context.Context) ([]Calendar, error) {
 		}
 		out := make([]Calendar, 0, len(r.Calendars))
 		for _, c := range r.Calendars {
-			var name, color, desc string
-			if len(c.Members) > 0 {
-				name = c.Members[0].Name
-				color = c.Members[0].Color
-				desc = c.Members[0].Description
-			}
-			out = append(out, Calendar{
-				ID: c.ID, Name: name, Color: color, Description: desc,
-				MemberCount: len(c.Members), Kind: kindOf(c.Type),
-			})
+			out = append(out, calendarFromListing(c.ID, c.Type, c.Owner.Email, c.Members))
 		}
 		return out, nil
 	})
+}
+
+// calendarFromListing reads one calendar out of the account's list of them.
+//
+// Proton lists only the account's own memberships of each calendar, and its
+// clients read everything personal from the first: the name, the colour, what it
+// may do. The calendar is yours when the address that owns it is that
+// membership's.
+func calendarFromListing(id string, typ int, owner string, members []member) Calendar {
+	var me member
+	if len(members) > 0 {
+		me = members[0]
+	}
+	cal := Calendar{
+		ID: id, Name: me.Name, Color: me.Color, Description: me.Description,
+		Kind:     kindOf(typ, len(members) > 0 && owner == me.Email),
+		memberID: me.ID, priority: me.Priority,
+		active: me.Flags&flagActive != 0 && me.Flags&(flagSelfDisabled|flagSuperOwnerDisabled) == 0,
+	}
+	if cal.Kind == KindShared {
+		cal.Owner, cal.Access = owner, accessWord(me.Permissions)
+	}
+	return cal
+}
+
+// Writable reports whether events can be made and changed in the calendar: one
+// of your own, or one shared with you to edit.
+func (c Calendar) Writable() bool {
+	return c.Kind == KindPersonal || (c.Kind == KindShared && c.Access == accessEditor)
+}
+
+// Active reports whether the calendar is in use rather than switched off.
+func (c Calendar) Active() bool { return c.active }
+
+// TakesEvents refuses a calendar nothing can be written to, saying why.
+func (c Calendar) TakesEvents() error {
+	switch {
+	case c.Writable():
+		return nil
+	case c.Kind == KindHolidays:
+		return errs.Naming(c.Name, errs.Problemf("%s is read-only: its events are Proton's.", c.Name))
+	case c.Kind == KindSubscribed:
+		return errs.Naming(c.Name, errs.Problemf(
+			"%s is read-only: its events come from the address it follows.", c.Name))
+	case c.Kind == KindShared:
+		return errs.Naming(c.Name, errs.Problemf(
+			"You can only view %s, which %s shared with you.", c.Name, c.Owner))
+	}
+	return errs.Naming(c.Name, errs.Problemf("%s is a kind of calendar nothing is written to.", c.Name))
+}
+
+// Shareable refuses a calendar that cannot be given to anybody or published as a
+// link, saying why. Only a personal calendar of your own can be.
+func (c Calendar) Shareable() error {
+	switch c.Kind {
+	case KindPersonal:
+		return nil
+	case KindShared:
+		return errs.Naming(c.Name, errs.Problemf(
+			"%s is %s's, and only they can share or publish it.", c.Name, c.Owner))
+	case KindSubscribed:
+		return errs.Naming(c.Name, errs.Problemf(
+			"%s is a subscribed calendar, which cannot be shared or published.", c.Name))
+	case KindHolidays:
+		return errs.Naming(c.Name, errs.Problemf(
+			"%s is a holidays calendar, which cannot be shared or published.", c.Name))
+	}
+	return errs.Naming(c.Name, errs.Problemf("%s cannot be shared or published.", c.Name))
+}
+
+// ErrNoCalendarTakesEvents is DefaultCalendar's answer for an account none of
+// whose calendars can take a new event.
+var ErrNoCalendarTakesEvents = errors.New("no calendar takes events")
+
+// DefaultCalendar is the calendar a new event goes into when nothing names one.
+//
+// It is the one Proton's clients choose: the default calendar the account has
+// set, when that one is in use and can take events, and otherwise the first that
+// can.
+func (s *Service) DefaultCalendar(ctx context.Context) (Calendar, error) {
+	cals, settings, err := s.calendarsAndSettings(ctx)
+	if err != nil {
+		return Calendar{}, err
+	}
+	takers := inUse(cals, Calendar.Writable)
+	if len(takers) == 0 {
+		return Calendar{}, ErrNoCalendarTakesEvents
+	}
+	if i := slices.IndexFunc(takers, func(c Calendar) bool { return c.ID == settings.DefaultCalendarID }); i >= 0 {
+		return takers[i], nil
+	}
+	if settings.DefaultCalendarID != "" {
+		// Recorded and not counted: nothing is missing from an answer, and the
+		// result names the calendar that was used instead.
+		slog.DebugContext(ctx, "the default calendar takes no events, so the first that does was used",
+			"calendar", settings.DefaultCalendarID)
+	}
+	return takers[0], nil
+}
+
+// DefaultAfter is what becomes of the default calendar once the named calendars
+// are deleted.
+//
+// moves is false while the default survives. When it goes, Proton's clients
+// hand the default to the first remaining calendar of your own, and next is that
+// calendar - or nil when none remains, which leaves the account with no default.
+func (s *Service) DefaultAfter(ctx context.Context, deleting []string) (next *Calendar, moves bool, err error) {
+	cals, settings, err := s.calendarsAndSettings(ctx)
+	if err != nil {
+		return nil, false, err
+	}
+	own := inUse(cals, func(c Calendar) bool { return c.Kind == KindPersonal })
+	if len(own) == 0 {
+		return nil, false, nil
+	}
+	current := own[0]
+	if i := slices.IndexFunc(own, func(c Calendar) bool { return c.ID == settings.DefaultCalendarID }); i >= 0 {
+		current = own[i]
+	}
+	if !slices.Contains(deleting, current.ID) {
+		return nil, false, nil
+	}
+	for _, c := range own {
+		if !slices.Contains(deleting, c.ID) {
+			return &c, true, nil
+		}
+	}
+	return nil, true, nil
+}
+
+// CalendarSetDefault makes a calendar the one new events go into, or leaves the
+// account with none when calendarID is empty.
+func (s *Service) CalendarSetDefault(ctx context.Context, calendarID string) error {
+	var id any
+	if calendarID != "" {
+		id = calendarID
+	}
+	return s.C.Decode(ctx, proton.Request{
+		Method: "PUT", Path: "/settings/calendar", Body: map[string]any{"DefaultCalendarID": id},
+	}, nil)
+}
+
+func (s *Service) calendarsAndSettings(ctx context.Context) ([]Calendar, userSettings, error) {
+	var cals []Calendar
+	var settings userSettings
+	err := fetch.Together(ctx,
+		func(ctx context.Context) error {
+			var err error
+			cals, err = s.CalendarsList(ctx)
+			return err
+		},
+		func(ctx context.Context) error {
+			var err error
+			settings, err = s.userSettings(ctx)
+			return err
+		},
+	)
+	return cals, settings, err
+}
+
+// inUse is the calendars in use that keep, in the order Proton's clients offer
+// them: your own before any shared with you, each by the priority it was given.
+func inUse(cals []Calendar, keep func(Calendar) bool) []Calendar {
+	var out []Calendar
+	for _, c := range cals {
+		if c.active && keep(c) {
+			out = append(out, c)
+		}
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if mineI, mineJ := out[i].Kind == KindPersonal, out[j].Kind == KindPersonal; mineI != mineJ {
+			return mineI
+		}
+		return out[i].priority < out[j].priority
+	})
+	return out
 }
 
 // CalendarName is the name this account gave a calendar.
@@ -138,9 +346,25 @@ func (s *Service) CalendarCreate(ctx context.Context, name, color, url string) (
 	return r.Calendar.ID, nil
 }
 
-// CalendarDelete requires the caller to have unlocked the password scope first.
-func (s *Service) CalendarDelete(ctx context.Context, id string) error {
-	return s.C.Decode(ctx, proton.Request{Method: "DELETE", Path: "/calendar/v1/" + id}, nil)
+// CalendarDelete removes a calendar from the account.
+//
+// Proton removes a holidays calendar through a route of its own, which asks for
+// no password: the calendar is Proton's, and what goes is only your membership
+// of it. Deleting a calendar of your own is guarded by a re-authentication the
+// client performs when Proton asks for one.
+func (s *Service) CalendarDelete(ctx context.Context, cal Calendar) error {
+	if cal.Kind == KindHolidays {
+		return s.C.Decode(ctx, proton.Request{Method: "DELETE", Path: "/calendar/v1/" + cal.ID + "/managed"}, nil)
+	}
+	return s.C.Decode(ctx, proton.Request{Method: "DELETE", Path: "/calendar/v1/" + cal.ID}, nil)
+}
+
+// CalendarLeave gives up a calendar somebody shared with you, which ends your
+// membership of it.
+func (s *Service) CalendarLeave(ctx context.Context, cal Calendar) error {
+	return s.C.Decode(ctx, proton.Request{
+		Method: "DELETE", Path: "/calendar/v1/" + cal.ID + "/members/" + cal.memberID,
+	}, nil)
 }
 
 func (s *Service) calendarMemberID(ctx context.Context, calendarID string) (string, error) {
@@ -181,7 +405,7 @@ func (s *Service) CalendarRename(ctx context.Context, calendarID, name, color st
 //
 // An ID is already the answer, so it is returned without asking: a reference that
 // names the calendar outright should not cost the list of all of them. A name has
-// to be looked up, and nothing named at all means the first one.
+// to be looked up.
 func (s *Service) ResolveCalendarID(ctx context.Context, nameOrID string) (string, error) {
 	if ref.Full(nameOrID) {
 		return nameOrID, nil
@@ -189,12 +413,6 @@ func (s *Service) ResolveCalendarID(ctx context.Context, nameOrID string) (strin
 	cals, err := s.CalendarsList(ctx)
 	if err != nil {
 		return "", err
-	}
-	if nameOrID == "" {
-		if len(cals) == 0 {
-			return "", &errs.NotFound{Kind: "calendar"}
-		}
-		return cals[0].ID, nil
 	}
 	for _, c := range cals {
 		if c.ID == nameOrID {

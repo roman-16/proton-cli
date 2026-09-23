@@ -242,6 +242,7 @@ var SettingsPages = map[string]string{
 	"account settings security-keys":     "Account and password",
 	"account settings two-factor":        "Account and password",
 	"calendar settings calendars":        "Calendars",
+	"calendar settings holidays":         "Calendars",
 	"calendar settings links":            "Calendars",
 	"mail settings addresses":            "Identity and addresses",
 	"mail settings autoreply":            "Forward and auto-reply",

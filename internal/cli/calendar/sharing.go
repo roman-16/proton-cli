@@ -42,6 +42,9 @@ func shareAddCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if err := cal.Shareable(); err != nil {
+				return err
+			}
 			return kit.Mutate(c, ui.ResultSpec{
 				Action: ui.Invited, Kind: "members", Count: 1, Name: c.Args[1],
 				Detail: "to " + cal.Name,
@@ -64,6 +67,9 @@ func shareGetCmd() *cobra.Command {
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			cal, err := calendarList(c).Find(c.Ctx, c.Args[0])
 			if err != nil {
+				return err
+			}
+			if err := cal.Shareable(); err != nil {
 				return err
 			}
 			rows, err := c.App.Calendar.CalendarMembers(c.Ctx, cal.ID)
@@ -106,6 +112,9 @@ func shareUpdateCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if err := cal.Shareable(); err != nil {
+				return err
+			}
 			member, err := memberList(c, cal.ID).Find(c.Ctx, c.Args[1])
 			if err != nil {
 				return err
@@ -132,6 +141,9 @@ func shareRemoveCmd() *cobra.Command {
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			cal, err := calendarList(c).Find(c.Ctx, c.Args[0])
 			if err != nil {
+				return err
+			}
+			if err := cal.Shareable(); err != nil {
 				return err
 			}
 			member, err := memberList(c, cal.ID).Find(c.Ctx, c.Args[1])

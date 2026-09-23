@@ -80,9 +80,10 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton calendar invitations list`](../calendar/invitations.md#list) | List calendars other people have offered you |
 | [`proton calendar reminders list`](../calendar/reminders.md#list) | List the reminders due in a date range |
 | [`proton calendar reminders watch`](../calendar/reminders.md#watch) | Print each reminder as it comes due |
-| [`proton calendar settings calendars create`](../calendar/settings.md#calendars-create) | Create a calendar, or subscribe to one published elsewhere |
+| [`proton calendar settings calendars create`](../calendar/settings.md#calendars-create) | Create a calendar, subscribe to one, or add public holidays |
 | [`proton calendar settings calendars delete`](../calendar/settings.md#calendars-delete) | Delete calendars, and every event in them |
 | [`proton calendar settings calendars get`](../calendar/settings.md#calendars-get) | Show one calendar, with the defaults it gives new events |
+| [`proton calendar settings calendars leave`](../calendar/settings.md#calendars-leave) | Leave calendars somebody shared with you |
 | [`proton calendar settings calendars list`](../calendar/settings.md#calendars-list) | List your calendars |
 | [`proton calendar settings calendars share add`](../calendar/settings.md#calendars-share-add) | Give somebody a calendar |
 | [`proton calendar settings calendars share get`](../calendar/settings.md#calendars-share-get) | Show who has a calendar |
@@ -90,6 +91,7 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton calendar settings calendars share update`](../calendar/settings.md#calendars-share-update) | Change what somebody may do with a calendar |
 | [`proton calendar settings calendars update`](../calendar/settings.md#calendars-update) | Rename or recolor a calendar, or change what it gives new events |
 | [`proton calendar settings get`](../calendar/settings.md#get) | Show the calendar settings now in effect |
+| [`proton calendar settings holidays list`](../calendar/settings.md#holidays-list) | List the public holidays calendars you can add |
 | [`proton calendar settings links create`](../calendar/settings.md#links-create) | Publish a calendar as a link anyone can follow |
 | [`proton calendar settings links get`](../calendar/settings.md#links-get) | Show one link, URL and all |
 | [`proton calendar settings links list`](../calendar/settings.md#links-list) | List the links you have published |

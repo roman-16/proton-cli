@@ -43,6 +43,7 @@ These are the listings that can be narrowed, and what narrows them. The same fla
 - `proton calendar invitations list --desc --limit int --page int --sort string`
 - `proton calendar reminders list --after string --before string --calendar string --limit int --page int`
 - `proton calendar settings calendars list --desc --limit int --page int --sort string`
+- `proton calendar settings holidays list --desc --limit int --page int --sort string`
 - `proton calendar settings links list --calendar string --desc --limit int --page int --sort string`
 - `proton contacts groups list --desc --limit int --page int --sort string`
 - `proton contacts list --desc --keyword string --limit int --page int --sort string`
@@ -174,8 +175,9 @@ One line per group, with the verbs under it. Arguments, flags and examples are i
 - `proton calendar invitations` - Calendars other people have offered you: accept, decline, list
 - `proton calendar reminders` - The notifications your events will raise: list, watch
 - `proton calendar settings` - How Calendar behaves: get, list, set
-- `proton calendar settings calendars` - The calendars you keep events in: create, delete, get, list, update
+- `proton calendar settings calendars` - The calendars you keep events in: create, delete, get, leave, list, update
 - `proton calendar settings calendars share` - Who else can see a calendar: add, get, remove, update
+- `proton calendar settings holidays` - Public holidays calendars you can add: list
 - `proton calendar settings links` - Links that open a calendar for anyone: create, get, list, revoke, update
 
 ### contacts - Contacts, their groups and their pinned keys

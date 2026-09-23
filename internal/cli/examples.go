@@ -243,6 +243,12 @@ var examples = map[string][]string{
 		"proton calendar settings calendars create --name Work",
 		"proton calendar settings calendars create --name Personal --color pacific",
 		"proton calendar settings calendars create --name Timetable --url https://example.com/team.ics",
+		"proton calendar settings calendars create --holidays Austria",
+		"proton calendar settings calendars create --holidays Switzerland --language Français",
+	},
+	"proton calendar settings holidays list": {
+		"proton calendar settings holidays list",
+		"proton calendar settings holidays list --output json",
 	},
 	"proton calendar invitations list": {
 		"proton calendar invitations list",
@@ -271,8 +277,11 @@ var examples = map[string][]string{
 		"proton calendar settings calendars update Work --color enzian",
 		"proton calendar settings calendars update Work --default-duration 30m --remind 15m",
 		"proton calendar settings calendars update Personal --busy off",
+		"proton calendar settings calendars update Work --default",
+		"proton calendar settings calendars update 'Holidays in Austria' --remind-all-day 1d",
 	},
 	"proton calendar settings calendars delete": {"proton calendar settings calendars delete Work"},
+	"proton calendar settings calendars leave":  {"proton calendar settings calendars leave Team"},
 	"proton calendar settings links create": {
 		"proton calendar settings links create Work",
 		"proton calendar settings links create Work --access full --name 'Team feed'",

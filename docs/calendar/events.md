@@ -33,7 +33,7 @@ proton calendar events create --title Deadline --start 2026-04-30T17:00 --durati
 | --- | --- |
 | `--all-day` | An event with no time of day |
 | `--attendee stringArray` | Invite someone, as EMAIL or EMAIL:optional; Proton users are added directly, others are emailed (repeatable) |
-| `--calendar string` | Which calendar, by name or ID (default: your first) |
+| `--calendar string` | Which calendar, by name or ID (default: your default calendar) |
 | `--color string` | Set the color, by name (purple) or hex (#8080FF) |
 | `--description string` | Set the description |
 | `--duration string` | Set how long it lasts (e.g. 15m, 1h, 2h30m, 3d) |
@@ -125,7 +125,7 @@ curl -s https://example.com/team.ics | proton calendar events import -
 
 | Flag | Description |
 | --- | --- |
-| `--calendar string` | Which calendar to import into, by name or ID (default: your first) |
+| `--calendar string` | Which calendar to import into, by name or ID (default: your default calendar) |
 
 ## `list`
 

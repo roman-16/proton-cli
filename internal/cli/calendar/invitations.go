@@ -73,9 +73,9 @@ func invitationsAcceptCmd() *cobra.Command {
 		Use:   "accept REF...",
 		Short: "Take a calendar somebody offered you",
 		Long: "Take a calendar somebody offered you.\n\n" +
-			"The invitation carries the calendar's key, encrypted to the address it was\n" +
-			"sent to. Accepting re-encrypts that key to your own, after which the\n" +
-			"calendar behaves like any other of yours.",
+			"It then lists as shared. With editor access you can change what is on it;\n" +
+			"with viewer access you can only read it. `settings calendars leave` gives\n" +
+			"it up again.",
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			return answerInvitations(c, ui.Accepted, c.App.Calendar.CalendarInvitationAccept)
 		}),

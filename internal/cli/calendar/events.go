@@ -1,6 +1,7 @@
 package calendar
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"regexp"
@@ -290,10 +291,11 @@ func eventsCreateCmd() *cobra.Command {
 				return kit.Fail("An event needs a title and a start.").
 					Hint(`--title Dentist --start 2026-04-16T14:00`)
 			}
-			calID, err := resolveCalendar(c, calendar)
+			cal, chosen, err := targetCalendar(c, calendar)
 			if err != nil {
 				return err
 			}
+			calID := cal.ID
 			zone, loc, err := workingZone(c)
 			if err != nil {
 				return err
@@ -311,10 +313,14 @@ func eventsCreateCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			when := "for " + timeLabel(start)
+			if chosen {
+				when = "in " + cal.Name + " " + when
+			}
 			var res *calsvc.EventResult
 			if err := kit.Create(c, ui.ResultSpec{
 				Action: ui.Created, Kind: "events", Name: d.title,
-				Detail: clauses("for "+timeLabel(start), lengthClause(dur, fromCalendar)),
+				Detail: clauses(when, lengthClause(dur, fromCalendar)),
 			}, func() (string, error) {
 				var err error
 				res, err = c.App.Calendar.EventCreate(c.Ctx, calID, calsvc.EventInput{
@@ -334,7 +340,7 @@ func eventsCreateCmd() *cobra.Command {
 		}),
 	}
 	d.register(c, "Set")
-	c.Flags().StringVar(&calendar, "calendar", "", "Which calendar, by name or ID (default: your first)")
+	c.Flags().StringVar(&calendar, "calendar", "", "Which calendar, by name or ID (default: your default calendar)")
 	c.Flags().BoolVar(&d.allDay, "all-day", false, "An event with no time of day")
 	c.Flags().StringArrayVar(&attendees, "attendee", nil,
 		"Invite someone, as EMAIL or EMAIL:optional; Proton users are added directly, "+
@@ -363,6 +369,9 @@ func eventsUpdateCmd() *cobra.Command {
 		RunE: kit.Run([]kit.Step{d.check(false), kit.StepExpand}, func(c *kit.Invocation) error {
 			calID, eventID, occurrence, err := resolveEvent(c, c.Args[0])
 			if err != nil {
+				return err
+			}
+			if err := takesEvents(c, calID); err != nil {
 				return err
 			}
 			if onwards && occurrence == "" {
@@ -804,6 +813,9 @@ func eventsRespondCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if err := takesEvents(c, calID); err != nil {
+				return err
+			}
 			if occurrence != "" {
 				return kit.Fail("An answer applies to the whole series, not to one occurrence.").
 					Hint(fmt.Sprintf("drop the @%s from the reference", occurrence))
@@ -853,6 +865,9 @@ func eventsDeleteCmd() *cobra.Command {
 			for _, ref := range c.Args {
 				calID, eventID, occurrence, err := resolveEvent(c, ref)
 				if err != nil {
+					return err
+				}
+				if err := takesEvents(c, calID); err != nil {
 					return err
 				}
 				if onwards && occurrence == "" {
@@ -959,6 +974,38 @@ func resolveCalendar(c *kit.Invocation, ref string) (string, error) {
 	return c.App.Calendar.ResolveCalendarID(c.Ctx, expanded)
 }
 
+// targetCalendar is the calendar a new event or an import goes into: the one
+// --calendar names, or your default calendar when it names none. chosen says the
+// default was taken, which is when the result has to say which calendar that is.
+func targetCalendar(c *kit.Invocation, ref string) (cal calsvc.Calendar, chosen bool, err error) {
+	if ref == "" {
+		cal, err = c.App.Calendar.DefaultCalendar(c.Ctx)
+		if errors.Is(err, calsvc.ErrNoCalendarTakesEvents) {
+			return cal, false, kit.Fail("You have no calendar that takes events.").
+				Hint(kit.Program + " calendar settings calendars create --name Personal")
+		}
+		return cal, true, err
+	}
+	expanded, err := kit.Expand(c.App, ref)
+	if err != nil {
+		return cal, false, err
+	}
+	if cal, err = calendarList(c).Find(c.Ctx, expanded); err != nil {
+		return cal, false, err
+	}
+	return cal, false, cal.TakesEvents()
+}
+
+// takesEvents refuses a change to an event in a calendar nothing can be written
+// to, before anything is asked or sent.
+func takesEvents(c *kit.Invocation, calendarID string) error {
+	cal, err := calendarList(c).Find(c.Ctx, calendarID)
+	if err != nil {
+		return err
+	}
+	return cal.TakesEvents()
+}
+
 // ── export ──
 
 // Export writes what a calendar holds as an .ics file, which is the format every
@@ -1051,16 +1098,20 @@ func eventsImportCmd() *cobra.Command {
 			if len(events) == 0 {
 				return kit.Fail("%s holds no events.", c.Args[0])
 			}
-			calID, err := resolveCalendar(c, calendar)
+			cal, chosen, err := targetCalendar(c, calendar)
 			if err != nil {
 				return err
 			}
+			detail := "from " + c.Args[0]
+			if chosen {
+				detail += " into " + cal.Name
+			}
 			return kit.Attempt(c, ui.ResultSpec{
 				Action: ui.Imported, Kind: "events", Count: len(events),
-				Detail:  "from " + c.Args[0],
+				Detail:  detail,
 				Preview: kit.Preview("events", importColumns(), events),
 			}, func() ([]calsvc.SkippedEvent, error) {
-				res, err := c.App.Calendar.EventsImport(c.Ctx, calID, events)
+				res, err := c.App.Calendar.EventsImport(c.Ctx, cal.ID, events)
 				if err != nil {
 					return nil, err
 				}
@@ -1068,7 +1119,7 @@ func eventsImportCmd() *cobra.Command {
 			})
 		}),
 	}
-	c.Flags().StringVar(&calendar, "calendar", "", "Which calendar to import into, by name or ID (default: your first)")
+	c.Flags().StringVar(&calendar, "calendar", "", "Which calendar to import into, by name or ID (default: your default calendar)")
 	return c
 }
 

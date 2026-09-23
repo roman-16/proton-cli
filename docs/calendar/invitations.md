@@ -10,7 +10,7 @@ Holds `accept`, `decline` and `list`.
 
 Take a calendar somebody offered you.
 
-The invitation carries the calendar's key, encrypted to the address it was sent to. Accepting re-encrypts that key to your own, after which the calendar behaves like any other of yours.
+It then lists as shared. With editor access you can change what is on it; with viewer access you can only read it. `settings calendars leave` gives it up again.
 
 ```
 proton calendar invitations accept REF...

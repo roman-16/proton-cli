@@ -1143,3 +1143,47 @@ func eventsTitled(t *testing.T, day, title string) []string {
 	}
 	return refs
 }
+
+// A new event with no calendar named goes into the default calendar, which
+// `--default` makes of one of your own calendars, and the result says which it
+// went into. Deleting that calendar hands the role to the next calendar of your
+// own, as Proton's clients do.
+func TestCalendarNewEventsGoToTheDefaultCalendar(t *testing.T) {
+	was, _ := runJSON(t, "calendar", "settings", "get")["default_calendar"].(string)
+	restore := was
+	if restore == "" {
+		restore = "Default"
+	}
+	cleanup(t, "Restore the default calendar: proton calendar settings calendars update --default "+restore,
+		func() error {
+			_, stderr, code := run(t, "calendar", "settings", "calendars", "update", "--default", restore)
+			if code != 0 {
+				return fmt.Errorf("exit %d: %s", code, strings.TrimSpace(stderr))
+			}
+			return nil
+		})
+
+	name := testID() + "-default"
+	id := assertBareID(t, runOK(t, "calendar", "settings", "calendars", "create", "--name", name),
+		"calendars create")
+	cleanupRun(t, "Delete calendar: proton calendar settings calendars delete -- "+id,
+		"calendar", "settings", "calendars", "delete", "--", id)
+
+	runOK(t, "calendar", "settings", "calendars", "update", "--default", id)
+	if got, _ := runJSON(t, "calendar", "settings", "get")["default_calendar"].(string); got != id {
+		t.Fatalf("the default calendar is %q, want the one --default was given", got)
+	}
+
+	out, stderr := runOKStderr(t, "calendar", "events", "create", "--title", name+"-evt",
+		"--start", "2027-06-01T10:00", "--duration", "30m")
+	if ref := assertBarePairRef(t, out, "events create"); !strings.HasPrefix(ref, id+"/") {
+		t.Errorf("the event went into %s, want the default calendar %s", ref, id)
+	}
+	assertContains(t, stderr, "in "+name+" for ")
+
+	_, stderr = runOKStderr(t, "calendar", "settings", "calendars", "delete", "--", id)
+	assertContains(t, stderr, "as your new default calendar")
+	if got, _ := runJSON(t, "calendar", "settings", "get")["default_calendar"].(string); got == "" || got == id {
+		t.Errorf("after deleting the default calendar the default is %q, want the next calendar of your own", got)
+	}
+}

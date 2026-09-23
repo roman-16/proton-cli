@@ -154,6 +154,12 @@ func TestCalendarSubscriptionIsFilledFromAnAddress(t *testing.T) {
 	if kind, _ := shown["kind"].(string); kind != "subscribed" {
 		t.Errorf("the calendar came back as %q, want subscribed", kind)
 	}
+
+	// What it holds is somebody else's to publish, so it carries no link.
+	_, stderr, code := runPaid(t, "calendar", "settings", "links", "create", ref)
+	if code != 1 || !strings.Contains(stderr, "is a subscribed calendar, which cannot be shared or published") {
+		t.Errorf("a link on a subscribed calendar: exit %d, %s", code, truncateOutput(stderr))
+	}
 }
 
 // An address Proton cannot read is refused before the calendar is made, so
@@ -223,37 +229,11 @@ func TestCalendarSharingRoundTrip(t *testing.T) {
 
 	// The other side takes it, which is the half that proves the key it was
 	// handed actually opens the calendar.
-	var invitationID string
-	waitFor(60*time.Second, 3*time.Second, func() bool {
-		for _, row := range runJSONArraySecondary(t, "calendar", "invitations", "list") {
-			m, _ := row.(map[string]interface{})
-			if n, _ := m["name"].(string); n != name {
-				continue
-			}
-			invitationID, _ = m["id"].(string)
-			return invitationID != ""
-		}
-		return false
-	})
-	if invitationID == "" {
-		t.Fatal("the invitation never reached the second account")
-	}
-	runOKSecondary(t, "calendar", "invitations", "accept", "--", invitationID)
+	runOKSecondary(t, "calendar", "invitations", "accept", "--", calendarInvitation(t, name))
 
-	// Once accepted it is a calendar like any other on that account, which is
-	// only true if the passphrase it was given opened.
-	var got bool
-	waitFor(60*time.Second, 3*time.Second, func() bool {
-		for _, row := range runJSONArraySecondary(t, "calendar", "settings", "calendars", "list") {
-			m, _ := row.(map[string]interface{})
-			if n, _ := m["name"].(string); n == name {
-				got = true
-				return true
-			}
-		}
-		return false
-	})
-	if !got {
+	// Once accepted it is a calendar on that account, which is only true if the
+	// passphrase it was given opened.
+	if acceptedCalendar(t, name) == nil {
 		t.Error("the calendar did not appear on the account that accepted it")
 	}
 
@@ -285,6 +265,114 @@ func TestCalendarSharingRoundTrip(t *testing.T) {
 			t.Error("the second account still has the calendar after being removed")
 		}
 	}
+}
+
+// A calendar somebody shared with you lists as shared and says whose it is. It
+// takes nothing it was not shared to take - a viewer makes no events in it, and
+// nobody but its owner shares it, gives it a default duration or deletes it - and
+// it is given up with leave, after which its owner no longer lists you.
+func TestCalendarSharedCalendarIsReadOnlyAndLeft(t *testing.T) {
+	name := testID() + "-left"
+	out, stderr, code := runPaid(t, "--yes", "calendar", "settings", "calendars", "create", "--name", name)
+	if code != 0 {
+		t.Fatalf("could not make a calendar to share: %s", truncateOutput(stderr))
+	}
+	ref := strings.TrimSpace(out)
+	cleanupRunPaid(t, "Delete the shared calendar: proton calendar settings calendars delete "+ref,
+		"calendar", "settings", "calendars", "delete", ref)
+
+	runOKPaid(t, "calendar", "settings", "calendars", "share", "add", ref, secondaryEmail())
+	runOKSecondary(t, "calendar", "invitations", "accept", "--", calendarInvitation(t, name))
+	shared := acceptedCalendar(t, name)
+	if shared == nil {
+		t.Fatal("the calendar did not appear on the account that accepted it")
+	}
+	if kind, _ := shared["kind"].(string); kind != "shared" {
+		t.Errorf("a calendar shared with this account lists as %q, want shared", kind)
+	}
+	// The owner is the address the calendar was made under, which the owning
+	// account's own listing of members names.
+	var owner string
+	for _, row := range shareMembers(t, ref) {
+		m, _ := row.(map[string]interface{})
+		if isOwner, _ := m["owner"].(bool); isOwner {
+			owner, _ = m["email"].(string)
+		}
+	}
+	if got, _ := shared["owner"].(string); owner == "" || !strings.EqualFold(got, owner) {
+		t.Errorf("the shared calendar's owner is %q, want %q", got, owner)
+	}
+	if access, _ := shared["access"].(string); access != "viewer" {
+		t.Errorf("access is %q, want viewer", access)
+	}
+	id, _ := shared["id"].(string)
+
+	for _, tc := range []struct {
+		what string
+		args []string
+		says string
+	}{
+		{"an event made in it", []string{"calendar", "events", "create", "--calendar=" + id,
+			"--title", name + "-evt", "--start", "2027-06-01T10:00", "--duration", "30m"}, "You can only view"},
+		{"sharing it on", []string{"calendar", "settings", "calendars", "share", "add", id, "nobody@example.com"},
+			"only they can share or publish it"},
+		{"a default duration", []string{"calendar", "settings", "calendars", "update",
+			"--default-duration", "45m", id}, "--default-duration applies only to a personal calendar of your own"},
+		{"deleting it", []string{"--yes", "calendar", "settings", "calendars", "delete", id},
+			"so it is left, not deleted"},
+	} {
+		_, stderr, code := runSecondary(t, tc.args...)
+		if code != 1 || !strings.Contains(stderr, tc.says) {
+			t.Errorf("%s: exit %d, %s", tc.what, code, truncateOutput(stderr))
+		}
+	}
+
+	runOKSecondary(t, "calendar", "settings", "calendars", "leave", id)
+	for _, row := range shareMembers(t, ref) {
+		m, _ := row.(map[string]interface{})
+		if email, _ := m["email"].(string); strings.EqualFold(email, secondaryEmail()) {
+			t.Error("the owner still lists the account that left")
+		}
+	}
+}
+
+// calendarInvitation waits for the offer of a calendar to reach the second
+// account, and returns the invitation's ID.
+func calendarInvitation(t *testing.T, name string) string {
+	t.Helper()
+	var id string
+	waitFor(60*time.Second, 3*time.Second, func() bool {
+		for _, row := range runJSONArraySecondary(t, "calendar", "invitations", "list") {
+			m, _ := row.(map[string]interface{})
+			if n, _ := m["name"].(string); n == name {
+				id, _ = m["id"].(string)
+				return id != ""
+			}
+		}
+		return false
+	})
+	if id == "" {
+		t.Fatal("the invitation never reached the second account")
+	}
+	return id
+}
+
+// acceptedCalendar waits for a calendar the second account accepted to appear in
+// its list, and returns it as the list shows it.
+func acceptedCalendar(t *testing.T, name string) map[string]interface{} {
+	t.Helper()
+	var found map[string]interface{}
+	waitFor(60*time.Second, 3*time.Second, func() bool {
+		for _, row := range runJSONArraySecondary(t, "calendar", "settings", "calendars", "list") {
+			m, _ := row.(map[string]interface{})
+			if n, _ := m["name"].(string); n == name {
+				found = m
+				return true
+			}
+		}
+		return false
+	})
+	return found
 }
 
 // An offer can be taken back before it is answered, which is a different
