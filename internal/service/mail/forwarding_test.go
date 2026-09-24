@@ -200,7 +200,7 @@ func (a *forwardingAPI) Decode(_ context.Context, req proton.Request, out any) e
 		if !ok {
 			return &proton.APIError{HTTPStatus: 422, Code: 33103, Message: "no such address"}
 		}
-		answer = fmt.Sprintf(`{"Code":1000,"Address":{"Keys":[{"PublicKey":%q,"Primary":1}]}}`, armored)
+		answer = fmt.Sprintf(`{"Code":1000,"Address":{"Keys":[{"PublicKey":%q,"Primary":1,"Flags":3}]}}`, armored)
 	case "/core/v4/keys/address":
 		answer = `{"Code":1000,"Key":{"ID":"published-key"}}`
 	case "/mail/v4/forwardings":

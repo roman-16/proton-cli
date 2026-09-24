@@ -26,7 +26,7 @@ func encrypting(t *testing.T) (*Unlocked, Address, *encryptionAPI) {
 	if err != nil {
 		t.Fatalf("NewKeyRing: %v", err)
 	}
-	data, err := composeKeyList(key)
+	data, err := composeKeyList(key, mailKeyFlags)
 	if err != nil {
 		t.Fatalf("compose the key list: %v", err)
 	}

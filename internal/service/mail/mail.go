@@ -89,11 +89,11 @@ type Service struct {
 	// the only thing that can answer a question about a body.
 	index *search.Store
 
-	// senderKeys caches fetched sender public key rings (per email) for body
-	// signature verification. A nil entry means "no key available" - cached so
-	// we don't refetch on every message in a conversation.
+	// senderKeys caches the keys each sender's signatures are checked against.
+	// A nil entry means "no key available" - cached so a conversation does not
+	// fetch them again for every message.
 	keyMu      sync.Mutex
-	senderKeys map[string]*pgp.KeyRing
+	senderKeys map[string]*keys.Signers
 
 	// Mail settings are read once per run, for the outgoing signature's Proton
 	// footer. See signature.go.

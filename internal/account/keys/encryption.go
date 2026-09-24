@@ -3,7 +3,6 @@ package keys
 import (
 	"context"
 
-	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
 )
 
@@ -24,28 +23,12 @@ import (
 // before it is signed: a list that does not describe the address is not one to
 // re-publish under a fresh signature.
 func (u *Unlocked) SetEncryption(ctx context.Context, c proton.Doer, addr Address, on bool) error {
-	if addr.SignedKeyList == nil || addr.SignedKeyList.Data == "" {
-		return errs.Unsupportedf(
-			"Proton publishes no key list for %s, and changing its encryption has to sign one.", addr.Email).
-			Hint("a Proton client writes the list the next time it opens the account")
-	}
-	held, err := addressKeys(addr)
+	signers, err := u.writers(addr)
 	if err != nil {
 		return err
 	}
-	if err := describesAddress(addr.SignedKeyList.Data, held); err != nil {
-		return err
-	}
-	rings, ok := u.AddrRings(addr.ID)
-	if !ok {
-		return errs.Problemf(
-			"The keys for %s did not open, so its key list cannot be signed.", addr.Email)
-	}
-	data, err := withEncryption(addr.SignedKeyList.Data, on)
-	if err != nil {
-		return err
-	}
-	signature, err := signKeyList(data, rings.Write.GetKeys())
+	list, err := u.relisted(addr, noKeyList(addr, "changing its encryption"),
+		func(data string) (string, error) { return withEncryption(data, on) }, signers)
 	if err != nil {
 		return err
 	}
@@ -56,10 +39,8 @@ func (u *Unlocked) SetEncryption(ctx context.Context, c proton.Doer, addr Addres
 			// Whether a signature is expected on what arrives is a second thing
 			// the same request carries, and no business of this one: it goes back
 			// as the address already has it.
-			"Sign": boolBit(ExpectsSigned(addr.Flags)),
-			"SignedKeyList": map[string]string{
-				"Data": data, "Signature": signature,
-			},
+			"Sign":          boolBit(ExpectsSigned(addr.Flags)),
+			"SignedKeyList": list.body(),
 		},
 	}, nil)
 }

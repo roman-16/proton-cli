@@ -172,6 +172,28 @@ func (s *Service) ForwardingsList(ctx context.Context) ([]Forwarding, error) {
 	return out, nil
 }
 
+// ForwardingsPausedByKeys counts the forwardings out of an address that a
+// change to its keys pauses: the end-to-end encrypted ones still in force, whose
+// key was derived from the address's primary. One that is outdated or was
+// rejected waits on the forwardee already. Mirrors the count AddressKeysSection
+// warns with in WebClients (packages/components/containers/keys).
+func (s *Service) ForwardingsPausedByKeys(ctx context.Context, addressID string) (int, error) {
+	var outgoing struct{ OutgoingAddressForwardings []apiForwarding }
+	if err := s.C.Decode(ctx, proton.Request{
+		Method: "GET", Path: "/mail/v4/forwardings/outgoing",
+	}, &outgoing); err != nil {
+		return 0, err
+	}
+	var n int
+	for _, f := range outgoing.OutgoingAddressForwardings {
+		if f.Type == forwardingInternalEncrypted && f.ForwarderAddressID == addressID &&
+			f.State != forwardingOutdated && f.State != forwardingRejected {
+			n++
+		}
+	}
+	return n, nil
+}
+
 // ForwardingOffer is what setting a forwarding up would arrange, judged before
 // anything is sent.
 //
@@ -334,12 +356,16 @@ func (s *Service) ForwardingAccept(ctx context.Context, f Forwarding) error {
 	// Every key the forwarder has published, not just their primary: a
 	// forwarding that has waited may have been sealed by a key they have since
 	// replaced, and the signature over it is checked against whichever it was.
-	forwarderKR, err := keys.Signing(ctx, s.C, f.From)
+	signers, err := keys.Signing(ctx, s.C, f.From)
 	if err != nil {
 		return err
 	}
-	if forwarderKR == nil {
+	if signers == nil {
 		return errs.Problemf("Proton publishes no key for %s, so what they sent cannot be checked.", f.From)
+	}
+	forwarderKR, err := signers.Vouching(f.From)
+	if err != nil {
+		return err
 	}
 
 	for _, sent := range f.keys {

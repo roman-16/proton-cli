@@ -7,7 +7,7 @@ Signing in runs [Secure Remote Password](https://en.wikipedia.org/wiki/Secure_Re
 ## What leaves your machine
 
 - API requests to `https://mail.proton.me/api` over HTTPS, authenticated with your session tokens.
-- Encrypted payloads you asked to create: an encrypted message, an encrypted file block, an encrypted event, the locked key a forwarding you accepted adds to your address, and the locked key a forwarding you set up derives for the other address, whose passphrase only that address can open.
+- Encrypted payloads you asked to create: an encrypted message, an encrypted file block, an encrypted event, a key you generate or import for an address, locked so only your account opens it, the locked key a forwarding you accepted adds to your address, and the locked key a forwarding you set up derives for the other address, whose passphrase only that address can open.
 - The decrypted body of a message you report with `mail messages mark phishing`, so Proton's anti-abuse team can read what was sent to you. Nothing withdraws a report.
 - The SRP proof during login, which does not reveal your password.
 - The verifier for a Pass extra password you set, which Proton checks a password against and cannot read one out of.
@@ -20,7 +20,7 @@ Signing in runs [Secure Remote Password](https://en.wikipedia.org/wiki/Secure_Re
 
 There is no telemetry, and there is nothing to turn off. proton-cli never reports a command you ran, a feature you used, or the fact that you ran it at all. The diagnostic log is written to your disk and read by nobody unless you run `proton report` and paste it somewhere yourself ([Reporting a bug](../help/troubleshooting.md#reporting-a-bug)). What is known about how the tool is used comes from counters the distribution channels publish, and is [on the site](https://proton-cli.lerchster.dev/stats/) in full.
 
-**Anything you export is plaintext.** `mail messages export` and `contacts export` decrypt on the way out, so the files they write are readable by anything. Put them where you would be comfortable putting the mail itself.
+**What you export is plaintext.** `mail messages export` and `contacts export` decrypt on the way out, so the files they write are readable by anything. Put them where you would be comfortable putting the mail itself. A private key from `account keys export --private` is the exception: it is written locked with the passphrase you give.
 
 ## What is stored on disk
 

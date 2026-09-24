@@ -3,6 +3,7 @@ package account
 import (
 	"github.com/roman-16/proton-cli/internal/app"
 	"github.com/roman-16/proton-cli/internal/cli/kit"
+	"github.com/roman-16/proton-cli/internal/proton"
 	"github.com/roman-16/proton-cli/internal/ui"
 	"github.com/spf13/cobra"
 )
@@ -80,7 +81,7 @@ func passwordSetCmd() *cobra.Command {
 				// The current password is proved before the new one is asked for.
 				// The other order has somebody invent a password and only then
 				// finds out whether they were entitled to set one.
-				relock, err := c.App.Elevate(c.Ctx, "change your password")
+				relock, err := c.App.Elevate(c.Ctx, proton.ScopePassword, "change your password")
 				if err != nil {
 					return err
 				}

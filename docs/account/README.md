@@ -2,7 +2,7 @@
 
 Sign in once and your password is never asked for again on that machine.
 
-This page covers signing in and out, unattended and two-password sign-in, running several Proton accounts side by side, the sessions Proton holds across your devices, unlocking data after a password reset, and your account settings.
+This page covers signing in and out, unattended and two-password sign-in, running several Proton accounts side by side, the sessions Proton holds across your devices, your encryption keys, unlocking data after a password reset, and your account settings.
 
 For every command and flag, see the reference: [account](account.md), [keys](keys.md), [security-log](security-log.md), [sessions](sessions.md), [profiles](profiles.md), [settings](settings.md).
 
@@ -172,6 +172,7 @@ proton account login --user alice@proton.me \
 
 These commands ask for your password again even when you are signed in:
 
+- `account keys create` · `account keys delete` · `account keys export --private` · `account keys import` · `account keys update`
 - `account keys reactivate`
 - `account security-log delete` · `account security-log disable` · `account security-log enable`
 - `account sessions revoke`
@@ -214,6 +215,102 @@ Error: --password-file - and --body - both read standard input, which can only b
 Try:   pass it with --password-file FILE instead
 ```
 
+## Your encryption keys
+
+Every key of the account and of its addresses:
+
+```console
+$ proton account keys list
+ID        KIND     ADDRESS          FINGERPRINT                               ALGORITHM         CREATED           STATUS
+────────  ───────  ───────────────  ────────────────────────────────────────  ────────────────  ────────────────  ───────
+Xq3v9KpL  address  alice@proton.me  efc080fc29483fb2bf6706826c723749a013efb7  ECC (Curve25519)  2024-03-12 09:41  primary
+7Hn2Lw0R  address  alice@proton.me  8023711ec0c59bca3710f43ece03ac772bc5c84e  RSA (2048)        2019-01-04 18:22  active
+Pz8mQ2rT  address  alice@pm.me      ed048f24c9d2674d6728ad5b546472c03857cbac  ECC (Curve25519)  2019-01-04 18:22  primary
+Kd91mQxT  account                   139d79d095d7555689ad0e20f2b4b7bf15de5e46  ECC (Curve25519)  2019-01-04 18:22  primary
+4 keys.
+```
+
+An address's primary key is what mail to it is encrypted to and what it signs with. Its other keys open and verify what arrived before. A key is named by its ID, its short ID or its fingerprint:
+
+```console
+$ proton account keys get 8023711ec0c59bca3710f43ece03ac772bc5c84e
+Fingerprint:  8023711ec0c59bca3710f43ece03ac772bc5c84e
+Kind:         address
+Address:      alice@proton.me
+Algorithm:    RSA (2048)
+Created:      2019-01-04 18:22
+Status:       active
+Used For:     decryption, verification
+ID:           7Hn2Lw0R
+```
+
+Adding, changing and deleting a key ask for your password even when you are signed in. With nobody to ask, pass `--password-file`.
+
+### Export a key
+
+```bash
+proton account keys export Xq3v9KpL             # the public key, into the current directory
+proton account keys export Xq3v9KpL --dest -    # the public key, to stdout
+```
+
+`--private` writes the private key, locked with a passphrase you choose. It asks for your password first, even when you are signed in:
+
+```console
+$ proton account keys export Xq3v9KpL --private
+Password:
+Passphrase:
+✓ Exported key "efc080fc29483fb2bf6706826c723749a013efb7" to privatekey.alice@proton.me-efc080fc29483fb2bf6706826c723749a013efb7.asc, locked with your passphrase.
+```
+
+The passphrase needs at least eight characters. With no terminal to ask, both come from files:
+
+```bash
+proton account keys export Xq3v9KpL --private \
+  --password-file /run/secrets/proton --passphrase-file /run/secrets/key-backup
+```
+
+### Add a key to an address
+
+```bash
+proton account keys create alice@proton.me                         # generate one
+proton account keys import alice@proton.me ~/keys/alice-2019.asc   # bring one in from a file
+```
+
+A generated key becomes the address's primary key, and the one it replaces keeps opening what arrived before. An account that creates post-quantum keys generates them in a Proton client.
+
+An imported key joins the address as one that reads; make it primary with `update --primary`. Its public half is published with every name and address it carries. A locked file asks for its passphrase, and `--passphrase-file` gives it. One passphrase serves a whole run, so files locked with different passphrases are imported one at a time. `-` reads the file from stdin.
+
+Both print the new key's ID on stdout.
+
+### Make a key primary, or stop trusting one
+
+```console
+$ proton account keys update 7Hn2Lw0R --primary
+Password:
+✓ Updated key "8023711ec0c59bca3710f43ece03ac772bc5c84e" - now the primary key of alice@proton.me.
+```
+
+| Flag | What the key does afterwards |
+| --- | --- |
+| `--obsolete` | Opens and verifies what arrived before; nothing new is encrypted to it |
+| `--compromised` | Opens what was sealed to it; nothing is encrypted to it, and what it signed is not trusted |
+
+`=false` takes a mark off. `--compromised=false` leaves the key obsolete, so pass `--obsolete=false` as well to use it again. The primary key cannot be marked: make another key primary first.
+
+A message signed by a key its owner marked compromised shows `Signature: invalid`.
+
+Generating a key, importing one, or changing an address's primary key pauses its end-to-end encrypted forwardings. `proton mail settings forwarding enable` resumes them.
+
+### Delete a key
+
+```console
+$ proton account keys delete 7Hn2Lw0R
+! Nothing sealed to this key opens again, and what it signed is no longer verified. `proton account keys export 8023711ec0c59bca3710f43ece03ac772bc5c84e --private` keeps a copy.
+Would delete key "8023711ec0c59bca3710f43ece03ac772bc5c84e". This cannot be undone. Continue? [y/N]
+```
+
+An address's primary key and the account's own keys cannot be deleted.
+
 ## After a password reset
 
 A password reset locks everything encrypted before it. Mail, contacts, calendars, vaults and Drive stay sealed until you bring the old keys back:
@@ -238,7 +335,11 @@ proton account keys reactivate --recovery-phrase
 proton account keys reactivate --recovery-file ~/Downloads/proton_recovery.asc
 ```
 
-Keys the secret does not open stay locked and are named. A key from an earlier reset opens with the secret from that time, so run the command again with it.
+Keys the secret does not open stay locked and are named. A key from an earlier reset opens with the secret from that time, so run the command again with it. An address key that stays locked comes back from a copy you exported:
+
+```bash
+proton account keys import alice@proton.me privatekey.alice@proton.me-8023711ec0c59bca3710f43ece03ac772bc5c84e.asc
+```
 
 What was locked opens from the next command onwards. Drive files need one more step, under [Drive](../drive/README.md#after-a-password-reset).
 

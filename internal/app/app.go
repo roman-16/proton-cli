@@ -665,23 +665,26 @@ func (a *App) ReachesPass(ctx context.Context) (bool, error) {
 	return slices.Contains(scopes, string(proton.ScopePass)), nil
 }
 
-// Elevate proves the account password before the work starts, and hands back
-// what drops the elevation again.
+// Elevate proves the account password for a scope before the work starts, and
+// hands back what drops the elevation again.
 //
 // Almost nothing calls this: an endpoint that wants an elevated session says so
 // when it is asked, and the client answers that by itself, which is why no
 // command knows which endpoints are guarded. What this is for is the handful
-// that go on to ask for a *second* secret - a new password, a code from an
-// authenticator app - where the order is the whole point. Proving the current
-// password first means a person is never asked to invent one and then told they
-// could not have, and a code is never typed before a prompt that outlives it.
+// whose guard is not an endpoint's. Some go on to ask for a *second* secret - a
+// new password, a code from an authenticator app - where the order is the whole
+// point: proving the current password first means a person is never asked to
+// invent one and then told they could not have, and a code is never typed before
+// a prompt that outlives it. And one sends nothing at all that Proton could
+// guard - an exported private key is written here - so the password Proton's
+// clients prove before handing one out is proved here instead.
 //
 // reason completes "Your password is required to <reason>".
 //
 // A dry run proves nothing: it changes nothing, so there is nothing to
 // authorise, and a preview that asked for a password would be the one path that
 // costs more than the change it is previewing.
-func (a *App) Elevate(ctx context.Context, reason string) (func(), error) {
+func (a *App) Elevate(ctx context.Context, scope proton.Scope, reason string) (func(), error) {
 	if a.DryRun {
 		return func() {}, nil
 	}
@@ -696,7 +699,7 @@ func (a *App) Elevate(ctx context.Context, reason string) (func(), error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := a.API.Elevate(ctx, proton.ScopePassword, proton.ScopeCredentials{
+	if err := a.API.Elevate(ctx, scope, proton.ScopeCredentials{
 		Username: user, Password: []byte(password),
 	}); err != nil {
 		return nil, err

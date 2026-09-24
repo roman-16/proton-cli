@@ -13,7 +13,14 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton account get`](../account/account.md#get) | Show the account, its storage and this machine's session |
 | [`proton account login`](../account/account.md#login) | Sign in and save the session for this profile |
 | [`proton account logout`](../account/account.md#logout) | Discard the saved session for this profile |
+| [`proton account keys create`](../account/keys.md#create) | Generate a key for an address |
+| [`proton account keys delete`](../account/keys.md#delete) | Delete keys of an address |
+| [`proton account keys export`](../account/keys.md#export) | Write keys out to files |
+| [`proton account keys get`](../account/keys.md#get) | Show one key and what it is used for |
+| [`proton account keys import`](../account/keys.md#import) | Add keys to an address from files |
+| [`proton account keys list`](../account/keys.md#list) | List the keys of the account and its addresses |
 | [`proton account keys reactivate`](../account/keys.md#reactivate) | Bring back the keys a password reset locked |
+| [`proton account keys update`](../account/keys.md#update) | Make a key primary, or mark it obsolete or compromised |
 | [`proton account profiles delete`](../account/profiles.md#delete) | Remove a profile and everything it keeps on this machine |
 | [`proton account profiles list`](../account/profiles.md#list) | List the profiles with a saved session |
 | [`proton account security-log delete`](../account/security-log.md#delete) | Remove every event the log holds |

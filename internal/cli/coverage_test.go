@@ -84,6 +84,7 @@ var unreachable = map[string]string{
 	// covered offline instead, against the shape Proton documents.
 	"GET /core/v4/settings/mnemonic":        "only a key a password reset locked is opened with a recovery phrase, and no test may reset a password",
 	"PUT /core/v4/keys/user/{id}":           "the same: nothing but a reset leaves a key to reactivate",
+	"PUT /core/v4/keys/address/{id}":        "the same: only a key a reset locked comes back from a copy of itself",
 	"PUT /drive/volumes/{id}/restore":       "the same: nothing but a reset leaves a volume locked",
 	"PUT /drive/volumes/{id}/delete_locked": "the same, and deleting a locked volume cannot be undone by a run",
 	"GET /drive/volumes/{id}":               "only a locked volume the volume listing left out is read alone, and no test account has one",

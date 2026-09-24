@@ -58,6 +58,20 @@ type Restriction struct {
 // Restrictions are the commands the paid account refuses.
 func Restrictions() []Restriction {
 	return []Restriction{{
+		Command: []string{"account", "keys", "create"},
+		Why: "it makes a new key what somebody's address encrypts to and signs with, on every" +
+			" device they have",
+	}, {
+		Command: []string{"account", "keys", "delete"},
+		Why:     "whatever was sealed to the key does not open again, for anybody",
+	}, {
+		Command: []string{"account", "keys", "import"},
+		Why:     "it publishes a key the run made as one of somebody's own, to everyone who writes to them",
+	}, {
+		Command: []string{"account", "keys", "update"},
+		Why: "it changes which of somebody's keys their mail is encrypted to, or whether what" +
+			" they signed is trusted",
+	}, {
 		Command: []string{"account", "settings", "password", "set"},
 		Why: "it would change the password somebody signs in with, and a run that stopped" +
 			" halfway would leave them locked out of their own account",

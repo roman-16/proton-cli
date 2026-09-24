@@ -261,7 +261,7 @@ One line per group, with the verbs under it. Arguments, flags and examples are i
 ### account - Your Proton account, its settings and your session
 
 - `proton account` - get, login, logout
-- `proton account keys` - The keys your data is encrypted with: reactivate
+- `proton account keys` - The keys your data is encrypted with: create, delete, export, get, import, list, reactivate, update
 - `proton account profiles` - Accounts signed in on this machine: delete, list
 - `proton account security-log` - Sign-ins and credential changes Proton recorded: delete, disable, enable, get, list
 - `proton account sessions` - Sessions Proton holds for this account: create, list, revoke

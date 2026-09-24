@@ -305,11 +305,24 @@ func (s *Service) openBody(ctx context.Context, u *keys.Unlocked, m rawMessage, 
 	}
 	// The signature is verified against the sender's public key - their own key
 	// for mail we sent. No key available -> Unverified, never Invalid.
-	var verKR *pgp.KeyRing
-	if verify {
-		verKR = s.senderKeyRing(ctx, senderAddress(m.Sender))
+	if !verify {
+		return decryptBody(m.Body, rings.Read, nil)
 	}
-	return decryptBody(m.Body, rings.Read, verKR)
+	signers := s.senderKeyRing(ctx, senderAddress(m.Sender))
+	if signers == nil {
+		return decryptBody(m.Body, rings.Read, nil)
+	}
+	body, verdict, err := decryptBody(m.Body, rings.Read, signers.Trusted)
+	if err != nil || verdict != pgphelper.Unverified || signers.Compromised == nil {
+		return body, verdict, err
+	}
+	// A signature no trusted key accounts for may be by a key its owner marked
+	// compromised, and Proton's clients treat that as a signature that does not
+	// hold. Only then is the body opened a second time, to ask.
+	if _, again, err := decryptBody(m.Body, rings.Read, signers.Compromised); err == nil && again == pgphelper.Verified {
+		return body, pgphelper.Invalid, nil
+	}
+	return body, verdict, nil
 }
 
 // sealed is a body as the message it is, for asking which keys it was sealed to.
@@ -353,8 +366,8 @@ func senderAddress(sender map[string]any) string {
 	return ""
 }
 
-// senderKeyRing fetches and caches the public key ring a message body's
-// signature is verified against.
+// senderKeyRing fetches and caches the keys a message body's signature is
+// verified against.
 //
 // Every key Proton holds for the sender goes in, retired ones included, because
 // an old message was signed with whichever key was current then - which is what
@@ -366,24 +379,24 @@ func senderAddress(sender map[string]any) string {
 // between "this was not signed" and "nobody could check", which looks the same on
 // screen - so the log is the only thing that can tell them apart, and it says
 // which of the two happened.
-func (s *Service) senderKeyRing(ctx context.Context, email string) *pgp.KeyRing {
+func (s *Service) senderKeyRing(ctx context.Context, email string) *keys.Signers {
 	if email == "" {
 		return nil
 	}
 	s.keyMu.Lock()
 	defer s.keyMu.Unlock()
 	if s.senderKeys == nil {
-		s.senderKeys = map[string]*pgp.KeyRing{}
+		s.senderKeys = map[string]*keys.Signers{}
 	}
-	if kr, ok := s.senderKeys[email]; ok {
-		return kr
+	if signers, ok := s.senderKeys[email]; ok {
+		return signers
 	}
 	s.senderKeys[email] = s.fetchSenderKeyRing(ctx, email)
 	return s.senderKeys[email]
 }
 
-func (s *Service) fetchSenderKeyRing(ctx context.Context, email string) *pgp.KeyRing {
-	ring, err := keys.Signing(ctx, s.C, email)
+func (s *Service) fetchSenderKeyRing(ctx context.Context, email string) *keys.Signers {
+	signers, err := keys.Signing(ctx, s.C, email)
 	if err != nil {
 		// Recorded and not counted: nothing is missing from the answer that the
 		// answer does not already state. The message is shown whole, and its
@@ -393,7 +406,7 @@ func (s *Service) fetchSenderKeyRing(ctx context.Context, email string) *pgp.Key
 			"signer", email, "error", err)
 		return nil
 	}
-	return ring
+	return signers
 }
 
 // Read is one message, decrypted.

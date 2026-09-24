@@ -145,7 +145,7 @@ func twoFactorEnableCmd() *cobra.Command {
 				Action: ui.Enabled, Kind: "settings", Count: 1, Name: "authenticator app",
 				Detail: "- a code is asked for at every sign-in", AnswerFollows: true,
 			}, func() error {
-				relock, err := c.App.Elevate(c.Ctx, "turn on two-factor authentication")
+				relock, err := c.App.Elevate(c.Ctx, proton.ScopePassword, "turn on two-factor authentication")
 				if err != nil {
 					return err
 				}

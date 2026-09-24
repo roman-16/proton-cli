@@ -148,7 +148,7 @@ func (s *Service) AddressCreate(ctx context.Context, local, domain, displayName 
 		return "", err
 	}
 	if postQuantum {
-		return "", keys.UnsupportedPostQuantum()
+		return "", keys.UnsupportedPostQuantum("add the address in a Proton client")
 	}
 	email := local + "@" + domain
 	if existing, ok := addressByEmail(u, email); ok {

@@ -12,9 +12,9 @@ import (
 	"github.com/roman-16/proton-cli/internal/proton"
 )
 
-// Giving an address its first key is the one place this package makes key
-// material, so what it makes is pinned here: a key the account's own password
-// opens, and a list that says one true thing about the address.
+// Giving an address its first key is where this package makes key material for
+// an address that has none, so what it makes is pinned here: a key the account's
+// own password opens, and a list that says one true thing about the address.
 
 // newAddress serves the two requests publishing a key makes - the key itself, and
 // the read-back that follows - and keeps what it was given.

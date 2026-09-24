@@ -74,7 +74,8 @@ var Fields = map[string]Policy{
 	"address_keys":     Keep,
 	"keys_locked":      Keep, // how many keys a password reset left shut
 	"keys_reactivated": Keep,
-	"keys_unsupported": Keep, // how many are held in a form only a Proton client brings back
+	"keys_resigned":    Keep, // how many of an address's earlier key lists were signed again
+	"keys_unsupported": Keep, // how many come back only from a copy the account exported
 	"volumes":          Keep, // how many volumes the account has
 
 	// ── the things an account holds ──

@@ -29,11 +29,43 @@ var examples = map[string][]string{
 		"proton account get",
 		"proton account get --output json",
 	},
+	"proton account keys create": {
+		"proton account keys create alice@proton.me",
+		"proton account keys create alice@proton.me --dry-run",
+	},
+	"proton account keys delete": {
+		"proton account keys delete 7Hn2Lw0R",
+		"proton account keys delete 7Hn2Lw0R --yes",
+	},
+	"proton account keys export": {
+		"proton account keys export 7Hn2Lw0R",
+		"proton account keys export 7Hn2Lw0R --dest -",
+		"proton account keys export 7Hn2Lw0R --private --dest-dir ~/backup",
+		"proton account keys export 7Hn2Lw0R --private --password-file /run/secrets/proton --passphrase-file /run/secrets/key-backup",
+	},
+	"proton account keys get": {
+		"proton account keys get 7Hn2Lw0R",
+		"proton account keys get c4e1a86d0f3b7e25a9c1d4f8b6e2a0937d5c1e84",
+	},
+	"proton account keys import": {
+		"proton account keys import alice@proton.me ~/keys/alice-2019.asc",
+		"proton account keys import alice@proton.me ~/keys/work.asc ~/keys/old.asc --passphrase-file /run/secrets/key",
+		"cat ~/keys/alice-2019.asc | proton account keys import alice@proton.me - --passphrase-file /run/secrets/key",
+	},
+	"proton account keys list": {
+		"proton account keys list",
+		"proton account keys list --output json",
+	},
 	"proton account keys reactivate": {
 		"proton account keys reactivate",
 		"proton account keys reactivate --recovery-phrase",
 		"proton account keys reactivate --recovery-file ~/Downloads/proton_recovery.asc",
 		"proton account keys reactivate --previous-password-file /run/secrets/proton-old --password-file /run/secrets/proton",
+	},
+	"proton account keys update": {
+		"proton account keys update 7Hn2Lw0R --primary",
+		"proton account keys update 9d02f7c1 --compromised",
+		"proton account keys update 9d02f7c1 --compromised=false --obsolete=false",
 	},
 	"proton account login": {
 		"proton account login",

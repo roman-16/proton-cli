@@ -15,9 +15,9 @@ import (
 	"github.com/roman-16/proton-cli/internal/proton"
 )
 
-// Publishing a key somebody else derived is the one write proton makes to a key
-// hierarchy, so what it sends is pinned here: the token it reuses, the key that
-// has to open with it, and the key list that has to go up unchanged under a
+// Publishing a key somebody else derived puts a key the account did not make
+// beside its own, so what it sends is pinned here: the token it reuses, the key
+// that has to open with it, and the key list that has to go up unchanged under a
 // signature the account itself can check.
 
 // recorder answers as Proton would and keeps what it was asked.

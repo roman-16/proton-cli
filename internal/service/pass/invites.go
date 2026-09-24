@@ -610,14 +610,14 @@ var errUnsigned = errors.New("the key was not signed by the inviter")
 // key for cannot have sent an invitation, and one whose keys this build cannot
 // read is reported as such rather than as a forgery.
 func (s *Service) inviterKeys(ctx context.Context, email string) (*pgp.KeyRing, error) {
-	kr, err := keys.Signing(ctx, s.C, email)
+	signers, err := keys.Signing(ctx, s.C, email)
 	if err != nil {
 		return nil, err
 	}
-	if kr == nil {
+	if signers == nil {
 		return nil, errs.Problemf("Proton publishes no key for %s, so nothing can vouch for this offer.", email)
 	}
-	return kr, nil
+	return signers.Vouching(email)
 }
 
 // openInviteKey unseals one rotation of the vault key an invitation carries,

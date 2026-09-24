@@ -678,7 +678,7 @@ func publishing(t *testing.T, armored ...string) *proton.Client {
 	t.Helper()
 	keys := make([]map[string]any, 0, len(armored))
 	for _, a := range armored {
-		keys = append(keys, map[string]any{"PublicKey": a, "Primary": 1})
+		keys = append(keys, map[string]any{"PublicKey": a, "Primary": 1, "Flags": 3})
 	}
 	return client(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -729,8 +729,8 @@ func TestSigningReturnsEveryPublishedKey(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"Code": 1000,
 			"Address": map[string]any{"Keys": []map[string]any{
-				{"PublicKey": current, "Primary": 1},
-				{"PublicKey": retired, "Primary": 0},
+				{"PublicKey": current, "Primary": 1, "Flags": 3},
+				{"PublicKey": retired, "Primary": 0, "Flags": 1},
 			}},
 		})
 	})
@@ -738,8 +738,8 @@ func TestSigningReturnsEveryPublishedKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Signing: %v", err)
 	}
-	if got := len(signing.GetKeys()); got != 2 {
-		t.Errorf("Signing holds %d keys, want both", got)
+	if got := len(signing.Trusted.GetKeys()); got != 2 {
+		t.Errorf("Signing trusts %d keys, want both", got)
 	}
 	sealing, err := Published(context.Background(), c, "them@proton.me")
 	if err != nil {
@@ -756,24 +756,61 @@ func TestSigningAnswersLikePublishedWhenThereIsNothingToRead(t *testing.T) {
 		"Proton's refusal":  refusing(t),
 	} {
 		t.Run(name, func(t *testing.T) {
-			kr, err := Signing(context.Background(), c, "them@example.com")
-			if err != nil || kr != nil {
-				t.Errorf("Signing = (%v, %v), want (nil, nil) for an address outside Proton", kr, err)
+			signers, err := Signing(context.Background(), c, "them@example.com")
+			if err != nil || signers != nil {
+				t.Errorf("Signing = (%v, %v), want (nil, nil) for an address outside Proton", signers, err)
 			}
 		})
 	}
 	unreadable := "-----BEGIN PGP PUBLIC KEY BLOCK-----\n\nnope\n-----END PGP PUBLIC KEY BLOCK-----\n"
-	if kr, err := Signing(context.Background(), publishing(t, unreadable), "them@proton.me"); err == nil {
-		t.Errorf("a key nobody can read came back as a ring: %v", kr)
+	if signers, err := Signing(context.Background(), publishing(t, unreadable), "them@proton.me"); err == nil {
+		t.Errorf("a key nobody can read came back as a ring: %v", signers)
 	}
 	// One unreadable key beside a readable one is left out, not fatal: the
 	// signature may be by the other.
-	kr, err := Signing(context.Background(), publishing(t, unreadable, armoredPublicKey(t, "readable")), "them@proton.me")
+	signers, err := Signing(context.Background(), publishing(t, unreadable, armoredPublicKey(t, "readable")), "them@proton.me")
 	if err != nil {
 		t.Fatalf("Signing: %v", err)
 	}
-	if got := len(kr.GetKeys()); got != 1 {
+	if got := len(signers.Trusted.GetKeys()); got != 1 {
 		t.Errorf("Signing holds %d keys, want the one that parsed", got)
+	}
+}
+
+// A key its owner marked compromised signs for whoever holds it, which may not
+// be them, so it is kept apart from the keys a signature is checked against -
+// and an address all of whose keys are marked says so rather than reading as
+// one outside Proton.
+func TestSigningSetsCompromisedKeysApart(t *testing.T) {
+	serving := func(keys ...map[string]any) *proton.Client {
+		return client(t, func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{"Code": 1000, "Address": map[string]any{"Keys": keys}})
+		})
+	}
+	current, leaked := armoredPublicKey(t, "current"), armoredPublicKey(t, "leaked")
+	signers, err := Signing(context.Background(), serving(
+		map[string]any{"PublicKey": current, "Primary": 1, "Flags": 3},
+		map[string]any{"PublicKey": leaked, "Primary": 0, "Flags": 0},
+	), "them@proton.me")
+	if err != nil {
+		t.Fatalf("Signing: %v", err)
+	}
+	if got := len(signers.Trusted.GetKeys()); got != 1 {
+		t.Errorf("Signing trusts %d keys, want the one not marked", got)
+	}
+	if signers.Compromised == nil || len(signers.Compromised.GetKeys()) != 1 {
+		t.Error("the compromised key is not kept apart")
+	}
+
+	signers, err = Signing(context.Background(), serving(
+		map[string]any{"PublicKey": leaked, "Primary": 1, "Flags": 0},
+	), "them@proton.me")
+	if err != nil {
+		t.Fatalf("Signing: %v", err)
+	}
+	if _, err := signers.Vouching("them@proton.me"); err == nil || !strings.Contains(err.Error(), "marked compromised") {
+		t.Errorf("an address whose every key is compromised vouches: %v", err)
 	}
 }
 

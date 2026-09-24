@@ -6,6 +6,7 @@ import (
 
 	"github.com/roman-16/proton-cli/internal/app"
 	"github.com/roman-16/proton-cli/internal/cli/kit"
+	"github.com/roman-16/proton-cli/internal/proton"
 	acctsvc "github.com/roman-16/proton-cli/internal/service/account"
 	"github.com/roman-16/proton-cli/internal/ui"
 	"github.com/spf13/cobra"
@@ -112,7 +113,7 @@ func securityKeysCreateCmd() *cobra.Command {
 				// The password is proved before the key is asked for anything: a
 				// touch cannot be taken back, and nobody should spend one to be
 				// told afterwards that they mistyped their password.
-				relock, err := c.App.Elevate(c.Ctx, "register a security key")
+				relock, err := c.App.Elevate(c.Ctx, proton.ScopePassword, "register a security key")
 				if err != nil {
 					return "", err
 				}

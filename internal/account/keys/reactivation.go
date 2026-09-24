@@ -86,8 +86,9 @@ type Outcome struct {
 	// StillLocked is every user key the secret did not open, which stays as it
 	// was: a key from between two resets is opened by the secret of its own time.
 	StillLocked []LockedKey
-	// Unsupported is every address key held in a form only a Proton client
-	// brings back, with the address it belongs to.
+	// Unsupported is every address key no secret of the account's opens, with
+	// the address it belongs to: it comes back only from a copy of itself,
+	// through Import.
 	Unsupported []LockedKey
 }
 
@@ -207,8 +208,8 @@ type reactivated struct {
 // opens, which is the whole of what ties an address key to a user key.
 //
 // A locked key with no token is from before Proton moved address keys under the
-// user key, and is locked with a password rather than a token; only a Proton
-// client brings one back, so it is set aside and said so.
+// user key, and is locked with a password rather than a token; it comes back
+// only from a copy of itself, so it is set aside and said so.
 //
 // Recorded and not counted: a key the user key does not open is not this user
 // key's to bring back, and is left to whichever one is.
@@ -252,29 +253,12 @@ func (u *Unlocked) addressKeysOpenedBy(ctx context.Context, addr Address, userRi
 // key is locked has nothing to vouch for the list, and is left to a Proton
 // client.
 func (u *Unlocked) listWithReactivated(_ context.Context, addr Address, keys []reactivated) (SignedKeyList, error) {
-	if addr.SignedKeyList == nil || addr.SignedKeyList.Data == "" {
-		return SignedKeyList{}, fmt.Errorf("the address has no published key list")
-	}
-	held, err := addressKeys(addr)
+	signers, err := u.writers(addr)
 	if err != nil {
 		return SignedKeyList{}, err
 	}
-	if err := describesAddress(addr.SignedKeyList.Data, held); err != nil {
-		return SignedKeyList{}, err
-	}
-	rings, ok := u.AddrRings(addr.ID)
-	if !ok || len(rings.Write.GetKeys()) == 0 {
-		return SignedKeyList{}, fmt.Errorf("no key of the address opened to sign its key list")
-	}
-	data, err := withReactivated(addr.SignedKeyList.Data, keys)
-	if err != nil {
-		return SignedKeyList{}, err
-	}
-	signature, err := signKeyList(data, rings.Write.GetKeys())
-	if err != nil {
-		return SignedKeyList{}, err
-	}
-	return SignedKeyList{Data: data, Signature: signature}, nil
+	return u.relisted(addr, fmt.Errorf("the address has no published key list"),
+		func(data string) (string, error) { return withReactivated(data, addr, keys) }, signers)
 }
 
 // ── the secrets ──

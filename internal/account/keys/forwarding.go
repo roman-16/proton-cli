@@ -88,28 +88,14 @@ func primaryRecord(addr Address) (Key, error) {
 // account actually holds. If it does, re-signing it asserts nothing new; if it
 // does not, something is wrong that this is not the place to paper over.
 func (u *Unlocked) republishKeyList(addr Address) (SignedKeyList, error) {
-	if addr.SignedKeyList == nil || addr.SignedKeyList.Data == "" {
-		return SignedKeyList{}, errs.Unsupportedf(
-			"Proton publishes no key list for %s, and accepting a forwarding has to sign one.", addr.Email).
-			Hint("accept this one in a Proton client, which writes the list; later ones work here")
-	}
-	held, err := addressKeys(addr)
+	signers, err := u.writers(addr)
 	if err != nil {
 		return SignedKeyList{}, err
 	}
-	if err := describesAddress(addr.SignedKeyList.Data, held); err != nil {
-		return SignedKeyList{}, err
-	}
-	rings, ok := u.AddrRings(addr.ID)
-	if !ok {
-		return SignedKeyList{}, errs.Problemf(
-			"The keys for %s did not open, so its key list cannot be signed.", addr.Email)
-	}
-	signature, err := signKeyList(addr.SignedKeyList.Data, rings.Write.GetKeys())
-	if err != nil {
-		return SignedKeyList{}, err
-	}
-	return SignedKeyList{Data: addr.SignedKeyList.Data, Signature: signature}, nil
+	return u.relisted(addr, errs.Unsupportedf(
+		"Proton publishes no key list for %s, and accepting a forwarding has to sign one.", addr.Email).
+		Hint("accept this one in a Proton client, which writes the list; later ones work here"),
+		func(data string) (string, error) { return data, nil }, signers)
 }
 
 // PrimaryKeys are the keys an address writes with: its primary records, as they

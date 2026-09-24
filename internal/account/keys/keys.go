@@ -938,6 +938,8 @@ func Unreadable(email string) error {
 type publicKey struct {
 	PublicKey string
 	Primary   int
+	// Flags is what the key may be used for, as its owner's key list says.
+	Flags int
 }
 
 // published asks Proton what keys it holds for somebody else's address.
@@ -1021,6 +1023,28 @@ func Published(ctx context.Context, c proton.Doer, email string) (*pgp.KeyRing, 
 	return kr, nil
 }
 
+// Signers is every key Proton holds for somebody else's address, parted by
+// whether its owner still vouches for what it signed.
+type Signers struct {
+	// Trusted is every key whose signatures count, and nil when there is none.
+	Trusted *pgp.KeyRing
+	// Compromised is every key its owner marked compromised: something it
+	// signed was signed by whoever holds it, which may not be them. Nil when
+	// there is none.
+	Compromised *pgp.KeyRing
+}
+
+// Vouching is the ring a signature by the address is checked against, or the
+// refusal for an address whose every key is marked compromised - which is not
+// an address that publishes no key, and must not read as one.
+func (s *Signers) Vouching(email string) (*pgp.KeyRing, error) {
+	if s.Trusted == nil {
+		return nil, errs.Problemf(
+			"Every key Proton publishes for %s is marked compromised, so nothing it signed can be trusted.", email)
+	}
+	return s.Trusted, nil
+}
+
 // Signing returns every key Proton holds for somebody else's address.
 //
 // Checking that a person signed something - a message, the key inside an
@@ -1029,13 +1053,15 @@ func Published(ctx context.Context, c proton.Doer, email string) (*pgp.KeyRing, 
 // one key to seal to, this hands back all of them, and answers the same three
 // questions the same way:
 //
-//	a ring   the keys a signature by this address is checked against
+//	signers  the keys a signature by this address is checked against
 //	nil, nil Proton publishes no key, so the address is outside Proton
 //	nil, err Proton publishes keys and this build can read none of them
 //
+// A key its owner marked compromised is set apart rather than trusted, which is
+// what the mark asks of every client: what it signed is not taken as theirs.
 // One key that will not parse among others that do is logged and left out,
 // since the signature may well be by one of the others.
-func Signing(ctx context.Context, c proton.Doer, email string) (*pgp.KeyRing, error) {
+func Signing(ctx context.Context, c proton.Doer, email string) (*Signers, error) {
 	keys, err := published(ctx, c, email)
 	if err != nil {
 		return nil, err
@@ -1043,10 +1069,7 @@ func Signing(ctx context.Context, c proton.Doer, email string) (*pgp.KeyRing, er
 	if len(keys) == 0 {
 		return nil, nil
 	}
-	kr, err := pgp.NewKeyRing(nil)
-	if err != nil {
-		return nil, err
-	}
+	var trusted, compromised []*pgp.Key
 	for _, k := range keys {
 		key, err := pgp.NewKeyFromArmored(k.PublicKey)
 		if err != nil {
@@ -1057,10 +1080,21 @@ func Signing(ctx context.Context, c proton.Doer, email string) (*pgp.KeyRing, er
 				"signer", email, "error", err)
 			continue
 		}
-		_ = kr.AddKey(key)
+		if k.Flags&keyNotCompromised == 0 {
+			compromised = append(compromised, key)
+			continue
+		}
+		trusted = append(trusted, key)
 	}
-	if len(kr.GetKeys()) == 0 {
+	if len(trusted) == 0 && len(compromised) == 0 {
 		return nil, Unreadable(email)
 	}
-	return kr, nil
+	s := &Signers{}
+	if len(trusted) > 0 {
+		s.Trusted = ringHolding(trusted)
+	}
+	if len(compromised) > 0 {
+		s.Compromised = ringHolding(compromised)
+	}
+	return s, nil
 }

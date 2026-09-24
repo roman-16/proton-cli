@@ -3,6 +3,7 @@ package account
 import (
 	"github.com/roman-16/proton-cli/internal/app"
 	"github.com/roman-16/proton-cli/internal/cli/kit"
+	"github.com/roman-16/proton-cli/internal/proton"
 	"github.com/roman-16/proton-cli/internal/ui"
 	"github.com/spf13/cobra"
 )
@@ -91,7 +92,7 @@ func secondPasswordEnableCmd() *cobra.Command {
 				Action: ui.Enabled, Kind: "settings", Count: 1, Name: "two-password mode",
 				Detail: "- your keys open with the second password from now on",
 			}, func() error {
-				relock, err := c.App.Elevate(c.Ctx, "add a second password")
+				relock, err := c.App.Elevate(c.Ctx, proton.ScopePassword, "add a second password")
 				if err != nil {
 					return err
 				}
@@ -195,7 +196,7 @@ func secondPasswordSetCmd() *cobra.Command {
 			return kit.Mutate(c, ui.ResultSpec{
 				Action: ui.Updated, Count: 1, Name: "your second password",
 			}, func() error {
-				relock, err := c.App.Elevate(c.Ctx, "change your second password")
+				relock, err := c.App.Elevate(c.Ctx, proton.ScopePassword, "change your second password")
 				if err != nil {
 					return err
 				}
@@ -251,7 +252,7 @@ func secondPasswordDisableCmd() *cobra.Command {
 				Action: ui.Disabled, Kind: "settings", Count: 1, Name: "two-password mode",
 				Detail: "- your password opens your keys too",
 			}, func() error {
-				relock, err := c.App.Elevate(c.Ctx, "turn off two-password mode")
+				relock, err := c.App.Elevate(c.Ctx, proton.ScopePassword, "turn off two-password mode")
 				if err != nil {
 					return err
 				}

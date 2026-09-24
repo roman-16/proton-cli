@@ -94,7 +94,7 @@ func (d *inviteDoer) Decode(_ context.Context, r proton.Request, out any) error 
 		if err != nil {
 			return err
 		}
-		payload = map[string]any{"Address": map[string]any{"Keys": []map[string]any{{"PublicKey": armored, "Primary": 1}}}}
+		payload = map[string]any{"Address": map[string]any{"Keys": []map[string]any{{"PublicKey": armored, "Primary": 1, "Flags": 3}}}}
 	case r.Method == "POST":
 		d.accepted, _ = r.Body.(map[string]any)
 		return nil

@@ -863,7 +863,12 @@ func TestStandardInputHasOneOwner(t *testing.T) {
 // rather than a reflex, and the integration harness keeps the same list.
 func TestReauthCommandsAreDeclared(t *testing.T) {
 	want := []string{
+		"proton account keys create",
+		"proton account keys delete",
+		"proton account keys export",
+		"proton account keys import",
 		"proton account keys reactivate",
+		"proton account keys update",
 		"proton account login",
 		"proton account security-log delete",
 		"proton account security-log disable",

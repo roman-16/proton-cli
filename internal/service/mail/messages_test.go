@@ -2,12 +2,15 @@ package mail
 
 import (
 	"context"
+	"encoding/json"
 	"reflect"
 	"strings"
 	"testing"
 
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
 	"github.com/roman-16/proton-cli/internal/account/keys"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
+	"github.com/roman-16/proton-cli/internal/proton"
 )
 
 // Proton says what it made of a message in the flags of every envelope it sends,
@@ -214,5 +217,74 @@ func TestATabIsAskedForBesideTheInbox(t *testing.T) {
 	}
 	if q := listQuery(ListOptions{Folder: labelArchive}, false); q.Get("LabelID") != labelArchive || q.Has("LabelID[]") {
 		t.Errorf("a folder is asked for alone, got %v", q)
+	}
+}
+
+// senderKeysAPI answers the key lookup for a sender with the keys given, each
+// with the flags its owner's list carries.
+type senderKeysAPI struct{ keys []map[string]any }
+
+func (a senderKeysAPI) Do(context.Context, proton.Request) (*proton.Response, error) {
+	return &proton.Response{Status: 200, Body: []byte(`{"Code":1000}`)}, nil
+}
+
+func (a senderKeysAPI) Decode(_ context.Context, req proton.Request, out any) error {
+	if req.Path != "/core/v4/keys/all" {
+		return nil
+	}
+	answer, err := json.Marshal(map[string]any{"Code": 1000, "Address": map[string]any{"Keys": a.keys}})
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(answer, out)
+}
+
+// A signature by a key its owner marked compromised is one Proton's clients do
+// not take as theirs, so it reads as invalid rather than as verified - and one by
+// a key nobody vouches for either way stays unverified.
+func TestASignatureByACompromisedKeyIsInvalid(t *testing.T) {
+	address := genMailKeyRing(t)
+	trusted, compromised, stranger := genMailKeyRing(t), genMailKeyRing(t), genMailKeyRing(t)
+	public := func(kr *pgp.KeyRing) string {
+		armored, err := kr.GetKeys()[0].GetArmoredPublicKey()
+		if err != nil {
+			t.Fatalf("GetArmoredPublicKey: %v", err)
+		}
+		return armored
+	}
+	s := &Service{C: senderKeysAPI{keys: []map[string]any{
+		{"PublicKey": public(trusted), "Primary": 1, "Flags": 3},
+		{"PublicKey": public(compromised), "Primary": 0, "Flags": 0},
+	}}}
+	u := &keys.Unlocked{AddrKRs: map[string]keys.Rings{"address": {Read: address, Write: address}}}
+
+	for _, tc := range []struct {
+		name   string
+		signer *pgp.KeyRing
+		want   pgphelper.VerifyResult
+	}{
+		{"a trusted key", trusted, pgphelper.Verified},
+		{"a compromised key", compromised, pgphelper.Invalid},
+		{"a key the sender does not publish", stranger, pgphelper.Unverified},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			sealed, err := address.Encrypt(pgp.NewPlainMessageFromString("the body"), tc.signer)
+			if err != nil {
+				t.Fatalf("Encrypt: %v", err)
+			}
+			armored, err := sealed.GetArmored()
+			if err != nil {
+				t.Fatalf("GetArmored: %v", err)
+			}
+			body, verdict, err := s.openBody(context.Background(), u, rawMessage{
+				AddressID: "address", Body: armored, Sender: map[string]any{"Address": "jane@proton.me"},
+			}, true)
+			if err != nil {
+				t.Fatalf("openBody: %v", err)
+			}
+			if body != "the body" || verdict != tc.want {
+				t.Errorf("opened %q as %s, want the body as %s", body, verdict, tc.want)
+			}
+		})
 	}
 }

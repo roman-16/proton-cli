@@ -159,6 +159,23 @@ func (d *Destination) Describe() string {
 	return "the current directory"
 }
 
+// Where names the path one payload of this name would be written to, for a
+// confirmation that says so before anything is written. Nothing is made: a
+// directory that does not exist yet is named rather than created.
+func (d *Destination) Where(name string) (string, error) {
+	switch {
+	case d.dest == "-":
+		return "stdout", nil
+	case d.dest != "":
+		return d.dest, nil
+	}
+	target := filepath.Join(d.destDir, SafeFilename(name))
+	if d.force {
+		return target, nil
+	}
+	return freePath(target)
+}
+
 // Write puts data where the flags say, returning the path written, or "" when it
 // streamed to stdout.
 //

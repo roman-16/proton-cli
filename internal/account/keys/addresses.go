@@ -13,67 +13,110 @@ import (
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
+	"github.com/roman-16/proton-cli/internal/skip"
 )
 
-// Giving an address its first key.
+// Adding a key to an address.
 //
-// An address without a key can neither send nor receive, so bringing one into
-// being is the one moment a key has to be made rather than read. It is bounded
-// by what makes it safe: the address holds nothing yet, so nothing is replaced;
-// Proton serves no key list for it, so the list published names one key and can
-// contradict nothing; and afterwards the address is read back, so the account
-// knows Proton holds a key it can open and a list it composed.
-//
-// Keys an address already has are never touched, here or anywhere.
+// A key reaches an address in one of two ways: made here, or brought in from a
+// file. Either way it is locked with a passphrase sealed to the account's primary
+// user key, published beside the address's other keys, and named in the
+// address's key list - first, when the address is to write with it, and last
+// otherwise. An address with no key in use has no list to contradict, so its
+// list is composed naming the one key; every other list is edited. Afterwards
+// the address is read back, so the account knows Proton holds a key it can open
+// and the list that was signed.
 
-// NewAddressKey generates the first key of an address, publishes it, and hands
-// back the ID Proton files it under.
-//
-// The key is locked with a passphrase minted here and sealed to the account's
-// primary user key, exactly as every other address key of the account is - so
-// nothing but the account's own password opens it, and the next run unlocks it
-// with what it already has.
+// NewAddressKey makes a key for an address and publishes it as the key the
+// address writes with, handing back the ID Proton files it under.
 func (u *Unlocked) NewAddressKey(ctx context.Context, c proton.Doer, addr Address) (string, error) {
-	userKR, err := u.PrimaryUserKey()
-	if err != nil {
-		return "", fmt.Errorf("take the primary user key: %w", err)
-	}
-	token, err := newAddressKeyToken(userKR)
+	key, err := u.GenerateAddressKey(ctx, addr.Email)
 	if err != nil {
 		return "", err
 	}
-	key, err := u.generateAddressKey(ctx, addr.Email)
+	return u.PublishAddressKey(ctx, c, addr, key)
+}
+
+// PublishAddressKey publishes a key made for an address as the key the address
+// writes with.
+//
+// It is locked with the passphrase the address's primary key already has, as
+// Proton's clients lock a key they make, so every key of the address opens with
+// the one token; an address with no key yet is given a passphrase minted here.
+func (u *Unlocked) PublishAddressKey(ctx context.Context, c proton.Doer, addr Address, key *pgp.Key) (string, error) {
+	token, err := u.addressToken(ctx, addr)
 	if err != nil {
 		return "", err
 	}
+	return u.addKey(ctx, c, addr, key, token, true)
+}
+
+// addKey locks a key, names it in the address's key list, publishes both, and
+// reads the address back.
+func (u *Unlocked) addKey(
+	ctx context.Context, c proton.Doer, addr Address, key *pgp.Key, token *addressKeyToken, primary bool,
+) (string, error) {
 	armored, err := LockAndArmor(key, []byte(token.passphrase))
 	if err != nil {
-		return "", fmt.Errorf("lock the new address key: %w", err)
+		return "", fmt.Errorf("lock the address key: %w", err)
 	}
-	data, err := composeKeyList(key)
+	list, primary, err := u.listWithKey(addr, key, primary)
 	if err != nil {
 		return "", err
 	}
-	signature, err := signKeyList(data, []*pgp.Key{key})
-	if err != nil {
-		return "", err
-	}
-
 	id, err := publishKey(ctx, c, addressKeyRequest{
-		addressID: addr.ID, armoredKey: armored, primary: 1,
+		addressID: addr.ID, armoredKey: armored, primary: boolBit(primary),
 		token: token.sealed, signature: token.signature,
-		keyList: SignedKeyList{Data: data, Signature: signature},
+		keyList: list,
 	})
 	if err != nil {
 		return "", err
 	}
-	if err := u.verifyPublishedKey(ctx, c, addr.ID, key, data); err != nil {
+	published, err := u.verifyPublishedKey(ctx, c, addr.ID, key, list.Data)
+	if err != nil {
 		return "", err
 	}
+	u.adopt(published, key, primary)
 	return id, nil
 }
 
-// generateAddressKey makes the key an address is given: the key this account's
+// listWithKey is the key list an address publishes once a key joins it, and
+// whether the key joins as the one it writes with.
+//
+// An address with no key in use is given a list naming the new key alone, as
+// its primary, since there is nothing else for it to write with. Any other
+// address's list has to describe the keys the account holds before it is added
+// to, and is signed by the keys that are primary afterwards.
+func (u *Unlocked) listWithKey(addr Address, key *pgp.Key, primary bool) (SignedKeyList, bool, error) {
+	held, err := addressKeys(addr)
+	if err != nil {
+		return SignedKeyList{}, false, err
+	}
+	flags := defaultKeyFlags(addr)
+	if listable(held) == 0 {
+		data, err := composeKeyList(key, flags)
+		if err != nil {
+			return SignedKeyList{}, false, err
+		}
+		signature, err := signKeyList(data, []*pgp.Key{key}, u.clock())
+		if err != nil {
+			return SignedKeyList{}, false, err
+		}
+		return SignedKeyList{Data: data, Signature: signature}, true, nil
+	}
+	signers, err := u.writers(addr)
+	if err != nil {
+		return SignedKeyList{}, false, err
+	}
+	if primary {
+		signers = replacingPrimary(signers, key)
+	}
+	list, err := u.relisted(addr, noKeyList(addr, "adding a key"),
+		func(data string) (string, error) { return withAdded(data, key, flags, primary) }, signers)
+	return list, primary, err
+}
+
+// GenerateAddressKey makes the key an address is given: the key this account's
 // other addresses already hold, generated fresh.
 //
 // Generation settles everything about its shape except one thing OpenPGP leaves
@@ -83,7 +126,7 @@ func (u *Unlocked) NewAddressKey(ctx context.Context, c proton.Doer, addr Addres
 // this account has ever written, and a key that is unlike the account's own is
 // refused where one is read as Proton expects to have written it. So that choice
 // is not made here at all: it is copied from a key Proton made.
-func (u *Unlocked) generateAddressKey(ctx context.Context, email string) (*pgp.Key, error) {
+func (u *Unlocked) GenerateAddressKey(ctx context.Context, email string) (*pgp.Key, error) {
 	config := u.Generation()
 	entity, err := openpgp.NewEntity(email, "", email, config)
 	if err != nil {
@@ -91,8 +134,8 @@ func (u *Unlocked) generateAddressKey(ctx context.Context, email string) (*pgp.K
 	}
 	kdf, ok := u.keyDerivation(ctx)
 	if !ok {
-		// Recorded and not counted: the address is made and works either way, and
-		// this is what says why its key may not read like the account's others.
+		// Recorded and not counted: the key is made and works either way, and
+		// this is what says why it may not read like the account's others.
 		slog.DebugContext(ctx, "keys: no key of the account's own to take the key derivation from",
 			"addresses", len(u.Addresses))
 		return pgp.NewKeyFromEntity(entity)
@@ -157,6 +200,40 @@ type addressKeyToken struct {
 	signature  string
 }
 
+// addressToken is the passphrase a key made for the address is locked with: the
+// one its primary key is locked with, handed back exactly as Proton holds it.
+//
+// An address with no key, or whose primary's token this account cannot open,
+// is given a fresh one - which is what Proton's clients fall back to as well
+// (getNewAddressKeyToken, packages/shared/lib/keys/addressKeys.ts).
+func (u *Unlocked) addressToken(ctx context.Context, addr Address) (*addressKeyToken, error) {
+	if len(addr.Keys) == 0 {
+		return u.newAddressKeyToken()
+	}
+	primary, err := primaryRecord(addr)
+	if err == nil {
+		var passphrase []byte
+		if passphrase, err = decryptToken(primary.Token, primary.Signature, u.UserKR); err == nil {
+			return &addressKeyToken{
+				passphrase: string(passphrase), sealed: primary.Token, signature: primary.Signature,
+			}, nil
+		}
+	}
+	// Recorded and not counted: a fresh token opens the new key just as well, and
+	// this line is what says why it is not the one the address's others share.
+	slog.DebugContext(ctx, "keys: the primary key's token cannot be reused; minting one",
+		"kind", string(skip.KindAddress), "ref", addr.ID, "error", err.Error())
+	return u.newAddressKeyToken()
+}
+
+func (u *Unlocked) newAddressKeyToken() (*addressKeyToken, error) {
+	userKR, err := u.PrimaryUserKey()
+	if err != nil {
+		return nil, fmt.Errorf("take the primary user key: %w", err)
+	}
+	return newAddressKeyToken(userKR)
+}
+
 // newAddressKeyToken mints a passphrase for an address's keys.
 //
 // It is thirty-two bytes of randomness in hex, sealed to the primary user key
@@ -172,7 +249,7 @@ func newAddressKeyToken(userKR *pgp.KeyRing) (*addressKeyToken, error) {
 
 	encrypted, err := userKR.Encrypt(message, nil)
 	if err != nil {
-		return nil, fmt.Errorf("seal the new address key's token: %w", err)
+		return nil, fmt.Errorf("seal the address key's token: %w", err)
 	}
 	sealed, err := encrypted.GetArmored()
 	if err != nil {
@@ -180,7 +257,7 @@ func newAddressKeyToken(userKR *pgp.KeyRing) (*addressKeyToken, error) {
 	}
 	signed, err := userKR.SignDetached(message)
 	if err != nil {
-		return nil, fmt.Errorf("sign the new address key's token: %w", err)
+		return nil, fmt.Errorf("sign the address key's token: %w", err)
 	}
 	signature, err := signed.GetArmored()
 	if err != nil {
@@ -191,58 +268,55 @@ func newAddressKeyToken(userKR *pgp.KeyRing) (*addressKeyToken, error) {
 	}, nil
 }
 
-// verifyPublishedKey reads the address back and checks that what Proton holds
-// is what was published.
+// verifyPublishedKey reads the address back, checks that what Proton holds is
+// what was published, and hands back the address as Proton now holds it.
 //
 // It is the difference between having sent a key and having given the address
 // one: the record has to open with the token that was sealed, and the list
 // Proton serves has to be the text that was signed. A mismatch is this build's
-// fault rather than the account's, so it says so and asks for a report - and it
-// says it while the address is still empty, which is the only moment at which
-// finding out is worth anything.
+// fault rather than the account's, so it says so and asks for a report.
 func (u *Unlocked) verifyPublishedKey(
 	ctx context.Context, c proton.Doer, addressID string, key *pgp.Key, data string,
-) error {
+) (Address, error) {
 	addrs, err := getAddresses(ctx, c)
 	if err != nil {
-		return fmt.Errorf("read the address back: %w", err)
+		return Address{}, fmt.Errorf("read the address back: %w", err)
 	}
 	for _, addr := range addrs {
 		if addr.ID != addressID {
 			continue
 		}
 		if addr.SignedKeyList == nil || addr.SignedKeyList.Data != data {
-			return fmt.Errorf("proton published a key list for the new address and Proton serves a different one")
+			return Address{}, fmt.Errorf("proton published a key list for the address and Proton serves a different one")
 		}
 		held, err := addressKeys(addr)
 		if err != nil {
-			return err
+			return Address{}, err
 		}
 		for _, k := range held {
 			if k.key.GetFingerprint() != key.GetFingerprint() {
 				continue
 			}
 			if _, err := unlockKeyRing(ctx, []Key{k.record}, nil, u.UserKR); err != nil {
-				return fmt.Errorf("the key published for the new address does not open: %w", err)
+				return Address{}, fmt.Errorf("the key published for the address does not open: %w", err)
 			}
-			return nil
+			return addr, nil
 		}
-		return fmt.Errorf("the key published for the new address is not among the %d Proton holds for it", len(held))
+		return Address{}, fmt.Errorf("the key published for the address is not among the %d Proton holds for it", len(held))
 	}
-	return fmt.Errorf("the new address is not among the %d the account holds", len(addrs))
+	return Address{}, fmt.Errorf("the address is not among the %d the account holds", len(addrs))
 }
 
-// addressKeyRequest is what publishing a key to an address carries. Both ways of
-// getting one - a key made here for a new address, a key another account derived
-// for an existing one - send exactly this, which is why they send it from one
-// place.
+// addressKeyRequest is what publishing a key to an address carries. Every way of
+// getting one - a key made here, a key brought in from a file, a key another
+// account derived for a forwarding - sends exactly this, which is why they send
+// it from one place.
 type addressKeyRequest struct {
 	addressID  string
 	armoredKey string
 	primary    int
 	// token and signature are the address's passphrase as Proton holds it: minted
-	// for an address that had no keys, and handed back untouched for one that
-	// has.
+	// here, or handed back untouched.
 	token     string
 	signature string
 	keyList   SignedKeyList
@@ -278,10 +352,11 @@ func publishKey(ctx context.Context, c proton.Doer, req addressKeyRequest) (stri
 
 // PostQuantum reports whether the account makes post-quantum keys.
 //
-// It decides what a new address may be given: an account that opted in expects
-// every address to hold a post-quantum key beside the ordinary one, and this
-// build reads those keys without being able to generate them. So the answer is
-// asked for before an address is made rather than found out afterwards.
+// It decides whether this build may make a key for the account at all: an
+// account that opted in expects every address to hold a post-quantum key beside
+// the ordinary one, and this build reads those keys without being able to
+// generate them. So the answer is asked for before a key is made rather than
+// found out afterwards.
 func PostQuantum(ctx context.Context, c proton.Doer) (bool, error) {
 	var r struct {
 		UserSettings struct {
@@ -295,9 +370,9 @@ func PostQuantum(ctx context.Context, c proton.Doer) (bool, error) {
 }
 
 // UnsupportedPostQuantum is the refusal for making a key on an account that
-// holds post-quantum ones, phrased once because both a new address and a repair
-// of one reach it.
-func UnsupportedPostQuantum() error {
+// holds post-quantum ones, phrased once for everything that reaches it. instead
+// is what to do in a Proton client, which is the command's to say.
+func UnsupportedPostQuantum(instead string) error {
 	return errs.Unsupportedf("This account creates post-quantum keys, which this build cannot generate.").
-		Hint("add the address in a Proton client")
+		Hint(instead)
 }

@@ -66,6 +66,7 @@ GET /core/v4/auth/modulus
 GET /core/v4/auth/scopes
 GET /core/v4/events/latest
 GET /core/v4/keys/all
+GET /core/v4/keys/signedkeylists
 GET /core/v4/labels
 GET /core/v4/logs/auth
 GET /core/v4/members/me
@@ -109,6 +110,7 @@ GET /drive/volumes/{id}/trash
 GET /importer/v1/importers
 GET /importer/v1/mail/importers/authinfo
 GET /importer/v1/reports
+GET /kt/v1/verifiedepoch/{id}
 GET /mail/v4/attachments/{id}
 GET /mail/v4/conversations
 GET /mail/v4/conversations/count
@@ -167,6 +169,7 @@ POST /calendar/v1/{id}/urls
 POST /contacts/v4/contacts
 POST /core/v4/auth/info
 POST /core/v4/keys/address
+POST /core/v4/keys/address/{id}/delete
 POST /core/v4/labels
 POST /core/v4/settings/2fa/totp
 POST /core/v4/settings/mnemonic/disable
@@ -258,6 +261,9 @@ PUT /core/v4/addresses/{id}/disable
 PUT /core/v4/addresses/{id}/enable
 PUT /core/v4/addresses/{id}/encryption
 PUT /core/v4/keys/private
+PUT /core/v4/keys/signedkeylists/signature
+PUT /core/v4/keys/{id}/flags
+PUT /core/v4/keys/{id}/primary
 PUT /core/v4/labels/order
 PUT /core/v4/labels/{id}
 PUT /core/v4/settings/2fa/totp

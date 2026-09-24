@@ -10,7 +10,9 @@ A refusal that comes from Proton rather than from proton-cli belongs to [Trouble
 
 **Only a security key you plug in can be registered.** `proton account settings security-keys create` registers a key over USB. A built-in authenticator - Windows Hello, Touch ID, a machine's own secure element - and a passkey held in a phone are registered in [Proton's own settings](https://account.proton.me).
 
-**Post-quantum keys are read, never generated.** An account that opted in during Proton's rollout signs in, and mail and shares reach others who opted in. Turning the setting on is done in Proton's own settings, and adding an address to such an account is refused.
+**Post-quantum keys are read, never generated or imported.** An account that opted in during Proton's rollout signs in, and mail and shares reach others who opted in. Turning the setting on is done in Proton's own settings. On such an account, adding an address and generating a key are refused, and a post-quantum key file is imported in a Proton client.
+
+**Account keys are listed and exported, never generated or deleted.** Generating an account key, and deleting one a password reset locked, are done in [Proton's own settings](https://account.proton.me).
 
 **A recurring event needs a zone that can be named.** proton reads one from `TZ`, `/etc/localtime` or `/etc/timezone`, then from your Proton calendar settings. Where none of those answers, a recurring event drifts by an hour when the clocks change. Pass `--zone Europe/Vienna` to be sure.
 

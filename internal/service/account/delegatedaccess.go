@@ -310,12 +310,16 @@ func (s *Service) AccessDelegatedAccess(ctx context.Context, incoming DelegatedA
 	if !ok {
 		return AccessSession{}, errs.Problemf("The address this access was granted to has no key on this machine.")
 	}
-	verify, err := keys.Signing(ctx, s.C, incoming.Contact)
+	signers, err := keys.Signing(ctx, s.C, incoming.Contact)
 	if err != nil {
 		return AccessSession{}, err
 	}
-	if verify == nil {
+	if signers == nil {
 		return AccessSession{}, errs.Problemf("%s publishes no key, so the token it signed cannot be trusted.", incoming.Contact)
+	}
+	verify, err := signers.Vouching(incoming.Contact)
+	if err != nil {
+		return AccessSession{}, err
 	}
 	keyPassword, err := keys.OpenDelegatedToken(r.UserKeyToken, rings.Read, verify)
 	if err != nil {
