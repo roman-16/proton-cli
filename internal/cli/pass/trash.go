@@ -22,6 +22,8 @@ func trashListCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "list",
 		Short: "List what is in the trash",
+		Long: "List what is in the trash.\n\n" +
+			"What a hidden vault holds in its trash is left out.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			items, err := c.App.Pass.ItemsTrashed(c.Ctx)
 			if err != nil {
@@ -71,6 +73,9 @@ func trashEmptyCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "empty",
 		Short: "Delete everything in the trash, permanently",
+		Long: "Delete everything in the trash, permanently.\n\n" +
+			"What a hidden vault holds in its trash is left alone. `vaults unhide` brings\n" +
+			"it back into reach.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			items, err := c.App.Pass.ItemsTrashed(c.Ctx)
 			if err != nil {

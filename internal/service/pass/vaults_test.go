@@ -4,12 +4,16 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"sync"
 	"testing"
 
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
 
 	"github.com/roman-16/proton-cli/internal/account/keys"
 	"github.com/roman-16/proton-cli/internal/crypto/aead"
+	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
 	pb "github.com/roman-16/proton-cli/internal/service/pass/proto"
 	"google.golang.org/protobuf/proto"
@@ -213,4 +217,137 @@ func (d *capturingDoer) Decode(_ context.Context, r proton.Request, out any) err
 		return json.Unmarshal([]byte(`{"Share":{"ShareID":"share"}}`), out)
 	}
 	return nil
+}
+
+// shareDoer serves a list of vault shares and nothing else, and records every
+// request, from whichever goroutine sent it.
+type shareDoer struct {
+	shares string
+	mu     sync.Mutex
+	sent   []proton.Request
+}
+
+func (d *shareDoer) Do(_ context.Context, r proton.Request) (*proton.Response, error) {
+	d.record(r)
+	return &proton.Response{Status: 200, Body: []byte(`{"Code":1000}`)}, nil
+}
+
+func (d *shareDoer) Decode(_ context.Context, r proton.Request, out any) error {
+	d.record(r)
+	switch {
+	case r.Method == "GET" && r.Path == "/pass/v1/share":
+		return json.Unmarshal([]byte(d.shares), out)
+	case r.Method == "PUT":
+		return nil
+	}
+	return fmt.Errorf("nothing to answer %s %s with", r.Method, r.Path)
+}
+
+func (d *shareDoer) record(r proton.Request) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.sent = append(d.sent, r)
+}
+
+func (d *shareDoer) asked(path string) bool {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	for _, r := range d.sent {
+		if r.Path == path {
+			return true
+		}
+	}
+	return false
+}
+
+const archiveHiddenWorkVisible = `{"Shares":[
+	{"ShareID":"archive","VaultID":"v1","TargetType":1,"Owner":true,"ShareRoleID":"1","Flags":1},
+	{"ShareID":"work","VaultID":"v2","TargetType":1,"Owner":true,"ShareRoleID":"1","Flags":0}
+]}`
+
+func hiddenVaultService(shares string) (*Service, *shareDoer) {
+	d := &shareDoer{shares: shares}
+	return New(d, testKeys(&keys.Unlocked{})), d
+}
+
+func TestAVaultIsHiddenByItsShareFlag(t *testing.T) {
+	s, _ := hiddenVaultService(archiveHiddenWorkVisible)
+	vaults, err := s.VaultsList(context.Background())
+	if err != nil {
+		t.Fatalf("VaultsList: %v", err)
+	}
+	hidden := map[string]bool{}
+	for _, v := range vaults {
+		hidden[v.ShareID] = v.Hidden
+	}
+	if !hidden["archive"] || hidden["work"] {
+		t.Errorf("hidden = %v, want archive alone", hidden)
+	}
+}
+
+// A read across vaults leaves the hidden ones out, and so never opens them; one
+// named, or a read that has to cover the whole account, reads them too.
+func TestAHiddenVaultIsReadOnlyWhenNamedOrWhenEverythingIs(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		filter string
+		reach  reach
+		opened bool
+	}{
+		{"a read across vaults", "", browsed, false},
+		{"the hidden vault named", "archive", browsed, true},
+		{"a read of everything", "", everything, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s, d := hiddenVaultService(archiveHiddenWorkVisible)
+			if _, err := s.itemsFull(context.Background(), tc.filter, tc.reach, false); err != nil {
+				t.Fatalf("itemsFull: %v", err)
+			}
+			if got := d.asked("/pass/v1/share/archive/key"); got != tc.opened {
+				t.Errorf("opened the hidden vault = %v, want %v", got, tc.opened)
+			}
+			if tc.filter == "" && !d.asked("/pass/v1/share/work/key") {
+				t.Error("the vault that is not hidden was never read")
+			}
+		})
+	}
+}
+
+func TestANewItemGoesToTheFirstVaultThatIsNotHidden(t *testing.T) {
+	s, _ := hiddenVaultService(archiveHiddenWorkVisible)
+	got, err := s.ResolveVault(context.Background(), "")
+	if err != nil {
+		t.Fatalf("ResolveVault: %v", err)
+	}
+	if got != "work" {
+		t.Errorf("ResolveVault = %q, want work", got)
+	}
+	if got, err := s.ResolveVault(context.Background(), "archive"); err != nil || got != "archive" {
+		t.Errorf("ResolveVault(archive) = %q, %v; a hidden vault can still be named", got, err)
+	}
+}
+
+func TestWhenEveryVaultIsHiddenNoneIsChosen(t *testing.T) {
+	s, _ := hiddenVaultService(`{"Shares":[{"ShareID":"archive","VaultID":"v1","TargetType":1,"Flags":1}]}`)
+	_, err := s.ResolveVault(context.Background(), "")
+	var problem *errs.Problem
+	if !errors.As(err, &problem) {
+		t.Fatalf("err = %v, want a refusal", err)
+	}
+}
+
+// Both lists are sent every time, empty rather than null, which is how Pass
+// itself asks.
+func TestHidingSendsBothLists(t *testing.T) {
+	d := &capturingDoer{}
+	if err := New(d, testKeys(nil)).VaultsSetHidden(context.Background(), []string{"archive"}, nil); err != nil {
+		t.Fatalf("VaultsSetHidden: %v", err)
+	}
+	body, err := json.Marshal(d.body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := string(body), `{"SharesToHide":["archive"],"SharesToUnhide":[]}`; got != want {
+		t.Errorf("body = %s, want %s", got, want)
+	}
 }

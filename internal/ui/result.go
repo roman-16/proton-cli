@@ -99,6 +99,12 @@ var (
 	Unfavorited      = Action{"Unfavorited", "unfavorite", "unfavorited", Ordinary}
 	Pinned           = Action{"Pinned", "pin", "pinned", Ordinary}
 	Unpinned         = Action{"Unpinned", "unpin", "unpinned", Ordinary}
+	Hidden           = Action{"Hid", "hide", "hidden", Ordinary}
+	Unhidden         = Action{"Unhid", "unhide", "unhidden", Ordinary}
+	Excluded         = Action{"Excluded", "exclude", "excluded", Ordinary}
+	Included         = Action{"Included", "include", "included", Ordinary}
+	Trusted          = Action{"Trusted", "trust", "trusted", Ordinary}
+	Untrusted        = Action{"Untrusted", "untrust", "untrusted", Ordinary}
 	Reactivated      = Action{"Reactivated", "reactivate", "reactivated", Ordinary}
 	Granted          = Action{"Granted", "grant", "granted", Ordinary}
 	Requested        = Action{"Requested", "request", "requested", Ordinary}
@@ -129,7 +135,8 @@ var Actions = []Action{
 	Labelled, Unlabelled, Starred, Unstarred, MarkedRead, MarkedUnread,
 	MarkedLegitimate, Reported,
 	Enabled, Disabled, Added, Removed, Confirmed, Left, Accepted, Declined,
-	Favorited, Unfavorited, Pinned, Unpinned, Reactivated, Responded, Set, Invited, Revoked, Granted,
+	Favorited, Unfavorited, Pinned, Unpinned, Hidden, Unhidden, Excluded, Included, Trusted, Untrusted,
+	Reactivated, Responded, Set, Invited, Revoked, Granted,
 	Requested, Accessed,
 	Transferred, SignedIn, SignedOut,
 }

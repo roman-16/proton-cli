@@ -34,7 +34,7 @@ Read `git status --short`, `git --no-pager diff -U0` and what the conversation h
 A test that does not exist yet is a test to write, never a reason to run everything. Confirm the selection before asking:
 
 ```bash
-.agents/skills/live-test/scripts/live-test.sh tests 'TestContactsMatchingPinStillDelivers|TestPassExportAndImportRoundTrip'
+.agents/skills/live-test/scripts/live-test.sh tests 'TestContactsMatchingTrustedKeyStillDelivers|TestPassExportAndImportRoundTrip'
 ```
 
 It prints one line per match with the first sentence of that test's doc comment, then the count. A match list past about 140 tests is a full run in disguise: offer the full pair, or split it by collection.
@@ -59,7 +59,7 @@ Leave `allowOther` on. Free text is a correction to the selection: apply it and 
 One call, and it lasts as long as the run does. Make it bare, with the bash tool's timeout set to one hour (3600 seconds):
 
 ```bash
-.agents/skills/live-test/scripts/live-test.sh run coverage-one 'TestContactsMatchingPinStillDelivers|TestPassExportAndImportRoundTrip'
+.agents/skills/live-test/scripts/live-test.sh run coverage-one 'TestContactsMatchingTrustedKeyStillDelivers|TestPassExportAndImportRoundTrip'
 ```
 
 Bare means no pipe and no redirect - not `| tail`, not `| grep`, not `> file`. The progress lines are for the user to watch, and a pipe holds every one of them back until the run ends, which for the full suite is forty minutes of nothing on screen. One hour is what the full suite needs with room to spare; a shorter timeout aborts the call partway, and a longer one holds nothing.

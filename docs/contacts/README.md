@@ -77,7 +77,7 @@ proton contacts emails update jane@example.com --encrypt off
 The settings depend on each other, and `emails update` refuses a combination that cannot be sent:
 
 - **A Proton address** takes `--email-format` alone. Mail to it is always encrypted and signed.
-- **Encrypted mail is always signed.** `--encrypt` needs a key: a pinned one, or one the address's provider publishes.
+- **Encrypted mail is always signed.** `--encrypt` needs a key: a trusted one, or one the address's provider publishes.
 - **Signed mail's format follows the scheme:** plain text under `pgp-inline`, as it was written under `pgp-mime`.
 
 With `--eo-password-file`, a message goes to an address that is not encrypted to as a password-protected link, whatever its settings say.
@@ -107,7 +107,7 @@ proton contacts merge
 
 Contacts are duplicates when they share an **email address**, compared without regard to case. Sharing only a name is not enough, since people are routinely called the same thing.
 
-The oldest contact of each set is kept, so groups and pinned keys that refer to it keep working. Fields from the others are added, and nothing is overwritten.
+The oldest contact of each set is kept, so groups and trusted keys that refer to it keep working. Fields from the others are added, and nothing is overwritten.
 
 ## Import and export
 
@@ -125,16 +125,16 @@ A card with no name and no address is skipped and reported. The rest still land.
 
 Nothing is merged on import, so reading a file that has no UIDs twice creates duplicates. Run `contacts merge` afterwards to fold them together.
 
-## Pinned keys
+## Trusted keys
 
-Pinning a public key to a contact means mail to that address is encrypted to the key *you* trust, not just whatever the server hands back.
+Trusting a public key for a contact means mail to that address is encrypted to the key *you* chose, not just whatever the server hands back.
 
 ```bash
-proton contacts keys pin jane --key jane-pubkey.asc
-proton contacts keys pin jane@example.com --key -           # armored key on stdin
-proton contacts keys unpin jane@example.com
+proton contacts keys trust jane --key jane-pubkey.asc
+proton contacts keys trust jane@example.com --key -         # armored key on stdin
+proton contacts keys untrust jane@example.com
 ```
 
-A key is pinned to one address. Name that address when the contact holds several; naming the contact is enough when they hold one.
+A key is trusted for one address. Name that address when the contact holds several; naming the contact is enough when they hold one.
 
-Pinning turns encryption to the address on. To keep a key for verifying signatures only, turn it off again with `proton contacts emails update jane@example.com --encrypt off`. Unpinning removes the keys and leaves the address's other settings as they are.
+Trusting turns encryption to the address on. To keep a key for verifying signatures only, turn it off again with `proton contacts emails update jane@example.com --encrypt off`. Untrusting removes the keys and leaves the address's other settings as they are.

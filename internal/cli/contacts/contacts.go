@@ -625,7 +625,7 @@ func mergeCmd() *cobra.Command {
 		Long: "Fold duplicate contacts into one.\n\n" +
 			"Contacts are duplicates when they share an email address, compared without\n" +
 			"regard to case. Sharing only a name is not enough.\n\n" +
-			"The oldest contact of each set is kept, so groups and pinned keys that refer\n" +
+			"The oldest contact of each set is kept, so groups and trusted keys that refer\n" +
 			"to it keep working. Fields from the others are added; nothing is\n" +
 			"overwritten.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {

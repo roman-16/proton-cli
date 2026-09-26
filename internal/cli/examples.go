@@ -427,13 +427,13 @@ var examples = map[string][]string{
 		"proton contacts emails update jane@example.com --encrypt off",
 	},
 	"proton contacts keys list": {"proton contacts keys list jane"},
-	"proton contacts keys pin": {
-		"proton contacts keys pin jane --key jane-pubkey.asc",
-		"proton contacts keys pin jane@example.com --key -",
+	"proton contacts keys trust": {
+		"proton contacts keys trust jane --key jane-pubkey.asc",
+		"proton contacts keys trust jane@example.com --key -",
 	},
-	"proton contacts keys unpin": {
-		"proton contacts keys unpin jane",
-		"proton contacts keys unpin jane@example.com",
+	"proton contacts keys untrust": {
+		"proton contacts keys untrust jane",
+		"proton contacts keys untrust jane@example.com",
 	},
 
 	// ── drive ──
@@ -1205,6 +1205,8 @@ var examples = map[string][]string{
 		"proton pass items list --risk weak --vault Work",
 		"proton pass items list --risk missing-2fa",
 		"proton pass items list --risk compromised",
+		"proton pass items list --excluded",
+		"proton pass items list --sort used --desc",
 	},
 	"proton pass items get": {
 		"proton pass items get github.com",
@@ -1244,6 +1246,10 @@ var examples = map[string][]string{
 		"proton pass items update GitHub --username roman-16 --url github.com",
 		"proton pass items update GitHub --generate-password",
 		"proton pass items update Passport --attach ~/scans/visa.pdf --detach passport.pdf",
+		"proton pass items update shop --display-name 'Jane R'",
+		"proton pass items update shop --clear-display-name",
+		"proton pass items update shop --simplelogin-note 'Bike shop, 2024'",
+		"proton pass items update shop --clear-simplelogin-note",
 	},
 	"proton pass items move": {
 		"proton pass items move github.com --into Work",
@@ -1268,6 +1274,13 @@ var examples = map[string][]string{
 	"proton pass items unpin": {
 		"proton pass items unpin github.com",
 	},
+	"proton pass items exclude": {
+		"proton pass items exclude 'Router admin'",
+		"proton pass items exclude 'Router admin' 'Printer admin'",
+	},
+	"proton pass items include": {
+		"proton pass items include 'Router admin'",
+	},
 	"proton pass items trash": {
 		"proton pass items trash GitHub",
 		"proton pass items trash --vault Work --older-than 1y",
@@ -1286,10 +1299,18 @@ var examples = map[string][]string{
 		"proton pass vaults update Work --description 'Shared team logins' --icon star --color teal",
 	},
 	"proton pass vaults delete": {"proton pass vaults delete Work"},
-	"proton pass aliases list":  {"proton pass aliases list", "proton pass aliases list --vault Work"},
+	"proton pass vaults hide": {
+		"proton pass vaults hide Archive",
+		"proton pass vaults hide Archive 'Old work'",
+	},
+	"proton pass vaults unhide": {
+		"proton pass vaults unhide Archive",
+	},
+	"proton pass aliases list": {"proton pass aliases list", "proton pass aliases list --vault Work"},
 	"proton pass aliases create": {
 		"proton pass aliases create --prefix shop --mailbox me@proton.me",
 		"proton pass aliases create --prefix news --mailbox me@proton.me --vault Work --name 'Newsletter alias'",
+		"proton pass aliases create --prefix shop --note 'Bike shop'",
 	},
 	"proton pass aliases enable":  {"proton pass aliases enable shop"},
 	"proton pass aliases disable": {"proton pass aliases disable shop"},

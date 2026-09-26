@@ -99,6 +99,28 @@ func TestFlagValueOutsideItsDomainIsRefused(t *testing.T) {
 func TestARiskOnSomethingWithNoPasswordIsRefused(t *testing.T) {
 	refuses(t, 1, []string{"pass", "items", "list", "--risk", "weak", "--type", "note"},
 		"--risk looks at logins")
+	refuses(t, 1, []string{"pass", "items", "list", "--excluded", "--type", "note"},
+		"--excluded looks at logins")
+}
+
+// An excluded login fails no check, so asking for both is asking for nothing.
+func TestExcludedAndARiskAreRefusedTogether(t *testing.T) {
+	refuses(t, 1, []string{"pass", "items", "list", "--excluded", "--risk", "weak"},
+		"--excluded and --risk contradict each other.")
+}
+
+// A name and a note are taken off with the flag beside them, so an empty one
+// and one given together with its clearing flag are both refused before
+// anything is read.
+func TestAnAliasFieldIsClearedByItsOwnFlag(t *testing.T) {
+	refuses(t, 1, []string{"pass", "items", "update", "shop", "--display-name", ""},
+		"--display-name needs a name.", "--clear-display-name")
+	refuses(t, 1, []string{"pass", "items", "update", "shop", "--simplelogin-note", " "},
+		"--simplelogin-note needs some text.", "--clear-simplelogin-note")
+	refuses(t, 1, []string{"pass", "items", "update", "shop", "--display-name", "Jane R", "--clear-display-name"},
+		"--display-name and --clear-display-name contradict each other.")
+	refuses(t, 1, []string{"pass", "items", "update", "shop", "--simplelogin-note", "x", "--clear-simplelogin-note"},
+		"--simplelogin-note and --clear-simplelogin-note contradict each other.")
 }
 
 // A tag is referenced by name only, so Proton's own number for it is refused

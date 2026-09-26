@@ -15,19 +15,19 @@ import (
 func keysCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "keys",
-		Short: "Public keys pinned to a contact",
-		Long: "Public keys pinned to a contact.\n\n" +
-			"Pinning a key means mail to that address is encrypted to the key you trust,\n" +
-			"rather than to whatever the server hands back. Whether it is encrypted at all\n" +
-			"is one of the address's settings: see `contacts emails`.",
+		Short: "Public keys you trust for a contact",
+		Long: "Public keys you trust for a contact.\n\n" +
+			"Trusting a key means mail to that address is encrypted to that key, rather\n" +
+			"than to whatever the server hands back. Whether it is encrypted at all is one\n" +
+			"of the address's settings: see `contacts emails`.",
 	}
-	c.AddCommand(keysListCmd(), keysPinCmd(), keysUnpinCmd())
+	c.AddCommand(keysListCmd(), keysTrustCmd(), keysUntrustCmd())
 	return c
 }
 
-// pinnedKey is one pinned key as reported, with the fingerprint standing in for
-// the key material: an armoured block is not something to print into a table.
-type pinnedKey struct {
+// trustedKey is one trusted key as reported, with the fingerprint standing in
+// for the key material: an armoured block is not something to print into a table.
+type trustedKey struct {
 	Email       string `json:"email"`
 	Fingerprint string `json:"fingerprint"`
 	Verified    bool   `json:"signature_verified"`
@@ -36,7 +36,7 @@ type pinnedKey struct {
 func keysListCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list REF",
-		Short: "List the keys pinned to a contact",
+		Short: "List the keys you trust for a contact",
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			id, err := c.App.Contacts.Resolve(c.Ctx, c.Args[0])
 			if err != nil {
@@ -46,41 +46,41 @@ func keysListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			var rows []pinnedKey
+			var rows []trustedKey
 			// A key that would not decode is counted where it is skipped, so the
 			// listing says it is short; what did decode is shown.
 			for _, es := range ctsvc.ContactEmailSettings(c.Ctx, ct) {
 				for _, armored := range es.Keys {
-					rows = append(rows, pinnedKey{
+					rows = append(rows, trustedKey{
 						Email:       es.Address,
 						Fingerprint: pgphelper.Fingerprint(armored),
 						Verified:    es.SignatureVerified,
 					})
 				}
 			}
-			return kit.List(c, ui.TableSpec[pinnedKey]{
+			return kit.List(c, ui.TableSpec[trustedKey]{
 				Noun:  "keys",
 				Total: ui.Unknown, Page: ui.Unpaged,
-				Columns: []ui.Column[pinnedKey]{
-					{Header: "EMAIL", Flex: true, Cell: func(k pinnedKey) string { return k.Email }},
-					{Header: "FINGERPRINT", Cell: func(k pinnedKey) string { return k.Fingerprint }},
-					{Header: "VERIFIED", Cell: func(k pinnedKey) string { return yesNo(k.Verified) }},
+				Columns: []ui.Column[trustedKey]{
+					{Header: "EMAIL", Flex: true, Cell: func(k trustedKey) string { return k.Email }},
+					{Header: "FINGERPRINT", Cell: func(k trustedKey) string { return k.Fingerprint }},
+					{Header: "VERIFIED", Cell: func(k trustedKey) string { return yesNo(k.Verified) }},
 				},
 			}, rows)
 		}),
 	}
 }
 
-func keysPinCmd() *cobra.Command {
+func keysTrustCmd() *cobra.Command {
 	var keyPath string
 	c := &cobra.Command{
-		Use:   "pin REF",
-		Short: "Pin a public key so mail to a contact is encrypted to it",
-		Long: "Pin a public key so mail to a contact is encrypted to it.\n\n" +
-			"A key is pinned to one address. Name that address as REF when the contact\n" +
+		Use:   "trust REF",
+		Short: "Trust a public key so mail to a contact is encrypted to it",
+		Long: "Trust a public key so mail to a contact is encrypted to it.\n\n" +
+			"A key is trusted for one address. Name that address as REF when the contact\n" +
 			"holds more than one; naming the contact is enough when they hold one.\n\n" +
-			"Pinning turns encryption to the address on. To keep a key for verifying\n" +
-			"signatures only, pin it and then run `contacts emails update REF --encrypt off`.",
+			"Trusting turns encryption to the address on. To keep a key for verifying\n" +
+			"signatures only, trust it and then run `contacts emails update REF --encrypt off`.",
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			if keyPath == "" {
 				return kit.Fail("A key is required.").
@@ -100,10 +100,10 @@ func keysPinCmd() *cobra.Command {
 			}
 			var rewrote rewritten
 			if err := kit.Mutate(c, ui.ResultSpec{
-				Action: ui.Pinned, Kind: "keys", Count: 1,
+				Action: ui.Trusted, Kind: "keys", Count: 1,
 				Detail: "for " + target,
 			}, func() error {
-				verdict, err := c.App.Contacts.PinKey(c.Ctx, id, target, armored)
+				verdict, err := c.App.Contacts.TrustKey(c.Ctx, id, target, armored)
 				rewrote.card(verdict)
 				return err
 			}); err != nil {
@@ -117,12 +117,12 @@ func keysPinCmd() *cobra.Command {
 	return c
 }
 
-func keysUnpinCmd() *cobra.Command {
+func keysUntrustCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "unpin REF",
-		Short: "Remove the keys pinned to a contact",
-		Long: "Remove the keys pinned to a contact.\n\n" +
-			"A key is pinned to one address. Name that address as REF when the contact\n" +
+		Use:   "untrust REF",
+		Short: "Stop trusting a contact's keys",
+		Long: "Stop trusting a contact's keys.\n\n" +
+			"Keys are trusted for one address. Name that address as REF when the contact\n" +
 			"holds more than one; naming the contact is enough when they hold one.",
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			id, err := c.App.Contacts.Resolve(c.Ctx, c.Args[0])
@@ -135,10 +135,10 @@ func keysUnpinCmd() *cobra.Command {
 			}
 			var rewrote rewritten
 			if err := kit.Mutate(c, ui.ResultSpec{
-				Action: ui.Unpinned, Kind: "keys", Count: 1,
+				Action: ui.Untrusted, Kind: "keys", Count: 1,
 				Detail: "for " + target,
 			}, func() error {
-				verdict, err := c.App.Contacts.UnpinKey(c.Ctx, id, target)
+				verdict, err := c.App.Contacts.UntrustKey(c.Ctx, id, target)
 				rewrote.card(verdict)
 				return err
 			}); err != nil {
@@ -154,7 +154,7 @@ func keysUnpinCmd() *cobra.Command {
 // back the contact it read to decide.
 //
 // A key and a setting belong to an address, and a reference already names one:
-// `pin jane` and `pin jane@example.com` both find the contact, and only the
+// `trust jane` and `trust jane@example.com` both find the contact, and only the
 // second says which of her addresses. So the reference answers when it can, the
 // sole address answers when there is one, and anything else is a refusal that
 // lists the choice - guessing would silently encrypt to the wrong address.

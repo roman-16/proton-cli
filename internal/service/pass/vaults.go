@@ -23,6 +23,7 @@ type Vault struct {
 	Owner       bool   `json:"owner"`
 	Shared      bool   `json:"shared"`
 	Members     int    `json:"members"`
+	Hidden      bool   `json:"hidden"`
 	AddressID   string `json:"address_id,omitempty"`
 	// Icon and Color are which of Pass's grid the vault picked, by name. Empty
 	// means it never chose.
@@ -62,7 +63,7 @@ func (s *Service) VaultsList(ctx context.Context) ([]Vault, error) {
 	for _, sh := range shares {
 		v := Vault{
 			ShareID: sh.ShareID, VaultID: sh.VaultID,
-			Owner: sh.Owner, Shared: sh.Shared,
+			Owner: sh.Owner, Shared: sh.Shared, Hidden: sh.Hidden,
 			Members: sh.Members, AddressID: sh.AddressID,
 		}
 		if sh.Content != "" {
@@ -272,6 +273,20 @@ func (s *Service) VaultEdit(ctx context.Context, shareID string, patch VaultPatc
 	}, nil)
 }
 
+// VaultsSetHidden keeps vaults out of this account's listings, or brings them
+// back into them, in one request.
+func (s *Service) VaultsSetHidden(ctx context.Context, hide, unhide []string) error {
+	return s.C.Decode(ctx, proton.Request{
+		Method: "PUT", Path: "/pass/v1/share/hide",
+		Body: map[string]any{
+			"SharesToHide":   append([]string{}, hide...),
+			"SharesToUnhide": append([]string{}, unhide...),
+		},
+	}, nil)
+}
+
+// ResolveVault accepts a vault's name or share ID. With neither, it answers with
+// the first vault that is not hidden.
 func (s *Service) ResolveVault(ctx context.Context, nameOrID string) (string, error) {
 	vaults, err := s.VaultsList(ctx)
 	if err != nil {
@@ -281,7 +296,13 @@ func (s *Service) ResolveVault(ctx context.Context, nameOrID string) (string, er
 		if len(vaults) == 0 {
 			return "", &errs.NotFound{Kind: "vault"}
 		}
-		return vaults[0].ShareID, nil
+		for _, v := range vaults {
+			if !v.Hidden {
+				return v.ShareID, nil
+			}
+		}
+		return "", errs.Problemf("Every vault is hidden, so none is used unless you name it.").
+			Hint("--vault Work")
 	}
 	for _, v := range vaults {
 		if v.ShareID == nameOrID {

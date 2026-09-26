@@ -24,7 +24,7 @@ func emailRow(t *testing.T, ref, email string) map[string]interface{} {
 }
 
 // The settings land in the signed card, and survive an edit of something else
-// and a key being pinned and unpinned.
+// and a key being trusted and untrusted.
 func TestContactsEmailsUpdate(t *testing.T) {
 	email := "settings-" + testID() + "@example.invalid"
 	id := strings.TrimSpace(runOK(t, "contacts", "create", "--name", testID()+"-settings", "--email", email))
@@ -47,13 +47,13 @@ func TestContactsEmailsUpdate(t *testing.T) {
 	}
 
 	runOK(t, "contacts", "update", "--job-title", "Boss", "--", id)
-	runOK(t, "contacts", "keys", "pin", "--key", writeGeneratedPubKey(t), email)
-	runOK(t, "contacts", "keys", "unpin", email)
+	runOK(t, "contacts", "keys", "trust", "--key", writeGeneratedPubKey(t), email)
+	runOK(t, "contacts", "keys", "untrust", email)
 
 	card = signedCardData(t, id)
 	for _, want := range []string{"X-PM-SIGN:true", "X-PM-SCHEME:pgp-inline", "X-PM-MIMETYPE:text/plain"} {
 		if !strings.Contains(card, want) {
-			t.Errorf("an edit, a pin and an unpin dropped %s:\n%s", want, card)
+			t.Errorf("an edit, a trust and an untrust dropped %s:\n%s", want, card)
 		}
 	}
 }

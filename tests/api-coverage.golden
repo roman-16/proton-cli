@@ -324,8 +324,10 @@ PUT /mail/v4/settings/remove-image-metadata
 PUT /mail/v4/settings/spam-action
 PUT /mail/v4/settings/viewmode
 PUT /pass/v1/breach/address/{id}/monitor
+PUT /pass/v1/share/hide
 PUT /pass/v1/share/{id}/alias/{id}/contact/{n}/blocked
 PUT /pass/v1/share/{id}/alias/{id}/name
+PUT /pass/v1/share/{id}/alias/{id}/note
 PUT /pass/v1/share/{id}/alias/{id}/status
 PUT /pass/v1/share/{id}/item/share
 PUT /pass/v1/share/{id}/item/{id}

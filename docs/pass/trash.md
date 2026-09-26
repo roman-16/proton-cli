@@ -10,6 +10,8 @@ Holds `empty`, `list` and `restore`.
 
 Delete everything in the trash, permanently.
 
+What a hidden vault holds in its trash is left alone. `vaults unhide` brings it back into reach.
+
 ```
 proton pass trash empty
 ```
@@ -21,6 +23,8 @@ proton pass trash empty
 ## `list`
 
 List what is in the trash.
+
+What a hidden vault holds in its trash is left out.
 
 ```
 proton pass trash list

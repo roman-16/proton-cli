@@ -58,7 +58,7 @@ const corpusAtOnce = 8
 // corpus is the client the leaked-credential check talks to, and is used by that
 // check alone.
 func (s *Service) AtRisk(ctx context.Context, vaultFilter string, risk Risk, corpus *http.Client) ([]Item, error) {
-	full, err := s.itemsFull(ctx, vaultFilter, false)
+	full, err := s.itemsFull(ctx, vaultFilter, browsed, false)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +83,7 @@ func (s *Service) AtRisk(ctx context.Context, vaultFilter string, risk Risk, cor
 func checkable(items []FullItem) []FullItem {
 	out := make([]FullItem, 0, len(items))
 	for _, it := range items {
-		if it.Type == "login" && it.monitored {
+		if it.Type == "login" && !it.Excluded {
 			out = append(out, it)
 		}
 	}

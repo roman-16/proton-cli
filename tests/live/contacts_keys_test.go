@@ -11,18 +11,18 @@ import (
 	gopenpgp "github.com/ProtonMail/gopenpgp/v2/crypto"
 )
 
-// Pinned keys: telling Proton which key belongs to somebody, whatever it would
+// Trusted keys: telling Proton which key belongs to somebody, whatever it would
 // otherwise have found.
 //
-// A pin is looked up by address across the whole address book, so what a pin
-// decides is whether a send goes through at all - which is why the sends are
-// here with the pinning rather than with the rest of the compose tests.
+// A trusted key is looked up by address across the whole address book, so what
+// one decides is whether a send goes through at all - which is why the sends are
+// here with the trusting rather than with the rest of the compose tests.
 
 // writeGeneratedPubKey generates a throwaway key pair and writes its armored
 // public key to a temp .asc file, returning the path.
 func writeGeneratedPubKey(t *testing.T) string {
 	t.Helper()
-	key, err := gopenpgp.GenerateKey("pin-test", "pin@example.invalid", "x25519", 0)
+	key, err := gopenpgp.GenerateKey("trust-test", "trust@example.invalid", "x25519", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,45 +54,45 @@ func signedCardData(t *testing.T, contactID string) string {
 	return ""
 }
 
-func TestContactsPinUnpinKey(t *testing.T) {
-	email := "pin-" + testID() + "@example.invalid"
-	id := strings.TrimSpace(runOK(t, "contacts", "create", "--name", testID()+"-pin", "--email", email))
+func TestContactsTrustAndUntrustKey(t *testing.T) {
+	email := "trust-" + testID() + "@example.invalid"
+	id := strings.TrimSpace(runOK(t, "contacts", "create", "--name", testID()+"-trust", "--email", email))
 	cleanupRun(t, fmt.Sprintf("Delete contact: proton contacts delete %s", id),
 		"contacts", "delete", "--", id)
 
-	runOK(t, "contacts", "keys", "pin", "--key", writeGeneratedPubKey(t), email)
+	runOK(t, "contacts", "keys", "trust", "--key", writeGeneratedPubKey(t), email)
 	if !strings.Contains(signedCardData(t, id), "KEY;") {
-		t.Error("expected a pinned KEY property in the signed card after pin-key")
+		t.Error("expected a KEY property in the signed card after trusting a key")
 	}
 
-	runOK(t, "contacts", "keys", "unpin", email)
+	runOK(t, "contacts", "keys", "untrust", email)
 	if strings.Contains(signedCardData(t, id), "KEY;") {
-		t.Error("KEY property should be gone after unpin-key")
+		t.Error("KEY property should be gone after untrusting the key")
 	}
 }
 
-func TestContactsUpdatePreservesPinnedKey(t *testing.T) {
-	email := "pin-" + testID() + "@example.invalid"
-	id := strings.TrimSpace(runOK(t, "contacts", "create", "--name", testID()+"-pin", "--email", email))
+func TestContactsUpdatePreservesTrustedKey(t *testing.T) {
+	email := "trust-" + testID() + "@example.invalid"
+	id := strings.TrimSpace(runOK(t, "contacts", "create", "--name", testID()+"-trust", "--email", email))
 	cleanupRun(t, fmt.Sprintf("Delete contact: proton contacts delete %s", id),
 		"contacts", "delete", "--", id)
 
-	runOK(t, "contacts", "keys", "pin", "--key", writeGeneratedPubKey(t), email)
+	runOK(t, "contacts", "keys", "trust", "--key", writeGeneratedPubKey(t), email)
 	if !strings.Contains(signedCardData(t, id), "KEY;") {
-		t.Fatal("setup: pinned key missing after pin-key")
+		t.Fatal("setup: trusted key missing after trusting it")
 	}
 
-	// An unrelated field update must not drop the pinned key.
+	// An unrelated field update must not drop the trusted key.
 	runOK(t, "contacts", "update", "--job-title", "Boss", id)
 	if !strings.Contains(signedCardData(t, id), "KEY;") {
-		t.Error("contacts update dropped the pinned key")
+		t.Error("contacts update dropped the trusted key")
 	}
 }
 
-// TestContactsMatchingPinStillDelivers pins the second account's real public key on a
-// contact and sends to it: a matching pin must not break E2EE delivery, and
+// TestContactsMatchingTrustedKeyStillDelivers trusts the second account's real public
+// key on a contact and sends to it: a matching trusted key must not break E2EE delivery, and
 // the second account must still decrypt the body with a verified signature.
-func TestContactsMatchingPinStillDelivers(t *testing.T) {
+func TestContactsMatchingTrustedKeyStillDelivers(t *testing.T) {
 	data := runJSON(t, "api", "GET", "/core/v4/keys/all", "--query", "Email="+secondaryEmail(), "--query", "InternalOnly=0")
 	addr, _ := data["Address"].(map[string]interface{})
 	ks, _ := addr["Keys"].([]interface{})
@@ -105,16 +105,16 @@ func TestContactsMatchingPinStillDelivers(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	id := strings.TrimSpace(runOK(t, "contacts", "create", "--name", testID()+"-altpin", "--email", secondaryEmail()))
+	id := strings.TrimSpace(runOK(t, "contacts", "create", "--name", testID()+"-alttrust", "--email", secondaryEmail()))
 	cleanupRun(t, fmt.Sprintf("Delete contact: proton contacts delete %s", id),
 		"contacts", "delete", "--", id)
 	// The contact made here is named, not the address: an address book that
 	// already holds somebody at that address makes the address ambiguous, and
-	// the contact holds one address, so the pin lands on it either way.
-	runOK(t, "contacts", "keys", "pin", "--key", keyPath, "--", id)
+	// the contact holds one address, so the key is trusted for it either way.
+	runOK(t, "contacts", "keys", "trust", "--key", keyPath, "--", id)
 
-	subject := testID() + "-pinned-send"
-	body := "pinned-key body for " + subject
+	subject := testID() + "-trusted-send"
+	body := "trusted-key body for " + subject
 	runOK(t, "mail", "messages", "send", "--to", secondaryEmail(), "--subject", subject, "--body", body)
 	if sentID := findMessage(t, "sent", subject); sentID != "" {
 		cleanupRun(t, "Delete sent mail: proton mail messages delete "+sentID,
@@ -127,7 +127,7 @@ func TestContactsMatchingPinStillDelivers(t *testing.T) {
 		return recvID != ""
 	})
 	if recvID == "" {
-		t.Fatal("the second account did not receive the pinned-key mail")
+		t.Fatal("the second account did not receive the trusted-key mail")
 	}
 	cleanupRunSecondary(t, "Delete received mail (secondary): proton --profile secondary mail messages delete "+recvID,
 		"mail", "messages", "delete", recvID)
@@ -137,25 +137,25 @@ func TestContactsMatchingPinStillDelivers(t *testing.T) {
 	assertField(t, read, "Signature:", "verified")
 }
 
-// TestContactsPinnedMismatchRefusesTheSend pins a wrong key on a contact for a Proton
+// TestContactsTrustedMismatchRefusesTheSend trusts a wrong key on a contact for a Proton
 // recipient: the send must refuse (the recipient's primary key isn't among the
-// pinned keys) and must not leak the draft it created. The second assertion is
+// trusted keys) and must not leak the draft it created. The second assertion is
 // a regression guard for the send-abort cleanup, which used the wrong HTTP
 // method and silently leaked drafts on any aborted send.
-func TestContactsPinnedMismatchRefusesTheSend(t *testing.T) {
+func TestContactsTrustedMismatchRefusesTheSend(t *testing.T) {
 	id := strings.TrimSpace(runOK(t, "contacts", "create", "--name", testID()+"-mismatch", "--email", secondaryEmail()))
 	cleanupRun(t, fmt.Sprintf("Delete contact: proton contacts delete %s", id),
 		"contacts", "delete", "--", id)
 	// A freshly generated key is a valid PGP key but not the second account's.
-	runOK(t, "contacts", "keys", "pin", "--key", writeGeneratedPubKey(t), "--", id)
+	runOK(t, "contacts", "keys", "trust", "--key", writeGeneratedPubKey(t), "--", id)
 
 	subject := testID() + "-mismatch"
 	_, stderr, code := run(t, "mail", "messages", "send", "--to", secondaryEmail(), "--subject", subject, "--body", "nope")
 	if code != 1 {
-		t.Errorf("expected exit 1 on a pinned-key mismatch, got %d (stderr: %s)", code, stderr)
+		t.Errorf("expected exit 1 on a trusted-key mismatch, got %d (stderr: %s)", code, stderr)
 	}
 	if !strings.Contains(stderr, "do not match") {
-		t.Errorf("expected a primary-not-pinned message, got: %s", stderr)
+		t.Errorf("expected a primary-not-trusted message, got: %s", stderr)
 	}
 
 	// The aborted send must not leave its draft behind.

@@ -110,13 +110,21 @@ var Verbs = map[string]string{
 	"favorite":   "mark as a favourite",
 	"unfavorite": "unmark as a favourite",
 
+	// What a listing offers
+	"pin":     "keep at the top of a list",
+	"unpin":   "stop keeping at the top of a list",
+	"hide":    "leave out of every listing that does not name it",
+	"unhide":  "bring back into the listings",
+	"exclude": "leave out of the checks Pass Monitor runs",
+	"include": "bring back into the checks Pass Monitor runs",
+
 	// Secrets
 	"totp":     "print the code a stored secret currently stands for",
 	"generate": "make a new secret",
 
 	// Keys
-	"pin":        "trust a public key for a contact",
-	"unpin":      "stop trusting a pinned key",
+	"trust":      "encrypt to a public key and verify with it, for a contact",
+	"untrust":    "stop relying on a contact's trusted keys",
 	"reactivate": "bring keys a password reset locked back into use",
 
 	// Trusted contacts
@@ -212,7 +220,8 @@ var Mutating = map[string]bool{
 	"decline": true, "resend": true, "block": true, "allow": true,
 	"spam": true, "unsubscribe": true,
 	"snooze": true, "unsnooze": true, "apply": true, "reorder": true, "favorite": true, "unfavorite": true, "pin": true,
-	"unpin": true, "reactivate": true, "respond": true, "login": true, "logout": true,
+	"unpin": true, "hide": true, "unhide": true, "exclude": true, "include": true,
+	"trust": true, "untrust": true, "reactivate": true, "respond": true, "login": true, "logout": true,
 	"revoke": true, "uninstall": true, "transfer": true,
 	"grant": true, "request": true, "access": true,
 }

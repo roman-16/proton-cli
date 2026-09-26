@@ -99,12 +99,14 @@ proton pass aliases create
 ```bash
 proton pass aliases create --prefix shop --mailbox me@proton.me
 proton pass aliases create --prefix news --mailbox me@proton.me --vault Work --name 'Newsletter alias'
+proton pass aliases create --prefix shop --note 'Bike shop'
 ```
 
 | Flag | Description |
 | --- | --- |
 | `--mailbox stringArray` | Where mail to the alias should arrive (repeatable) |
 | `--name string` | Name for the alias item |
+| `--note string` | Note for the alias item |
 | `--prefix string` | The part before the @ |
 | `--suffix string` | The part from the @ onwards (default: the first Proton offers) |
 | `--vault string` | Which vault to keep it in, by name or ID |

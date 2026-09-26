@@ -13,7 +13,6 @@ func login(name, password string, urls ...string) FullItem {
 	it.Name = name
 	it.ItemID = name
 	it.URLs = urls
-	it.monitored = true
 	return it
 }
 
@@ -31,7 +30,7 @@ func names(rows []Item) string {
 
 func TestOnlyLoginsProtonWouldCheckAreChecked(t *testing.T) {
 	excluded := login("excluded", "admin")
-	excluded.monitored = false
+	excluded.Excluded = true
 
 	note := login("note", "admin")
 	note.Type = "note"

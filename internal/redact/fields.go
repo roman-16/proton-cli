@@ -52,7 +52,7 @@ var Fields = map[string]Policy{
 
 	// ── counts, which describe a shape and never a person ──
 	"count":  Keep,
-	"hidden": Keep, // how many of a directory's entries Proton marked as not to be offered
+	"hidden": Keep, // how many things were left out for being hidden: directory entries, vaults
 	"opened": Keep,
 	"cards":  Keep, // which cards one write carried: signed, encrypted+signed
 

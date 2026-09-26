@@ -106,18 +106,25 @@ func (s *Service) AliasSetEnabled(ctx context.Context, shareID, itemID string, e
 	}, nil)
 }
 
-// AliasPatch is what an alias edit changes about the route.
+// AliasPatch is what an alias edit changes about the route. A nil field is left
+// as it is, and an empty one is taken away.
 type AliasPatch struct {
 	// Mailboxes are the addresses mail to the alias should arrive in, named as
-	// `settings domains list` lists them.
+	// `settings mailboxes list` lists them.
 	Mailboxes []string
 	// DisplayName is the name recipients see on mail sent from the alias.
-	DisplayName string
+	DisplayName *string
+	// SimpleLoginNote is the note SimpleLogin keeps beside the address, which is
+	// not end-to-end encrypted.
+	SimpleLoginNote *string
 }
 
-func (p AliasPatch) empty() bool { return len(p.Mailboxes) == 0 && p.DisplayName == "" }
+func (p AliasPatch) empty() bool {
+	return len(p.Mailboxes) == 0 && p.DisplayName == nil && p.SimpleLoginNote == nil
+}
 
-// AliasEdit changes where an alias forwards and what it sends as.
+// AliasEdit changes where an alias forwards, what it sends as, and the note
+// SimpleLogin keeps for it.
 //
 // Proton keeps the two behind endpoints of their own, so this is where one edit
 // becomes the requests it takes - the same way Pass itself submits its one form.
@@ -141,10 +148,18 @@ func (s *Service) AliasEdit(ctx context.Context, shareID, itemID string, patch A
 			return err
 		}
 	}
-	if patch.DisplayName != "" {
-		return s.C.Decode(ctx, proton.Request{
+	if patch.DisplayName != nil {
+		if err := s.C.Decode(ctx, proton.Request{
 			Method: "PUT", Path: fmt.Sprintf("/pass/v1/share/%s/alias/%s/name", shareID, itemID),
-			Body: map[string]any{"Name": patch.DisplayName},
+			Body: map[string]any{"Name": *patch.DisplayName},
+		}, nil); err != nil {
+			return err
+		}
+	}
+	if patch.SimpleLoginNote != nil {
+		return s.C.Decode(ctx, proton.Request{
+			Method: "PUT", Path: fmt.Sprintf("/pass/v1/share/%s/alias/%s/note", shareID, itemID),
+			Body: map[string]any{"Note": *patch.SimpleLoginNote},
 		}, nil)
 	}
 	return nil
@@ -215,13 +230,18 @@ func (s *Service) PlanAlias(ctx context.Context, shareID, prefix, suffix string,
 }
 
 // AliasCreate makes the alias the plan describes and returns the new item's ID.
-func (s *Service) AliasCreate(ctx context.Context, shareID string, plan *AliasPlan, name string) (string, error) {
+// AliasCreate makes the alias the plan worked out, as an item called name that
+// carries note.
+func (s *Service) AliasCreate(ctx context.Context, shareID string, plan *AliasPlan, name, note string) (string, error) {
 	sk, err := s.decryptShareKeys(ctx, shareID)
 	if err != nil {
 		return "", err
 	}
 	shareKey, rotation := sk.latest()
-	item := &pb.Item{Metadata: &pb.Metadata{Name: name}, Content: &pb.Content{Content: &pb.Content_Alias{Alias: &pb.ItemAlias{}}}}
+	item := &pb.Item{
+		Metadata: &pb.Metadata{Name: name, Note: note},
+		Content:  &pb.Content{Content: &pb.Content_Alias{Alias: &pb.ItemAlias{}}},
+	}
 	itemKey, err := aead.NewKey()
 	if err != nil {
 		return "", err

@@ -146,7 +146,7 @@ Fold duplicate contacts into one.
 
 Contacts are duplicates when they share an email address, compared without regard to case. Sharing only a name is not enough.
 
-The oldest contact of each set is kept, so groups and pinned keys that refer to it keep working. Fields from the others are added; nothing is overwritten.
+The oldest contact of each set is kept, so groups and trusted keys that refer to it keep working. Fields from the others are added; nothing is overwritten.
 
 ```
 proton contacts merge

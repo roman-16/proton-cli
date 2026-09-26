@@ -124,9 +124,9 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton contacts groups list`](../contacts/groups.md#list) | List contact groups |
 | [`proton contacts groups remove`](../contacts/groups.md#remove) | Remove contacts from a group |
 | [`proton contacts groups update`](../contacts/groups.md#update) | Rename or recolor a contact group |
-| [`proton contacts keys list`](../contacts/keys.md#list) | List the keys pinned to a contact |
-| [`proton contacts keys pin`](../contacts/keys.md#pin) | Pin a public key so mail to a contact is encrypted to it |
-| [`proton contacts keys unpin`](../contacts/keys.md#unpin) | Remove the keys pinned to a contact |
+| [`proton contacts keys list`](../contacts/keys.md#list) | List the keys you trust for a contact |
+| [`proton contacts keys trust`](../contacts/keys.md#trust) | Trust a public key so mail to a contact is encrypted to it |
+| [`proton contacts keys untrust`](../contacts/keys.md#untrust) | Stop trusting a contact's keys |
 | [`proton drive computers delete`](../drive/computers.md#delete) | Remove computers from Drive |
 | [`proton drive computers list`](../drive/computers.md#list) | List the computers syncing to Drive |
 | [`proton drive computers update`](../drive/computers.md#update) | Rename a computer |
@@ -357,7 +357,9 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton pass items attachments update`](../pass/items.md#attachments-update) | Rename an attachment |
 | [`proton pass items create`](../pass/items.md#create) | Create an item |
 | [`proton pass items delete`](../pass/items.md#delete) | Delete items permanently |
+| [`proton pass items exclude`](../pass/items.md#exclude) | Leave logins out of Pass Monitor's checks |
 | [`proton pass items get`](../pass/items.md#get) | Show one item, decrypted |
+| [`proton pass items include`](../pass/items.md#include) | Bring logins back into Pass Monitor's checks |
 | [`proton pass items list`](../pass/items.md#list) | List items across your vaults |
 | [`proton pass items move`](../pass/items.md#move) | Put an item in another vault |
 | [`proton pass items passkeys list`](../pass/items.md#passkeys-list) | List the passkeys stored against a login |
@@ -410,6 +412,7 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton pass vaults create`](../pass/vaults.md#create) | Create a vault |
 | [`proton pass vaults delete`](../pass/vaults.md#delete) | Delete vaults, and everything in them |
 | [`proton pass vaults get`](../pass/vaults.md#get) | Show one vault in full |
+| [`proton pass vaults hide`](../pass/vaults.md#hide) | Keep vaults out of your listings |
 | [`proton pass vaults list`](../pass/vaults.md#list) | List your vaults |
 | [`proton pass vaults share add`](../pass/vaults.md#share-add) | Offer a vault to somebody |
 | [`proton pass vaults share confirm`](../pass/vaults.md#share-confirm) | Let somebody into a vault once they join Proton |
@@ -417,6 +420,7 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton pass vaults share remove`](../pass/vaults.md#share-remove) | Take somebody's access to a vault away |
 | [`proton pass vaults share update`](../pass/vaults.md#share-update) | Change what somebody may do with a vault |
 | [`proton pass vaults transfer`](../pass/vaults.md#transfer) | Make somebody else the owner of a vault |
+| [`proton pass vaults unhide`](../pass/vaults.md#unhide) | Bring hidden vaults back into your listings |
 | [`proton pass vaults update`](../pass/vaults.md#update) | Rename a vault, or change how it looks |
 | [`proton changelog`](../proton.md#changelog) | Print what each release changed |
 | [`proton completion`](../proton.md#completion) | Generate a shell completion script |

@@ -451,6 +451,97 @@ func TestPassItemPinAndUnpin(t *testing.T) {
 	runOK(t, "pass", "items", "unpin", "--", ref)
 }
 
+// Excluding a login takes it out of every Pass Monitor check and into the list
+// of what is excluded, and including it puts it back.
+func TestPassItemsExcludeAndInclude(t *testing.T) {
+	name := testID() + "-exclude"
+	ref := createItem(t, "--name", name, "--username", "tester",
+		"--secret-file", secretFile(t, "password", "weak"))
+	cleanupRun(t, fmt.Sprintf("Delete item: proton pass items delete -- %s", ref),
+		"pass", "items", "delete", "--", ref)
+
+	_, stderr := runOKStderr(t, "pass", "items", "exclude", "--", ref)
+	assertContains(t, stderr, `Excluded item "`+name+`" from Pass Monitor`)
+	if got := runJSON(t, "pass", "items", "get", "--", ref); got["excluded"] != true {
+		t.Errorf("an excluded login reads excluded %v", got["excluded"])
+	}
+	assertField(t, runOK(t, "pass", "items", "get", "--", ref), "Monitor:", "excluded")
+	if !itemListed(t, name, "pass", "items", "list", "--excluded", "--limit", "0") {
+		t.Error("--excluded does not list a login just excluded")
+	}
+	if itemListed(t, name, "pass", "items", "list", "--risk", "weak", "--limit", "0") {
+		t.Error("--risk weak still checks a login that was excluded")
+	}
+
+	_, stderr = runOKStderr(t, "pass", "items", "include", "--", ref)
+	assertContains(t, stderr, `Included item "`+name+`" in Pass Monitor`)
+	if got := runJSON(t, "pass", "items", "get", "--", ref); got["excluded"] != nil {
+		t.Errorf("an included login reads excluded %v", got["excluded"])
+	}
+	if !itemListed(t, name, "pass", "items", "list", "--risk", "weak", "--limit", "0") {
+		t.Error("--risk weak does not check a login that was included again")
+	}
+	if itemListed(t, name, "pass", "items", "list", "--excluded", "--limit", "0") {
+		t.Error("--excluded still lists a login that was included again")
+	}
+}
+
+// Pass Monitor checks logins, and an alias's address is watched from breaches,
+// so both are refused - the alias with the command that does it.
+func TestPassItemsExcludeRefusesWhatIsNotALogin(t *testing.T) {
+	name := testID() + "-exclude-note"
+	note := createItem(t, "--type", "note", "--name", name, "--note", "nothing to check")
+	cleanupRun(t, fmt.Sprintf("Delete note: proton pass items delete -- %s", note),
+		"pass", "items", "delete", "--", note)
+
+	_, stderr, code := run(t, "pass", "items", "exclude", "--", note)
+	if code != 1 {
+		t.Errorf("excluding a note exited %d: %s", code, truncateOutput(stderr))
+	}
+	assertContains(t, stderr, "Pass Monitor checks logins")
+
+	aliasRef, address := alias(t)
+	_, stderr, code = run(t, "pass", "items", "exclude", "--", aliasRef)
+	if code != 1 {
+		t.Errorf("excluding an alias exited %d: %s", code, truncateOutput(stderr))
+	}
+	assertContains(t, stderr, "breaches disable "+address)
+}
+
+// When an item was last used is Pass's to record, as it fills one in. The test
+// records one the only way a run can, and reads it back.
+func TestPassItemsShowWhenTheyWereLastUsed(t *testing.T) {
+	name := testID() + "-used"
+	ref := createItem(t, "--name", name, "--username", "tester")
+	cleanupRun(t, fmt.Sprintf("Delete item: proton pass items delete -- %s", ref),
+		"pass", "items", "delete", "--", ref)
+
+	got := runOK(t, "pass", "items", "get", "--", ref)
+	assertField(t, got, "Last Used:", "never")
+	assertContains(t, got, "Created:")
+	assertContains(t, got, "Modified:")
+
+	share, item, _ := strings.Cut(ref, "/")
+	runOK(t, "api", "PUT", "/pass/v1/share/"+share+"/item/"+item+"/lastuse", "--body", "{}")
+
+	if used, _ := runJSON(t, "pass", "items", "get", "--", ref)["last_use_time"].(float64); used == 0 {
+		t.Fatal("an item just used reads no last use")
+	}
+	for _, line := range strings.Split(runOK(t, "pass", "items", "get", "--", ref), "\n") {
+		if value, ok := strings.CutPrefix(strings.TrimSpace(line), "Last Used:"); ok &&
+			strings.TrimSpace(value) == "never" {
+			t.Error("an item just used still reads never used")
+		}
+	}
+	rows := runJSONArray(t, "pass", "items", "list", "--sort", "used", "--desc", "--limit", "1")
+	if len(rows) != 1 {
+		t.Fatalf("--limit 1 listed %d items", len(rows))
+	}
+	if first, _ := rows[0].(map[string]interface{}); first["item_id"] != item {
+		t.Errorf("--sort used --desc put %v first, want the item just used", first["name"])
+	}
+}
+
 // Pass stores the secret, not the code, so the code is worked out here. The
 // arithmetic is checked against RFC 6238's own vectors in internal/otp; this
 // checks it reaches a stored item.

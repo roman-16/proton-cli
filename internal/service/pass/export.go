@@ -49,7 +49,7 @@ func (s *Service) PlanExport(ctx context.Context, userID string, withFiles bool)
 	if err != nil {
 		return nil, err
 	}
-	items, err := s.itemsFull(ctx, "", true)
+	items, err := s.itemsFull(ctx, "", everything, true)
 	if err != nil {
 		return nil, err
 	}

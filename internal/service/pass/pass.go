@@ -8,6 +8,7 @@ import (
 
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
 	"github.com/roman-16/proton-cli/internal/account/keys"
+	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/fetch"
 	"github.com/roman-16/proton-cli/internal/proton"
 	"github.com/roman-16/proton-cli/internal/skip"
@@ -52,6 +53,9 @@ type Share struct {
 	AddressID  string
 	// Access is what this account may do with it: viewer, editor or manager.
 	Access string
+	// Hidden is this account keeping the vault out of its listings. Each member
+	// holds a share of their own, so hiding one changes nothing for the others.
+	Hidden bool
 	// Content is the encrypted name and display of a vault share, and empty on an
 	// item share, which has nothing of its own to name.
 	Content            string
@@ -60,6 +64,10 @@ type Share struct {
 
 // Vault reports whether the share opens a whole vault.
 func (sh Share) Vault() bool { return sh.TargetType == targetVault }
+
+// shareHidden is the share flag that keeps a vault out of this account's
+// listings.
+const shareHidden = 1 << 0
 
 // shares reads every share this account holds, of either kind.
 //
@@ -93,6 +101,7 @@ func (s *Service) fetchShares(ctx context.Context) ([]Share, error) {
 			ShareRoleID        string
 			Content            string
 			ContentKeyRotation int
+			Flags              int
 		}
 		if err := json.Unmarshal(r, &sh); err != nil {
 			skip.Record(ctx, skip.KindVault, "", skip.Malformed, err)
@@ -103,10 +112,26 @@ func (s *Service) fetchShares(ctx context.Context) ([]Share, error) {
 			TargetType: sh.TargetType, TargetID: sh.TargetID,
 			Owner: sh.Owner, Shared: sh.Shared, Members: sh.TargetMembers,
 			AddressID: sh.AddressID, Access: roleWord(sh.ShareRoleID),
+			Hidden:  sh.Flags&shareHidden != 0,
 			Content: sh.Content, ContentKeyRotation: sh.ContentKeyRotation,
 		})
 	}
 	return out, nil
+}
+
+// ShareAccess is what this account may do with what one share opens: viewer,
+// editor or manager.
+func (s *Service) ShareAccess(ctx context.Context, shareID string) (string, error) {
+	shares, err := s.shares(ctx)
+	if err != nil {
+		return "", err
+	}
+	for _, sh := range shares {
+		if sh.ShareID == shareID {
+			return sh.Access, nil
+		}
+	}
+	return "", &errs.NotFound{Kind: "share", Ref: shareID}
 }
 
 type shareKeys struct{ keys map[int][]byte }

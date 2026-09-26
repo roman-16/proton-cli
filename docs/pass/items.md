@@ -4,7 +4,7 @@ Logins, notes, cards and the rest.
 
 Every command under `proton pass items`, with the arguments and flags it takes. For these commands in use, see [the pass guide](README.md).
 
-Holds `attachments`, `create`, `delete`, `get`, `list`, `move`, `passkeys`, `pin`, `revisions`, `share`, `totp`, `trash`, `unpin` and `update`.
+Holds `attachments`, `create`, `delete`, `exclude`, `get`, `include`, `list`, `move`, `passkeys`, `pin`, `revisions`, `share`, `totp`, `trash`, `unpin` and `update`.
 
 ## `attachments`
 
@@ -189,11 +189,28 @@ proton pass items delete --vault Work --all --yes
 | `--type string` | Match only this kind of item: login, note, credit-card, wifi, ssh-key, identity, alias, custom |
 | `--vault string` | Match only this vault, by name or ID |
 
+## `exclude`
+
+Leave logins out of Pass Monitor's checks.
+
+An excluded login is left out of every `items list --risk` check, and `items list --excluded` lists them. Only logins can be excluded: an alias's address is watched or not with `breaches enable` and `breaches disable`.
+
+```
+proton pass items exclude REF...
+```
+
+```bash
+proton pass items exclude 'Router admin'
+proton pass items exclude 'Router admin' 'Printer admin'
+```
+
 ## `get`
 
 Show one item, decrypted.
 
 Passwords, TOTP secrets and private keys are printed in full. This is the only command that prints them; the listings do not.
+
+Last Used is when a Pass app last filled the item in, and shows for logins, cards and identities. Reading an item with this program does not count.
 
 ```
 proton pass items get REF
@@ -204,19 +221,35 @@ proton pass items get github.com
 proton pass items get GitHub --output json
 ```
 
+## `include`
+
+Bring logins back into Pass Monitor's checks.
+
+```
+proton pass items include REF...
+```
+
+```bash
+proton pass items include 'Router admin'
+```
+
 ## `list`
 
 List items across your vaults.
 
-Takes the same filters as trash and delete, so you can preview a selection here before acting on it.
+Takes the same filters as trash and delete, so you can preview a selection here before acting on it. A hidden vault is left out unless --vault names it.
 
---risk is Pass Monitor's password health, and keeps only the logins that fail one check. A RISK column says what was found, numbering the logins that share one password so two pairs do not read as one group of four. Anything excluded from Proton's security checks is left out of all of them.
+--sort used orders by when a Pass app last filled an item in. Reading one with this program does not count as using it.
+
+--risk is Pass Monitor's password health, and keeps only the logins that fail one check. A RISK column says what was found, numbering the logins that share one password so two pairs do not read as one group of four. A login excluded with `items exclude` is left out of all of them.
 
 --risk weak is this program's own reading: a password shorter than twelve characters, or shorter than sixteen and drawn from fewer than three of lowercase, uppercase, digits and symbols. Pass judges strength its own way, so the two can disagree.
 
 --risk missing-2fa names the logins for sites that offer a time-based code and have neither a code nor a passkey stored against them.
 
 --risk compromised asks a public corpus of leaked passwords whether yours are in it, one request per password you have stored. It is the only check that reaches the network, and it sends the first six hexadecimal characters of each password's SHA-1 - one bucket in sixteen million - to credential-check.protonweb.com, never the password and never the whole hash.
+
+--excluded keeps only the logins excluded from Pass Monitor, which no check looks at. `items include` brings one back.
 
 No check prints a password; `items get` is still the only command that does.
 
@@ -232,17 +265,20 @@ proton pass items list --risk reused
 proton pass items list --risk weak --vault Work
 proton pass items list --risk missing-2fa
 proton pass items list --risk compromised
+proton pass items list --excluded
+proton pass items list --sort used --desc
 ```
 
 | Flag | Description |
 | --- | --- |
 | `--desc` | Reverse the order |
+| `--excluded` | Keep only the logins excluded from Pass Monitor |
 | `--limit int` | How many items per page; 0 for all of them (default `50`) |
 | `--newer-than string` | Match items newer than DURATION |
 | `--older-than string` | Match items older than DURATION (e.g. 30d, 2w, 1h) |
 | `--page int` | Which page of results, counting from zero |
 | `--risk string` | Keep only the logins failing this password check: compromised, missing-2fa, reused, weak |
-| `--sort string` | Order by: name, type, modified, created (default `name`) |
+| `--sort string` | Order by: name, type, modified, created, used (default `name`) |
 | `--type string` | Match only this kind of item: login, note, credit-card, wifi, ssh-key, identity, alias, custom |
 | `--vault string` | Match only this vault, by name or ID |
 
@@ -523,6 +559,8 @@ A secret is read from a file, never from a flag value: --secret-file NAME=FILE, 
 
 --attach puts a local file on the item, and needs a paid Pass plan. --detach takes one off by name or ID; it stays in the item's history.
 
+--simplelogin-note replaces the note an alias brought from SimpleLogin, and --clear-simplelogin-note removes it. That note is not end-to-end encrypted, and an alias without one is refused: --note is the encrypted one.
+
 ```
 proton pass items update REF
 ```
@@ -533,6 +571,10 @@ proton pass items update GitHub --secret-file password=-
 proton pass items update GitHub --username roman-16 --url github.com
 proton pass items update GitHub --generate-password
 proton pass items update Passport --attach ~/scans/visa.pdf --detach passport.pdf
+proton pass items update shop --display-name 'Jane R'
+proton pass items update shop --clear-display-name
+proton pass items update shop --simplelogin-note 'Bike shop, 2024'
+proton pass items update shop --clear-simplelogin-note
 ```
 
 | Flag | Description |
@@ -541,6 +583,8 @@ proton pass items update Passport --attach ~/scans/visa.pdf --detach passport.pd
 | `--attach stringArray` | Attach a local file (repeatable) |
 | `--birthdate string` | Replace the birthdate (identity) |
 | `--city string` | Replace the city (identity) |
+| `--clear-display-name` | Remove the display name (alias) |
+| `--clear-simplelogin-note` | Remove the SimpleLogin note (alias) |
 | `--company string` | Replace the company (identity) |
 | `--country string` | Replace the country (identity) |
 | `--county string` | Replace the county (identity) |
@@ -580,6 +624,7 @@ proton pass items update Passport --attach ~/scans/visa.pdf --detach passport.pd
 | `--secret-file stringArray` | Read a secret field from a file, as NAME=FILE; - is stdin (repeatable) |
 | `--security string` | Wi-Fi security (wifi): WPA, WPA2, WPA3, WEP |
 | `--separator string` | What stands between the words of a passphrase: comma, digit, hyphen, period, space, symbol, underscore (default `hyphen`) |
+| `--simplelogin-note string` | Replace the note SimpleLogin keeps beside the address (alias) |
 | `--social-security-number string` | Replace the social security number (identity) |
 | `--ssid string` | Replace the network name (wifi) |
 | `--state string` | Replace the state (identity) |

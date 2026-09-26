@@ -13,7 +13,9 @@ import (
 func vaultsCmd() *cobra.Command {
 	c := &cobra.Command{Use: "vaults", Short: "The vaults your items live in"}
 	c.AddCommand(vaultsListCmd(), vaultsGetCmd(), vaultsShareCmd(), vaultsCreateCmd(),
-		vaultsTransferCmd(), vaultsUpdateCmd(), vaultsDeleteCmd())
+		vaultsTransferCmd(), vaultsUpdateCmd(), vaultsDeleteCmd(),
+		vaultsVisibilityCmd("hide", "Keep vaults out of your listings", hiddenVaultsLong, ui.Hidden, true),
+		vaultsVisibilityCmd("unhide", "Bring hidden vaults back into your listings", "", ui.Unhidden, false))
 	return c
 }
 
@@ -31,6 +33,7 @@ func vaultColumns() []ui.Column[passsvc.Vault] {
 		}},
 		{Header: "OWNER", Cell: func(v passsvc.Vault) string { return yesNo(v.Owner) }},
 		{Header: "SHARED", Cell: func(v passsvc.Vault) string { return yesNo(v.Shared) }},
+		{Header: "HIDDEN", Cell: func(v passsvc.Vault) string { return yesNo(v.Hidden) }},
 	}
 }
 
@@ -130,11 +133,19 @@ func vaultsUpdateCmd() *cobra.Command {
 				return kit.Fail("Nothing to change.").
 					Hint("pass --name, --description, --icon or --color.")
 			}
+			vault, err := vaultList(c).Find(c.Ctx, c.Args[0])
+			if err != nil {
+				return err
+			}
+			called := vault.Name
+			if patch.Name != nil {
+				called = name
+			}
 			return kit.Mutate(c, ui.ResultSpec{
-				Action: ui.Updated, Kind: "vaults", Count: 1, Name: name,
-				IDs: []string{c.Args[0]},
+				Action: ui.Updated, Kind: "vaults", Count: 1, Name: called,
+				IDs: []string{vault.ShareID},
 			}, func() error {
-				return c.App.Pass.VaultEdit(c.Ctx, c.Args[0], patch)
+				return c.App.Pass.VaultEdit(c.Ctx, vault.ShareID, patch)
 			})
 		}),
 	}
@@ -170,6 +181,42 @@ func vaultsDeleteCmd() *cobra.Command {
 	}
 }
 
+// hiddenVaultsLong is what hiding a vault does to the rest of the CLI.
+const hiddenVaultsLong = "Keep vaults out of your listings.\n\n" +
+	"A hidden vault is left out of `items list`, the trash, `aliases list`,\n" +
+	"`sharing list`, the password checks and `breaches list`, and looking an item\n" +
+	"up by name does not search it. Naming it still reaches it, as in\n" +
+	"`items list --vault Archive`, and so does an item's ID. `vaults list` shows\n" +
+	"every vault, hidden or not.\n\n" +
+	"Only you stop seeing it: the other members of a shared vault are not\n" +
+	"affected."
+
+// Hiding a vault is this account's view of it, not a change to the vault: each
+// member holds a share of their own, so nobody else is affected.
+func vaultsVisibilityCmd(use, short, long string, action ui.Action, hidden bool) *cobra.Command {
+	return &cobra.Command{
+		Use:   use + " REF...",
+		Short: short,
+		Long:  long,
+		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
+			sel, err := kit.SelectFrom(c, "vaults", vaultColumns(), vaultList(c))
+			if err != nil {
+				return err
+			}
+			return kit.Mutate(c, ui.ResultSpec{
+				Action: action, Kind: "vaults", Count: sel.Len(), IDs: sel.IDs,
+				Name:    kit.Sole(sel.Rows, func(v passsvc.Vault) string { return v.Name }),
+				Preview: sel.Preview(),
+			}, func() error {
+				if hidden {
+					return c.App.Pass.VaultsSetHidden(c.Ctx, sel.IDs, nil)
+				}
+				return c.App.Pass.VaultsSetHidden(c.Ctx, nil, sel.IDs)
+			})
+		}),
+	}
+}
+
 // A vault has more to it than a listing has room for: what it is for, and which
 // of Pass's icons and colours it took.
 func vaultsGetCmd() *cobra.Command {
@@ -191,6 +238,7 @@ func vaultsGetCmd() *cobra.Command {
 					{Label: "Members", Value: strconv.Itoa(v.Members)},
 					{Label: "Owner", Value: yesNo(v.Owner), Always: true},
 					{Label: "Shared", Value: yesNo(v.Shared), Always: true},
+					{Label: "Hidden", Value: yesNo(v.Hidden), Always: true},
 					{Label: "ID", Value: v.ShareID, ID: true},
 				},
 			})

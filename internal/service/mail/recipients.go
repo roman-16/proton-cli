@@ -207,7 +207,7 @@ func (s *Service) planRecipient(ctx context.Context, email, eoPassword string, c
 	// send has no use for.
 	if contact != nil && contact.Unknown {
 		return plannedRecipient{}, errs.Problemf(
-			"The contact for %s could not be read, so whether it pins a key is unknown. Nothing was sent.", email).
+			"The contact for %s could not be read, so whether it trusts a key is unknown. Nothing was sent.", email).
 			Hint("proton contacts get " + email + " says what is wrong with it")
 	}
 	resp, err := s.keysFor(ctx, email)
@@ -285,8 +285,8 @@ func pinnedSendKey(ctx context.Context, email, apiArmored string, cs ContactSett
 	// means "report this".
 	if !cs.SignatureVerified {
 		return "", errs.Problemf(
-			"The contact signature for %s could not be verified, so its pinned key is not trusted.", email).
-			Hint("open the contact in a Proton app to re-sign it, or unpin the key")
+			"The contact signature for %s could not be verified, so the key it trusts is not used.", email).
+			Hint("open the contact in a Proton app to re-sign it, or untrust the key")
 	}
 	type pinnedKey struct{ armored, fingerprint string }
 	var valid []pinnedKey
@@ -310,8 +310,8 @@ func pinnedSendKey(ctx context.Context, email, apiArmored string, cs ContactSett
 	}
 	if len(valid) == 0 {
 		return "", errs.Problemf(
-			"No pinned key for %s can encrypt: they are expired, revoked, or not encryption keys.", email).
-			Hint("proton contacts keys unpin " + email)
+			"No trusted key for %s can encrypt: they are expired, revoked, or not encryption keys.", email).
+			Hint("proton contacts keys untrust " + email)
 	}
 	if apiArmored == "" {
 		return valid[0].armored, nil
@@ -333,7 +333,7 @@ func pinnedSendKey(ctx context.Context, email, apiArmored string, cs ContactSett
 		}
 	}
 	return "", errs.Problemf(
-		"The pinned key(s) for %s do not match the recipient's current primary key.", email).
-		Hint("update the pinned key before sending",
-			"proton contacts keys pin "+email+" --key FILE")
+		"The trusted key(s) for %s do not match the recipient's current primary key.", email).
+		Hint("update the trusted key before sending",
+			"proton contacts keys trust "+email+" --key FILE")
 }

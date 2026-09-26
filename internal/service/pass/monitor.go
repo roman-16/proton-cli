@@ -265,7 +265,7 @@ func aliasRows(items []Item) []MonitoredAddress {
 		}
 		row := MonitoredAddress{
 			AddressID: ref.Join(it.ShareID, it.ItemID), Email: it.Alias, Type: AddressAlias,
-			Monitored: it.monitored, Verified: true,
+			Monitored: !it.Excluded, Verified: true,
 			shareID: it.ShareID, itemID: it.ItemID,
 		}
 		if !it.breached {

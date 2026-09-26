@@ -64,6 +64,7 @@ var Flags = map[string]Flag{
 	"catch-all":              {Means: "where mail sent to a name the domain has not got arrives, or none"},
 	"cc":                     {Means: "a carbon-copy recipient"},
 	"city":                   {Means: "a city"},
+	"clear-display-name":     {Means: "remove the name recipients see"},
 	"clear-link-password":    {Means: "take the password off a public link"},
 	"clear-name":             {Means: "remove the name"},
 	"clear-signature":        {Means: "remove the signature"},

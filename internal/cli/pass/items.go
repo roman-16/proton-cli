@@ -30,6 +30,10 @@ func itemsCmd() *cobra.Command {
 		itemsMoveCmd(), itemsRevisionsCmd(), itemsTOTPCmd(), itemsShareCmd(),
 		itemsPinCmd("pin", "Keep items at the top of the list", ui.Pinned, true),
 		itemsPinCmd("unpin", "Stop keeping items at the top", ui.Unpinned, false),
+		itemsMonitorCmd("exclude", "Leave logins out of Pass Monitor's checks", excludeLong,
+			ui.Excluded, "from Pass Monitor", true),
+		itemsMonitorCmd("include", "Bring logins back into Pass Monitor's checks", "",
+			ui.Included, "in Pass Monitor", false),
 		itemsTrashCmd(), itemsDeleteCmd())
 	return c
 }
@@ -115,6 +119,7 @@ func itemOrder() kit.Comparators[passsvc.Item] {
 		"type":     func(a, b passsvc.Item) int { return kit.Fold(a.Type, b.Type) },
 		"modified": func(a, b passsvc.Item) int { return kit.Ints(a.ModifyTime, b.ModifyTime) },
 		"created":  func(a, b passsvc.Item) int { return kit.Ints(a.CreateTime, b.CreateTime) },
+		"used":     func(a, b passsvc.Item) int { return kit.Ints(a.LastUseTime, b.LastUseTime) },
 	}
 }
 
@@ -125,6 +130,7 @@ func itemsListCmd() *cobra.Command {
 	var f filters
 	var page kit.Page
 	var order kit.Order
+	var excluded bool
 	risk := &kit.Enum{
 		Name: "risk", Usage: "Keep only the logins failing this password check",
 		Values: passsvc.Risks(),
@@ -134,11 +140,13 @@ func itemsListCmd() *cobra.Command {
 		Short: "List items across your vaults",
 		Long: "List items across your vaults.\n\n" +
 			"Takes the same filters as trash and delete, so you can preview a selection\n" +
-			"here before acting on it.\n\n" +
+			"here before acting on it. A hidden vault is left out unless --vault names it.\n\n" +
+			"--sort used orders by when a Pass app last filled an item in. Reading one\n" +
+			"with this program does not count as using it.\n\n" +
 			"--risk is Pass Monitor's password health, and keeps only the logins that\n" +
 			"fail one check. A RISK column says what was found, numbering the logins that\n" +
-			"share one password so two pairs do not read as one group of four. Anything\n" +
-			"excluded from Proton's security checks is left out of all of them.\n\n" +
+			"share one password so two pairs do not read as one group of four. A login\n" +
+			"excluded with `items exclude` is left out of all of them.\n\n" +
 			"--risk weak is this program's own reading: a password shorter than twelve\n" +
 			"characters, or shorter than sixteen and drawn from fewer than three of\n" +
 			"lowercase, uppercase, digits and symbols. Pass judges strength its own way,\n" +
@@ -150,9 +158,11 @@ func itemsListCmd() *cobra.Command {
 			"that reaches the network, and it sends the first six hexadecimal characters\n" +
 			"of each password's SHA-1 - one bucket in sixteen million - to\n" +
 			credcheck.Host + ", never the password and never the whole hash.\n\n" +
+			"--excluded keeps only the logins excluded from Pass Monitor, which no check\n" +
+			"looks at. `items include` brings one back.\n\n" +
 			"No check prints a password; `items get` is still the only command that does.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
-			items, err := matchRiskyItems(c, &f, risk)
+			items, err := matchMonitorItems(c, &f, risk, excluded)
 			if err != nil {
 				return err
 			}
@@ -167,33 +177,53 @@ func itemsListCmd() *cobra.Command {
 			return kit.List(c, ui.TableSpec[passsvc.Item]{
 				Noun: "items", Columns: columns,
 				Total: total, Page: page.Number, PageSize: page.Size,
-				Filtered: f.narrowed() || risk.Set(),
+				Filtered: f.narrowed() || risk.Set() || excluded,
 			}, rows)
 		}),
 	}
 	f.registerNarrowing(c)
 	risk.Register(c)
-	order.Register(c, "name", "type", "modified", "created")
+	c.Flags().BoolVar(&excluded, "excluded", false, "Keep only the logins excluded from Pass Monitor")
+	kit.Exclusive(c, "excluded", "risk")
+	order.Register(c, "name", "type", "modified", "created", "used")
 	page.Default = screenful
 	page.Register(c, "items")
 	return c
 }
 
-// matchRiskyItems is the listing with a check in front of it, or the ordinary
-// listing when none was asked for.
+// matchMonitorItems is the listing through one of Pass Monitor's lists - a
+// check, or the logins excluded from every check - or the ordinary listing when
+// neither was asked for.
 //
-// A check reads the logins and nothing else, so --type is the one filter it has
-// no room for: asking for weak notes is asking for nothing.
-func matchRiskyItems(c *kit.Invocation, f *filters, risk *kit.Enum) ([]passsvc.Item, error) {
+// Pass Monitor reads the logins and nothing else, so --type is the one filter it
+// has no room for: asking for weak notes is asking for nothing.
+func matchMonitorItems(c *kit.Invocation, f *filters, risk *kit.Enum, excluded bool) ([]passsvc.Item, error) {
 	chosen, err := risk.Value()
-	if err != nil || chosen == "" {
+	if err != nil {
+		return nil, err
+	}
+	if chosen == "" && !excluded {
+		return matchItems(c.Ctx, c, f)
+	}
+	asked := "--risk"
+	if excluded {
+		asked = "--excluded"
+	}
+	if kind, _ := f.itemType.Value(); kind != "" && kind != "login" {
+		return nil, kit.Fail("%s looks at logins, so --type %s selects nothing.", asked, kind)
+	}
+	if excluded {
+		items, err := matchItems(c.Ctx, c, f)
 		if err != nil {
 			return nil, err
 		}
-		return matchItems(c.Ctx, c, f)
-	}
-	if kind, _ := f.itemType.Value(); kind != "" && kind != "login" {
-		return nil, kit.Fail("--risk looks at logins, so --type %s selects nothing.", kind)
+		out := items[:0]
+		for _, it := range items {
+			if it.Type == "login" && it.Excluded {
+				out = append(out, it)
+			}
+		}
+		return out, nil
 	}
 	vaultRef, err := kit.Expand(c.App, f.vault)
 	if err != nil {
@@ -213,7 +243,9 @@ func itemsGetCmd() *cobra.Command {
 		Short: "Show one item, decrypted",
 		Long: "Show one item, decrypted.\n\n" +
 			"Passwords, TOTP secrets and private keys are printed in full. This is the\n" +
-			"only command that prints them; the listings do not.",
+			"only command that prints them; the listings do not.\n\n" +
+			"Last Used is when a Pass app last filled the item in, and shows for logins,\n" +
+			"cards and identities. Reading an item with this program does not count.",
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			shareID, itemID, err := resolveItem(c, c.Args[0])
 			if err != nil {
@@ -223,12 +255,44 @@ func itemsGetCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return kit.Show(c, ui.RecordSpec{Object: it, Fields: itemFields(it)})
+			fields := append(itemFields(it), historyFields(it.Item)...)
+			return kit.Show(c, ui.RecordSpec{Object: it, Fields: append(fields, itemIDField(it.Item))})
 		}),
 	}
 }
 
-// itemFields is the record for one item. Every kind shares it: an empty field is
+// autofilled are the kinds of item a Pass app fills in, which are the only ones
+// that have a last use to show.
+var autofilled = map[string]bool{"credit-card": true, "identity": true, "login": true}
+
+// historyFields are what an item is now rather than what it holds: when it was
+// made, changed and last used, and whether Pass Monitor looks at it.
+func historyFields(it passsvc.Item) []ui.Field {
+	used := ""
+	switch {
+	case !autofilled[it.Type]:
+	case it.LastUseTime == 0:
+		used = "never"
+	default:
+		used = units.Time(it.LastUseTime)
+	}
+	monitor := ""
+	if it.Excluded {
+		monitor = "excluded"
+	}
+	return []ui.Field{
+		{Label: "Created", Value: units.Time(it.CreateTime)},
+		{Label: "Modified", Value: units.Time(it.ModifyTime)},
+		{Label: "Last Used", Value: used},
+		{Label: "Monitor", Value: monitor},
+	}
+}
+
+func itemIDField(it passsvc.Item) ui.Field {
+	return ui.Field{Label: "ID", Value: itemRef(it), ID: true}
+}
+
+// itemFields is what one item holds. Every kind shares it: an empty field is
 // dropped, so a note shows a note's fields and a card shows a card's without
 // either needing a layout of its own.
 func itemFields(it *passsvc.FullItem) []ui.Field {
@@ -275,8 +339,7 @@ func itemFields(it *passsvc.FullItem) []ui.Field {
 	for _, f := range it.Fields {
 		fields = append(fields, ui.Field{Label: f.Ref(), Value: f.Value})
 	}
-	fields = append(fields, attachmentFields(it.Attachments)...)
-	return append(fields, ui.Field{Label: "ID", Value: itemRef(it.Item), ID: true})
+	return append(fields, attachmentFields(it.Attachments)...)
 }
 
 // activity is what an alias has carried lately, over the fourteen days Proton
@@ -482,19 +545,75 @@ func (d *fields) register(c *cobra.Command, verb string) {
 	}
 }
 
-// aliasFields are the two an alias carries beside the item's own, which only an
+// aliasFields are what an alias carries beside the item's own, which only an
 // edit takes: an alias is born from `aliases create`, since Proton and not this
 // CLI decides what its address is.
 type aliasFields struct {
-	patch passsvc.AliasPatch
+	mailboxes                              []string
+	displayName, simpleLoginNote           string
+	clearDisplayName, clearSimpleLoginNote bool
 }
 
 func (a *aliasFields) register(c *cobra.Command) {
 	f := c.Flags()
-	f.StringArrayVar(&a.patch.Mailboxes, "mailbox", nil,
+	f.StringArrayVar(&a.mailboxes, "mailbox", nil,
 		"Replace where mail to it arrives (alias, repeatable)")
-	f.StringVar(&a.patch.DisplayName, "display-name", "",
+	f.StringVar(&a.displayName, "display-name", "",
 		"Replace the name recipients see on mail from it (alias)")
+	f.BoolVar(&a.clearDisplayName, "clear-display-name", false, "Remove the display name (alias)")
+	f.StringVar(&a.simpleLoginNote, "simplelogin-note", "",
+		"Replace the note SimpleLogin keeps beside the address (alias)")
+	f.BoolVar(&a.clearSimpleLoginNote, "clear-simplelogin-note", false, "Remove the SimpleLogin note (alias)")
+	kit.Exclusive(c, "display-name", "clear-display-name")
+	kit.Exclusive(c, "simplelogin-note", "clear-simplelogin-note")
+}
+
+// check refuses an empty value where the flag beside it is the way to take one
+// off, which is judged from the command line alone.
+func (a *aliasFields) check(c *kit.Invocation) error {
+	if c.Changed("display-name") && strings.TrimSpace(a.displayName) == "" {
+		return kit.Fail("--display-name needs a name.").Hint("--clear-display-name takes it off")
+	}
+	if c.Changed("simplelogin-note") && strings.TrimSpace(a.simpleLoginNote) == "" {
+		return kit.Fail("--simplelogin-note needs some text.").Hint("--clear-simplelogin-note takes it off")
+	}
+	return nil
+}
+
+func (a *aliasFields) patch() passsvc.AliasPatch {
+	p := passsvc.AliasPatch{Mailboxes: a.mailboxes}
+	switch {
+	case a.displayName != "":
+		p.DisplayName = &a.displayName
+	case a.clearDisplayName:
+		p.DisplayName = new(string)
+	}
+	switch {
+	case a.simpleLoginNote != "":
+		p.SimpleLoginNote = &a.simpleLoginNote
+	case a.clearSimpleLoginNote:
+		p.SimpleLoginNote = new(string)
+	}
+	return p
+}
+
+// noteChangeable refuses a SimpleLogin note on anything but an alias that
+// already carries one, which is the only note of that kind Pass lets you
+// change. The note is not end-to-end encrypted, so the item's own note is where
+// a new one goes.
+func noteChangeable(c *kit.Invocation, shareID, itemID string) error {
+	it, err := c.App.Pass.ItemGet(c.Ctx, shareID, itemID)
+	if err != nil {
+		return err
+	}
+	if it.Type != "alias" {
+		return errs.Naming(it.Name, kit.Fail("%s is a %s, not an alias.", it.Name, it.Type))
+	}
+	if it.AliasNote == "" {
+		return errs.Naming(it.Name, kit.Fail("%s has no SimpleLogin note to change.", it.Name).
+			Hint("--note, which Pass encrypts end to end"))
+	}
+	return nil
 }
 
 func itemsCreateCmd() *cobra.Command {
@@ -599,11 +718,17 @@ func itemsUpdateCmd() *cobra.Command {
 			"or any name at all, which makes a hidden custom field of it.\n\n" +
 			"--generate-password replaces the password with one it makes.\n\n" +
 			"--attach puts a local file on the item, and needs a paid Pass plan.\n" +
-			"--detach takes one off by name or ID; it stays in the item's history.",
+			"--detach takes one off by name or ID; it stays in the item's history.\n\n" +
+			"--simplelogin-note replaces the note an alias brought from SimpleLogin, and\n" +
+			"--clear-simplelogin-note removes it. That note is not end-to-end encrypted,\n" +
+			"and an alias without one is refused: --note is the encrypted one.",
 		// Whether the item has a section to put a field under depends on what
 		// kind it is, which is not known until it is read; what a field says, and
 		// whether a file named by --attach is there to be read, are known now.
-		RunE: kit.Run([]kit.Step{kit.StepExpand, d.secrets.Supply, func(*kit.Invocation) error {
+		RunE: kit.Run([]kit.Step{kit.StepExpand, d.secrets.Supply, func(c *kit.Invocation) error {
+			if err := a.check(c); err != nil {
+				return err
+			}
 			if _, err := d.readAttachments(); err != nil {
 				return err
 			}
@@ -636,6 +761,12 @@ func itemsUpdateCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			route := a.patch()
+			if route.SimpleLoginNote != nil {
+				if err := noteChangeable(c, shareID, itemID); err != nil {
+					return err
+				}
+			}
 			patch := passsvc.Patch{
 				Scalars: passsvc.Scalars{
 					Name: d.nc.Name, Username: d.nc.Username, Password: d.nc.Password,
@@ -654,7 +785,7 @@ func itemsUpdateCmd() *cobra.Command {
 				Detail: carrying(len(files), len(detaching)),
 				IDs:    []string{kit.JoinPair(shareID, itemID)},
 			}, func() error {
-				if err := c.App.Pass.AliasEdit(c.Ctx, shareID, itemID, a.patch); err != nil {
+				if err := c.App.Pass.AliasEdit(c.Ctx, shareID, itemID, route); err != nil {
 					return err
 				}
 				return c.App.Pass.ItemEdit(c.Ctx, shareID, itemID, patch)
@@ -917,6 +1048,81 @@ func itemsPinCmd(use, short string, action ui.Action, pinned bool) *cobra.Comman
 	}
 }
 
+// excludeLong is what excluding a login changes, and what it cannot be used for.
+const excludeLong = "Leave logins out of Pass Monitor's checks.\n\n" +
+	"An excluded login is left out of every `items list --risk` check, and\n" +
+	"`items list --excluded` lists them. Only logins can be excluded: an alias's\n" +
+	"address is watched or not with `breaches enable` and `breaches disable`."
+
+// Excluding a login from Pass Monitor is an item flag, like pinning: nothing is
+// encrypted and no version is written.
+func itemsMonitorCmd(use, short, long string, action ui.Action, detail string, excluded bool) *cobra.Command {
+	return &cobra.Command{
+		Use:   use + " REF...",
+		Short: short,
+		Long:  long,
+		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
+			type target struct{ share, item, name string }
+			targets := make([]target, 0, len(c.Args))
+			for _, ref := range c.Args {
+				shareID, itemID, err := resolveItem(c, ref)
+				if err != nil {
+					return err
+				}
+				it, err := c.App.Pass.ItemGet(c.Ctx, shareID, itemID)
+				if err != nil {
+					return err
+				}
+				if err := monitorable(c, it, excluded); err != nil {
+					return err
+				}
+				targets = append(targets, target{shareID, itemID, it.Name})
+			}
+			ids := make([]string, 0, len(targets))
+			for _, t := range targets {
+				ids = append(ids, kit.JoinPair(t.share, t.item))
+			}
+			return kit.Mutate(c, ui.ResultSpec{
+				Action: action, Kind: "items", Count: len(targets), IDs: ids, Detail: detail,
+				Name: kit.Sole(targets, func(t target) string { return t.name }),
+			}, func() error {
+				for _, t := range targets {
+					if err := c.App.Pass.SetHealthChecked(c.Ctx, t.share, t.item, !excluded); err != nil {
+						return err
+					}
+				}
+				return nil
+			})
+		}),
+	}
+}
+
+// monitorable refuses what Pass Monitor's switch is not offered on: anything
+// but a login, and a login in a vault this account may only view. An alias has
+// the same switch under another name, so its refusal says where that is.
+func monitorable(c *kit.Invocation, it *passsvc.FullItem, excluding bool) error {
+	switch it.Type {
+	case "login":
+	case "alias":
+		verb, does := "disable", "stops watching its address"
+		if !excluding {
+			verb, does = "enable", "watches its address again"
+		}
+		return errs.Naming(it.Name, kit.Fail("%s is an alias, and Pass Monitor checks logins.", it.Name).
+			Hint(kit.Program+" pass breaches "+verb+" "+it.Alias+" "+does))
+	default:
+		return errs.Naming(it.Name, kit.Fail("%s is a %s, and Pass Monitor checks logins.", it.Name, it.Type))
+	}
+	access, err := c.App.Pass.ShareAccess(c.Ctx, it.ShareID)
+	if err != nil {
+		return err
+	}
+	if access == "viewer" {
+		return errs.Naming(it.Name, kit.Fail("You may only view %s.", it.Name))
+	}
+	return nil
+}
+
 // An item's revisions are what it used to be. Pass keeps every edit, so a
 // password changed by mistake is recoverable by reading what it was.
 //
@@ -995,7 +1201,7 @@ func itemsRevisionsGetCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return kit.Show(c, ui.RecordSpec{Object: it, Fields: itemFields(it)})
+			return kit.Show(c, ui.RecordSpec{Object: it, Fields: append(itemFields(it), itemIDField(it.Item))})
 		}),
 	}
 }

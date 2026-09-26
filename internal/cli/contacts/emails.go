@@ -74,8 +74,8 @@ func emailsListCmd() *cobra.Command {
 		Use:   "list REF",
 		Short: "List a contact's addresses and how mail to each is sent",
 		Long: "List a contact's addresses and how mail to each is sent.\n\n" +
-			"ENCRYPT is blank for an address with nothing pinned that states no choice: mail\n" +
-			"to it is encrypted when its provider publishes a key.",
+			"ENCRYPT is blank for an address with no trusted key that states no choice:\n" +
+			"mail to it is encrypted when its provider publishes a key.",
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			id, err := c.App.Contacts.Resolve(c.Ctx, c.Args[0])
 			if err != nil {
@@ -126,7 +126,7 @@ func emailsUpdateCmd() *cobra.Command {
 			"Name the address as REF when the contact holds more than one. A Proton address\n" +
 			"takes --email-format alone: mail to it is always encrypted and signed. Encrypted\n" +
 			"mail is always signed, and the scheme decides the format of signed mail: plain\n" +
-			"text under pgp-inline, as written under pgp-mime. --encrypt needs a pinned key,\n" +
+			"text under pgp-inline, as written under pgp-mime. --encrypt needs a trusted key,\n" +
 			"or one the address's provider publishes.",
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			var ch emailChange
@@ -214,7 +214,7 @@ func decideEmailPreferences(address string, dest mailsvc.Destination, defaults m
 	if ch.encrypt != "" {
 		if len(current.Keys) == 0 && !dest.ProviderKey {
 			return p, kit.Fail("There is no key to encrypt mail to %s with.", address).
-				Hint("proton contacts keys pin " + address + " --key FILE pins one")
+				Hint(kit.Program + " contacts keys trust " + address + " --key FILE trusts one")
 		}
 		on := ch.encrypt == settingOn
 		p.Encrypt = &on

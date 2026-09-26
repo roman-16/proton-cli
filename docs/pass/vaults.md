@@ -4,7 +4,7 @@ The vaults your items live in.
 
 Every command under `proton pass vaults`, with the arguments and flags it takes. For these commands in use, see [the pass guide](README.md).
 
-Holds `create`, `delete`, `get`, `list`, `share`, `transfer` and `update`.
+Holds `create`, `delete`, `get`, `hide`, `list`, `share`, `transfer`, `unhide` and `update`.
 
 ## `create`
 
@@ -44,6 +44,23 @@ proton pass vaults get REF
 
 ```bash
 proton pass vaults get Work
+```
+
+## `hide`
+
+Keep vaults out of your listings.
+
+A hidden vault is left out of `items list`, the trash, `aliases list`, `sharing list`, the password checks and `breaches list`, and looking an item up by name does not search it. Naming it still reaches it, as in `items list --vault Archive`, and so does an item's ID. `vaults list` shows every vault, hidden or not.
+
+Only you stop seeing it: the other members of a shared vault are not affected.
+
+```
+proton pass vaults hide REF...
+```
+
+```bash
+proton pass vaults hide Archive
+proton pass vaults hide Archive 'Old work'
 ```
 
 ## `list`
@@ -166,6 +183,18 @@ proton pass vaults transfer REF EMAIL
 
 ```bash
 proton pass vaults transfer Work jane@proton.me
+```
+
+## `unhide`
+
+Bring hidden vaults back into your listings.
+
+```
+proton pass vaults unhide REF...
+```
+
+```bash
+proton pass vaults unhide Archive
 ```
 
 ## `update`

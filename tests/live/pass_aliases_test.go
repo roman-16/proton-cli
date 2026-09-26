@@ -263,7 +263,8 @@ func TestPassAliasesCreate(t *testing.T) {
 	// The prefix becomes part of an email address, so it is short and plain, and
 	// the item's name carries the suite's own prefix instead.
 	prefix := fmt.Sprintf("pcli-%d", time.Now().UnixNano()%1_000_000_000)
-	stdout, stderr := runOKStderr(t, "pass", "aliases", "create", "--prefix", prefix, "--name", name)
+	stdout, stderr := runOKStderr(t, "pass", "aliases", "create", "--prefix", prefix, "--name", name,
+		"--note", "made by the suite")
 	ref := strings.TrimSpace(stdout)
 	cleanupRun(t, fmt.Sprintf("Delete alias: proton pass items delete %s", name),
 		"pass", "items", "delete", name)
@@ -288,6 +289,9 @@ func TestPassAliasesCreate(t *testing.T) {
 	}
 	if said != address {
 		t.Errorf("creating said %q but the alias is %q", said, address)
+	}
+	if got["note"] != "made by the suite" {
+		t.Errorf("the alias carries the note %v, want the one it was made with", got["note"])
 	}
 	assertContains(t, runOK(t, "pass", "items", "get", "--", ref), address)
 	assertContains(t, runOK(t, "pass", "aliases", "list"), address)
@@ -345,8 +349,8 @@ func TestPassItemsUpdateAliasRoute(t *testing.T) {
 	mailbox := runJSON(t, "pass", "items", "get", "--", ref)["alias_mailboxes"].([]interface{})[0].(string)
 	sender := "Jane " + testID()
 	// The display name is the shared alias's, so it goes back to having none.
-	cleanupRun(t, "Clear the shared alias's display name: proton pass items update --display-name \"\" "+ref,
-		"pass", "items", "update", "--display-name", "", "--", ref)
+	cleanupRun(t, "Clear the shared alias's display name: proton pass items update --clear-display-name "+ref,
+		"pass", "items", "update", "--clear-display-name", "--", ref)
 
 	runOK(t, "pass", "items", "update", "--mailbox", mailbox, "--display-name", sender, "--", ref)
 
@@ -357,6 +361,45 @@ func TestPassItemsUpdateAliasRoute(t *testing.T) {
 	}
 	if got["alias_display_name"] != sender {
 		t.Errorf("the alias sends as %v, want %q", got["alias_display_name"], sender)
+	}
+
+	runOK(t, "pass", "items", "update", "--clear-display-name", "--", ref)
+	if got := runJSON(t, "pass", "items", "get", "--", ref); got["alias_display_name"] != nil {
+		t.Errorf("after clearing, the alias sends as %v", got["alias_display_name"])
+	}
+}
+
+// A SimpleLogin note is changed and cleared where one exists, and refused where
+// none does: Pass never starts one, since it is not end-to-end encrypted.
+func TestPassAliasSimpleLoginNote(t *testing.T) {
+	ref, _ := alias(t)
+	share, item, _ := strings.Cut(ref, "/")
+	notePath := "/pass/v1/share/" + share + "/alias/" + item + "/note"
+	// The fixture alias is shared by the suite, so it starts and ends with none.
+	runOK(t, "api", "PUT", notePath, "--body", `{"Note":""}`)
+	cleanupRun(t, "Clear the shared alias's SimpleLogin note: proton api PUT "+notePath+` --body '{"Note":""}'`,
+		"api", "PUT", notePath, "--body", `{"Note":""}`)
+
+	_, stderr, code := run(t, "pass", "items", "update", "--simplelogin-note", "never started", "--", ref)
+	if code != 1 {
+		t.Errorf("a SimpleLogin note was started on an alias without one (exit %d): %s", code, truncateOutput(stderr))
+	}
+	assertContains(t, stderr, "has no SimpleLogin note to change")
+
+	// Only SimpleLogin brings one, so the suite puts one there the way it would.
+	seeded := "seeded " + testID()
+	runOK(t, "api", "PUT", notePath, "--body", fmt.Sprintf(`{"Note":%q}`, seeded))
+	assertField(t, runOK(t, "pass", "items", "get", "--", ref), "SimpleLogin Note:", seeded)
+
+	changed := "changed " + testID()
+	runOK(t, "pass", "items", "update", "--simplelogin-note", changed, "--", ref)
+	if got := runJSON(t, "pass", "items", "get", "--", ref); got["alias_note"] != changed {
+		t.Errorf("the alias's SimpleLogin note is %v, want %q", got["alias_note"], changed)
+	}
+
+	runOK(t, "pass", "items", "update", "--clear-simplelogin-note", "--", ref)
+	if got := runJSON(t, "pass", "items", "get", "--", ref); got["alias_note"] != nil {
+		t.Errorf("after clearing, the alias's SimpleLogin note is %v", got["alias_note"])
 	}
 }
 

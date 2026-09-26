@@ -20,6 +20,14 @@ proton pass generate --words 4                  # or a passphrase
 
 **A listing carries no secret.** `items list`, `aliases list`, `trash list` and `shared list` show what an item is and where it lives, in every format including JSON. The password, the card, the keys and the hidden fields are what `items get` is for.
 
+### When an item was last used
+
+`items get` shows when an item was created, last changed and last used. **Last Used** is when a Pass app last filled the item in, and shows for logins, cards and identities. Reading an item with `proton` does not count as using it.
+
+```bash
+proton pass items list --sort used --desc     # the most recently used first
+```
+
 `generate` reaches no account and needs no session. The alphabet leaves out `i`, `o`, `l` and their capitals unless letters are all the password may contain. Every character kind you ask for is guaranteed to appear, and a length too short to hold one of each is refused.
 
 `--words N` makes a passphrase instead: capitalised words, each followed by a digit, joined by `--separator`.
@@ -152,6 +160,19 @@ Deleting a vault takes everything in it, so it names the vault and asks first.
 
 To keep an item at the top of the list, run `proton pass items pin github.com`.
 
+### Hide a vault
+
+```bash
+proton pass vaults hide Archive
+proton pass vaults unhide Archive
+```
+
+A hidden vault is left out of `items list`, the trash, `aliases list`, `sharing list`, the password checks and `breaches list`, and looking an item up by name does not search it. `items list --vault Archive` still lists it, and an item's ID still reaches it. `vaults list` shows every vault, and says which are hidden.
+
+- `trash empty` leaves the trash of a hidden vault alone.
+- A new item without `--vault` goes to your first vault that is not hidden.
+- Only you stop seeing it: hiding a shared vault changes nothing for its other members.
+
 ## Aliases
 
 Hide-my-email addresses that forward to your own mailboxes.
@@ -174,7 +195,17 @@ An alias is an item, so it is read and edited like one:
 proton pass items get shop
 proton pass items update shop --mailbox work@proton.me    # where its mail arrives
 proton pass items update shop --display-name "Jane R"     # what recipients see
+proton pass items update shop --clear-display-name
 ```
+
+An alias brought in from SimpleLogin can carry a note of SimpleLogin's own, which `items get` shows as **SimpleLogin Note**.
+
+```bash
+proton pass items update shop --simplelogin-note "Bike shop, 2024"
+proton pass items update shop --clear-simplelogin-note
+```
+
+**That note is not end-to-end encrypted**, and an alias without one cannot be given one. `--note` is the encrypted note every item has, and `aliases create --note` sets it on a new alias.
 
 When an address starts attracting spam, **switch it off rather than delete it.** A disabled alias keeps its address and stops receiving; deleting it burns the address for good.
 
@@ -326,7 +357,7 @@ proton pass import pass-backup.zip --passphrase-file ~/.backup-passphrase
 
 The archive is the one **Proton Pass itself writes**, so the app opens what this writes and this opens what the app wrote.
 
-It holds **the vaults you own**, and the attachments on their items. A vault somebody shared with you is theirs to back up and stays out. When something is left out, the command says how much on stderr.
+It holds **the vaults you own**, hidden or not, and the attachments on their items. A vault somebody shared with you is theirs to back up and stays out. When something is left out, the command says how much on stderr.
 
 `--no-attachments` writes the items alone, which is much faster.
 
@@ -476,13 +507,23 @@ proton pass items list --risk missing-2fa      # a site offers a code and you st
 proton pass items list --risk compromised      # the password has leaked somewhere
 ```
 
-This is Pass Monitor's password health. Each check keeps only the logins that fail it and adds a RISK column saying what was found. Logins sharing one password carry the same number, so two pairs do not read as one group of four. Anything you excluded from Proton's security checks is left out of all of them.
+This is Pass Monitor's password health. Each check keeps only the logins that fail it and adds a RISK column saying what was found. Logins sharing one password carry the same number, so two pairs do not read as one group of four. A login you excluded is left out of all of them.
 
 `--risk weak` is `proton`'s own reading: a password shorter than twelve characters, or shorter than sixteen and drawn from fewer than three of lowercase, uppercase, digits and symbols. Pass judges strength its own way, so the two can disagree.
 
 `--risk compromised` is the only check that reaches the network. It sends the first six hexadecimal characters of each password's SHA-1 to `credential-check.protonweb.com`, never the password and never the whole hash, and asks one question per password you have stored.
 
 No check prints a password. `proton pass items get` is still the only command that does.
+
+### Exclude a login from the checks
+
+```bash
+proton pass items exclude "Router admin"
+proton pass items list --excluded              # every login you excluded
+proton pass items include "Router admin"
+```
+
+Only logins can be excluded, and only in a vault you may edit. `items get` shows **Monitor: excluded** on one. An alias's address is watched or not with `breaches enable` and `breaches disable`, which is the same switch.
 
 ## Breaches
 

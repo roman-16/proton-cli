@@ -7,7 +7,11 @@
 package pass
 
 import (
+	"errors"
+	"log/slog"
+
 	"github.com/roman-16/proton-cli/internal/cli/kit"
+	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/secret"
 	passsvc "github.com/roman-16/proton-cli/internal/service/pass"
 	"github.com/roman-16/proton-cli/internal/ui"
@@ -29,14 +33,37 @@ func New() *cobra.Command {
 func itemRef(it passsvc.Item) string { return kit.JoinPair(it.ShareID, it.ItemID) }
 
 // resolveItem turns a reference into the share and item IDs the service needs.
+//
+// A name is looked for in the vaults that are not hidden, so a name that finds
+// nothing says so when there are hidden ones it did not look in.
 func resolveItem(c *kit.Invocation, ref string) (shareID, itemID string, err error) {
 	if first, second, err := kit.ExpandPair(c.App, ref); err != nil || first != "" {
 		return first, second, err
 	}
-	return c.App.Pass.ResolveItem(c.Ctx, []string{ref})
+	shareID, itemID, err = c.App.Pass.ResolveItem(c.Ctx, []string{ref})
+	var missing *errs.NotFound
+	if !errors.As(err, &missing) {
+		return shareID, itemID, err
+	}
+	vaults, listErr := c.App.Pass.VaultsList(c.Ctx)
+	if listErr != nil {
+		// Recorded and not counted. The refusal is on the screen either way; this
+		// only costs it the hint about hidden vaults.
+		slog.DebugContext(c.Ctx, "pass: whether hidden vaults were left out of a lookup is unknown",
+			"error", listErr)
+		return "", "", err
+	}
+	for _, v := range vaults {
+		if v.Hidden {
+			missing.Try = append(missing.Try, "hidden vaults are not searched: "+kit.Program+" pass vaults list")
+			break
+		}
+	}
+	return "", "", err
 }
 
-// resolveVault accepts a vault name or ID, defaulting to the first vault.
+// resolveVault accepts a vault name or ID, defaulting to the first vault that is
+// not hidden.
 func resolveVault(c *kit.Invocation, ref string) (string, error) {
 	expanded, err := kit.Expand(c.App, ref)
 	if err != nil {

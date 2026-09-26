@@ -212,7 +212,7 @@ func TestPinnedSendKey(t *testing.T) {
 		if !errors.As(err, &problem) {
 			t.Fatalf("err = %v, want a refusal", err)
 		}
-		if hint := strings.Join(problem.Hints(), " "); !strings.Contains(hint, "proton contacts keys unpin bob@ext.com") {
+		if hint := strings.Join(problem.Hints(), " "); !strings.Contains(hint, "proton contacts keys untrust bob@ext.com") {
 			t.Errorf("the refusal points at %q, which is not a command", hint)
 		}
 	})

@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"slices"
 	"strconv"
 	"strings"
@@ -28,17 +29,20 @@ import (
 // what says so in its own help - so a listing cannot spill a secret nobody asked
 // for, whatever format it is printed in.
 type Item struct {
-	ShareID    string   `json:"share_id"`
-	ItemID     string   `json:"item_id"`
-	Revision   int      `json:"revision"`
-	State      int      `json:"state"`
-	Type       string   `json:"type"`
-	CreateTime int64    `json:"create_time,omitempty"`
-	ModifyTime int64    `json:"modify_time,omitempty"`
-	Name       string   `json:"name,omitempty"`
-	Username   string   `json:"username,omitempty"`
-	Email      string   `json:"email,omitempty"`
-	URLs       []string `json:"urls"`
+	ShareID    string `json:"share_id"`
+	ItemID     string `json:"item_id"`
+	Revision   int    `json:"revision"`
+	State      int    `json:"state"`
+	Type       string `json:"type"`
+	CreateTime int64  `json:"create_time,omitempty"`
+	ModifyTime int64  `json:"modify_time,omitempty"`
+	// LastUseTime is when a Pass app last filled the item in somewhere, and zero
+	// for one never used.
+	LastUseTime int64    `json:"last_use_time,omitempty"`
+	Name        string   `json:"name,omitempty"`
+	Username    string   `json:"username,omitempty"`
+	Email       string   `json:"email,omitempty"`
+	URLs        []string `json:"urls"`
 
 	// Shares is how many people hold this item on its own, which is what makes it
 	// one of the things you have shared.
@@ -59,11 +63,13 @@ type Item struct {
 	// never read as one group of four. It is set only by the reuse check.
 	ReuseGroup int `json:"reuse_group,omitempty"`
 
-	// monitored is whether Proton's security checks apply to this item, and
-	// breached is whether an alias's address has turned up in a leak. Both are
-	// item flags, so both are known without a request of their own.
-	monitored bool
-	breached  bool
+	// Excluded is the item being left out of Pass Monitor's checks, which for an
+	// alias is also its address not being watched for breaches.
+	Excluded bool `json:"excluded,omitempty"`
+
+	// breached is whether an alias's address has turned up in a leak. Like
+	// Excluded it is an item flag, so it is known without a request of its own.
+	breached bool
 }
 
 // FullItem is one item decrypted whole, secrets included.
@@ -186,9 +192,10 @@ type ItemField struct {
 // Ref renders the field the way --field accepts it.
 func (f ItemField) Ref() string { return FieldRef(f.Section, f.Name) }
 
-// ItemsList reads what is in every vault, or in the one named.
+// ItemsList reads what is in the vault named, or in every vault that is not
+// hidden.
 func (s *Service) ItemsList(ctx context.Context, vaultFilter string) ([]Item, error) {
-	full, err := s.itemsFull(ctx, vaultFilter, false)
+	full, err := s.itemsFull(ctx, vaultFilter, browsed, false)
 	if err != nil {
 		return nil, err
 	}
@@ -205,7 +212,7 @@ func (s *Service) ItemsList(ctx context.Context, vaultFilter string) ([]Item, er
 // this is the only listing that sees one - which is what a restore and an
 // emptying are for.
 func (s *Service) ItemsTrashed(ctx context.Context) ([]Item, error) {
-	full, err := s.itemsFull(ctx, "", true)
+	full, err := s.itemsFull(ctx, "", browsed, true)
 	if err != nil {
 		return nil, err
 	}
@@ -218,27 +225,52 @@ func (s *Service) ItemsTrashed(ctx context.Context) ([]Item, error) {
 	return out, nil
 }
 
-// itemsFull reads every item whole, which only a backup wants.
+// reach is which vaults a read across them covers when none is named.
+type reach int
+
+const (
+	// browsed is what a person looks through: every vault they have not hidden.
+	browsed reach = iota
+	// everything is every vault the account holds, hidden or not, which a backup
+	// and the check for which alias addresses are still held both need.
+	everything
+)
+
+// itemsFull reads every item whole.
 //
 // The vaults are read at the same time and their items joined in the order the
 // vaults came in, so the answer does not depend on which vault replied first. A
-// vault that cannot be read is left out, as it was before.
+// vault that cannot be read is left out.
+//
+// A vault named by vaultFilter is read whether it is hidden or not; with none
+// named, r decides whether the hidden ones are.
 //
 // withTrashed says whether what is in the trash counts. A backup takes it, so
 // that a restored one puts the trash back as it was, and so does the check for
 // which alias addresses this account still holds - trashing an alias does not
 // give its address up.
-func (s *Service) itemsFull(ctx context.Context, vaultFilter string, withTrashed bool) ([]FullItem, error) {
+func (s *Service) itemsFull(ctx context.Context, vaultFilter string, r reach, withTrashed bool) ([]FullItem, error) {
 	vaults, err := s.VaultsList(ctx)
 	if err != nil {
 		return nil, err
 	}
 	wanted := make([]Vault, 0, len(vaults))
+	hidden := 0
 	for _, v := range vaults {
 		if vaultFilter != "" && v.ShareID != vaultFilter && v.Name != vaultFilter {
 			continue
 		}
+		if vaultFilter == "" && r == browsed && v.Hidden {
+			hidden++
+			continue
+		}
 		wanted = append(wanted, v)
+	}
+	if hidden > 0 {
+		// Recorded and not counted. Leaving a hidden vault out is what hiding it
+		// asks for, so nothing is missing from the answer; the line is here so a
+		// report says why a listing holds less than the account does.
+		slog.DebugContext(ctx, "pass: hidden vaults left out of a read across vaults", "hidden", hidden)
 	}
 
 	perVault := make([][]FullItem, len(wanted))
@@ -393,6 +425,7 @@ func (s *Service) ItemGet(ctx context.Context, shareID, itemID string) (*FullIte
 			KeyRotation      int
 			CreateTime       int64
 			ModifyTime       int64
+			LastUseTime      int64
 			AliasEmail       string
 		}
 	}
@@ -430,9 +463,10 @@ func (s *Service) ItemGet(ctx context.Context, shareID, itemID string) (*FullIte
 	out.State = r.Item.State
 	out.CreateTime = r.Item.CreateTime
 	out.ModifyTime = r.Item.ModifyTime
+	out.LastUseTime = r.Item.LastUseTime
 	out.Alias = r.Item.AliasEmail
 	out.AliasStatus = aliasStatus(out.Type, r.Item.Flags)
-	out.monitored = r.Item.Flags&skipHealthCheck == 0
+	out.Excluded = r.Item.Flags&skipHealthCheck != 0
 	out.breached = r.Item.Flags&emailBreached != 0
 	if r.Item.Flags&hasFiles != 0 {
 		// The item says whether it carries files, so an item with none costs no
@@ -1013,6 +1047,7 @@ func (s *Service) fetchItems(ctx context.Context, shareID string, sk *shareKeys,
 				KeyRotation      int
 				CreateTime       int64
 				ModifyTime       int64
+				LastUseTime      int64
 				AliasEmail       string
 				ShareCount       int
 			}
@@ -1061,10 +1096,11 @@ func (s *Service) fetchItems(ctx context.Context, shareID string, sk *shareKeys,
 			item.State = enc.State
 			item.CreateTime = enc.CreateTime
 			item.ModifyTime = enc.ModifyTime
+			item.LastUseTime = enc.LastUseTime
 			item.Alias = enc.AliasEmail
 			item.AliasStatus = aliasStatus(item.Type, enc.Flags)
 			item.Shares = enc.ShareCount
-			item.monitored = enc.Flags&skipHealthCheck == 0
+			item.Excluded = enc.Flags&skipHealthCheck != 0
 			item.breached = enc.Flags&emailBreached != 0
 			item.hasAttachments = enc.Flags&hasFiles != 0
 			out = append(out, *item)

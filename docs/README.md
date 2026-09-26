@@ -20,7 +20,7 @@ One guide each, task by task, with the reference for that app beside it.
 | [Drive](drive/README.md) | Upload and download, revisions, sharing, public links, trash, photos |
 | [Calendar](calendar/README.md) | Events, recurrence, reminders, invitations, busy times, `.ics` |
 | [Pass](pass/README.md) | Items, vaults, aliases, secure links, two-factor codes |
-| [Contacts](contacts/README.md) | Contacts, groups, pinned keys, vCard import and export |
+| [Contacts](contacts/README.md) | Contacts, groups, trusted keys, vCard import and export |
 | [Account](account/README.md) | Signing in, sessions, several accounts side by side, settings |
 | [Local index](index/README.md) | Searching inside messages, from an encrypted copy on this machine |
 | [Raw API](api/README.md) | Reaching an endpoint the commands do not cover |

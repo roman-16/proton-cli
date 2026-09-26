@@ -83,7 +83,7 @@ func aliasesToggleCmd(use, short string, action ui.Action, enabled bool) *cobra.
 
 func aliasesCreateCmd() *cobra.Command {
 	var mailboxes []string
-	var prefix, suffix, name, vault string
+	var prefix, suffix, name, note, vault string
 	c := &cobra.Command{
 		Use:   "create",
 		Short: "Create an alias",
@@ -119,7 +119,7 @@ func aliasesCreateCmd() *cobra.Command {
 				spec.Extra = map[string]any{"alias": plan.Address}
 			}
 			return kit.Create(c, spec, func() (string, error) {
-				itemID, err := c.App.Pass.AliasCreate(c.Ctx, shareID, plan, name)
+				itemID, err := c.App.Pass.AliasCreate(c.Ctx, shareID, plan, name, note)
 				if err != nil {
 					return "", err
 				}
@@ -131,6 +131,7 @@ func aliasesCreateCmd() *cobra.Command {
 	c.Flags().StringVar(&suffix, "suffix", "", "The part from the @ onwards (default: the first Proton offers)")
 	c.Flags().StringArrayVar(&mailboxes, "mailbox", nil, "Where mail to the alias should arrive (repeatable)")
 	c.Flags().StringVar(&name, "name", "", "Name for the alias item")
+	c.Flags().StringVar(&note, "note", "", "Note for the alias item")
 	c.Flags().StringVar(&vault, "vault", "", "Which vault to keep it in, by name or ID")
 	return c
 }

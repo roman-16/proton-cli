@@ -273,7 +273,7 @@ func (s *Service) heldAliases(ctx context.Context, doc *passfile.Document, userI
 	if !any {
 		return nil, nil
 	}
-	items, err := s.itemsFull(ctx, "", true)
+	items, err := s.itemsFull(ctx, "", everything, true)
 	if err != nil {
 		return nil, err
 	}

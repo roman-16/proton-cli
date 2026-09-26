@@ -1,6 +1,8 @@
 package pass
 
 import (
+	"context"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -52,5 +54,36 @@ func TestAStaleSuffixIsRefusedByNamingTheDomains(t *testing.T) {
 	}
 	if strings.Contains(err.Error(), ".voice819@") {
 		t.Errorf("the refusal offers another value that will not last: %q", err)
+	}
+}
+
+// A field left nil is not sent, and one set to nothing takes the value away,
+// which is how a display name and a SimpleLogin note are cleared.
+func TestAnAliasEditSendsOnlyWhatItNames(t *testing.T) {
+	cleared, note := "", "Bike shop, 2024"
+	d := &shareDoer{}
+	err := New(d, testKeys(nil)).AliasEdit(context.Background(), "s", "i",
+		AliasPatch{DisplayName: &cleared, SimpleLoginNote: &note})
+	if err != nil {
+		t.Fatalf("AliasEdit: %v", err)
+	}
+	got := map[string]any{}
+	for _, r := range d.sent {
+		got[r.Method+" "+r.Path] = r.Body
+	}
+	want := map[string]any{
+		"PUT /pass/v1/share/s/alias/i/name": map[string]any{"Name": ""},
+		"PUT /pass/v1/share/s/alias/i/note": map[string]any{"Note": note},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("sent %v, want %v", got, want)
+	}
+
+	d = &shareDoer{}
+	if err := New(d, testKeys(nil)).AliasEdit(context.Background(), "s", "i", AliasPatch{}); err != nil {
+		t.Fatalf("AliasEdit: %v", err)
+	}
+	if len(d.sent) != 0 {
+		t.Errorf("an edit naming nothing sent %d requests", len(d.sent))
 	}
 }

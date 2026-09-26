@@ -238,11 +238,12 @@ func (s *Service) editSignedCard(ctx context.Context, id string, edit func(*vcar
 	return verdict, s.C.Decode(ctx, contactWrite(id, append([]any{signedCard}, others...)), nil)
 }
 
-// PinKey pins armoredKey to the contact's address as its preferred key, and
-// encrypts mail to the address from then on.
+// TrustKey trusts armoredKey for the contact's address as its preferred key,
+// and encrypts mail to the address from then on. The card calls such a key
+// pinned.
 //
 // It returns the verdict on the card it rewrote, for the caller to say.
-func (s *Service) PinKey(ctx context.Context, id, email, armoredKey string) (pgp.VerifyResult, error) {
+func (s *Service) TrustKey(ctx context.Context, id, email, armoredKey string) (pgp.VerifyResult, error) {
 	keyValue, err := encodePinnedKey(armoredKey)
 	if err != nil {
 		return "", err
@@ -260,13 +261,13 @@ func (s *Service) PinKey(ctx context.Context, id, email, armoredKey string) (pgp
 	})
 }
 
-// UnpinKey removes the keys a contact pins for email, and the choice of whether
-// to encrypt to them, returning the verdict on the card it rewrote.
-func (s *Service) UnpinKey(ctx context.Context, id, email string) (pgp.VerifyResult, error) {
+// UntrustKey removes the keys a contact trusts for email, and the choice of
+// whether to encrypt to them, returning the verdict on the card it rewrote.
+func (s *Service) UntrustKey(ctx context.Context, id, email string) (pgp.VerifyResult, error) {
 	return s.editSignedCard(ctx, id, func(model *vcard.Signed) error {
 		e := model.FindEmail(email)
 		if e == nil || len(e.KeyValues) == 0 {
-			return &errs.NotFound{Kind: "pinned key", Ref: email}
+			return &errs.NotFound{Kind: "trusted key", Ref: email}
 		}
 		e.KeyValues, e.Encrypt = nil, nil
 		return nil

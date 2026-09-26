@@ -12,7 +12,7 @@ Holds `list` and `update`.
 
 List a contact's addresses and how mail to each is sent.
 
-ENCRYPT is blank for an address with nothing pinned that states no choice: mail to it is encrypted when its provider publishes a key.
+ENCRYPT is blank for an address with no trusted key that states no choice: mail to it is encrypted when its provider publishes a key.
 
 ```
 proton contacts emails list REF
@@ -26,7 +26,7 @@ proton contacts emails list jane
 
 Change how mail to one of a contact's addresses is sent.
 
-Name the address as REF when the contact holds more than one. A Proton address takes --email-format alone: mail to it is always encrypted and signed. Encrypted mail is always signed, and the scheme decides the format of signed mail: plain text under pgp-inline, as written under pgp-mime. --encrypt needs a pinned key, or one the address's provider publishes.
+Name the address as REF when the contact holds more than one. A Proton address takes --email-format alone: mail to it is always encrypted and signed. Encrypted mail is always signed, and the scheme decides the format of signed mail: plain text under pgp-inline, as written under pgp-mime. --encrypt needs a trusted key, or one the address's provider publishes.
 
 ```
 proton contacts emails update REF

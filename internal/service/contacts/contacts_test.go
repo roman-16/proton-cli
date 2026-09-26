@@ -306,7 +306,7 @@ func TestEmailSettingsForNoConfigIsMiss(t *testing.T) {
 	}
 }
 
-func TestPinKeyAddsKeyAndPreservesOtherCards(t *testing.T) {
+func TestTrustKeyAddsKeyAndPreservesOtherCards(t *testing.T) {
 	kr := testKeyRing(t)
 	base := vcard.BuildSigned(vcard.Signed{
 		Name: "Bob", UID: "uid-1",
@@ -318,9 +318,9 @@ func TestPinKeyAddsKeyAndPreservesOtherCards(t *testing.T) {
 	u := &keys.Unlocked{UserKR: kr}
 
 	armored, keyValue := armoredPubKey(t)
-	verdict, err := New(d, testKeys(u)).PinKey(context.Background(), "c1", "bob@example.com", armored)
+	verdict, err := New(d, testKeys(u)).TrustKey(context.Background(), "c1", "bob@example.com", armored)
 	if err != nil {
-		t.Fatalf("PinKey: %v", err)
+		t.Fatalf("TrustKey: %v", err)
 	}
 	if verdict != pgp.Verified {
 		t.Errorf("a card signed by this account came back %q", verdict)
@@ -359,12 +359,12 @@ func TestAWriteOverAnUnverifiedCardGoesAheadAndSaysSo(t *testing.T) {
 	base := vcard.BuildSigned(vcard.Signed{Name: "Bob", UID: "u", Emails: []vcard.SignedEmail{{Address: "bob@example.com"}}})
 	u := &keys.Unlocked{UserKR: kr}
 
-	t.Run("pin", func(t *testing.T) {
+	t.Run("trust", func(t *testing.T) {
 		d := &contactDoer{cards: []map[string]any{signedCard(t, other, base)}}
 		armored, _ := armoredPubKey(t)
-		verdict, err := New(d, testKeys(u)).PinKey(context.Background(), "c1", "bob@example.com", armored)
+		verdict, err := New(d, testKeys(u)).TrustKey(context.Background(), "c1", "bob@example.com", armored)
 		if err != nil {
-			t.Fatalf("PinKey refused a card it could not verify: %v", err)
+			t.Fatalf("TrustKey refused a card it could not verify: %v", err)
 		}
 		if verdict != pgp.Unverified {
 			t.Errorf("verdict = %q, want %q", verdict, pgp.Unverified)
@@ -385,7 +385,7 @@ func TestAWriteOverAnUnverifiedCardGoesAheadAndSaysSo(t *testing.T) {
 	})
 }
 
-func TestUnpinKeyRemovesKeysAndKeepsTheSettings(t *testing.T) {
+func TestUntrustKeyRemovesKeysAndKeepsTheSettings(t *testing.T) {
 	kr := testKeyRing(t)
 	_, keyValue := armoredPubKey(t)
 	base := vcard.BuildSigned(vcard.Signed{
@@ -398,8 +398,8 @@ func TestUnpinKeyRemovesKeysAndKeepsTheSettings(t *testing.T) {
 	d := &contactDoer{cards: []map[string]any{signedCard(t, kr, base)}}
 	u := &keys.Unlocked{UserKR: kr}
 
-	if _, err := New(d, testKeys(u)).UnpinKey(context.Background(), "c1", "bob@example.com"); err != nil {
-		t.Fatalf("UnpinKey: %v", err)
+	if _, err := New(d, testKeys(u)).UntrustKey(context.Background(), "c1", "bob@example.com"); err != nil {
+		t.Fatalf("UntrustKey: %v", err)
 	}
 	model := vcard.ParseSigned(putSignedCardText(t, d))
 	if e := model.FindEmail("bob@example.com"); e == nil {

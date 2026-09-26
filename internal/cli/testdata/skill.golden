@@ -81,7 +81,7 @@ These are the listings that can be narrowed, and what narrows them. The same fla
 - `proton pass breaches list --desc --limit int --page int --sort string`
 - `proton pass invitations list --desc --limit int --page int --sort string`
 - `proton pass items attachments list REF --removed`
-- `proton pass items list --desc --limit int --newer-than string --older-than string --page int --risk string --sort string --type string --vault string`
+- `proton pass items list --desc --excluded --limit int --newer-than string --older-than string --page int --risk string --sort string --type string --vault string`
 - `proton pass links list --desc --limit int --page int --sort string`
 - `proton pass settings access-tokens activity list REF --limit int --page int`
 - `proton pass settings access-tokens list --desc --limit int --page int --sort string`
@@ -189,7 +189,7 @@ One line per group, with the verbs under it. Arguments, flags and examples are i
 - `proton contacts` - create, delete, export, get, import, list, merge, update
 - `proton contacts emails` - How mail to a contact's addresses is sent: list, update
 - `proton contacts groups` - Contact groups: add, create, delete, get, list, remove, update
-- `proton contacts keys` - Public keys pinned to a contact: list, pin, unpin
+- `proton contacts keys` - Public keys you trust for a contact: list, trust, untrust
 
 ### drive - Files and folders in Drive
 
@@ -242,7 +242,7 @@ One line per group, with the verbs under it. Arguments, flags and examples are i
 - `proton pass aliases contacts` - Addresses an alias can write to: allow, block, create, delete, list
 - `proton pass breaches` - Addresses that have appeared in a data breach: create, delete, disable, enable, get, list, resend, verify
 - `proton pass invitations` - What other people have offered you: accept, decline, list
-- `proton pass items` - Logins, notes, cards and the rest: create, delete, get, list, move, pin, totp, trash, unpin, update
+- `proton pass items` - Logins, notes, cards and the rest: create, delete, exclude, get, include, list, move, pin, totp, trash, unpin, update
 - `proton pass items attachments` - Files attached to an item: download, list, restore, update
 - `proton pass items passkeys` - Passkeys stored against a login: list, remove
 - `proton pass items revisions` - Earlier versions of an item: get, list, restore
@@ -256,7 +256,7 @@ One line per group, with the verbs under it. Arguments, flags and examples are i
 - `proton pass shared` - Items other people have shared with you: list
 - `proton pass sharing` - Items you have shared with other people: list
 - `proton pass trash` - Items you have removed but not yet deleted: empty, list, restore
-- `proton pass vaults` - The vaults your items live in: create, delete, get, list, transfer, update
+- `proton pass vaults` - The vaults your items live in: create, delete, get, hide, list, transfer, unhide, update
 - `proton pass vaults share` - Who else can open a vault: add, confirm, get, remove, update
 
 ### account - Your Proton account, its settings and your session
