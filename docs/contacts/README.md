@@ -1,8 +1,8 @@
 # Contacts
 
-Your Proton address book from the terminal: typed addresses and phones, the full vCard field set, groups, duplicate merging, and import and export. Cards are encrypted and signed with your user key.
+Your Proton address book from the terminal: typed addresses and phones, the full vCard field set, photos, groups, how mail to each address is sent, duplicate merging, and import and export. Cards are encrypted and signed with your user key.
 
-This page is what people actually do. For every command and flag, see the reference: [contacts](contacts.md), [groups](groups.md), [keys](keys.md).
+This page is what people actually do. For every command and flag, see the reference: [contacts](contacts.md), [emails](emails.md), [groups](groups.md), [keys](keys.md).
 
 `REF` is a contact ID, a name, or an email address.
 
@@ -16,7 +16,11 @@ proton contacts update jane --email jane@newdomain.com
 proton contacts delete jane
 ```
 
-`--email` and `--phone` are repeatable. On `update` they **replace** the existing values rather than adding to them, so pass every value you want the contact to keep.
+A repeatable flag such as `--email` or `--phone` **replaces** the existing values on `update` rather than adding to them, so pass every value you want the contact to keep. To remove a detail altogether, pass its `--clear-` flag:
+
+```bash
+proton contacts update jane --clear-note --clear-job-title
+```
 
 ## Fields
 
@@ -31,7 +35,7 @@ proton contacts create --name "Jane Roe" \
   --language de-AT --timezone Europe/Vienna --note "Likes tea"
 ```
 
-`--email`, `--phone`, `--address` and `--website` are repeatable and may say what kind they are. A bare value states no kind, which is not the same as `other`.
+`--nickname`, `--email`, `--phone`, `--address`, `--website`, `--organization`, `--job-title`, `--role`, `--language`, `--timezone` and `--note` are repeatable. `--email`, `--phone`, `--address` and `--website` may say what kind they are. A bare value states no kind, which is not the same as `other`.
 
 | Field | Kinds |
 | --- | --- |
@@ -39,6 +43,44 @@ proton contacts create --name "Jane Roe" \
 | `--phone` | `home`, `work`, `other`, `cell`, `main`, `fax`, `pager` |
 
 A word before the colon that is not one of these is part of the value, so `--website https://example.com` keeps its scheme.
+
+## Photo
+
+```bash
+proton contacts update jane --photo ~/Pictures/jane.jpg
+proton contacts update jane --photo https://example.com/jane.png
+proton contacts update jane --clear-photo
+```
+
+An image file is shrunk until its shorter side is at most 180 pixels and stored as JPEG, without its metadata. JPEG, PNG, GIF and WebP are read, and `--photo -` reads the image from standard input. A web address is stored as it is given.
+
+`contacts get` shows the photo's format and size, or its web address. With `--output json`, `photo` holds the web address, or the image itself as a `data:` URI.
+
+## How mail to an address is sent
+
+Each address has its own settings, which `proton` and Proton's own apps follow when they send to it:
+
+```bash
+proton contacts emails list jane
+proton contacts emails update jane@acme.com --email-format plain-text
+proton contacts emails update jane@acme.com --sign on --scheme pgp-inline
+proton contacts emails update jane@example.com --encrypt off
+```
+
+| Flag | Values | Default |
+| --- | --- | --- |
+| `--email-format` | `automatic` sends mail as it was written, `plain-text` always as plain text | `automatic` |
+| `--encrypt` | `on`, `off` | `on` when there is a key to encrypt to |
+| `--sign` | `on`, `off`, `default` | `default`, which follows `mail settings` `sign` |
+| `--scheme` | `pgp-mime`, `pgp-inline`, `default` | `default`, which follows `mail settings` `pgp-scheme` |
+
+The settings depend on each other, and `emails update` refuses a combination that cannot be sent:
+
+- **A Proton address** takes `--email-format` alone. Mail to it is always encrypted and signed.
+- **Encrypted mail is always signed.** `--encrypt` needs a key: a pinned one, or one the address's provider publishes.
+- **Signed mail's format follows the scheme:** plain text under `pgp-inline`, as it was written under `pgp-mime`.
+
+With `--eo-password-file`, a message goes to an address that is not encrypted to as a password-protected link, whatever its settings say.
 
 ## Groups
 
@@ -75,7 +117,7 @@ proton contacts export --dest - > contacts.vcf       # one file, all of them
 proton contacts import contacts.vcf
 ```
 
-**A property this tool has no flag for still travels.** The stored card goes out and comes back whole, so an anniversary, a photo or a second postal address survives a round trip even though no flag sets one.
+**A property this tool has no flag for still travels.** The stored card goes out and comes back whole, so a logo, a related person or a custom property survives a round trip even though no flag sets one.
 
 **An import is addressed by UID.** A card carries the UID of the contact it is, so reading a file back changes that contact rather than making a second one. Export, edit, import, and the address book says what the file says.
 
@@ -90,10 +132,9 @@ Pinning a public key to a contact means mail to that address is encrypted to the
 ```bash
 proton contacts keys pin jane --key jane-pubkey.asc
 proton contacts keys pin jane@example.com --key -           # armored key on stdin
-proton contacts keys pin jane --key jane.asc --no-encrypt   # pin for verification only
 proton contacts keys unpin jane@example.com
 ```
 
 A key is pinned to one address. Name that address when the contact holds several; naming the contact is enough when they hold one.
 
-`--scheme` is `pgp-mime` by default, or `pgp-inline`.
+Pinning turns encryption to the address on. To keep a key for verifying signatures only, turn it off again with `proton contacts emails update jane@example.com --encrypt off`. Unpinning removes the keys and leaves the address's other settings as they are.

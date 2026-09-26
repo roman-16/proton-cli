@@ -290,29 +290,29 @@ func (f *deliveryFlags) delivery() (mailsvc.Delivery, time.Time, error) {
 	return del, at, nil
 }
 
-// withPinnedKeys consults Contacts for each recipient's pinned keys. A pinned key
-// means the message is encrypted to the key the user trusts rather than to
-// whatever the server hands back - and a contact that would not open is handed
+// withContactSettings consults Contacts for each recipient: the keys it pins and
+// how mail to the address is to be sent. A contact that would not open is handed
 // on as exactly that, for the send to decide about.
-func withPinnedKeys(c *kit.Invocation, del *mailsvc.Delivery, content mailsvc.Content) error {
+func withContactSettings(c *kit.Invocation, del *mailsvc.Delivery, content mailsvc.Content) error {
 	for _, email := range content.RecipientAddresses() {
-		pin, err := c.App.Contacts.PinnedKeysFor(c.Ctx, email)
+		es, err := c.App.Contacts.EmailSettingsFor(c.Ctx, email)
 		if err != nil {
 			return err
 		}
-		if pin == nil {
+		if es == nil {
 			continue
 		}
-		if del.PinnedKeys == nil {
-			del.PinnedKeys = map[string]*mailsvc.PinnedRecipient{}
+		if del.Contacts == nil {
+			del.Contacts = map[string]*mailsvc.ContactSettings{}
 		}
-		del.PinnedKeys[email] = &mailsvc.PinnedRecipient{
-			ArmoredKeys:       pin.ArmoredKeys,
-			Encrypt:           pin.Encrypt,
-			Sign:              pin.Sign,
-			Scheme:            pin.Scheme,
-			SignatureVerified: pin.SignatureVerified,
-			Unknown:           pin.Unknown,
+		del.Contacts[email] = &mailsvc.ContactSettings{
+			Keys:              es.Keys,
+			Encrypt:           es.Encrypt,
+			Sign:              es.Sign,
+			Scheme:            es.Scheme,
+			PlainText:         es.PlainText,
+			SignatureVerified: es.SignatureVerified,
+			Unknown:           es.Unknown,
 		}
 	}
 	return nil
@@ -330,7 +330,7 @@ func deliver(c *kit.Invocation, content mailsvc.Content, del mailsvc.Delivery, a
 		Action: action, Kind: "messages",
 		Name: content.Subject, Detail: detail,
 	}, func() (string, error) {
-		if err := withPinnedKeys(c, &del, content); err != nil {
+		if err := withContactSettings(c, &del, content); err != nil {
 			return "", err
 		}
 		return c.App.Mail.Send(c.Ctx, content, del)

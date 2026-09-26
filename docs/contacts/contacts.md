@@ -1,14 +1,16 @@
 # proton contacts
 
-Contacts, their groups and their pinned keys.
+Contacts, their groups, email settings and keys.
 
 Every command under `proton contacts`, with the arguments and flags it takes. For these commands in use, see [the contacts guide](README.md).
 
-Holds `create`, `delete`, `export`, `get`, `groups`, `import`, `keys`, `list`, `merge` and `update`.
+Holds `create`, `delete`, `emails`, `export`, `get`, `groups`, `import`, `keys`, `list`, `merge` and `update`.
 
 ## `create`
 
 Create a contact.
+
+A photo from a file is shrunk until its shorter side is at most 180 pixels and stored as JPEG; JPEG, PNG, GIF and WebP are read. A web address is stored as it is given.
 
 ```
 proton contacts create
@@ -18,6 +20,7 @@ proton contacts create
 proton contacts create --name 'Jane Roe' --email jane@example.com
 proton contacts create --name 'Jane Roe' --email work:jane@acme.com --phone cell:+43123456 --anniversary 2015-06-20
 proton contacts create --name 'Jane Roe' --email jane@example.com --phone '+43 660 1234567' --organization Acme
+proton contacts create --name 'Jane Roe' --email jane@example.com --photo https://example.com/jane.png
 ```
 
 | Flag | Description |
@@ -28,16 +31,17 @@ proton contacts create --name 'Jane Roe' --email jane@example.com --phone '+43 6
 | `--email stringArray` | Set an email address, as ADDRESS or KIND:ADDRESS (repeatable) |
 | `--first-name string` | Set the given name |
 | `--gender string` | Set the gender |
-| `--job-title string` | Set the job title |
-| `--language string` | Set the preferred language (e.g. de-AT) |
+| `--job-title stringArray` | Set a job title (repeatable) |
+| `--language stringArray` | Set a preferred language, e.g. de-AT (repeatable) |
 | `--last-name string` | Set the family name |
 | `--name string` | Set the name shown in listings |
-| `--nickname string` | Set the nickname |
-| `--note string` | Set the note |
-| `--organization string` | Set the organization |
+| `--nickname stringArray` | Set a nickname (repeatable) |
+| `--note stringArray` | Set a note (repeatable) |
+| `--organization stringArray` | Set an organization (repeatable) |
 | `--phone stringArray` | Set a phone number, as NUMBER or KIND:NUMBER (repeatable) |
-| `--role string` | Set the role played in the organization |
-| `--timezone string` | Set the time zone (e.g. Europe/Vienna) |
+| `--photo string` | Set the photo: an image file, - for stdin, or a web address |
+| `--role stringArray` | Set a role played in an organization (repeatable) |
+| `--timezone stringArray` | Set a time zone, e.g. Europe/Vienna (repeatable) |
 | `--website stringArray` | Set a website, as URL or KIND:URL (repeatable) |
 
 ## `delete`
@@ -157,7 +161,9 @@ proton contacts merge
 
 Change a contact's details.
 
-Only what you pass is replaced. --email and --phone replace the whole list rather than adding to it, so pass every address you want the contact to keep.
+Only what you pass is replaced. A repeatable flag replaces the whole list rather than adding to it, so pass every value you want the contact to keep. --clear-note removes every note, --clear-photo the photo, and so on for each detail.
+
+A photo from a file is shrunk until its shorter side is at most 180 pixels and stored as JPEG; JPEG, PNG, GIF and WebP are read. A web address is stored as it is given.
 
 ```
 proton contacts update REF
@@ -166,6 +172,8 @@ proton contacts update REF
 ```bash
 proton contacts update jane --job-title 'Head of Design'
 proton contacts update jane --email jane.roe@work.example --birthday 1990-04-16
+proton contacts update jane --photo ~/Pictures/jane.jpg
+proton contacts update jane --clear-note --clear-photo
 ```
 
 | Flag | Description |
@@ -173,19 +181,37 @@ proton contacts update jane --email jane.roe@work.example --birthday 1990-04-16
 | `--address stringArray` | Replace a postal address, as ADDRESS or KIND:ADDRESS (repeatable) |
 | `--anniversary string` | Replace the anniversary (e.g. 2015-06-20) |
 | `--birthday string` | Replace the birthday (e.g. 1990-01-31) |
+| `--clear-address` | Remove every postal address |
+| `--clear-anniversary` | Remove the anniversary |
+| `--clear-birthday` | Remove the birthday |
+| `--clear-email` | Remove every email address |
+| `--clear-first-name` | Remove the given name |
+| `--clear-gender` | Remove the gender |
+| `--clear-job-title` | Remove every job title |
+| `--clear-language` | Remove every preferred language |
+| `--clear-last-name` | Remove the family name |
+| `--clear-nickname` | Remove every nickname |
+| `--clear-note` | Remove every note |
+| `--clear-organization` | Remove every organization |
+| `--clear-phone` | Remove every phone number |
+| `--clear-photo` | Remove the photo |
+| `--clear-role` | Remove every role |
+| `--clear-timezone` | Remove every time zone |
+| `--clear-website` | Remove every website |
 | `--email stringArray` | Replace an email address, as ADDRESS or KIND:ADDRESS (repeatable) |
 | `--first-name string` | Replace the given name |
 | `--gender string` | Replace the gender |
-| `--job-title string` | Replace the job title |
-| `--language string` | Replace the preferred language (e.g. de-AT) |
+| `--job-title stringArray` | Replace a job title (repeatable) |
+| `--language stringArray` | Replace a preferred language, e.g. de-AT (repeatable) |
 | `--last-name string` | Replace the family name |
 | `--name string` | Replace the name shown in listings |
-| `--nickname string` | Replace the nickname |
-| `--note string` | Replace the note |
-| `--organization string` | Replace the organization |
+| `--nickname stringArray` | Replace a nickname (repeatable) |
+| `--note stringArray` | Replace a note (repeatable) |
+| `--organization stringArray` | Replace an organization (repeatable) |
 | `--phone stringArray` | Replace a phone number, as NUMBER or KIND:NUMBER (repeatable) |
-| `--role string` | Replace the role played in the organization |
-| `--timezone string` | Replace the time zone (e.g. Europe/Vienna) |
+| `--photo string` | Replace the photo: an image file, - for stdin, or a web address |
+| `--role stringArray` | Replace a role played in an organization (repeatable) |
+| `--timezone stringArray` | Replace a time zone, e.g. Europe/Vienna (repeatable) |
 | `--website stringArray` | Replace a website, as URL or KIND:URL (repeatable) |
 
 ---

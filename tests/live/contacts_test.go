@@ -1,7 +1,10 @@
 package live
 
 import (
+	"bytes"
 	"fmt"
+	"image"
+	"image/png"
 	"os"
 	"path/filepath"
 	"strings"
@@ -171,20 +174,20 @@ func TestContactsExportAndImportRoundTrip(t *testing.T) {
 	if len(copies) != 1 {
 		t.Fatalf("re-importing an export made %d contacts out of one", len(copies))
 	}
-	if got := runJSON(t, "contacts", "get", "--", id); !strings.Contains(fmt.Sprint(got["note"]), "coffee") {
-		t.Errorf("the edited note did not come back: %v", got["note"])
+	if got := runJSON(t, "contacts", "get", "--", id); !strings.Contains(fmt.Sprint(got["notes"]), "coffee") {
+		t.Errorf("the edited note did not come back: %v", got["notes"])
 	}
 }
 
 // A property this tool has no flag for still has to survive the trip, since the
 // stored card goes out and in whole.
 func TestContactsImportKeepsAPropertyTheCLICannotSet(t *testing.T) {
-	name := testID() + "-anniversary"
+	name := testID() + "-related"
 	card := strings.Join([]string{
 		"BEGIN:VCARD", "VERSION:4.0",
 		"FN:" + name,
 		"EMAIL:" + testID() + "@example.com",
-		"ANNIVERSARY:2015-06-20",
+		"RELATED;TYPE=friend;VALUE=text:Alex Roe",
 		"END:VCARD",
 	}, "\r\n")
 	file := filepath.Join(t.TempDir(), "extra.vcf")
@@ -204,7 +207,7 @@ func TestContactsImportKeepsAPropertyTheCLICannotSet(t *testing.T) {
 	cleanupRun(t, fmt.Sprintf("Delete contact: proton contacts delete %s", id),
 		"contacts", "delete", "--", id)
 
-	if out := runOK(t, "contacts", "export", "--dest", "-", "--", id); !strings.Contains(out, "ANNIVERSARY:2015-06-20") {
+	if out := runOK(t, "contacts", "export", "--dest", "-", "--", id); !strings.Contains(out, "RELATED;TYPE=friend;VALUE=text:Alex Roe") {
 		t.Errorf("a property the CLI has no flag for was dropped:\n%s", out)
 	}
 }
@@ -256,11 +259,8 @@ func TestContactsCarryEveryFieldTheyAreGiven(t *testing.T) {
 
 	got := runJSON(t, "contacts", "get", "--", id)
 	for field, want := range map[string]string{
-		"first_name": "Jane", "last_name": "Roe", "nickname": "Janey",
-		"org": "Acme", "title": "Engineer", "role": "Team lead",
-		"birthday": "1990-01-31", "anniversary": "2015-06-20",
-		"gender": "female", "language": "de-AT", "timezone": "Europe/Vienna",
-		"note": "Likes tea",
+		"first_name": "Jane", "last_name": "Roe",
+		"birthday": "1990-01-31", "anniversary": "2015-06-20", "gender": "female",
 	} {
 		if v, _ := got[field].(string); v != want {
 			t.Errorf("%s = %q, want %q", field, v, want)
@@ -269,7 +269,9 @@ func TestContactsCarryEveryFieldTheyAreGiven(t *testing.T) {
 	// A kind is stored and printed back the way --phone accepts it.
 	for field, want := range map[string]string{
 		"phones": "cell:+43 1 234567", "addresses": "home:1 Example St",
-		"urls": "work:https://example.com",
+		"urls": "work:https://example.com", "nicknames": "Janey",
+		"organizations": "Acme", "job_titles": "Engineer", "roles": "Team lead",
+		"languages": "de-AT", "timezones": "Europe/Vienna", "notes": "Likes tea",
 	} {
 		list, _ := got[field].([]interface{})
 		if len(list) != 1 {
@@ -295,13 +297,74 @@ func TestContactsUpdateKeepsWhatItDoesNotMention(t *testing.T) {
 	runOK(t, "contacts", "update", "--note", "Changed", "--", id)
 
 	got := runJSON(t, "contacts", "get", "--", id)
-	if v, _ := got["note"].(string); v != "Changed" {
-		t.Errorf("note = %q, want Changed", v)
+	if v := fmt.Sprint(got["notes"]); v != "[Changed]" {
+		t.Errorf("notes = %s, want [Changed]", v)
 	}
-	for field, want := range map[string]string{"org": "Acme", "birthday": "1990-01-31"} {
-		if v, _ := got[field].(string); v != want {
-			t.Errorf("editing the note dropped %s: got %q, want %q", field, v, want)
-		}
+	if v := fmt.Sprint(got["organizations"]); v != "[Acme]" {
+		t.Errorf("editing the note dropped the organization: got %s", v)
+	}
+	if v, _ := got["birthday"].(string); v != "1990-01-31" {
+		t.Errorf("editing the note dropped the birthday: got %q", v)
+	}
+}
+
+// A contact holds as many notes and organizations as it is given, and a clear
+// takes one detail away without touching the rest.
+func TestContactsHoldSeveralValuesAndClearOne(t *testing.T) {
+	name := testID() + "-several"
+	id := strings.TrimSpace(runOK(t, "contacts", "create",
+		"--name", name, "--email", testID()+"@example.com",
+		"--note", "One", "--note", "Two", "--organization", "Acme", "--organization", "Initech"))
+	cleanupRun(t, fmt.Sprintf("Delete contact: proton contacts delete %s", id),
+		"contacts", "delete", "--", id)
+
+	got := runJSON(t, "contacts", "get", "--", id)
+	if v := fmt.Sprint(got["notes"]); v != "[One Two]" {
+		t.Errorf("notes = %s, want both", v)
+	}
+
+	runOK(t, "contacts", "update", "--clear-note", "--", id)
+
+	got = runJSON(t, "contacts", "get", "--", id)
+	if notes, _ := got["notes"].([]interface{}); len(notes) != 0 {
+		t.Errorf("--clear-note left %v", notes)
+	}
+	if v := fmt.Sprint(got["organizations"]); v != "[Acme Initech]" {
+		t.Errorf("clearing the notes changed the organizations to %s", v)
+	}
+}
+
+// A photo from a file is fitted and stored in the contact, a web address is
+// stored as given, and either comes out again with the card.
+func TestContactsPhoto(t *testing.T) {
+	img := image.NewRGBA(image.Rect(0, 0, 600, 400))
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(t.TempDir(), "jane.png")
+	if err := os.WriteFile(file, buf.Bytes(), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	name := testID() + "-photo"
+	id := strings.TrimSpace(runOK(t, "contacts", "create",
+		"--name", name, "--email", testID()+"@example.com", "--photo", file))
+	cleanupRun(t, fmt.Sprintf("Delete contact: proton contacts delete %s", id),
+		"contacts", "delete", "--", id)
+
+	assertField(t, runOK(t, "contacts", "get", "--", id), "Photo:", "JPEG, 270×180")
+	if out := runOK(t, "contacts", "export", "--dest", "-", "--", id); !strings.Contains(out, "PHOTO:data:image/jpeg;base64,") {
+		t.Errorf("the export does not carry the photo:\n%s", out)
+	}
+
+	runOK(t, "contacts", "update", "--photo", "https://example.com/jane.png", "--", id)
+	if got := runJSON(t, "contacts", "get", "--", id); got["photo"] != "https://example.com/jane.png" {
+		t.Errorf("photo = %v, want the web address", got["photo"])
+	}
+
+	runOK(t, "contacts", "update", "--clear-photo", "--", id)
+	if got := runJSON(t, "contacts", "get", "--", id); got["photo"] != nil {
+		t.Errorf("--clear-photo left %v", got["photo"])
 	}
 }
 
@@ -344,11 +407,11 @@ func TestContactsMergeFoldsDuplicatesIntoTheKeptOne(t *testing.T) {
 	runOK(t, "contacts", "merge", "--yes")
 
 	got := runJSON(t, "contacts", "get", "--", first)
-	if v, _ := got["note"].(string); v != "Original note" {
-		t.Errorf("note = %q; the kept contact's value must win", v)
+	if v := fmt.Sprint(got["notes"]); v != "[Original note Different note]" {
+		t.Errorf("notes = %s; both should be kept, the kept contact's first", v)
 	}
-	if v, _ := got["org"].(string); v != "Acme" {
-		t.Errorf("org = %q; a field only the other had should be folded in", v)
+	if v := fmt.Sprint(got["organizations"]); v != "[Acme]" {
+		t.Errorf("organizations = %s; a field only the other had should be folded in", v)
 	}
 	// The folded-in contact is gone, so its cleanup would fail; that is expected
 	// and the deletion above is what proves it.

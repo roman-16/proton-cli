@@ -192,7 +192,7 @@ func draftsSendCmd() *cobra.Command {
 				Name: draft.Content.Subject, Detail: detail,
 				IDs: []string{id}, EmitID: true,
 			}, func() error {
-				if err := withPinnedKeys(c, &del, draft.Content); err != nil {
+				if err := withContactSettings(c, &del, draft.Content); err != nil {
 					return err
 				}
 				return c.App.Mail.SendDraft(c.Ctx, draft, del)

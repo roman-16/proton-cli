@@ -136,9 +136,9 @@ type Delivery struct {
 	// instead of sending them cleartext.
 	EOPassword     string
 	EOPasswordHint string
-	// PinnedKeys carries contact-pinned encryption preferences per recipient
-	// address, resolved by the caller from Contacts.
-	PinnedKeys map[string]*PinnedRecipient
+	// Contacts carries what each recipient's contact says about mail sent to
+	// the address, resolved by the caller from Contacts.
+	Contacts map[string]*ContactSettings
 }
 
 func (c Content) mimeType() string {

@@ -1,6 +1,7 @@
 package mail
 
 import (
+	"context"
 	"encoding/base64"
 	"reflect"
 	"strings"
@@ -30,64 +31,136 @@ func testKeyRing(t *testing.T, name, email string) (*pgp.KeyRing, string) {
 	return kr, pub
 }
 
-func TestBuildInlinePackageFlattensHTMLAndWrapsKeys(t *testing.T) {
-	recKR, recPub := testKeyRing(t, "rec", "rec@ext.com")
-	sndKR, _ := testKeyRing(t, "snd", "snd@proton.me")
-
-	attSK, err := pgp.GenerateSessionKey()
+// openBody decrypts a package's body with the session key a recipient's entry
+// wraps to kr.
+func openBody(t *testing.T, pkg map[string]any, email string, kr *pgp.KeyRing) string {
+	t.Helper()
+	addr := pkg["Addresses"].(map[string]any)[email].(map[string]any)
+	kp, err := base64.StdEncoding.DecodeString(addr["BodyKeyPacket"].(string))
 	if err != nil {
-		t.Fatalf("attachment session key: %v", err)
+		t.Fatalf("decode BodyKeyPacket: %v", err)
 	}
-	atts := []*draftAttachment{{ID: "att-1", SessionKey: attSK}}
+	sk, err := kr.DecryptSessionKey(kp)
+	if err != nil {
+		t.Fatalf("DecryptSessionKey: %v", err)
+	}
+	body, err := base64.StdEncoding.DecodeString(pkg["Body"].(string))
+	if err != nil {
+		t.Fatalf("decode Body: %v", err)
+	}
+	dec, err := sk.Decrypt(body)
+	if err != nil {
+		t.Fatalf("decrypt body: %v", err)
+	}
+	return dec.GetString()
+}
+
+func packagesByFormat(pkgs []map[string]any) map[string]map[string]any {
+	out := map[string]map[string]any{}
+	for _, p := range pkgs {
+		out[p["MIMEType"].(string)] = p
+	}
+	return out
+}
+
+// Every recipient gets the package for the body their plan calls for, and a
+// package's type is the union of the types of those it carries.
+func TestBuildPackagesGivesEachRecipientTheBodyTheyNeed(t *testing.T) {
+	internalKR, internalPub := testKeyRing(t, "internal", "internal@proton.me")
+	inlineKR, inlinePub := testKeyRing(t, "inline", "inline@ext.com")
+	mimeKR, mimePub := testKeyRing(t, "mime", "mime@ext.com")
+	sndKR, _ := testKeyRing(t, "snd", "snd@proton.me")
 
 	c := Content{
 		From: &Sender{Address: keys.Address{Email: "snd@proton.me"}, Keys: keys.Rings{Read: sndKR, Write: sndKR}},
 		Body: "<p>hello <b>world</b></p>", HTML: true,
 	}
-	plans := []plannedRecipient{{email: "bob@ext.com", scheme: schemeExternalInline, armoredKey: recPub}}
-
-	pkg, ok, err := New(nil, testKeys(nil)).buildInlinePackage(c, atts, plans)
-	if err != nil {
-		t.Fatalf("buildInlinePackage: %v", err)
-	}
-	if !ok {
-		t.Fatal("expected an inline package")
-	}
-	if pkg["Type"] != pkgPGPInline {
-		t.Errorf("package Type = %v, want %d", pkg["Type"], pkgPGPInline)
-	}
-	if pkg["MIMEType"] != mimeTypePlain {
-		t.Errorf("MIMEType = %v, want %s", pkg["MIMEType"], mimeTypePlain)
+	plans := []plannedRecipient{
+		{email: "internal@proton.me", kind: pkgInternal, mimeType: mimeTypeHTML, armoredKey: internalPub},
+		{email: "clear@example.com", kind: pkgClear, mimeType: mimeTypeHTML},
+		{email: "plain@proton.me", kind: pkgInternal, mimeType: mimeTypePlain, armoredKey: internalPub},
+		{email: "inline@ext.com", kind: pkgPGPInline, mimeType: mimeTypePlain, armoredKey: inlinePub},
+		{email: "signed-inline@example.com", kind: pkgClear, signature: true, mimeType: mimeTypePlain},
+		{email: "mime@ext.com", kind: pkgPGPMIME, mimeType: mimeTypeMultipart, armoredKey: mimePub},
+		{email: "signed-mime@example.com", kind: pkgClearMIME, signature: true, mimeType: mimeTypeMultipart},
 	}
 
-	addr := pkg["Addresses"].(map[string]any)["bob@ext.com"].(map[string]any)
-	if addr["Type"] != pkgPGPInline {
-		t.Errorf("address Type = %v, want %d", addr["Type"], pkgPGPInline)
+	pkgs, err := New(nil, testKeys(nil)).buildPackages(context.Background(), c, Delivery{}, nil, plans, proton.Modulus{})
+	if err != nil {
+		t.Fatalf("buildPackages: %v", err)
+	}
+	if len(pkgs) != 3 {
+		t.Fatalf("got %d packages, want one per body", len(pkgs))
+	}
+	byFormat := packagesByFormat(pkgs)
+
+	html, plain, multipart := byFormat[mimeTypeHTML], byFormat[mimeTypePlain], byFormat[mimeTypeMultipart]
+	for format, want := range map[string]int{
+		mimeTypeHTML:      pkgInternal | pkgClear,
+		mimeTypePlain:     pkgInternal | pkgPGPInline | pkgClear,
+		mimeTypeMultipart: pkgPGPMIME | pkgClearMIME,
+	} {
+		if got := byFormat[format]["Type"]; got != want {
+			t.Errorf("%s package Type = %v, want %d", format, got, want)
+		}
+	}
+	for format, pkg := range byFormat {
+		if _, has := pkg["BodyKey"]; !has {
+			t.Errorf("the %s package carries a cleartext recipient but not the session key", format)
+		}
 	}
 
-	// The body key packet is wrapped to the recipient: decrypt it, then the body,
-	// and confirm the recipient reads a flattened plaintext body.
-	recKP, err := base64.StdEncoding.DecodeString(addr["BodyKeyPacket"].(string))
-	if err != nil {
-		t.Fatalf("decode BodyKeyPacket: %v", err)
+	if got := openBody(t, html, "internal@proton.me", internalKR); got != c.Body {
+		t.Errorf("the HTML body = %q", got)
 	}
-	sk, err := recKR.DecryptSessionKey(recKP)
-	if err != nil {
-		t.Fatalf("recipient DecryptSessionKey: %v", err)
+	if got := openBody(t, plain, "inline@ext.com", inlineKR); !strings.Contains(got, "hello world") || strings.Contains(got, "<b>") {
+		t.Errorf("the plain body is not flattened: %q", got)
 	}
-	bodyData, err := base64.StdEncoding.DecodeString(pkg["Body"].(string))
-	if err != nil {
-		t.Fatalf("decode Body: %v", err)
-	}
-	dec, err := sk.Decrypt(bodyData)
-	if err != nil {
-		t.Fatalf("decrypt inline body: %v", err)
-	}
-	if got := dec.GetString(); !strings.Contains(got, "hello world") || strings.Contains(got, "<b>") {
-		t.Errorf("inline body should be flattened plaintext, got %q", got)
+	if got := openBody(t, multipart, "mime@ext.com", mimeKR); !strings.Contains(got, "Content-Type: multipart/mixed") {
+		t.Errorf("the MIME body is not a MIME message: %q", got)
 	}
 
-	// The attachment session key is wrapped to the recipient as well.
+	for _, tc := range []struct {
+		pkg   map[string]any
+		email string
+		kind  int
+		sign  int
+	}{
+		{html, "clear@example.com", pkgClear, 0},
+		{plain, "signed-inline@example.com", pkgClear, 1},
+		{multipart, "signed-mime@example.com", pkgClearMIME, 1},
+	} {
+		addr := tc.pkg["Addresses"].(map[string]any)[tc.email].(map[string]any)
+		if addr["Type"] != tc.kind || addr["Signature"] != tc.sign {
+			t.Errorf("%s: entry %+v, want type %d signature %d", tc.email, addr, tc.kind, tc.sign)
+		}
+	}
+}
+
+// A body that refers to its attachments hands each recipient their keys; the
+// MIME message carries the attachments inside and hands none.
+func TestBuildPackagesWrapsAttachmentKeysForReferencedAttachments(t *testing.T) {
+	recKR, recPub := testKeyRing(t, "rec", "rec@ext.com")
+	sndKR, _ := testKeyRing(t, "snd", "snd@proton.me")
+	attSK, err := pgp.GenerateSessionKey()
+	if err != nil {
+		t.Fatalf("attachment session key: %v", err)
+	}
+	atts := []*draftAttachment{{ID: "att-1", SessionKey: attSK}}
+	c := Content{
+		From: &Sender{Address: keys.Address{Email: "snd@proton.me"}, Keys: keys.Rings{Read: sndKR, Write: sndKR}},
+		Body: "hello",
+	}
+	plans := []plannedRecipient{
+		{email: "rec@ext.com", kind: pkgPGPInline, mimeType: mimeTypePlain, armoredKey: recPub},
+		{email: "clear@example.com", kind: pkgClear, mimeType: mimeTypePlain},
+	}
+	pkgs, err := New(nil, testKeys(nil)).buildPackages(context.Background(), c, Delivery{}, atts, plans, proton.Modulus{})
+	if err != nil {
+		t.Fatalf("buildPackages: %v", err)
+	}
+	pkg := packagesByFormat(pkgs)[mimeTypePlain]
+	addr := pkg["Addresses"].(map[string]any)["rec@ext.com"].(map[string]any)
 	akp, ok := addr["AttachmentKeyPackets"].(map[string]string)
 	if !ok {
 		t.Fatalf("AttachmentKeyPackets missing or wrong type: %T", addr["AttachmentKeyPackets"])
@@ -103,83 +176,7 @@ func TestBuildInlinePackageFlattensHTMLAndWrapsKeys(t *testing.T) {
 	if !reflect.DeepEqual(gotAttSK.Key, attSK.Key) {
 		t.Error("attachment session key was not wrapped to the recipient")
 	}
-}
-
-func TestBuildInlinePackageIsSkippedWithoutInlineRecipients(t *testing.T) {
-	sndKR, _ := testKeyRing(t, "snd", "snd@proton.me")
-	c := Content{From: &Sender{Keys: keys.Rings{Read: sndKR, Write: sndKR}}, Body: "hi"}
-	plans := []plannedRecipient{{email: "a@proton.me", scheme: schemeInternal}}
-
-	_, ok, err := New(nil, testKeys(nil)).buildInlinePackage(c, nil, plans)
-	if err != nil {
-		t.Fatalf("buildInlinePackage: %v", err)
-	}
-	if ok {
-		t.Error("no recipient uses PGP-Inline, so no package should be built")
-	}
-}
-
-func TestBuildBodyPackagesSplitsPerScheme(t *testing.T) {
-	recKR, recPub := testKeyRing(t, "rec", "rec@proton.me")
-	sndKR, _ := testKeyRing(t, "snd", "snd@proton.me")
-
-	c := Content{
-		From: &Sender{Address: keys.Address{Email: "snd@proton.me"}, Keys: keys.Rings{Read: sndKR, Write: sndKR}},
-		Body: "hello",
-	}
-	plans := []plannedRecipient{
-		{email: "internal@proton.me", scheme: schemeInternal, armoredKey: recPub},
-		{email: "clear@example.com", scheme: schemeClear},
-	}
-
-	pkgs, err := New(nil, testKeys(nil)).buildBodyPackages(c, Delivery{}, nil, plans, proton.Modulus{})
-	if err != nil {
-		t.Fatalf("buildBodyPackages: %v", err)
-	}
-	if len(pkgs) != 2 {
-		t.Fatalf("got %d packages, want one internal and one cleartext", len(pkgs))
-	}
-
-	byType := map[int]map[string]any{}
-	for _, p := range pkgs {
-		byType[p["Type"].(int)] = p
-	}
-	internal, ok := byType[pkgInternal]
-	if !ok {
-		t.Fatal("no internal package")
-	}
-	clear, ok := byType[pkgClear]
-	if !ok {
-		t.Fatal("no cleartext package")
-	}
-	// Both packages reference the same encrypted body; only the key handling
-	// differs, which is the whole point of sharing one session key.
-	if internal["Body"] != clear["Body"] {
-		t.Error("internal and cleartext packages should share one encrypted body")
-	}
-	// The cleartext package hands over the raw session key; the internal one
-	// wraps it to the recipient.
-	if _, has := clear["BodyKey"]; !has {
-		t.Error("a cleartext package must carry the session key itself")
-	}
-	addr := internal["Addresses"].(map[string]any)["internal@proton.me"].(map[string]any)
-	kp, err := base64.StdEncoding.DecodeString(addr["BodyKeyPacket"].(string))
-	if err != nil {
-		t.Fatalf("decode BodyKeyPacket: %v", err)
-	}
-	sk, err := recKR.DecryptSessionKey(kp)
-	if err != nil {
-		t.Fatalf("recipient DecryptSessionKey: %v", err)
-	}
-	bodyData, err := base64.StdEncoding.DecodeString(internal["Body"].(string))
-	if err != nil {
-		t.Fatalf("decode Body: %v", err)
-	}
-	dec, err := sk.Decrypt(bodyData)
-	if err != nil {
-		t.Fatalf("decrypt body: %v", err)
-	}
-	if dec.GetString() != "hello" {
-		t.Errorf("decrypted body = %q, want hello", dec.GetString())
+	if _, has := pkg["AttachmentKeys"]; !has {
+		t.Error("a package with a cleartext recipient must hand over the attachment keys")
 	}
 }

@@ -66,6 +66,37 @@ func TestBuildSignedRoundTripsPinnedKeysAndFlags(t *testing.T) {
 	}
 }
 
+// Proton's apps store more under an address than this package gives a field of
+// its own, and an edit rewrites the card: what it does not model has to come
+// back under the address's new group rather than be dropped.
+func TestBuildSignedKeepsEverySettingUnderTheAddress(t *testing.T) {
+	card := "BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Jane\r\nUID:u\r\n" +
+		"item7.EMAIL:jane@example.test\r\n" +
+		"item7.X-PM-MIMETYPE:text/plain\r\n" +
+		"item7.X-PM-ENCRYPT-UNTRUSTED:false\r\n" +
+		"item7.X-PM-TLS:required\r\n" +
+		"item7.CATEGORIES:Work\r\n" +
+		"END:VCARD"
+	back := ParseSigned(BuildSigned(ParseSigned(card)))
+	e := back.FindEmail("jane@example.test")
+	if e == nil {
+		t.Fatal("the address did not survive")
+	}
+	if e.MIMEType != "text/plain" {
+		t.Errorf("MIMEType = %q, want text/plain", e.MIMEType)
+	}
+	if e.EncryptUntrusted == nil || *e.EncryptUntrusted {
+		t.Errorf("EncryptUntrusted = %v, want false", e.EncryptUntrusted)
+	}
+	if len(e.Rest) != 1 || e.Rest[0].Name != "X-PM-TLS" || e.Rest[0].Value != "required" {
+		t.Errorf("Rest = %+v, want the X-PM-TLS the card held and nothing another card holds", e.Rest)
+	}
+	built := BuildSigned(back)
+	if !strings.Contains(built, "item1.X-PM-TLS:required") {
+		t.Errorf("the property did not follow the address to its new group:\n%s", built)
+	}
+}
+
 func TestEmailGroupFindsTheGroupAnAddressSettingsHangOff(t *testing.T) {
 	if g := EmailGroup(signedCard, "JANE@example.test"); g != "item1" {
 		t.Errorf("EmailGroup = %q, want item1", g)
@@ -84,7 +115,7 @@ func TestValuesReturnsEveryValueInDocumentOrder(t *testing.T) {
 }
 
 func TestBuildEncryptedEscapesTextAndOmitsEmptyProperties(t *testing.T) {
-	out := BuildEncrypted(Encrypted{Note: "line one\nline two, with a comma", Org: "Acme"})
+	out := BuildEncrypted(Encrypted{Notes: []string{"line one\nline two, with a comma"}, Organizations: []string{"Acme"}})
 	if !strings.Contains(out, `NOTE:line one\nline two\, with a comma`) {
 		t.Errorf("note was not escaped:\n%s", out)
 	}
@@ -93,6 +124,68 @@ func TestBuildEncryptedEscapesTextAndOmitsEmptyProperties(t *testing.T) {
 	}
 	if got := Field(out, "NOTE"); got != "line one\nline two, with a comma" {
 		t.Errorf("note did not survive a round trip: %q", got)
+	}
+}
+
+// A contact may hold several notes, organizations and the like, and an edit
+// that kept one of them would delete the others.
+func TestParseEncryptedKeepsEveryValueOfARepeatableText(t *testing.T) {
+	card := "BEGIN:VCARD\r\nVERSION:4.0\r\nNOTE:one\r\nNOTE:two\r\nORG:Acme\r\nORG:Initech\r\n" +
+		"TZ:Europe/Vienna\r\nBDAY:1990-01-31\r\nBDAY:1991-02-01\r\nEND:VCARD"
+	f := ParseEncrypted(card)
+	if strings.Join(f.Notes, ",") != "one,two" || strings.Join(f.Organizations, ",") != "Acme,Initech" {
+		t.Errorf("notes %q, organizations %q", f.Notes, f.Organizations)
+	}
+	if f.Birthday != "1990-01-31" {
+		t.Errorf("birthday = %q, want the first", f.Birthday)
+	}
+	out := BuildEncrypted(f)
+	for property, want := range map[string]int{"NOTE": 2, "ORG": 2, "TZ": 1, "BDAY": 2} {
+		if got := len(Values(out, property)); got != want {
+			t.Errorf("a rewrite holds %d %s, want %d:\n%s", got, property, want, out)
+		}
+	}
+}
+
+// The preferred photo is the contact's picture, whichever vCard version wrote
+// it; the others travel untouched.
+func TestParseEncryptedReadsThePreferredPhoto(t *testing.T) {
+	card := "BEGIN:VCARD\r\nVERSION:4.0\r\n" +
+		"PHOTO;PREF=2:https://example.test/second.png\r\n" +
+		"PHOTO;ENCODING=b;TYPE=JPEG;PREF=1:/9j/4AAQ\r\n" +
+		"END:VCARD"
+	f := ParseEncrypted(card)
+	if f.Photo != "data:image/jpeg;base64,/9j/4AAQ" {
+		t.Errorf("Photo = %q", f.Photo)
+	}
+	if len(f.Rest) != 1 || f.Rest[0].Value != "https://example.test/second.png" {
+		t.Errorf("Rest = %+v, want the other photo", f.Rest)
+	}
+	out := BuildEncrypted(f)
+	if !strings.Contains(out, "PHOTO;PREF=1:data:image/jpeg;base64,/9j/4AAQ") {
+		t.Errorf("the photo was not written as the preferred URI:\n%s", out)
+	}
+	if again := ParseEncrypted(out); again.Photo != f.Photo {
+		t.Errorf("a rewrite changed the photo to %q", again.Photo)
+	}
+}
+
+func TestPhotoURIReadsEveryWayAPhotoIsWritten(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		line contentline.Line
+		want string
+	}{
+		{"a URL", contentline.Line{Name: "PHOTO", Value: "https://example.test/a.jpg"}, "https://example.test/a.jpg"},
+		{"a data URI", contentline.Line{Name: "PHOTO", Value: "data:image/png;base64,iVBOR"}, "data:image/png;base64,iVBOR"},
+		{"vCard 3 with a media type", contentline.Line{Name: "PHOTO",
+			Params: contentline.Params{{Name: "ENCODING", Value: "b"}, {Name: "TYPE", Value: "image/gif"}}, Value: "R0lG"},
+			"data:image/gif;base64,R0lG"},
+		{"bare base64", contentline.Line{Name: "PHOTO", Value: "iVBORw0KGgoAAAANSUhEUg=="}, "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg=="},
+	} {
+		if got := PhotoURI(tc.line); got != tc.want {
+			t.Errorf("%s: PhotoURI = %q, want %q", tc.name, got, tc.want)
+		}
 	}
 }
 
@@ -209,7 +302,7 @@ func TestRewritingAContactDoesNotGrowIt(t *testing.T) {
 			KeyValues: []string{"data:application/pgp-keys;base64,AAAA"},
 		}},
 	})
-	encrypted := BuildEncrypted(Encrypted{Note: "Likes tea"})
+	encrypted := BuildEncrypted(Encrypted{Notes: []string{"Likes tea"}})
 
 	for round := 1; round <= 3; round++ {
 		// What an edit does: read the contact off every card it is stored as,

@@ -9,216 +9,122 @@ import (
 	"github.com/roman-16/proton-cli/internal/proton"
 )
 
-// buildBodyPackages encrypts the body once under a shared session key and
-// returns up to three packages (internal, encrypted-for-outside, cleartext) that
-// reference it, keyed per recipient scheme.
-func (s *Service) buildBodyPackages(c Content, del Delivery, atts []*draftAttachment, plans []plannedRecipient, eoModulus proton.Modulus) ([]map[string]any, error) {
-	sessionKey, err := pgp.GenerateSessionKey()
-	if err != nil {
-		return nil, err
-	}
-	encBody, err := sessionKey.EncryptAndSign(pgp.NewPlainMessageFromString(c.Body), c.From.Keys.Write)
-	if err != nil {
-		return nil, err
-	}
-	bodyB64 := base64.StdEncoding.EncodeToString(encBody)
-	mimeType := c.mimeType()
+// packageFormats are the bodies a message can be sent as, one package each.
+var packageFormats = []string{mimeTypeHTML, mimeTypePlain, mimeTypeMultipart}
 
-	internalAddrs := map[string]any{}
-	eoAddrs := map[string]any{}
-	clearAddrs := map[string]any{}
-
-	for _, p := range plans {
-		switch p.scheme {
-		case schemeInternal:
-			recKR, err := keyRingFromArmored(p.armoredKey, p.email)
-			if err != nil {
-				return nil, err
-			}
-			recKP, err := recKR.EncryptSessionKey(sessionKey)
-			if err != nil {
-				return nil, err
-			}
-			addr := map[string]any{
-				"Type":          pkgInternal,
-				"BodyKeyPacket": base64.StdEncoding.EncodeToString(recKP),
-				"Signature":     0,
-			}
-			akp, err := attachmentKeyPackets(recKR, atts)
-			if err != nil {
-				return nil, err
-			}
-			if akp != nil {
-				addr["AttachmentKeyPackets"] = akp
-			}
-			internalAddrs[p.email] = addr
-		case schemeEO:
-			addr, err := eoAddress(sessionKey, del.EOPassword, del.EOPasswordHint, atts, eoModulus)
-			if err != nil {
-				return nil, err
-			}
-			eoAddrs[p.email] = addr
-		case schemeClear:
-			clearAddrs[p.email] = map[string]any{"Type": pkgClear, "Signature": 0}
-		}
-	}
-
+// buildPackages lays a message out the way Proton's own clients do: one
+// package per body the recipients need - the HTML, the plain text, or the
+// whole MIME message with its attachments inside - each encrypted once under a
+// session key of its own, with every recipient attached to the one they get.
+func (s *Service) buildPackages(ctx context.Context, c Content, del Delivery, atts []*draftAttachment, plans []plannedRecipient, eoModulus proton.Modulus) ([]map[string]any, error) {
 	var packages []map[string]any
-	if len(internalAddrs) > 0 {
-		bodyKP, err := c.From.Keys.Write.EncryptSessionKey(sessionKey)
+	for _, format := range packageFormats {
+		var members []plannedRecipient
+		for _, p := range plans {
+			if p.mimeType == format {
+				members = append(members, p)
+			}
+		}
+		if len(members) == 0 {
+			continue
+		}
+		body, err := s.packageBody(ctx, c, atts, format)
 		if err != nil {
 			return nil, err
 		}
-		packages = append(packages, map[string]any{
-			"Addresses":     internalAddrs,
-			"MIMEType":      mimeType,
-			"Type":          pkgInternal,
-			"Body":          bodyB64,
-			"BodyKeyPacket": base64.StdEncoding.EncodeToString(bodyKP),
-		})
-	}
-	if len(eoAddrs) > 0 {
-		packages = append(packages, map[string]any{
-			"Addresses": eoAddrs,
-			"MIMEType":  mimeType,
-			"Type":      pkgEO,
-			"Body":      bodyB64,
-		})
-	}
-	if len(clearAddrs) > 0 {
-		clearPkg := map[string]any{
-			"Addresses": clearAddrs,
-			"MIMEType":  mimeType,
-			"Type":      pkgClear,
-			"Body":      bodyB64,
-			"BodyKey":   map[string]any{"Key": base64.StdEncoding.EncodeToString(sessionKey.Key), "Algorithm": sessionKey.Algo},
+		sessionKey, err := pgp.GenerateSessionKey()
+		if err != nil {
+			return nil, err
 		}
-		if ak := attachmentCleartextKeys(atts); ak != nil {
-			clearPkg["AttachmentKeys"] = ak
+		encBody, err := sessionKey.EncryptAndSign(pgp.NewPlainMessageFromString(body), c.From.Keys.Write)
+		if err != nil {
+			return nil, err
 		}
-		packages = append(packages, clearPkg)
+		addresses := map[string]any{}
+		kind := 0
+		for _, p := range members {
+			sub, err := subPackage(p, sessionKey, del, atts, eoModulus)
+			if err != nil {
+				return nil, err
+			}
+			addresses[p.email] = sub
+			kind |= p.kind
+		}
+		pkg := map[string]any{
+			"Addresses": addresses,
+			"MIMEType":  format,
+			"Type":      kind,
+			"Body":      base64.StdEncoding.EncodeToString(encBody),
+		}
+		if kind&(pkgClear|pkgClearMIME) != 0 {
+			pkg["BodyKey"] = map[string]any{
+				"Key": base64.StdEncoding.EncodeToString(sessionKey.Key), "Algorithm": sessionKey.Algo,
+			}
+		}
+		if kind&pkgClear != 0 && format != mimeTypeMultipart {
+			if ak := attachmentCleartextKeys(atts); ak != nil {
+				pkg["AttachmentKeys"] = ak
+			}
+		}
+		packages = append(packages, pkg)
 	}
 	return packages, nil
 }
 
-// buildInlinePackage builds the SEND_PGP_INLINE package: a plaintext body
-// encrypted under a fresh session key, with the session key and each attachment
-// key wrapped to every inline recipient's pinned PGP key. Inline is
-// plaintext-only, so an HTML body is flattened. Returns ok=false when no
-// recipient uses PGP-Inline.
-func (s *Service) buildInlinePackage(c Content, atts []*draftAttachment, plans []plannedRecipient) (map[string]any, bool, error) {
-	body := c.plainBody()
-	addrs := map[string]any{}
-	var sessionKey *pgp.SessionKey
-	var bodyB64 string
-	for _, p := range plans {
-		if p.scheme != schemeExternalInline {
-			continue
-		}
-		if sessionKey == nil {
-			sk, err := pgp.GenerateSessionKey()
-			if err != nil {
-				return nil, false, err
-			}
-			enc, err := sk.EncryptAndSign(pgp.NewPlainMessageFromString(body), c.From.Keys.Write)
-			if err != nil {
-				return nil, false, err
-			}
-			sessionKey = sk
-			bodyB64 = base64.StdEncoding.EncodeToString(enc)
-		}
-		recKR, err := keyRingFromArmored(p.armoredKey, p.email)
-		if err != nil {
-			return nil, false, err
-		}
-		recKP, err := recKR.EncryptSessionKey(sessionKey)
-		if err != nil {
-			return nil, false, err
-		}
-		addr := map[string]any{
-			"Type":          pkgPGPInline,
-			"BodyKeyPacket": base64.StdEncoding.EncodeToString(recKP),
-			"Signature":     0,
-		}
-		akp, err := attachmentKeyPackets(recKR, atts)
-		if err != nil {
-			return nil, false, err
-		}
-		if akp != nil {
-			addr["AttachmentKeyPackets"] = akp
-		}
-		addrs[p.email] = addr
+// packageBody is the message as one format carries it. The MIME message holds
+// the attachments itself, so its recipients are handed no attachment keys.
+func (s *Service) packageBody(ctx context.Context, c Content, atts []*draftAttachment, format string) (string, error) {
+	switch format {
+	case mimeTypeHTML:
+		return c.Body, nil
+	case mimeTypePlain:
+		return c.plainBody(), nil
 	}
-	if len(addrs) == 0 {
-		return nil, false, nil
-	}
-	bodyKP, err := c.From.Keys.Write.EncryptSessionKey(sessionKey)
+	parts, err := s.mimeParts(ctx, atts)
 	if err != nil {
-		return nil, false, err
+		return "", err
 	}
-	return map[string]any{
-		"Addresses":     addrs,
-		"MIMEType":      mimeTypePlain,
-		"Type":          pkgPGPInline,
-		"Body":          bodyB64,
-		"BodyKeyPacket": base64.StdEncoding.EncodeToString(bodyKP),
-	}, true, nil
+	return buildMIMEMessage(c.Body, c.mimeType(), parts)
 }
 
-// buildPGPMIMEPackage builds the multipart MIME body (with attachments embedded
-// verbatim rather than referenced), encrypts it under a fresh session key, and
-// wraps that key to each external-PGP recipient's key. Returns ok=false when no
-// recipient uses PGP/MIME.
-func (s *Service) buildPGPMIMEPackage(ctx context.Context, c Content, atts []*draftAttachment, plans []plannedRecipient) (map[string]any, bool, error) {
-	addrs := map[string]any{}
-	var sessionKey *pgp.SessionKey
-	var bodyB64 string
+// subPackage is one recipient's entry in a package: the body's session key
+// wrapped to their key, to a password, or handed over for Proton to send in the
+// clear - signed when their settings ask for it.
+func subPackage(p plannedRecipient, sessionKey *pgp.SessionKey, del Delivery, atts []*draftAttachment, eoModulus proton.Modulus) (map[string]any, error) {
+	switch p.kind {
+	case pkgEO:
+		return eoAddress(sessionKey, del.EOPassword, del.EOPasswordHint, atts, eoModulus)
+	case pkgClear, pkgClearMIME:
+		return map[string]any{"Type": p.kind, "Signature": signatureBit(p.signature)}, nil
+	}
+	recKR, err := keyRingFromArmored(p.armoredKey, p.email)
+	if err != nil {
+		return nil, err
+	}
+	kp, err := recKR.EncryptSessionKey(sessionKey)
+	if err != nil {
+		return nil, err
+	}
+	sub := map[string]any{"Type": p.kind, "BodyKeyPacket": base64.StdEncoding.EncodeToString(kp)}
+	if p.kind == pkgPGPMIME {
+		return sub, nil
+	}
+	sub["Signature"] = 0
+	akp, err := attachmentKeyPackets(recKR, atts)
+	if err != nil {
+		return nil, err
+	}
+	if akp != nil {
+		sub["AttachmentKeyPackets"] = akp
+	}
+	return sub, nil
+}
 
-	for _, p := range plans {
-		if p.scheme != schemeExternalPGP {
-			continue
-		}
-		if sessionKey == nil {
-			parts, err := s.mimeParts(ctx, atts)
-			if err != nil {
-				return nil, false, err
-			}
-			mimeStr, err := buildMIMEMessage(c.Body, c.mimeType(), parts)
-			if err != nil {
-				return nil, false, err
-			}
-			sessionKey, err = pgp.GenerateSessionKey()
-			if err != nil {
-				return nil, false, err
-			}
-			enc, err := sessionKey.EncryptAndSign(pgp.NewPlainMessageFromString(mimeStr), c.From.Keys.Write)
-			if err != nil {
-				return nil, false, err
-			}
-			bodyB64 = base64.StdEncoding.EncodeToString(enc)
-		}
-		recKR, err := keyRingFromArmored(p.armoredKey, p.email)
-		if err != nil {
-			return nil, false, err
-		}
-		kp, err := recKR.EncryptSessionKey(sessionKey)
-		if err != nil {
-			return nil, false, err
-		}
-		addrs[p.email] = map[string]any{
-			"Type":          pkgPGPMIME,
-			"BodyKeyPacket": base64.StdEncoding.EncodeToString(kp),
-		}
+func signatureBit(signed bool) int {
+	if signed {
+		return 1
 	}
-	if len(addrs) == 0 {
-		return nil, false, nil
-	}
-	return map[string]any{
-		"Addresses": addrs,
-		"MIMEType":  "multipart/mixed",
-		"Type":      pkgPGPMIME,
-		"Body":      bodyB64,
-	}, true, nil
+	return 0
 }
 
 // mimeParts materialises a draft's attachments as MIME parts, downloading and

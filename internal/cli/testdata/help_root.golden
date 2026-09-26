@@ -7,7 +7,7 @@ Usage:
 
 Apps:
   calendar    Calendars and events
-  contacts    Contacts, their groups and their pinned keys
+  contacts    Contacts, their groups, email settings and keys
   drive       Files and folders in Drive
   mail        Read, write and organize mail
   pass        Vaults, logins and secrets

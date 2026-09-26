@@ -396,10 +396,13 @@ var examples = map[string][]string{
 		"proton contacts create --name 'Jane Roe' --email jane@example.com",
 		"proton contacts create --name 'Jane Roe' --email work:jane@acme.com --phone cell:+43123456 --anniversary 2015-06-20",
 		"proton contacts create --name 'Jane Roe' --email jane@example.com --phone '+43 660 1234567' --organization Acme",
+		"proton contacts create --name 'Jane Roe' --email jane@example.com --photo https://example.com/jane.png",
 	},
 	"proton contacts update": {
 		"proton contacts update jane --job-title 'Head of Design'",
 		"proton contacts update jane --email jane.roe@work.example --birthday 1990-04-16",
+		"proton contacts update jane --photo ~/Pictures/jane.jpg",
+		"proton contacts update jane --clear-note --clear-photo",
 	},
 	"proton contacts delete": {"proton contacts delete jane"},
 	"proton contacts groups get": {
@@ -417,10 +420,16 @@ var examples = map[string][]string{
 	"proton contacts groups delete": {"proton contacts groups delete Team"},
 	"proton contacts groups add":    {"proton contacts groups add Team jane"},
 	"proton contacts groups remove": {"proton contacts groups remove Team jane"},
-	"proton contacts keys list":     {"proton contacts keys list jane"},
+	"proton contacts emails list":   {"proton contacts emails list jane"},
+	"proton contacts emails update": {
+		"proton contacts emails update jane@example.com --email-format plain-text",
+		"proton contacts emails update jane@example.com --sign on --scheme pgp-inline",
+		"proton contacts emails update jane@example.com --encrypt off",
+	},
+	"proton contacts keys list": {"proton contacts keys list jane"},
 	"proton contacts keys pin": {
 		"proton contacts keys pin jane --key jane-pubkey.asc",
-		"proton contacts keys pin jane@example.com --key - --no-encrypt",
+		"proton contacts keys pin jane@example.com --key -",
 	},
 	"proton contacts keys unpin": {
 		"proton contacts keys unpin jane",

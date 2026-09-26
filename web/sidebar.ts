@@ -116,6 +116,7 @@ export const sidebar: NonNullable<StarlightUserConfig["sidebar"]> = [
     items: [
       { label: "Guide", slug: "contacts" },
       "contacts/contacts",
+      "contacts/emails",
       "contacts/groups",
       "contacts/keys",
     ],

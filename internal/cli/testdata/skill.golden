@@ -184,9 +184,10 @@ One line per group, with the verbs under it. Arguments, flags and examples are i
 - `proton calendar settings holidays` - Public holidays calendars you can add: list
 - `proton calendar settings links` - Links that open a calendar for anyone: create, get, list, revoke, update
 
-### contacts - Contacts, their groups and their pinned keys
+### contacts - Contacts, their groups, email settings and keys
 
 - `proton contacts` - create, delete, export, get, import, list, merge, update
+- `proton contacts emails` - How mail to a contact's addresses is sent: list, update
 - `proton contacts groups` - Contact groups: add, create, delete, get, list, remove, update
 - `proton contacts keys` - Public keys pinned to a contact: list, pin, unpin
 

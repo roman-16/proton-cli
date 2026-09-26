@@ -24,6 +24,8 @@ type mailSettings struct {
 	PMSignatureContent string
 	MailCategoryView   any
 	AlmostAllMail      any
+	Sign               int
+	PGPScheme          int
 }
 
 func (m mailSettings) categoryViewOn() bool { return switchedOn(m.MailCategoryView) }

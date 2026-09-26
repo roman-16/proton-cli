@@ -29,10 +29,10 @@ const screenful = 50
 func New() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "contacts",
-		Short: "Contacts, their groups and their pinned keys",
+		Short: "Contacts, their groups, email settings and keys",
 	}
 	c.AddCommand(listCmd(), getCmd(), createCmd(), updateCmd(), deleteCmd(),
-		exportCmd(), importCmd(), mergeCmd(), keysCmd(), groupsCmd())
+		exportCmd(), importCmd(), mergeCmd(), emailsCmd(), keysCmd(), groupsCmd())
 	return c
 }
 
@@ -128,31 +128,30 @@ func getCmd() *cobra.Command {
 				{Label: "Name", Value: ct.Name, Handle: true},
 				{Label: "First Name", Value: ct.FirstName},
 				{Label: "Last Name", Value: ct.LastName},
-				{Label: "Nickname", Value: ct.Nickname},
 			}
-			for _, group := range []struct {
-				label  string
-				values []string
-			}{
-				{"Email", ct.Emails},
-				{"Phone", ct.Phones},
-				{"Address", ct.Addresses},
-				{"Website", ct.URLs},
-			} {
-				for _, v := range group.values {
-					fields = append(fields, ui.Field{Label: group.label, Value: v})
+			each := func(label string, values []string) {
+				for _, v := range values {
+					fields = append(fields, ui.Field{Label: label, Value: v})
 				}
 			}
+			each("Nickname", ct.Nicknames)
+			each("Email", ct.Emails)
+			each("Phone", ct.Phones)
+			each("Address", ct.Addresses)
+			each("Website", ct.URLs)
+			each("Organization", ct.Organizations)
+			each("Job Title", ct.JobTitles)
+			each("Role", ct.Roles)
 			fields = append(fields,
-				ui.Field{Label: "Organization", Value: ct.Org},
-				ui.Field{Label: "Job Title", Value: ct.Title},
-				ui.Field{Label: "Role", Value: ct.Role},
 				ui.Field{Label: "Birthday", Value: ct.Birthday},
 				ui.Field{Label: "Anniversary", Value: ct.Anniversary},
 				ui.Field{Label: "Gender", Value: ct.Gender},
-				ui.Field{Label: "Language", Value: ct.Language},
-				ui.Field{Label: "Time Zone", Value: ct.Timezone},
-				ui.Field{Label: "Note", Value: ct.Note},
+			)
+			each("Language", ct.Languages)
+			each("Time Zone", ct.Timezones)
+			each("Note", ct.Notes)
+			fields = append(fields,
+				ui.Field{Label: "Photo", Value: ctsvc.DescribePhoto(ct.Photo)},
 				kit.SignatureField(string(ct.Signature)),
 				ui.Field{Label: "ID", Value: ct.ID, ID: true},
 			)
@@ -164,7 +163,9 @@ func getCmd() *cobra.Command {
 // details are the fields a contact carries. create and update share them so the
 // two commands can never drift apart on what a contact is.
 type details struct {
-	nc ctsvc.NewContact
+	nc    ctsvc.NewContact
+	photo string
+	clear map[ctsvc.Detail]*bool
 }
 
 // A repeatable field may say what kind it is, the way Proton's own editor offers
@@ -173,26 +174,97 @@ type details struct {
 func (d *details) register(c *cobra.Command, verb string) {
 	f := c.Flags()
 	f.StringVar(&d.nc.Name, "name", "", verb+" the name shown in listings")
-	f.StringVar(&d.nc.FirstName, "first-name", "", verb+" the given name")
-	f.StringVar(&d.nc.LastName, "last-name", "", verb+" the family name")
-	f.StringVar(&d.nc.Nickname, "nickname", "", verb+" the nickname")
-	f.StringArrayVar(&d.nc.Emails, "email", nil,
+	f.StringVar(&d.nc.FirstName, string(ctsvc.DetailFirstName), "", verb+" the given name")
+	f.StringVar(&d.nc.LastName, string(ctsvc.DetailLastName), "", verb+" the family name")
+	f.StringArrayVar(&d.nc.Nicknames, string(ctsvc.DetailNickname), nil, verb+" a nickname (repeatable)")
+	f.StringArrayVar(&d.nc.Emails, string(ctsvc.DetailEmail), nil,
 		verb+" an email address, as ADDRESS or KIND:ADDRESS (repeatable)")
-	f.StringArrayVar(&d.nc.Phones, "phone", nil,
+	f.StringArrayVar(&d.nc.Phones, string(ctsvc.DetailPhone), nil,
 		verb+" a phone number, as NUMBER or KIND:NUMBER (repeatable)")
-	f.StringArrayVar(&d.nc.Addresses, "address", nil,
+	f.StringArrayVar(&d.nc.Addresses, string(ctsvc.DetailAddress), nil,
 		verb+" a postal address, as ADDRESS or KIND:ADDRESS (repeatable)")
-	f.StringArrayVar(&d.nc.URLs, "website", nil,
+	f.StringArrayVar(&d.nc.URLs, string(ctsvc.DetailWebsite), nil,
 		verb+" a website, as URL or KIND:URL (repeatable)")
-	f.StringVar(&d.nc.Org, "organization", "", verb+" the organization")
-	f.StringVar(&d.nc.Title, "job-title", "", verb+" the job title")
-	f.StringVar(&d.nc.Role, "role", "", verb+" the role played in the organization")
-	f.StringVar(&d.nc.Birthday, "birthday", "", verb+" the birthday (e.g. 1990-01-31)")
-	f.StringVar(&d.nc.Anniversary, "anniversary", "", verb+" the anniversary (e.g. 2015-06-20)")
-	f.StringVar(&d.nc.Gender, "gender", "", verb+" the gender")
-	f.StringVar(&d.nc.Language, "language", "", verb+" the preferred language (e.g. de-AT)")
-	f.StringVar(&d.nc.Timezone, "timezone", "", verb+" the time zone (e.g. Europe/Vienna)")
-	f.StringVar(&d.nc.Note, "note", "", verb+" the note")
+	f.StringArrayVar(&d.nc.Organizations, string(ctsvc.DetailOrganization), nil, verb+" an organization (repeatable)")
+	f.StringArrayVar(&d.nc.JobTitles, string(ctsvc.DetailJobTitle), nil, verb+" a job title (repeatable)")
+	f.StringArrayVar(&d.nc.Roles, string(ctsvc.DetailRole), nil,
+		verb+" a role played in an organization (repeatable)")
+	f.StringVar(&d.nc.Birthday, string(ctsvc.DetailBirthday), "", verb+" the birthday (e.g. 1990-01-31)")
+	f.StringVar(&d.nc.Anniversary, string(ctsvc.DetailAnniversary), "", verb+" the anniversary (e.g. 2015-06-20)")
+	f.StringVar(&d.nc.Gender, string(ctsvc.DetailGender), "", verb+" the gender")
+	f.StringArrayVar(&d.nc.Languages, string(ctsvc.DetailLanguage), nil,
+		verb+" a preferred language, e.g. de-AT (repeatable)")
+	f.StringArrayVar(&d.nc.Timezones, string(ctsvc.DetailTimezone), nil,
+		verb+" a time zone, e.g. Europe/Vienna (repeatable)")
+	f.StringArrayVar(&d.nc.Notes, string(ctsvc.DetailNote), nil, verb+" a note (repeatable)")
+	f.StringVar(&d.photo, string(ctsvc.DetailPhoto), "",
+		verb+" the photo: an image file, - for stdin, or a web address")
+}
+
+// registerClears gives every detail a --clear-x that takes it away.
+func (d *details) registerClears(c *cobra.Command) {
+	d.clear = map[ctsvc.Detail]*bool{}
+	for _, detail := range []struct {
+		detail ctsvc.Detail
+		what   string
+	}{
+		{ctsvc.DetailFirstName, "the given name"},
+		{ctsvc.DetailLastName, "the family name"},
+		{ctsvc.DetailNickname, "every nickname"},
+		{ctsvc.DetailEmail, "every email address"},
+		{ctsvc.DetailPhone, "every phone number"},
+		{ctsvc.DetailAddress, "every postal address"},
+		{ctsvc.DetailWebsite, "every website"},
+		{ctsvc.DetailOrganization, "every organization"},
+		{ctsvc.DetailJobTitle, "every job title"},
+		{ctsvc.DetailRole, "every role"},
+		{ctsvc.DetailBirthday, "the birthday"},
+		{ctsvc.DetailAnniversary, "the anniversary"},
+		{ctsvc.DetailGender, "the gender"},
+		{ctsvc.DetailLanguage, "every preferred language"},
+		{ctsvc.DetailTimezone, "every time zone"},
+		{ctsvc.DetailNote, "every note"},
+		{ctsvc.DetailPhoto, "the photo"},
+	} {
+		on := new(bool)
+		d.clear[detail.detail] = on
+		name := "clear-" + string(detail.detail)
+		c.Flags().BoolVar(on, name, false, "Remove "+detail.what)
+		kit.Exclusive(c, string(detail.detail), name)
+	}
+}
+
+// contact is what the flags describe, with the photo read and fitted. It is
+// judged before anything is sent: a file that is not an image is wrong whoever
+// is signed in.
+func (d *details) contact(c *kit.Invocation) (ctsvc.NewContact, error) {
+	nc := d.nc
+	for detail, on := range d.clear {
+		if *on {
+			if nc.Clear == nil {
+				nc.Clear = map[ctsvc.Detail]bool{}
+			}
+			nc.Clear[detail] = true
+		}
+	}
+	if d.photo == "" {
+		return nc, nil
+	}
+	if ctsvc.IsPhotoURL(d.photo) {
+		uri, err := ctsvc.PhotoFromURL(d.photo)
+		nc.Photo = uri
+		return nc, err
+	}
+	data, err := readFileArg(c, "--photo", d.photo)
+	if err != nil {
+		return nc, err
+	}
+	name := d.photo
+	if name == "-" {
+		name = "Standard input"
+	}
+	nc.Photo, err = ctsvc.PhotoFromImage(name, data)
+	return nc, err
 }
 
 func createCmd() *cobra.Command {
@@ -200,15 +272,23 @@ func createCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "create",
 		Short: "Create a contact",
+		Long: "Create a contact.\n\n" +
+			"A photo from a file is shrunk until its shorter side is at most 180 pixels and\n" +
+			"stored as JPEG; JPEG, PNG, GIF and WebP are read. A web address is stored as it\n" +
+			"is given.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			if d.nc.Name == "" && len(d.nc.Emails) == 0 {
 				return kit.Fail("A contact needs at least a name or an email address.").
 					Hint("--name \"Jane Roe\"", "--email jane@example.com")
 			}
+			nc, err := d.contact(c)
+			if err != nil {
+				return err
+			}
 			return kit.Create(c, ui.ResultSpec{
-				Action: ui.Created, Kind: "contacts", Name: d.nc.Name,
+				Action: ui.Created, Kind: "contacts", Name: nc.Name,
 			}, func() (string, error) {
-				return c.App.Contacts.Create(c.Ctx, d.nc)
+				return c.App.Contacts.Create(c.Ctx, nc)
 			})
 		}),
 	}
@@ -222,9 +302,18 @@ func updateCmd() *cobra.Command {
 		Use:   "update REF",
 		Short: "Change a contact's details",
 		Long: "Change a contact's details.\n\n" +
-			"Only what you pass is replaced. --email and --phone replace the whole list\n" +
-			"rather than adding to it, so pass every address you want the contact to keep.",
+			"Only what you pass is replaced. A repeatable flag replaces the whole list\n" +
+			"rather than adding to it, so pass every value you want the contact to keep.\n" +
+			"--clear-note removes every note, --clear-photo the photo, and so on for each\n" +
+			"detail.\n\n" +
+			"A photo from a file is shrunk until its shorter side is at most 180 pixels and\n" +
+			"stored as JPEG; JPEG, PNG, GIF and WebP are read. A web address is stored as it\n" +
+			"is given.",
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
+			nc, err := d.contact(c)
+			if err != nil {
+				return err
+			}
 			id, err := c.App.Contacts.Resolve(c.Ctx, c.Args[0])
 			if err != nil {
 				return err
@@ -232,9 +321,9 @@ func updateCmd() *cobra.Command {
 			var rewrote rewritten
 			if err := kit.Mutate(c, ui.ResultSpec{
 				Action: ui.Updated, Kind: "contacts", Count: 1,
-				Name: d.nc.Name, IDs: []string{id},
+				Name: nc.Name, IDs: []string{id},
 			}, func() error {
-				verdict, err := c.App.Contacts.Update(c.Ctx, id, d.nc)
+				verdict, err := c.App.Contacts.Update(c.Ctx, id, nc)
 				rewrote.card(verdict)
 				return err
 			}); err != nil {
@@ -245,6 +334,7 @@ func updateCmd() *cobra.Command {
 		}),
 	}
 	d.register(c, "Replace")
+	d.registerClears(c)
 	return c
 }
 

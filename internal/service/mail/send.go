@@ -25,10 +25,9 @@ func (s *Service) Send(ctx context.Context, c Content, del Delivery) (string, er
 	return d.ID, nil
 }
 
-// SendDraft delivers an existing draft. Recipients are classified once, then the
-// body is packaged per scheme: internal, encrypted-for-outside and cleartext
-// recipients share one symmetrically encrypted body, while PGP/MIME and
-// PGP-Inline recipients each get one encrypted to their own key.
+// SendDraft delivers an existing draft. Each recipient is planned once, from
+// what the address is, what its contact says and what the account says, and
+// then gets the package for the body their plan calls for.
 func (s *Service) SendDraft(ctx context.Context, d *Draft, del Delivery) error {
 	c := d.Content
 	if !c.HasRecipients() {
@@ -38,7 +37,7 @@ func (s *Service) SendDraft(ctx context.Context, d *Draft, del Delivery) error {
 		return fmt.Errorf("draft %s has no sending address", d.ID)
 	}
 
-	plans, needBody, hasEO, err := s.planRecipients(ctx, c, del)
+	plans, hasEO, err := s.planRecipients(ctx, c, del)
 	if err != nil {
 		return err
 	}
@@ -50,23 +49,9 @@ func (s *Service) SendDraft(ctx context.Context, d *Draft, del Delivery) error {
 		}
 	}
 
-	var packages []map[string]any
-	if needBody {
-		pkgs, err := s.buildBodyPackages(c, del, d.Attachments, plans, eoModulus)
-		if err != nil {
-			return err
-		}
-		packages = append(packages, pkgs...)
-	}
-	if pkg, ok, err := s.buildPGPMIMEPackage(ctx, c, d.Attachments, plans); err != nil {
+	packages, err := s.buildPackages(ctx, c, del, d.Attachments, plans, eoModulus)
+	if err != nil {
 		return err
-	} else if ok {
-		packages = append(packages, pkg)
-	}
-	if pkg, ok, err := s.buildInlinePackage(c, d.Attachments, plans); err != nil {
-		return err
-	} else if ok {
-		packages = append(packages, pkg)
 	}
 
 	body := map[string]any{"ExpirationTime": nil, "AutoSaveContacts": 0, "Packages": packages}

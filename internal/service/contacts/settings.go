@@ -15,32 +15,41 @@ import (
 	"github.com/roman-16/proton-cli/internal/vcard"
 )
 
-// ContactCrypto holds a contact's pinned-key encryption preferences for one
-// email address, mirroring the x-pm-* vCard properties Proton stores. A nil
-// Encrypt/Sign means the flag is unset in the contact.
-type ContactCrypto struct {
-	ArmoredKeys       []string `json:"armored_keys"`
-	Encrypt           *bool    `json:"encrypt,omitempty"`
-	Sign              *bool    `json:"sign,omitempty"`
-	Scheme            string   `json:"scheme,omitempty"`
-	SignatureVerified bool     `json:"signature_verified"`
-	// Unknown says what this address pins could not be established: the
+// EmailPreferences is how a contact wants mail to one of its addresses sent. A
+// nil Sign follows the account's sign setting. Encrypt is about the pinned keys
+// when the address has any, and about the keys its provider publishes when it
+// has none; nil means yes whenever there is a key.
+type EmailPreferences struct {
+	Encrypt   *bool
+	Sign      *bool
+	Scheme    string
+	PlainText bool
+}
+
+// EmailSettings is everything a contact holds for one of its addresses.
+type EmailSettings struct {
+	Address string
+	Kind    string
+	// Keys are the pinned public keys, armoured, in preference order.
+	Keys []string
+	EmailPreferences
+	SignatureVerified bool
+	// Unknown says what the address holds could not be established: the
 	// contact would not open, or a key it pins would not decode. It is a fact
 	// for the caller to weigh, not a refusal - a listing shows what it could
 	// read, and a send decides for itself what it does with a pin it cannot see.
-	Unknown bool `json:"unknown,omitempty"`
+	Unknown bool
 }
 
-// PinnedKeysFor returns what a contact stores for email: the pinned public keys
-// and encryption preferences, nil when the address has no contact or no pinned
-// key, or Unknown when there is a contact and what it pins could not be read.
+// EmailSettingsFor returns what a contact holds for email, nil when no contact
+// has settings for it, or Unknown when there is a contact and it would not open.
 //
 // A pinned key is somebody's decision about who they trust, and this is
 // answered on the way to encrypting a message. Reporting no pin for a contact
 // whose card will not open would send the message under Proton's key instead,
 // which is that decision quietly reversed - so a contact that will not open is
 // reported as exactly that, and the caller decides.
-func (s *Service) PinnedKeysFor(ctx context.Context, email string) (*ContactCrypto, error) {
+func (s *Service) EmailSettingsFor(ctx context.Context, email string) (*EmailSettings, error) {
 	id, ok, err := s.contactIDByEmail(ctx, email)
 	if err != nil {
 		return nil, err
@@ -54,42 +63,56 @@ func (s *Service) PinnedKeysFor(ctx context.Context, email string) (*ContactCryp
 		// about a pin it could not see; this line says which contact and why.
 		slog.DebugContext(ctx, "contacts: a contact did not open",
 			"kind", string(skip.KindContact), "reason", string(skip.Unreadable), "ref", id, "error", err.Error())
-		return &ContactCrypto{Unknown: true}, nil
+		return &EmailSettings{Address: email, Unknown: true}, nil
 	}
-	return PinnedKeys(ctx, ct, email), nil
+	return SettingsOf(ctx, ct, email), nil
 }
 
-// PinnedKeys reads what a contact already in hand pins for one of its addresses,
-// or nil when it pins nothing there.
+// ContactEmailSettings returns the settings of every address a contact holds,
+// in the order the contact lists them.
+func ContactEmailSettings(ctx context.Context, ct *Contact) []EmailSettings {
+	out := make([]EmailSettings, 0, len(ct.Emails))
+	for _, raw := range ct.Emails {
+		typed := vcard.ParseTyped("EMAIL", raw)
+		es := SettingsOf(ctx, ct, typed.Value)
+		if es == nil {
+			es = &EmailSettings{Address: typed.Value, SignatureVerified: ct.Signature == pgp.Verified}
+		}
+		es.Kind = typed.Kind
+		out = append(out, *es)
+	}
+	return out
+}
+
+// SettingsOf reads what a contact already in hand holds for one of its
+// addresses, or nil when its signed card does not hold the address.
 //
-// Only the signed card is read. A KEY property in the clear or the encrypted
-// card was vouched for by nobody, and Proton's own clients do not treat it as a
-// pin either.
-func PinnedKeys(ctx context.Context, ct *Contact, email string) *ContactCrypto {
-	group := vcard.EmailGroup(ct.signed, email)
-	if group == "" {
+// Only the signed card is read. Settings in the clear or the encrypted card
+// were vouched for by nobody, and Proton's own clients do not read them either.
+func SettingsOf(ctx context.Context, ct *Contact, email string) *EmailSettings {
+	signed := vcard.ParseSigned(ct.signed)
+	e := signed.FindEmail(email)
+	if e == nil {
 		return nil
 	}
-	values := vcard.GroupValues(ct.signed, group, "KEY")
-	if len(values) == 0 {
-		return nil
-	}
-	armored := decodePinnedKeys(ctx, ct.ID, values)
-	cc := &ContactCrypto{
-		ArmoredKeys:       armored,
-		Scheme:            strings.ToLower(strings.TrimSpace(vcard.GroupValue(ct.signed, group, "X-PM-SCHEME"))),
+	keys := decodePinnedKeys(ctx, ct.ID, e.KeyValues)
+	es := &EmailSettings{
+		Address: e.Address,
+		Kind:    e.Kind,
+		Keys:    keys,
+		EmailPreferences: EmailPreferences{
+			Encrypt:   e.EncryptUntrusted,
+			Sign:      e.Sign,
+			Scheme:    e.Scheme,
+			PlainText: e.MIMEType == vcard.MIMETypePlain,
+		},
 		SignatureVerified: ct.Signature == pgp.Verified,
-		Unknown:           len(armored) < len(values),
+		Unknown:           len(keys) < len(e.KeyValues),
 	}
-	if v := vcard.GroupValue(ct.signed, group, "X-PM-ENCRYPT"); v != "" {
-		b := parseVCardBool(v)
-		cc.Encrypt = &b
+	if len(e.KeyValues) > 0 {
+		es.Encrypt = e.Encrypt
 	}
-	if v := vcard.GroupValue(ct.signed, group, "X-PM-SIGN"); v != "" {
-		b := parseVCardBool(v)
-		cc.Sign = &b
-	}
-	return cc
+	return es
 }
 
 // contactIDByEmail resolves an email to its contact ID via the contact-emails
@@ -147,10 +170,6 @@ func decodePinnedKeys(ctx context.Context, contactID string, values []string) []
 	return out
 }
 
-func parseVCardBool(v string) bool {
-	return strings.EqualFold(strings.TrimSpace(v), "true")
-}
-
 type rawCard struct {
 	Type      int
 	Data      string
@@ -167,29 +186,28 @@ func (s *Service) rawContactCards(ctx context.Context, id string) ([]rawCard, er
 	return r.Contact.Cards, nil
 }
 
-// editableSignedCard fetches a contact's raw cards, parses the signed card into
-// an editable model, and returns the remaining (encrypted/clear) cards verbatim
-// so callers can re-attach them unchanged on PUT.
+// editSignedCard rewrites a contact's signed card through edit, re-signing it
+// and sending every other card back as it came.
 //
-// The signed card's verdict comes back with it rather than deciding anything
-// here. A card that does not verify is far more often one signed by a key this
-// account has since retired than one somebody altered - detached verification
-// cannot tell the two apart - and Proton's own client saves over either. So the
-// write goes ahead and the verdict is reported, which is the one thing a refusal
-// could not do: leave the person knowing.
-func (s *Service) editableSignedCard(ctx context.Context, id string) (*vcard.Signed, []map[string]any, pgp.VerifyResult, error) {
+// The signed card's verdict comes back rather than deciding anything here. A
+// card that does not verify is far more often one signed by a key this account
+// has since retired than one somebody altered - detached verification cannot
+// tell the two apart - and Proton's own client saves over either. So the write
+// goes ahead and the verdict is reported, which is the one thing a refusal could
+// not do: leave the person knowing.
+func (s *Service) editSignedCard(ctx context.Context, id string, edit func(*vcard.Signed) error) (pgp.VerifyResult, error) {
 	u, err := s.keys(ctx)
 	if err != nil {
-		return nil, nil, "", err
+		return "", err
 	}
 	cards, err := s.rawContactCards(ctx, id)
 	if err != nil {
-		return nil, nil, "", err
+		return "", err
 	}
 	var signedData string
 	verdict := pgp.Unsigned
 	haveSigned := false
-	var others []map[string]any
+	var others []any
 	for _, c := range cards {
 		if c.Type == pgp.CardSigned && !haveSigned {
 			verdict = pgp.VerifyDetachedStatus(u.UserKR, gopenpgp.NewPlainMessageFromString(c.Data), c.Signature)
@@ -200,87 +218,82 @@ func (s *Service) editableSignedCard(ctx context.Context, id string) (*vcard.Sig
 		others = append(others, map[string]any{"Type": c.Type, "Data": c.Data, "Signature": c.Signature})
 	}
 	if !haveSigned {
-		return nil, nil, "", fmt.Errorf("contact has no signed card to edit")
+		return "", fmt.Errorf("contact has no signed card to edit")
 	}
 	model := vcard.ParseSigned(signedData)
 	if model.UID == "" {
 		model.UID = vcard.UID()
 	}
-	return &model, others, verdict, nil
-}
-
-// putSignedCard re-signs the model and PUTs it alongside the preserved cards.
-func (s *Service) putSignedCard(ctx context.Context, id string, model vcard.Signed, others []map[string]any) error {
+	if err := edit(&model); err != nil {
+		return "", err
+	}
 	kr, err := s.writeKey(ctx)
 	if err != nil {
-		return err
+		return "", err
 	}
 	signedCard, err := pgp.SignCard(vcard.BuildSigned(model), kr)
 	if err != nil {
-		return err
+		return "", err
 	}
-	cards := make([]any, 0, len(others)+1)
-	cards = append(cards, signedCard)
-	for _, o := range others {
-		cards = append(cards, o)
-	}
-	return s.C.Decode(ctx, contactWrite(id, cards), nil)
+	return verdict, s.C.Decode(ctx, contactWrite(id, append([]any{signedCard}, others...)), nil)
 }
 
-// PinKey pins armoredKey to the contact for email as the preferred key. Encrypt
-// and sign default to true (matching the web client's "trust key" flow) unless
-// overridden. The signed card is re-signed; all other cards are preserved.
+// PinKey pins armoredKey to the contact's address as its preferred key, and
+// encrypts mail to the address from then on.
 //
 // It returns the verdict on the card it rewrote, for the caller to say.
-func (s *Service) PinKey(ctx context.Context, id, email, armoredKey string, encrypt, sign *bool, scheme string) (pgp.VerifyResult, error) {
+func (s *Service) PinKey(ctx context.Context, id, email, armoredKey string) (pgp.VerifyResult, error) {
 	keyValue, err := encodePinnedKey(armoredKey)
 	if err != nil {
 		return "", err
 	}
-	model, others, verdict, err := s.editableSignedCard(ctx, id)
-	if err != nil {
-		return "", err
-	}
-	e := model.FindEmail(email)
-	if e == nil {
-		model.Emails = append(model.Emails, vcard.SignedEmail{Address: email})
-		e = &model.Emails[len(model.Emails)-1]
-	}
-	e.KeyValues = prependUnique(e.KeyValues, keyValue)
-	trueVal := true
-	if encrypt != nil {
-		e.Encrypt = encrypt
-	} else {
-		e.Encrypt = &trueVal
-	}
-	if sign != nil {
-		e.Sign = sign
-	} else {
-		signVal := true
-		e.Sign = &signVal
-	}
-	if scheme != "" {
-		e.Scheme = scheme
-	}
-	return verdict, s.putSignedCard(ctx, id, *model, others)
+	return s.editSignedCard(ctx, id, func(model *vcard.Signed) error {
+		e := model.FindEmail(email)
+		if e == nil {
+			model.Emails = append(model.Emails, vcard.SignedEmail{Address: email})
+			e = &model.Emails[len(model.Emails)-1]
+		}
+		on := true
+		e.KeyValues = prependUnique(e.KeyValues, keyValue)
+		e.Encrypt, e.EncryptUntrusted = &on, nil
+		return nil
+	})
 }
 
-// UnpinKey removes all pinned keys and crypto flags a contact stores for email,
-// returning the verdict on the card it rewrote.
+// UnpinKey removes the keys a contact pins for email, and the choice of whether
+// to encrypt to them, returning the verdict on the card it rewrote.
 func (s *Service) UnpinKey(ctx context.Context, id, email string) (pgp.VerifyResult, error) {
-	model, others, verdict, err := s.editableSignedCard(ctx, id)
-	if err != nil {
-		return "", err
-	}
-	e := model.FindEmail(email)
-	if e == nil || len(e.KeyValues) == 0 {
-		return "", &errs.NotFound{Kind: "pinned key", Ref: email}
-	}
-	e.KeyValues = nil
-	e.Encrypt = nil
-	e.Sign = nil
-	e.Scheme = ""
-	return verdict, s.putSignedCard(ctx, id, *model, others)
+	return s.editSignedCard(ctx, id, func(model *vcard.Signed) error {
+		e := model.FindEmail(email)
+		if e == nil || len(e.KeyValues) == 0 {
+			return &errs.NotFound{Kind: "pinned key", Ref: email}
+		}
+		e.KeyValues, e.Encrypt = nil, nil
+		return nil
+	})
+}
+
+// SetEmailPreferences stores how mail to one of a contact's addresses is sent,
+// returning the verdict on the card it rewrote.
+func (s *Service) SetEmailPreferences(ctx context.Context, id, email string, p EmailPreferences) (pgp.VerifyResult, error) {
+	return s.editSignedCard(ctx, id, func(model *vcard.Signed) error {
+		e := model.FindEmail(email)
+		if e == nil {
+			model.Emails = append(model.Emails, vcard.SignedEmail{Address: email})
+			e = &model.Emails[len(model.Emails)-1]
+		}
+		e.Encrypt, e.EncryptUntrusted = nil, nil
+		if len(e.KeyValues) > 0 {
+			e.Encrypt = p.Encrypt
+		} else {
+			e.EncryptUntrusted = p.Encrypt
+		}
+		e.Sign, e.Scheme, e.MIMEType = p.Sign, p.Scheme, ""
+		if p.PlainText {
+			e.MIMEType = vcard.MIMETypePlain
+		}
+		return nil
+	})
 }
 
 // encodePinnedKey converts an armored public key (or the public part of a

@@ -115,6 +115,8 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton contacts list`](../contacts/contacts.md#list) | List contacts |
 | [`proton contacts merge`](../contacts/contacts.md#merge) | Fold duplicate contacts into one |
 | [`proton contacts update`](../contacts/contacts.md#update) | Change a contact's details |
+| [`proton contacts emails list`](../contacts/emails.md#list) | List a contact's addresses and how mail to each is sent |
+| [`proton contacts emails update`](../contacts/emails.md#update) | Change how mail to an address is sent |
 | [`proton contacts groups add`](../contacts/groups.md#add) | Add contacts to a group |
 | [`proton contacts groups create`](../contacts/groups.md#create) | Create a contact group |
 | [`proton contacts groups delete`](../contacts/groups.md#delete) | Delete contact groups |

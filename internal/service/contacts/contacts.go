@@ -10,6 +10,7 @@ import (
 
 	gopenpgp "github.com/ProtonMail/gopenpgp/v2/crypto"
 	"github.com/roman-16/proton-cli/internal/account/keys"
+	"github.com/roman-16/proton-cli/internal/contentline"
 	"github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/proton"
 	"github.com/roman-16/proton-cli/internal/ref"
@@ -37,18 +38,21 @@ type Contact struct {
 	Addresses []string `json:"addresses"`
 	URLs      []string `json:"urls"`
 
-	FirstName   string `json:"first_name,omitempty"`
-	LastName    string `json:"last_name,omitempty"`
-	Nickname    string `json:"nickname,omitempty"`
-	Org         string `json:"org,omitempty"`
-	Note        string `json:"note,omitempty"`
-	Title       string `json:"title,omitempty"`
-	Role        string `json:"role,omitempty"`
-	Birthday    string `json:"birthday,omitempty"`
-	Anniversary string `json:"anniversary,omitempty"`
-	Gender      string `json:"gender,omitempty"`
-	Language    string `json:"language,omitempty"`
-	Timezone    string `json:"timezone,omitempty"`
+	FirstName     string   `json:"first_name,omitempty"`
+	LastName      string   `json:"last_name,omitempty"`
+	Nicknames     []string `json:"nicknames"`
+	Organizations []string `json:"organizations"`
+	JobTitles     []string `json:"job_titles"`
+	Roles         []string `json:"roles"`
+	Notes         []string `json:"notes"`
+	Languages     []string `json:"languages"`
+	Timezones     []string `json:"timezones"`
+	Birthday      string   `json:"birthday,omitempty"`
+	Anniversary   string   `json:"anniversary,omitempty"`
+	Gender        string   `json:"gender,omitempty"`
+	// Photo is the picture as stored: a web address, or the image itself as a
+	// data: URI.
+	Photo string `json:"photo,omitempty"`
 
 	Cards []string `json:"cards"`
 
@@ -88,9 +92,32 @@ func typedTexts(values []vcard.Typed) []string {
 	return out
 }
 
-// NewContact is everything a contact can be given. A repeatable field may carry
-// a kind - "work:jane@example.com" - which is what Proton's own editor offers on
-// each of them.
+// Detail is one thing a contact can be given, and taken away again.
+type Detail string
+
+const (
+	DetailFirstName    Detail = "first-name"
+	DetailLastName     Detail = "last-name"
+	DetailNickname     Detail = "nickname"
+	DetailEmail        Detail = "email"
+	DetailPhone        Detail = "phone"
+	DetailAddress      Detail = "address"
+	DetailWebsite      Detail = "website"
+	DetailOrganization Detail = "organization"
+	DetailJobTitle     Detail = "job-title"
+	DetailRole         Detail = "role"
+	DetailBirthday     Detail = "birthday"
+	DetailAnniversary  Detail = "anniversary"
+	DetailGender       Detail = "gender"
+	DetailLanguage     Detail = "language"
+	DetailTimezone     Detail = "timezone"
+	DetailNote         Detail = "note"
+	DetailPhoto        Detail = "photo"
+)
+
+// NewContact is everything a contact can be given. A list left nil and a text
+// left empty change nothing; Clear takes a detail away. A repeatable field may
+// carry a kind - "work:jane@example.com".
 type NewContact struct {
 	Name      string
 	Emails    []string
@@ -98,18 +125,23 @@ type NewContact struct {
 	Addresses []string
 	URLs      []string
 
-	Note        string
-	Org         string
-	Title       string
-	Role        string
+	Nicknames     []string
+	Organizations []string
+	JobTitles     []string
+	Roles         []string
+	Notes         []string
+	Languages     []string
+	Timezones     []string
+
+	FirstName   string
+	LastName    string
 	Birthday    string
 	Anniversary string
 	Gender      string
-	Language    string
-	Timezone    string
-	Nickname    string
-	FirstName   string
-	LastName    string
+	// Photo is a web address, or an image as a data: URI.
+	Photo string
+
+	Clear map[Detail]bool
 }
 
 // writeKey is the key a contact's cards are written under, and the only one they
@@ -188,65 +220,103 @@ func contactWrite(id string, cards []any) proton.Request {
 func encryptedPart(nc NewContact, previous vcard.Encrypted) vcard.Encrypted {
 	f := previous
 	for _, group := range []struct {
+		detail   Detail
 		property string
 		raw      []string
 		into     *[]vcard.Typed
 	}{
-		{"TEL", nc.Phones, &f.Phones},
-		{"ADR", nc.Addresses, &f.Addresses},
-		{"URL", nc.URLs, &f.URLs},
+		{DetailPhone, "TEL", nc.Phones, &f.Phones},
+		{DetailAddress, "ADR", nc.Addresses, &f.Addresses},
+		{DetailWebsite, "URL", nc.URLs, &f.URLs},
 	} {
+		if nc.Clear[group.detail] {
+			*group.into = nil
+			continue
+		}
 		if group.raw == nil {
 			continue
 		}
 		values := make([]vcard.Typed, 0, len(group.raw))
 		for _, raw := range group.raw {
-			t := vcard.ParseTyped(group.property, raw)
-			if t.Value == "" {
-				continue
+			if t := vcard.ParseTyped(group.property, raw); t.Value != "" {
+				values = append(values, t)
 			}
-			values = append(values, t)
 		}
 		*group.into = values
 	}
-	for _, kv := range []struct {
-		value string
-		into  *string
+	for _, list := range []struct {
+		detail Detail
+		raw    []string
+		into   *[]string
 	}{
-		{nc.Note, &f.Note}, {nc.Org, &f.Org}, {nc.Title, &f.Title},
-		{nc.Role, &f.Role}, {nc.Birthday, &f.Birthday},
-		{nc.Anniversary, &f.Anniversary}, {nc.Gender, &f.Gender},
-		{nc.Language, &f.Language}, {nc.Timezone, &f.Timezone},
-		{nc.Nickname, &f.Nickname}, {nc.FirstName, &f.FirstName},
-		{nc.LastName, &f.LastName},
+		{DetailNickname, nc.Nicknames, &f.Nicknames},
+		{DetailOrganization, nc.Organizations, &f.Organizations},
+		{DetailJobTitle, nc.JobTitles, &f.Titles},
+		{DetailRole, nc.Roles, &f.Roles},
+		{DetailNote, nc.Notes, &f.Notes},
+		{DetailLanguage, nc.Languages, &f.Languages},
+		{DetailTimezone, nc.Timezones, &f.Timezones},
 	} {
-		if kv.value != "" {
-			*kv.into = kv.value
+		switch {
+		case nc.Clear[list.detail]:
+			*list.into = nil
+		case list.raw != nil:
+			*list.into = nonEmpty(list.raw)
+		}
+	}
+	for _, text := range []struct {
+		detail Detail
+		value  string
+		into   *string
+	}{
+		{DetailFirstName, nc.FirstName, &f.FirstName},
+		{DetailLastName, nc.LastName, &f.LastName},
+		{DetailBirthday, nc.Birthday, &f.Birthday},
+		{DetailAnniversary, nc.Anniversary, &f.Anniversary},
+		{DetailGender, nc.Gender, &f.Gender},
+		{DetailPhoto, nc.Photo, &f.Photo},
+	} {
+		switch {
+		case nc.Clear[text.detail]:
+			*text.into = ""
+		case text.value != "":
+			*text.into = text.value
 		}
 	}
 	return f
 }
 
-// signedPart builds the signed card for a set of addresses, carrying over the
-// pinned keys and crypto settings any previous card held for an address that
-// survives. Rebuilding from the addresses alone would silently unpin keys.
-func signedPart(name, uid string, emails []string, previous *vcard.Signed) vcard.Signed {
+func nonEmpty(values []string) []string {
+	out := make([]string, 0, len(values))
+	for _, v := range values {
+		if v = strings.TrimSpace(v); v != "" {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+// signedPart builds the signed card for a set of addresses, carrying over
+// everything the earlier cards held for an address that survives: its pinned
+// keys and the settings for mail sent to it. The first card that knows the
+// address answers for it.
+func signedPart(name, uid string, emails []string, previous ...vcard.Signed) vcard.Signed {
 	model := vcard.Signed{Name: name, UID: uid}
 	for _, raw := range emails {
 		if raw == "" {
 			continue
 		}
-		// An address carries its kind the way every other repeatable value does,
-		// as KIND:VALUE, so the kind has to come off before the address is stored
-		// or Proton is handed "work:jane@example.com" and refuses it.
+		// The kind has to come off before the address is stored, or Proton is
+		// handed "work:jane@example.com" and refuses it.
 		typed := vcard.ParseTyped("EMAIL", raw)
-		addr := typed.Value
-		e := vcard.SignedEmail{Address: addr, Kind: typed.Kind}
-		if previous != nil {
-			if prev := previous.FindEmail(addr); prev != nil {
-				e.KeyValues, e.Encrypt, e.Sign, e.Scheme = prev.KeyValues, prev.Encrypt, prev.Sign, prev.Scheme
+		e := vcard.SignedEmail{}
+		for _, card := range previous {
+			if prev := card.FindEmail(typed.Value); prev != nil {
+				e = *prev
+				break
 			}
 		}
+		e.Address, e.Kind = typed.Value, typed.Kind
 		model.Emails = append(model.Emails, e)
 	}
 	return model
@@ -394,7 +464,7 @@ func (s *Service) Create(ctx context.Context, nc NewContact) (string, error) {
 		return "", err
 	}
 	stored, err := storedCards(ctx, kr,
-		vcard.BuildSigned(signedPart(name, vcard.UID(), nc.Emails, nil)),
+		vcard.BuildSigned(signedPart(name, vcard.UID(), nc.Emails)),
 		vcard.BuildEncrypted(encryptedPart(nc, vcard.Encrypted{})), "")
 	if err != nil {
 		return "", err
@@ -443,12 +513,14 @@ func (s *Service) Update(ctx context.Context, id string, patch NewContact) (pgp.
 	// this tool has no flag for - is read back off the stored card and written
 	// out again, so an edit cannot silently drop what it did not mention.
 	joined := strings.Join(existing.Cards, "\n")
-	old := vcard.ParseSigned(joined)
-	uid := old.UID
+	uid := vcard.Field(joined, "UID")
 	if uid == "" {
 		uid = vcard.UID()
 	}
 	emails := pickSlice(patch.Emails, existing.Emails)
+	if patch.Clear[DetailEmail] {
+		emails = nil
+	}
 	name := firstNonEmpty(patch.Name, existing.Name)
 	if name == "" && len(emails) > 0 {
 		name = vcard.ParseTyped("EMAIL", emails[0]).Value
@@ -460,7 +532,7 @@ func (s *Service) Update(ctx context.Context, id string, patch NewContact) (pgp.
 	// The clear card is rebuilt by address rather than carried over: the signed
 	// card numbers its addresses afresh, and a CATEGORIES left under the old
 	// number would be about whichever address holds it now.
-	signed := vcard.BuildSigned(signedPart(name, uid, emails, &old))
+	signed := vcard.BuildSigned(signedPart(name, uid, emails, vcard.ParseSigned(existing.signed)))
 	stored, err := storedCards(ctx, kr, signed,
 		vcard.BuildEncrypted(encryptedPart(patch, vcard.ParseEncrypted(joined))),
 		vcard.BuildClear(signed, vcard.StoredMembership(existing.signed, existing.clear)))
@@ -482,24 +554,25 @@ func contactFromCards(id string, cards []string) Contact {
 		emails = append(emails, e.Text())
 	}
 	c := Contact{
-		ID:          id,
-		Name:        vcard.Field(joined, "FN"),
-		FirstName:   f.FirstName,
-		LastName:    f.LastName,
-		Nickname:    f.Nickname,
-		Emails:      emails,
-		Phones:      typedTexts(f.Phones),
-		Addresses:   typedTexts(f.Addresses),
-		URLs:        typedTexts(f.URLs),
-		Org:         f.Org,
-		Note:        f.Note,
-		Title:       f.Title,
-		Role:        f.Role,
-		Birthday:    f.Birthday,
-		Anniversary: f.Anniversary,
-		Gender:      f.Gender,
-		Language:    f.Language,
-		Timezone:    f.Timezone,
+		ID:            id,
+		Name:          vcard.Field(joined, "FN"),
+		FirstName:     f.FirstName,
+		LastName:      f.LastName,
+		Emails:        emails,
+		Phones:        typedTexts(f.Phones),
+		Addresses:     typedTexts(f.Addresses),
+		URLs:          typedTexts(f.URLs),
+		Nicknames:     f.Nicknames,
+		Organizations: f.Organizations,
+		JobTitles:     f.Titles,
+		Roles:         f.Roles,
+		Notes:         f.Notes,
+		Languages:     f.Languages,
+		Timezones:     f.Timezones,
+		Birthday:      f.Birthday,
+		Anniversary:   f.Anniversary,
+		Gender:        f.Gender,
+		Photo:         f.Photo,
 	}
 	if len(emails) > 0 {
 		c.Email = emails[0]
@@ -579,8 +652,8 @@ func (s SkippedContact) String() string {
 // Import writes vCards into the address book.
 //
 // Each card goes in whole rather than through the CLI's own field list, so a
-// property this tool has no flag for - an anniversary, a photo, a second postal
-// address - survives the trip instead of being quietly dropped on the way in.
+// property this tool has no flag for - a logo, a related person, a custom X-
+// property - survives the trip instead of being quietly dropped on the way in.
 //
 // The split between what is signed, what is encrypted and what is clear is
 // Proton's, not the file's: the identity properties are signed so a recipient
@@ -840,8 +913,7 @@ func (s *Service) Merge(ctx context.Context, group Duplicate) (string, error) {
 	keep := group.Contacts[0]
 	merged := mergeCards(group.Contacts)
 
-	old := vcard.ParseSigned(strings.Join(keep.Cards, "\n"))
-	uid := old.UID
+	uid := vcard.Field(strings.Join(keep.Cards, "\n"), "UID")
 	if uid == "" {
 		uid = vcard.UID()
 	}
@@ -849,7 +921,11 @@ func (s *Service) Merge(ctx context.Context, group Duplicate) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	signed := vcard.BuildSigned(signedPart(firstNonEmpty(keep.Name, merged.name), uid, merged.emails, &old))
+	previous := make([]vcard.Signed, 0, len(group.Contacts))
+	for _, ct := range group.Contacts {
+		previous = append(previous, vcard.ParseSigned(ct.signed))
+	}
+	signed := vcard.BuildSigned(signedPart(firstNonEmpty(keep.Name, merged.name), uid, merged.emails, previous...))
 	stored, err := storedCards(ctx, kr, signed,
 		vcard.BuildEncrypted(merged.encrypted),
 		vcard.BuildClear(signed, vcard.StoredMembership(keep.signed, keep.clear)))
@@ -885,6 +961,7 @@ func mergeCards(contacts []Contact) mergedContact {
 	var out mergedContact
 	seenEmail := map[string]bool{}
 	seen := map[string]bool{}
+	seenText := map[string]bool{}
 
 	for _, ct := range contacts {
 		joined := strings.Join(ct.Cards, "\n")
@@ -917,21 +994,46 @@ func mergeCards(contacts []Contact) mergedContact {
 				*group.into = append(*group.into, v)
 			}
 		}
+		for _, list := range []struct {
+			property string
+			from     []string
+			into     *[]string
+		}{
+			{"NICKNAME", f.Nicknames, &out.encrypted.Nicknames},
+			{"ORG", f.Organizations, &out.encrypted.Organizations},
+			{"TITLE", f.Titles, &out.encrypted.Titles},
+			{"ROLE", f.Roles, &out.encrypted.Roles},
+			{"NOTE", f.Notes, &out.encrypted.Notes},
+			{"LANG", f.Languages, &out.encrypted.Languages},
+			{"TZ", f.Timezones, &out.encrypted.Timezones},
+		} {
+			for _, v := range list.from {
+				key := list.property + ":" + strings.ToLower(strings.TrimSpace(v))
+				if seenText[key] {
+					continue
+				}
+				seenText[key] = true
+				*list.into = append(*list.into, v)
+			}
+		}
 		for _, kv := range []struct {
 			value string
 			into  *string
 		}{
-			{f.Note, &out.encrypted.Note}, {f.Org, &out.encrypted.Org},
-			{f.Title, &out.encrypted.Title}, {f.Role, &out.encrypted.Role},
 			{f.Birthday, &out.encrypted.Birthday},
 			{f.Anniversary, &out.encrypted.Anniversary},
-			{f.Gender, &out.encrypted.Gender}, {f.Language, &out.encrypted.Language},
-			{f.Timezone, &out.encrypted.Timezone}, {f.Nickname, &out.encrypted.Nickname},
+			{f.Gender, &out.encrypted.Gender},
 			{f.FirstName, &out.encrypted.FirstName}, {f.LastName, &out.encrypted.LastName},
 		} {
 			if *kv.into == "" {
 				*kv.into = kv.value
 			}
+		}
+		switch {
+		case out.encrypted.Photo == "":
+			out.encrypted.Photo = f.Photo
+		case f.Photo != "" && f.Photo != out.encrypted.Photo:
+			out.encrypted.Rest = append(out.encrypted.Rest, contentline.Line{Name: "PHOTO", Value: f.Photo})
 		}
 		out.encrypted.Rest = append(out.encrypted.Rest, f.Rest...)
 	}

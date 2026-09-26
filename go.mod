@@ -15,9 +15,10 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/teambition/rrule-go v1.8.2
-	golang.org/x/mod v0.39.0
+	golang.org/x/image v0.46.0
+	golang.org/x/mod v0.41.0
 	golang.org/x/net v0.57.0
-	golang.org/x/sys v0.47.0
+	golang.org/x/sys v0.48.0
 	golang.org/x/term v0.45.0
 	google.golang.org/protobuf v1.36.12
 )
@@ -42,7 +43,7 @@ require (
 	github.com/telesma-app/ctap v0.49.0
 	github.com/telesma-app/hid v0.12.0 // indirect
 	golang.org/x/crypto v0.54.0 // indirect
-	golang.org/x/text v0.40.0
+	golang.org/x/text v0.42.0
 )
 
 replace github.com/go-ctap/winhello => github.com/ProtonMail/winhello v0.0.0-20260223131736-d2c4f2d06287

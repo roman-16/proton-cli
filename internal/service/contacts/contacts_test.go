@@ -160,7 +160,7 @@ func TestUpdateSealsTheEncryptedCardToThePrimaryUserKeyAlone(t *testing.T) {
 	d := &contactDoer{cards: []map[string]any{signedCard(t, ring, base)}}
 
 	svc := New(d, testKeys(&keys.Unlocked{UserKR: ring}))
-	if _, err := svc.Update(context.Background(), "c1", NewContact{Note: "Likes tea"}); err != nil {
+	if _, err := svc.Update(context.Background(), "c1", NewContact{Notes: []string{"Likes tea"}}); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
 
@@ -212,7 +212,7 @@ func TestUpdateDoesNotDuplicateWhatTheSignedCardHolds(t *testing.T) {
 	}
 }
 
-func TestPinnedKeysForReadsSignedCard(t *testing.T) {
+func TestEmailSettingsForReadsSignedCard(t *testing.T) {
 	kr := testKeyRing(t)
 	_, keyValue := armoredPubKey(t)
 	card := vcard.BuildSigned(vcard.Signed{
@@ -229,11 +229,11 @@ func TestPinnedKeysForReadsSignedCard(t *testing.T) {
 	}
 	u := &keys.Unlocked{UserKR: kr}
 
-	cc, err := New(d, testKeys(u)).PinnedKeysFor(context.Background(), "bob@example.com")
+	cc, err := New(d, testKeys(u)).EmailSettingsFor(context.Background(), "bob@example.com")
 	if err != nil {
-		t.Fatalf("PinnedKeysFor: %v", err)
+		t.Fatalf("EmailSettingsFor: %v", err)
 	}
-	if cc == nil || len(cc.ArmoredKeys) != 1 {
+	if cc == nil || len(cc.Keys) != 1 {
 		t.Fatalf("expected one pinned key, got %+v", cc)
 	}
 	if cc.Encrypt == nil || !*cc.Encrypt {
@@ -242,23 +242,23 @@ func TestPinnedKeysForReadsSignedCard(t *testing.T) {
 	if !cc.SignatureVerified {
 		t.Error("SignatureVerified should be true for a card signed by the user key")
 	}
-	if !strings.Contains(cc.ArmoredKeys[0], "PGP PUBLIC KEY BLOCK") {
-		t.Errorf("pinned key is not armored: %q", cc.ArmoredKeys[0])
+	if !strings.Contains(cc.Keys[0], "PGP PUBLIC KEY BLOCK") {
+		t.Errorf("pinned key is not armored: %q", cc.Keys[0])
 	}
 }
 
 // A contact that will not open is not a contact with no pin. The answer says so,
 // and leaves what to do about it to the send.
-func TestPinnedKeysForSaysWhenItCannotTell(t *testing.T) {
+func TestEmailSettingsForSaysWhenItCannotTell(t *testing.T) {
 	kr := testKeyRing(t)
 	d := &contactDoer{
 		emails: []map[string]any{{"ContactID": "c1", "Defaults": 0}},
 		// An encrypted card sealed to a key this account does not hold.
 		cards: []map[string]any{{"Type": float64(pgp.CardEncryptedSigned), "Data": "not a message", "Signature": ""}},
 	}
-	cc, err := New(d, testKeys(&keys.Unlocked{UserKR: kr})).PinnedKeysFor(context.Background(), "bob@example.com")
+	cc, err := New(d, testKeys(&keys.Unlocked{UserKR: kr})).EmailSettingsFor(context.Background(), "bob@example.com")
 	if err != nil {
-		t.Fatalf("PinnedKeysFor: %v", err)
+		t.Fatalf("EmailSettingsFor: %v", err)
 	}
 	if cc == nil || !cc.Unknown {
 		t.Fatalf("a contact that would not open came back as %+v, want Unknown", cc)
@@ -267,21 +267,21 @@ func TestPinnedKeysForSaysWhenItCannotTell(t *testing.T) {
 
 // A pin is read off the signed card alone: a KEY anywhere else was vouched for by
 // nobody, and Proton's own clients do not treat it as a pin either.
-func TestPinnedKeysIgnoreAKeyOutsideTheSignedCard(t *testing.T) {
+func TestSettingsIgnoreAKeyOutsideTheSignedCard(t *testing.T) {
 	_, keyValue := armoredPubKey(t)
 	ct := &Contact{
 		ID: "c1", Signature: pgp.Verified,
 		signed: vcard.BuildSigned(vcard.Signed{Name: "Bob", UID: "u", Emails: []vcard.SignedEmail{{Address: "bob@example.com"}}}),
 		clear:  "BEGIN:VCARD\r\nVERSION:4.0\r\nitem1.EMAIL:bob@example.com\r\nitem1.KEY:" + keyValue + "\r\nEND:VCARD",
 	}
-	if cc := PinnedKeys(context.Background(), ct, "bob@example.com"); cc != nil {
+	if cc := SettingsOf(context.Background(), ct, "bob@example.com"); cc == nil || len(cc.Keys) != 0 {
 		t.Errorf("a KEY in the clear card was taken as a pin: %+v", cc)
 	}
 }
 
 // A pinned key that will not decode is a pin that cannot be seen, and the
 // answer says so alongside whatever did decode.
-func TestPinnedKeysSayWhenAKeyWillNotDecode(t *testing.T) {
+func TestSettingsSayWhenAKeyWillNotDecode(t *testing.T) {
 	_, keyValue := armoredPubKey(t)
 	ct := &Contact{
 		ID: "c1", Signature: pgp.Verified,
@@ -289,18 +289,18 @@ func TestPinnedKeysSayWhenAKeyWillNotDecode(t *testing.T) {
 			Address: "bob@example.com", KeyValues: []string{keyValue, "data:application/pgp-keys;base64,bm9wZQ=="},
 		}}}),
 	}
-	cc := PinnedKeys(context.Background(), ct, "bob@example.com")
-	if cc == nil || len(cc.ArmoredKeys) != 1 {
-		t.Fatalf("PinnedKeys = %+v, want the one key that decoded", cc)
+	cc := SettingsOf(context.Background(), ct, "bob@example.com")
+	if cc == nil || len(cc.Keys) != 1 {
+		t.Fatalf("SettingsOf = %+v, want the one key that decoded", cc)
 	}
 	if !cc.Unknown {
 		t.Error("a key that would not decode was passed over in silence")
 	}
 }
 
-func TestPinnedKeysForNoConfigIsMiss(t *testing.T) {
+func TestEmailSettingsForNoConfigIsMiss(t *testing.T) {
 	d := &contactDoer{emails: []map[string]any{{"ContactID": "c1", "Defaults": 1}}}
-	cc, err := New(d, testKeys(&keys.Unlocked{UserKR: testKeyRing(t)})).PinnedKeysFor(context.Background(), "x@example.com")
+	cc, err := New(d, testKeys(&keys.Unlocked{UserKR: testKeyRing(t)})).EmailSettingsFor(context.Background(), "x@example.com")
 	if err != nil || cc != nil {
 		t.Errorf("Defaults==1 should be a clean miss; got %+v, %v", cc, err)
 	}
@@ -318,7 +318,7 @@ func TestPinKeyAddsKeyAndPreservesOtherCards(t *testing.T) {
 	u := &keys.Unlocked{UserKR: kr}
 
 	armored, keyValue := armoredPubKey(t)
-	verdict, err := New(d, testKeys(u)).PinKey(context.Background(), "c1", "bob@example.com", armored, nil, nil, "")
+	verdict, err := New(d, testKeys(u)).PinKey(context.Background(), "c1", "bob@example.com", armored)
 	if err != nil {
 		t.Fatalf("PinKey: %v", err)
 	}
@@ -332,8 +332,11 @@ func TestPinKeyAddsKeyAndPreservesOtherCards(t *testing.T) {
 	if e == nil || len(e.KeyValues) != 1 || e.KeyValues[0] != keyValue {
 		t.Fatalf("pinned key not written: %+v", e)
 	}
-	if e.Encrypt == nil || !*e.Encrypt || e.Sign == nil || !*e.Sign {
-		t.Errorf("encrypt/sign should default to true: enc=%v sign=%v", e.Encrypt, e.Sign)
+	if e.Encrypt == nil || !*e.Encrypt {
+		t.Errorf("pinning should turn encryption on: %v", e.Encrypt)
+	}
+	if e.Sign != nil {
+		t.Errorf("pinning made a choice about signing: %v", *e.Sign)
 	}
 	// The encrypted card must be re-attached verbatim.
 	cards := d.putBody["Cards"].([]any)
@@ -359,7 +362,7 @@ func TestAWriteOverAnUnverifiedCardGoesAheadAndSaysSo(t *testing.T) {
 	t.Run("pin", func(t *testing.T) {
 		d := &contactDoer{cards: []map[string]any{signedCard(t, other, base)}}
 		armored, _ := armoredPubKey(t)
-		verdict, err := New(d, testKeys(u)).PinKey(context.Background(), "c1", "bob@example.com", armored, nil, nil, "")
+		verdict, err := New(d, testKeys(u)).PinKey(context.Background(), "c1", "bob@example.com", armored)
 		if err != nil {
 			t.Fatalf("PinKey refused a card it could not verify: %v", err)
 		}
@@ -372,7 +375,7 @@ func TestAWriteOverAnUnverifiedCardGoesAheadAndSaysSo(t *testing.T) {
 	})
 	t.Run("update", func(t *testing.T) {
 		d := &contactDoer{cards: []map[string]any{signedCard(t, other, base)}}
-		verdict, err := New(d, testKeys(u)).Update(context.Background(), "c1", NewContact{Note: "Likes tea"})
+		verdict, err := New(d, testKeys(u)).Update(context.Background(), "c1", NewContact{Notes: []string{"Likes tea"}})
 		if err != nil {
 			t.Fatalf("Update: %v", err)
 		}
@@ -382,12 +385,15 @@ func TestAWriteOverAnUnverifiedCardGoesAheadAndSaysSo(t *testing.T) {
 	})
 }
 
-func TestUnpinKeyRemovesKeys(t *testing.T) {
+func TestUnpinKeyRemovesKeysAndKeepsTheSettings(t *testing.T) {
 	kr := testKeyRing(t)
 	_, keyValue := armoredPubKey(t)
 	base := vcard.BuildSigned(vcard.Signed{
 		Name: "Bob", UID: "u",
-		Emails: []vcard.SignedEmail{{Address: "bob@example.com", KeyValues: []string{keyValue}, Encrypt: ptr(true)}},
+		Emails: []vcard.SignedEmail{{
+			Address: "bob@example.com", KeyValues: []string{keyValue}, Encrypt: ptr(true),
+			Sign: ptr(true), Scheme: vcard.SchemeInline, MIMEType: "text/plain",
+		}},
 	})
 	d := &contactDoer{cards: []map[string]any{signedCard(t, kr, base)}}
 	u := &keys.Unlocked{UserKR: kr}
@@ -400,6 +406,119 @@ func TestUnpinKeyRemovesKeys(t *testing.T) {
 		t.Error("email should remain after unpin")
 	} else if len(e.KeyValues) != 0 || e.Encrypt != nil {
 		t.Errorf("keys/flags should be gone: %+v", e)
+	} else if e.Sign == nil || !*e.Sign || e.Scheme != vcard.SchemeInline || e.MIMEType != "text/plain" {
+		t.Errorf("unpinning took the address's settings with it: %+v", e)
+	}
+}
+
+// Encryption is a choice about the pinned keys when there are any, and about
+// the keys the address's provider publishes when there are none.
+func TestSetEmailPreferencesWritesWhatTheAddressIsAbout(t *testing.T) {
+	kr := testKeyRing(t)
+	u := &keys.Unlocked{UserKR: kr}
+	_, keyValue := armoredPubKey(t)
+	for _, tc := range []struct {
+		name     string
+		keys     []string
+		property string
+	}{
+		{"no pinned key", nil, "item1.X-PM-ENCRYPT-UNTRUSTED:false"},
+		{"a pinned key", []string{keyValue}, "item1.X-PM-ENCRYPT:false"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			base := vcard.BuildSigned(vcard.Signed{Name: "Bob", UID: "u", Emails: []vcard.SignedEmail{{
+				Address: "bob@example.com", KeyValues: tc.keys, Encrypt: ptr(true),
+			}}})
+			d := &contactDoer{cards: []map[string]any{signedCard(t, kr, base)}}
+			if _, err := New(d, testKeys(u)).SetEmailPreferences(context.Background(), "c1", "bob@example.com", EmailPreferences{
+				Encrypt: ptr(false), Sign: ptr(true), Scheme: vcard.SchemeInline, PlainText: true,
+			}); err != nil {
+				t.Fatalf("SetEmailPreferences: %v", err)
+			}
+			written := putSignedCardText(t, d)
+			for _, want := range []string{tc.property, "item1.X-PM-SIGN:true", "item1.X-PM-SCHEME:pgp-inline", "item1.X-PM-MIMETYPE:text/plain"} {
+				if !strings.Contains(written, want) {
+					t.Errorf("the card lacks %s:\n%s", want, written)
+				}
+			}
+			if got := strings.Count(written, "X-PM-ENCRYPT"); got != 1 {
+				t.Errorf("the card says %d times whether to encrypt:\n%s", got, written)
+			}
+		})
+	}
+}
+
+// An edit rewrites the signed card, so whatever Proton's apps stored for an
+// address has to be written back with it.
+func TestUpdateKeepsTheSettingsOfEachAddress(t *testing.T) {
+	kr := testKeyRing(t)
+	card := "BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Bob\r\nUID:u\r\n" +
+		"item1.EMAIL:bob@example.com\r\nitem1.X-PM-MIMETYPE:text/plain\r\nitem1.X-PM-SIGN:true\r\n" +
+		"item1.X-PM-TLS:required\r\nEND:VCARD"
+	d := &contactDoer{cards: []map[string]any{signedCard(t, kr, card)}}
+	if _, err := New(d, testKeys(&keys.Unlocked{UserKR: kr})).Update(context.Background(), "c1",
+		NewContact{JobTitles: []string{"Boss"}}); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	written := putSignedCardText(t, d)
+	for _, want := range []string{"X-PM-MIMETYPE:text/plain", "X-PM-SIGN:true", "X-PM-TLS:required"} {
+		if !strings.Contains(written, want) {
+			t.Errorf("an unrelated edit dropped %s:\n%s", want, written)
+		}
+	}
+}
+
+func TestUpdateClearsWhatItIsToldTo(t *testing.T) {
+	kr := testKeyRing(t)
+	signed := vcard.BuildSigned(vcard.Signed{Name: "Bob", UID: "u", Emails: []vcard.SignedEmail{{Address: "bob@example.com"}}})
+	encrypted, err := pgp.EncryptAndSignCard(vcard.BuildEncrypted(vcard.Encrypted{
+		Notes: []string{"one", "two"}, Organizations: []string{"Acme"}, Photo: "https://example.test/bob.png",
+		Phones: []vcard.Typed{{Value: "+43 1 111"}}, Birthday: "1990-01-31",
+	}), kr, kr)
+	if err != nil {
+		t.Fatalf("EncryptAndSignCard: %v", err)
+	}
+	d := &contactDoer{cards: []map[string]any{
+		signedCard(t, kr, signed),
+		{"Type": float64(encrypted.Type), "Data": encrypted.Data, "Signature": encrypted.Signature},
+	}}
+	if _, err := New(d, testKeys(&keys.Unlocked{UserKR: kr})).Update(context.Background(), "c1", NewContact{
+		Clear: map[Detail]bool{DetailNote: true, DetailPhoto: true, DetailPhone: true, DetailBirthday: true},
+	}); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	sealed := putCard(t, d, pgp.CardEncryptedSigned)
+	msg, err := gopenpgp.NewPGPMessageFromArmored(sealed.Data)
+	if err != nil {
+		t.Fatalf("the encrypted card is not armored PGP: %v", err)
+	}
+	plain, err := kr.Decrypt(msg, nil, gopenpgp.GetUnixTime())
+	if err != nil {
+		t.Fatalf("Decrypt: %v", err)
+	}
+	f := vcard.ParseEncrypted(plain.GetString())
+	if len(f.Notes) != 0 || f.Photo != "" || len(f.Phones) != 0 || f.Birthday != "" {
+		t.Errorf("what was cleared is still there: %+v", f)
+	}
+	if len(f.Organizations) != 1 {
+		t.Errorf("clearing the note took the organization with it: %+v", f)
+	}
+}
+
+// A merge keeps what every contact knew about each address it folds in, not
+// only what the kept one knew about its own.
+func TestSignedPartCarriesEachAddressFromWhicheverCardKnowsIt(t *testing.T) {
+	kept := vcard.Signed{Emails: []vcard.SignedEmail{{Address: "jane@example.com", Sign: ptr(false)}}}
+	folded := vcard.Signed{Emails: []vcard.SignedEmail{
+		{Address: "jane@example.com", Sign: ptr(true)},
+		{Address: "j@work.example", KeyValues: []string{"KEY"}, MIMEType: "text/plain"},
+	}}
+	got := signedPart("Jane", "u", []string{"jane@example.com", "work:j@work.example"}, kept, folded)
+	if e := got.FindEmail("jane@example.com"); e == nil || e.Sign == nil || *e.Sign {
+		t.Errorf("the kept contact's setting did not win: %+v", e)
+	}
+	if e := got.FindEmail("j@work.example"); e == nil || len(e.KeyValues) != 1 || e.MIMEType != "text/plain" || e.Kind != "work" {
+		t.Errorf("the folded contact's address lost what it held: %+v", e)
 	}
 }
 
@@ -506,11 +625,11 @@ func TestMergeCardsKeepsTheFirstAndUnionsTheRest(t *testing.T) {
 	if got.name != "Jane Roe" {
 		t.Errorf("name = %q, want the kept contact's", got.name)
 	}
-	if got.encrypted.Note != "Original note" {
-		t.Errorf("note = %q; the kept contact's value must not be overwritten", got.encrypted.Note)
+	if strings.Join(got.encrypted.Notes, "|") != "Original note|Different note" {
+		t.Errorf("notes = %q, want both, the kept contact's first", got.encrypted.Notes)
 	}
-	if got.encrypted.Org != "Acme" {
-		t.Errorf("org = %q; a field the kept contact lacked should be filled in", got.encrypted.Org)
+	if strings.Join(got.encrypted.Organizations, "|") != "Acme" {
+		t.Errorf("organizations = %q; a field the kept contact lacked should be filled in", got.encrypted.Organizations)
 	}
 	if len(got.emails) != 2 {
 		t.Errorf("emails = %v, want both", got.emails)

@@ -107,6 +107,8 @@ echo "Deployed." | proton mail messages send --to me@proton.me --subject Deploy 
 - `--no-signature` leaves both out of one message.
 - `proton mail settings set pm-signature off` turns the footer off account-wide.
 
+Whether a recipient's copy is encrypted, PGP-signed or sent as plain text follows their contact's settings, and your account's `sign` and `pgp-scheme` settings where the contact states none. They are set in [How mail to an address is sent](../contacts/README.md#how-mail-to-an-address-is-sent).
+
 On an account with several addresses, `--from` chooses which one it leaves from, plus-aliases included:
 
 ```bash

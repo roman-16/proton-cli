@@ -344,3 +344,26 @@ func TestAMoveIntoAFolderThatTakesNoneIsRefused(t *testing.T) {
 	}
 	refuses(t, 3, []string{"mail", "messages", "move", "--into", "starred", "--unread"}, "is a label, not a folder")
 }
+
+// A photo is read and fitted on this machine, and a contact's email settings are
+// words from a fixed set, so a file that is not an image, a web address that is
+// not one and a setting that does not exist are all wrong before anybody is
+// signed in.
+func TestAContactsDetailsAreJudgedBeforeSigningIn(t *testing.T) {
+	notes := filepath.Join(t.TempDir(), "notes.txt")
+	if err := os.WriteFile(notes, []byte("not an image"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, tt := range []struct {
+		args   []string
+		phrase string
+	}{
+		{[]string{"contacts", "create", "--name", "Jane Roe", "--photo", notes}, "is not an image proton can read"},
+		{[]string{"contacts", "update", "jane", "--photo", "https://"}, "is not a web address a photo can be loaded from"},
+		{[]string{"contacts", "update", "jane", "--photo", notes, "--clear-photo"}, "contradict each other"},
+		{[]string{"contacts", "emails", "update", "jane", "--sign", "maybe"}, "--sign accepts: on, off, default"},
+		{[]string{"contacts", "emails", "update", "jane"}, "Nothing to change."},
+	} {
+		refuses(t, 1, tt.args, tt.phrase)
+	}
+}

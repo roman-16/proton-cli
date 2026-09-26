@@ -12,7 +12,9 @@ package vcard
 
 import (
 	"crypto/rand"
+	"encoding/base64"
 	"fmt"
+	"net/http"
 	"sort"
 	"strconv"
 	"strings"
@@ -104,17 +106,39 @@ func canonical(email string) string {
 	return strings.ToLower(strings.TrimSpace(strings.TrimPrefix(email, "mailto:")))
 }
 
-// SignedEmail is one address in the signed card, with the pinned keys and
-// per-address crypto settings stored under its group.
+// The schemes X-PM-SCHEME may name. An address that names none follows the
+// account's own choice.
+const (
+	SchemeMIME   = "pgp-mime"
+	SchemeInline = "pgp-inline"
+)
+
+// MIMETypePlain is the one value X-PM-MIMETYPE takes; an address without it is
+// sent the format a message was written in.
+const MIMETypePlain = "text/plain"
+
+// SignedEmail is one address in the signed card, with the pinned keys and the
+// settings for mail sent to it, all stored under the address's group.
 type SignedEmail struct {
 	Address string
 	// Kind is the TYPE the address carries - home, work, other - or "" for one
 	// that names no kind.
-	Kind      string
-	KeyValues []string // raw KEY property values, in preference order
-	Encrypt   *bool
-	Sign      *bool
-	Scheme    string
+	Kind string
+	// KeyValues are the raw KEY property values, in preference order.
+	KeyValues []string
+	// Encrypt is X-PM-ENCRYPT, whether mail is encrypted to the pinned keys, and
+	// EncryptUntrusted is X-PM-ENCRYPT-UNTRUSTED, whether it is encrypted to the
+	// keys the address's provider publishes when none is pinned.
+	Encrypt          *bool
+	EncryptUntrusted *bool
+	Sign             *bool
+	// Scheme is X-PM-SCHEME, pgp-mime or pgp-inline, and MIMEType is
+	// X-PM-MIMETYPE, text/plain or nothing.
+	Scheme   string
+	MIMEType string
+	// Rest is every other property under the address's group that the signed
+	// card holds, written back under whatever group the address is given next.
+	Rest []contentline.Line
 }
 
 // Text renders the address the way --email accepts it, so what a listing shows
@@ -139,33 +163,52 @@ func (c *Signed) FindEmail(addr string) *SignedEmail {
 	return nil
 }
 
+// modelledEmailFields are the group properties SignedEmail reads into fields of
+// its own; the rest of the signed ones under the group travel in Rest.
+var modelledEmailFields = map[string]bool{
+	"EMAIL": true, "KEY": true, "X-PM-ENCRYPT": true, "X-PM-ENCRYPT-UNTRUSTED": true,
+	"X-PM-SIGN": true, "X-PM-SCHEME": true, "X-PM-MIMETYPE": true,
+}
+
 // ParseSigned reads a signed card, capturing each address's group so its pinned
 // keys and settings survive a rebuild.
 func ParseSigned(text string) Signed {
 	out := Signed{Name: Field(text, "FN"), UID: Field(text, "UID")}
+	lines := contentline.ParseAll(text)
 	seen := map[string]bool{}
-	for _, l := range contentline.ParseAll(text) {
+	for _, l := range lines {
 		if l.Name != "EMAIL" || l.Group == "" || seen[l.Group] {
 			continue
 		}
 		seen[l.Group] = true
 		e := SignedEmail{
-			Address:   l.Value,
-			Kind:      strings.ToLower(l.Params.Get("TYPE")),
-			KeyValues: GroupValues(text, l.Group, "KEY"),
-			Scheme:    GroupValue(text, l.Group, "X-PM-SCHEME"),
+			Address:          l.Value,
+			Kind:             strings.ToLower(l.Params.Get("TYPE")),
+			KeyValues:        GroupValues(text, l.Group, "KEY"),
+			Encrypt:          groupBool(text, l.Group, "X-PM-ENCRYPT"),
+			EncryptUntrusted: groupBool(text, l.Group, "X-PM-ENCRYPT-UNTRUSTED"),
+			Sign:             groupBool(text, l.Group, "X-PM-SIGN"),
+			Scheme:           strings.ToLower(strings.TrimSpace(GroupValue(text, l.Group, "X-PM-SCHEME"))),
+			MIMEType:         strings.ToLower(strings.TrimSpace(GroupValue(text, l.Group, "X-PM-MIMETYPE"))),
 		}
-		if v := GroupValue(text, l.Group, "X-PM-ENCRYPT"); v != "" {
-			b := strings.EqualFold(strings.TrimSpace(v), "true")
-			e.Encrypt = &b
-		}
-		if v := GroupValue(text, l.Group, "X-PM-SIGN"); v != "" {
-			b := strings.EqualFold(strings.TrimSpace(v), "true")
-			e.Sign = &b
+		for _, other := range lines {
+			if other.Group == l.Group && signedFields[other.Name] && !modelledEmailFields[other.Name] {
+				other.Group = ""
+				e.Rest = append(e.Rest, other)
+			}
 		}
 		out.Emails = append(out.Emails, e)
 	}
 	return out
+}
+
+func groupBool(text, group, field string) *bool {
+	v := GroupValue(text, group, field)
+	if v == "" {
+		return nil
+	}
+	b := strings.EqualFold(strings.TrimSpace(v), "true")
+	return &b
 }
 
 // BuildSigned renders a signed card, grouping each address's properties as
@@ -198,14 +241,27 @@ func BuildSigned(c Signed) string {
 				Value:  kv,
 			})
 		}
-		if e.Encrypt != nil {
-			lines = append(lines, contentline.Line{Group: group, Name: "X-PM-ENCRYPT", Value: boolText(*e.Encrypt)})
-		}
-		if e.Sign != nil {
-			lines = append(lines, contentline.Line{Group: group, Name: "X-PM-SIGN", Value: boolText(*e.Sign)})
+		for _, flag := range []struct {
+			name  string
+			value *bool
+		}{
+			{"X-PM-ENCRYPT", e.Encrypt},
+			{"X-PM-ENCRYPT-UNTRUSTED", e.EncryptUntrusted},
+			{"X-PM-SIGN", e.Sign},
+		} {
+			if flag.value != nil {
+				lines = append(lines, contentline.Line{Group: group, Name: flag.name, Value: boolText(*flag.value)})
+			}
 		}
 		if e.Scheme != "" {
 			lines = append(lines, contentline.Line{Group: group, Name: "X-PM-SCHEME", Value: e.Scheme})
+		}
+		if e.MIMEType != "" {
+			lines = append(lines, contentline.Line{Group: group, Name: "X-PM-MIMETYPE", Value: e.MIMEType})
+		}
+		for _, l := range e.Rest {
+			l.Group = group
+			lines = append(lines, l)
 		}
 	}
 	lines = append(lines, contentline.Line{Name: "END", Value: "VCARD"})
@@ -277,26 +333,63 @@ type Encrypted struct {
 	Phones    []Typed
 	Addresses []Typed
 	URLs      []Typed
-	Note      string
-	Org       string
-	Title     string
-	Role      string
-	Birthday  string
-	// Anniversary, Gender, Language, Timezone and Nickname are the rest of what
-	// Proton's editor calls "other information".
+	// Nicknames through Timezones are the texts a contact may hold several of.
+	Nicknames     []string
+	Organizations []string
+	Titles        []string
+	Roles         []string
+	Notes         []string
+	Languages     []string
+	Timezones     []string
+	// Birthday, Anniversary and Gender are the texts a contact holds one of.
+	Birthday    string
 	Anniversary string
 	Gender      string
-	Language    string
-	Timezone    string
-	Nickname    string
 	// FirstName and LastName make up the structured name, which is what an
 	// address book sorts and merges on. The display name lives in the signed
 	// card, because that is the part a recipient verifies.
 	FirstName string
 	LastName  string
+	// Photo is the contact's picture as a URI: an image URL, or the image itself
+	// as a data: URI. Any further photo a card holds travels in Rest.
+	Photo string
 	// Rest are properties this tool has no opinion about, carried through so an
 	// imported contact does not lose them on the next edit.
 	Rest []contentline.Line
+}
+
+// textLists pairs each repeatable text property with where Encrypted keeps it.
+func (f *Encrypted) textLists() []struct {
+	name   string
+	values *[]string
+} {
+	return []struct {
+		name   string
+		values *[]string
+	}{
+		{"NICKNAME", &f.Nicknames},
+		{"ORG", &f.Organizations},
+		{"TITLE", &f.Titles},
+		{"ROLE", &f.Roles},
+		{"NOTE", &f.Notes},
+		{"LANG", &f.Languages},
+		{"TZ", &f.Timezones},
+	}
+}
+
+// texts pairs each single text property with where Encrypted keeps it.
+func (f *Encrypted) texts() []struct {
+	name  string
+	value *string
+} {
+	return []struct {
+		name  string
+		value *string
+	}{
+		{"BDAY", &f.Birthday},
+		{"ANNIVERSARY", &f.Anniversary},
+		{"GENDER", &f.Gender},
+	}
 }
 
 // BuildEncrypted renders the encrypted card. Empty properties are left out.
@@ -336,21 +429,27 @@ func BuildEncrypted(f Encrypted) string {
 			Value: contentline.EscapeText(f.LastName) + ";" + contentline.EscapeText(f.FirstName) + ";;;",
 		})
 	}
-	for _, kv := range []struct{ name, value string }{
-		{"NOTE", f.Note},
-		{"ORG", f.Org},
-		{"TITLE", f.Title},
-		{"ROLE", f.Role},
-		{"BDAY", f.Birthday},
-		{"ANNIVERSARY", f.Anniversary},
-		{"GENDER", f.Gender},
-		{"LANG", f.Language},
-		{"TZ", f.Timezone},
-		{"NICKNAME", f.Nickname},
-	} {
-		if kv.value != "" {
-			lines = append(lines, contentline.Line{Name: kv.name, Value: contentline.EscapeText(kv.value)})
+	for _, list := range f.textLists() {
+		for _, v := range *list.values {
+			if v != "" {
+				lines = append(lines, contentline.Line{Name: list.name, Value: contentline.EscapeText(v)})
+			}
 		}
+	}
+	for _, text := range f.texts() {
+		if *text.value != "" {
+			lines = append(lines, contentline.Line{Name: text.name, Value: contentline.EscapeText(*text.value)})
+		}
+	}
+	if f.Photo != "" {
+		photo := contentline.Line{Name: "PHOTO", Value: f.Photo}
+		for _, l := range f.Rest {
+			if l.Name == "PHOTO" {
+				photo.Params = contentline.Params{{Name: "PREF", Value: "1"}}
+				break
+			}
+		}
+		lines = append(lines, photo)
 	}
 	lines = append(lines, f.Rest...)
 	lines = append(lines, contentline.Line{Name: "END", Value: "VCARD"})
@@ -361,61 +460,98 @@ func BuildEncrypted(f Encrypted) string {
 // recognise so that editing one field cannot drop the rest.
 //
 // That is the point of Rest. An update rebuilds the card from this struct, so a
-// property left out here would be a property deleted by the next `--note`.
+// property left out here would be a property deleted by the next `--note`. A
+// second value of a property a contact holds one of goes there too, and so
+// does every photo but the preferred one.
 //
 // Which properties it may carry is decided by the same table that splits a card
 // on the way in: the ones another card holds are not this one's to keep.
 func ParseEncrypted(card string) Encrypted {
 	var f Encrypted
-	for _, l := range contentline.ParseAll(card) {
+	lines := contentline.ParseAll(card)
+	photo := preferredPhoto(lines)
+	lists := map[string]*[]string{}
+	for _, list := range f.textLists() {
+		lists[list.name] = list.values
+	}
+	singles := map[string]*string{}
+	for _, text := range f.texts() {
+		singles[text.name] = text.value
+	}
+	haveName := false
+	for i, l := range lines {
 		value := contentline.UnescapeText(l.Value)
 		typed := Typed{Kind: strings.ToLower(l.Params.Get("TYPE")), Value: value}
-		switch l.Name {
-		case "TEL":
+		switch {
+		case l.Name == "TEL":
 			f.Phones = append(f.Phones, typed)
-		case "ADR":
+		case l.Name == "ADR":
 			f.Addresses = append(f.Addresses, typed)
-		case "URL":
+		case l.Name == "URL":
 			f.URLs = append(f.URLs, typed)
-		case "N":
+		case l.Name == "N" && !haveName:
+			haveName = true
 			parts := strings.SplitN(l.Value, ";", 3)
-			if len(parts) > 0 {
-				f.LastName = contentline.UnescapeText(parts[0])
-			}
+			f.LastName = contentline.UnescapeText(parts[0])
 			if len(parts) > 1 {
 				f.FirstName = contentline.UnescapeText(parts[1])
 			}
-		case "NOTE":
-			f.Note = value
-		case "ORG":
-			f.Org = value
-		case "TITLE":
-			f.Title = value
-		case "ROLE":
-			f.Role = value
-		case "BDAY":
-			f.Birthday = value
-		case "ANNIVERSARY":
-			f.Anniversary = value
-		case "GENDER":
-			f.Gender = value
-		case "LANG":
-			f.Language = value
-		case "TZ":
-			f.Timezone = value
-		case "NICKNAME":
-			f.Nickname = value
-		default:
-			// A property belonging to another card is not this one's to carry.
-			// Carrying the address would make the next edit store a second copy
-			// of it, and the edit after that a third; carrying a VERSION would
-			// write two of them into a card that must have one.
-			if !signedFields[l.Name] && !clearFields[l.Name] {
-				f.Rest = append(f.Rest, l)
-			}
+		case lists[l.Name] != nil:
+			*lists[l.Name] = append(*lists[l.Name], value)
+		case singles[l.Name] != nil && *singles[l.Name] == "":
+			*singles[l.Name] = value
+		case l.Name == "PHOTO" && i == photo:
+			f.Photo = PhotoURI(l)
+		// A property belonging to another card is not this one's to carry.
+		// Carrying the address would make the next edit store a second copy
+		// of it, and the edit after that a third; carrying a VERSION would
+		// write two of them into a card that must have one.
+		case !signedFields[l.Name] && !clearFields[l.Name]:
+			f.Rest = append(f.Rest, l)
 		}
 	}
 	return f
+}
+
+// preferredPhoto is the index of the PHOTO a card prefers - the lowest PREF,
+// then the first - or -1 when it holds none.
+func preferredPhoto(lines []contentline.Line) int {
+	best, bestPref := -1, 0
+	for i, l := range lines {
+		if l.Name != "PHOTO" {
+			continue
+		}
+		if p := pref(l.Params, i); best < 0 || p < bestPref {
+			best, bestPref = i, p
+		}
+	}
+	return best
+}
+
+// PhotoURI reads a PHOTO property as the URI it stands for.
+//
+// vCard 4 writes a photo as a URI, which is the form this package stores. vCard
+// 3 writes the image's bytes in base64 with the format as a TYPE, and some
+// writers leave out even that, so both are turned into the data: URI they
+// amount to.
+func PhotoURI(l contentline.Line) string {
+	value := strings.TrimSpace(contentline.UnescapeText(l.Value))
+	if strings.Contains(value, ":") && !strings.EqualFold(l.Params.Get("ENCODING"), "b") &&
+		!strings.EqualFold(l.Params.Get("ENCODING"), "base64") {
+		return value
+	}
+	media := strings.ToLower(l.Params.Get("TYPE"))
+	switch {
+	case media == "":
+		data, err := base64.StdEncoding.DecodeString(value)
+		if err != nil {
+			return value
+		}
+		media = http.DetectContentType(data)
+	case !strings.Contains(media, "/"):
+		media = "image/" + media
+	}
+	return "data:" + media + ";base64," + value
 }
 
 // ── groups ──

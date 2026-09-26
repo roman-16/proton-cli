@@ -2,23 +2,29 @@ package mail
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
+	"github.com/roman-16/proton-cli/internal/vcard"
 )
 
-// Proton send-package types (PACKAGE_TYPE).
+// Proton send-package types (PACKAGE_TYPE). A package's Type is the union of
+// the types of the recipients it carries.
 const (
 	pkgInternal  = 1  // SEND_PM: E2EE to a Proton user
 	pkgEO        = 2  // SEND_EO: encrypted-for-outside (password link)
-	pkgClear     = 4  // SEND_CLEAR: cleartext (TLS only)
-	pkgPGPInline = 8  // SEND_PGP_INLINE: PGP-Inline (plaintext body) to an external key
-	pkgPGPMIME   = 16 // SEND_PGP_MIME: encrypted to an external recipient's PGP key
+	pkgClear     = 4  // SEND_CLEAR: cleartext, PGP/Inline-signed when asked
+	pkgPGPInline = 8  // SEND_PGP_INLINE: PGP/Inline to an external key
+	pkgPGPMIME   = 16 // SEND_PGP_MIME: PGP/MIME to an external key
+	pkgClearMIME = 32 // SEND_CLEAR_MIME: cleartext, PGP/MIME-signed
 )
 
 const (
+	mimeTypeMultipart = "multipart/mixed"
+
 	// keyFlagEmailNoEncrypt (KEY_FLAG.FLAG_EMAIL_NO_ENCRYPT) marks a key that
 	// cannot be used to encrypt mail (external address, e2ee-disabled, etc.).
 	keyFlagEmailNoEncrypt = 4
@@ -26,42 +32,81 @@ const (
 	// any other source (WKD, KOO) is an external key.
 	apiKeySourceProton = 0
 
+	// signEnabled is MailSettings.Sign turned on.
+	signEnabled = 1
+
 	// defaultEOExpirationSeconds mirrors DEFAULT_EO_EXPIRATION_DAYS (28 days):
 	// Proton always attaches an expiration to encrypted-for-outside messages.
 	defaultEOExpirationSeconds = 28 * 24 * 60 * 60
 )
 
-// sendScheme is how a single recipient's copy is packaged.
-type sendScheme int
-
-const (
-	schemeInternal       sendScheme = iota // Proton user -> E2EE
-	schemeExternalPGP                      // external user with a usable PGP key -> PGP/MIME
-	schemeExternalInline                   // external user with a pinned key preferring PGP-Inline
-	schemeEO                               // external user + EO password -> password link
-	schemeClear                            // external user, no key, no password -> cleartext
-)
-
-// externalScheme maps a pinned contact's x-pm-scheme to the send scheme for an
-// external recipient: PGP-Inline when requested, otherwise PGP/MIME.
-func externalScheme(pinScheme string) sendScheme {
-	if pinScheme == "pgp-inline" {
-		return schemeExternalInline
-	}
-	return schemeExternalPGP
-}
-
-// PinnedRecipient is a recipient's contact-pinned encryption preferences,
-// resolved from Contacts. Presence of a pinned key defaults encryption ON
-// (unless Encrypt is explicitly false), matching the Proton web client.
-type PinnedRecipient struct {
-	ArmoredKeys       []string
+// ContactSettings is what a recipient's contact says about mail sent to the
+// address. Encrypt is about the pinned keys when there are any, and about the
+// keys the address's provider publishes when there are none; a nil Encrypt
+// means yes, and a nil Sign follows the account.
+type ContactSettings struct {
+	Keys              []string
 	Encrypt           *bool
 	Sign              *bool
 	Scheme            string
+	PlainText         bool
 	SignatureVerified bool
-	// Unknown says the contact exists and what it pins could not be read.
+	// Unknown says the contact exists and what it holds could not be read.
 	Unknown bool
+}
+
+// Destination is what an address is before any contact says anything about it:
+// a Proton mailbox, one whose provider publishes a key, or neither.
+type Destination struct {
+	Proton      bool
+	ProviderKey bool
+}
+
+// SendDefaults are the account's own choices for mail to addresses outside
+// Proton, which an address follows where its contact makes none.
+type SendDefaults struct {
+	Sign   bool
+	Inline bool
+}
+
+// Preferences is how mail to one address goes out.
+type Preferences struct {
+	Encrypt   bool
+	Sign      bool
+	Inline    bool
+	PlainText bool
+}
+
+// Resolve decides how mail to an address goes out from what it is, what its
+// contact says and what the account says, by the rules Proton's own clients
+// send by: mail to a Proton address is always encrypted and signed, encrypted
+// mail is always signed, and signed mail outside Proton is plain text under
+// PGP/Inline and in the format it was written in under PGP/MIME.
+func Resolve(d Destination, c ContactSettings, def SendDefaults) Preferences {
+	if d.Proton {
+		return Preferences{Encrypt: true, Sign: true, PlainText: c.PlainText}
+	}
+	var p Preferences
+	if len(c.Keys) > 0 || d.ProviderKey {
+		p.Encrypt = c.Encrypt == nil || *c.Encrypt
+	}
+	p.Sign = def.Sign
+	if c.Sign != nil {
+		p.Sign = *c.Sign
+	}
+	p.Sign = p.Sign || p.Encrypt
+	switch c.Scheme {
+	case vcard.SchemeInline:
+		p.Inline = true
+	case vcard.SchemeMIME:
+	default:
+		p.Inline = def.Inline
+	}
+	p.PlainText = c.PlainText
+	if p.Sign {
+		p.PlainText = p.Inline
+	}
+	return p
 }
 
 type apiPublicKey struct {
@@ -76,42 +121,83 @@ type keysAllResponse struct {
 	ProtonMX   bool
 }
 
+// plannedRecipient is one recipient's part of a send: the sub-package type,
+// whether a cleartext copy is signed, which of the message's bodies it gets,
+// and the key its copy is encrypted to.
 type plannedRecipient struct {
 	email      string
-	scheme     sendScheme
-	armoredKey string // recipient public key for internal + external-PGP schemes
+	kind       int
+	signature  bool
+	mimeType   string
+	armoredKey string
 }
 
 func mailCapable(flags int) bool { return flags&keyFlagEmailNoEncrypt == 0 }
 
-// classifyRecipient picks the send scheme (and recipient key, if any) from a
-// /core/v4/keys/all response, mirroring the web client's getPublicKeys logic:
-// mail-capable internal address keys mark a Proton user; otherwise a mail-capable
-// external key (WKD/KOO) enables PGP/MIME; otherwise EO (with a password) or
-// cleartext.
-func classifyRecipient(resp keysAllResponse, eoPassword string) (sendScheme, string) {
+// destinationFrom reads a /core/v4/keys/all response the way the web client's
+// getPublicKeys does - a mail-capable Proton key marks a Proton mailbox, and a
+// mail-capable key from anywhere else is one the provider publishes - and
+// returns the key a send encrypts to when nothing is pinned.
+func destinationFrom(resp keysAllResponse) (Destination, string) {
 	for _, k := range resp.Address.Keys {
 		if mailCapable(k.Flags) {
-			return schemeInternal, k.PublicKey
+			return Destination{Proton: true}, k.PublicKey
 		}
 	}
 	for _, k := range resp.Unverified.Keys {
 		if k.Source == apiKeySourceProton && mailCapable(k.Flags) {
-			return schemeInternal, k.PublicKey
+			return Destination{Proton: true}, k.PublicKey
 		}
 	}
 	for _, k := range resp.Unverified.Keys {
 		if k.Source != apiKeySourceProton && mailCapable(k.Flags) {
-			return schemeExternalPGP, k.PublicKey
+			return Destination{ProviderKey: true}, k.PublicKey
 		}
 	}
-	if eoPassword != "" {
-		return schemeEO, ""
-	}
-	return schemeClear, ""
+	return Destination{}, ""
 }
 
-func (s *Service) planRecipient(ctx context.Context, email, eoPassword string, pin *PinnedRecipient) (plannedRecipient, error) {
+func (s *Service) keysFor(ctx context.Context, email string) (keysAllResponse, error) {
+	var resp keysAllResponse
+	err := s.C.Decode(ctx, proton.Request{
+		Method: "GET", Path: "/core/v4/keys/all",
+		Query: proton.Query("Email", email, "InternalOnly", "0"),
+	}, &resp)
+	return resp, err
+}
+
+// Proton's answers for an address it holds no keys for, which its own
+// email-settings editor reads as an address outside Proton with none.
+var noKeysCodes = map[int]bool{33101: true, 33102: true, 33103: true}
+
+// Destination says what an address is.
+func (s *Service) Destination(ctx context.Context, email string) (Destination, error) {
+	resp, err := s.keysFor(ctx, email)
+	var apiErr *proton.APIError
+	if errors.As(err, &apiErr) && noKeysCodes[apiErr.Code] {
+		// Recorded and not counted: the answer is the destination itself, an
+		// address with no key, and the code is what says which of the ways
+		// Proton has of saying so it was.
+		slog.DebugContext(ctx, "mail: no keys for an address", "signer", email, "code", apiErr.Code)
+		return Destination{}, nil
+	}
+	if err != nil {
+		return Destination{}, err
+	}
+	d, _ := destinationFrom(resp)
+	return d, nil
+}
+
+// SendDefaults reads the account's sign and pgp-scheme settings.
+func (s *Service) SendDefaults(ctx context.Context) (SendDefaults, error) {
+	set, err := s.settings(ctx)
+	if err != nil {
+		return SendDefaults{}, err
+	}
+	return SendDefaults{Sign: set.Sign == signEnabled, Inline: set.PGPScheme == pkgPGPInline}, nil
+}
+
+func (s *Service) planRecipient(ctx context.Context, email, eoPassword string, contact *ContactSettings, defaults SendDefaults, composer string) (plannedRecipient, error) {
 	// A pin that cannot be seen is not the same as no pin. The person pinned a
 	// key so that mail to this address goes to it and nothing else; sending under
 	// whatever Proton hands back because their contact would not open is that
@@ -119,51 +205,66 @@ func (s *Service) planRecipient(ctx context.Context, email, eoPassword string, p
 	// this one stops, since a sent message cannot be taken back and a stopped
 	// one can be sent again. Judged before the keys request, which a stopped
 	// send has no use for.
-	if pin != nil && pin.Unknown {
+	if contact != nil && contact.Unknown {
 		return plannedRecipient{}, errs.Problemf(
 			"The contact for %s could not be read, so whether it pins a key is unknown. Nothing was sent.", email).
 			Hint("proton contacts get " + email + " says what is wrong with it")
 	}
-	var resp keysAllResponse
-	if err := s.C.Decode(ctx, proton.Request{
-		Method: "GET", Path: "/core/v4/keys/all",
-		Query: proton.Query("Email", email, "InternalOnly", "0"),
-	}, &resp); err != nil {
+	resp, err := s.keysFor(ctx, email)
+	if err != nil {
 		return plannedRecipient{}, err
 	}
-	scheme, armored := classifyRecipient(resp, eoPassword)
-	if pin != nil && len(pin.ArmoredKeys) > 0 && pinEncrypts(pin) {
-		return planPinnedRecipient(ctx, email, scheme, armored, pin)
+	dest, key := destinationFrom(resp)
+	var cs ContactSettings
+	if contact != nil {
+		cs = *contact
 	}
-	return plannedRecipient{email: email, scheme: scheme, armoredKey: armored}, nil
+	pref := Resolve(dest, cs, defaults)
+	if len(cs.Keys) > 0 && pref.Encrypt {
+		if key, err = pinnedSendKey(ctx, email, key, cs); err != nil {
+			return plannedRecipient{}, err
+		}
+	}
+	format := composer
+	if pref.PlainText {
+		format = mimeTypePlain
+	}
+	p := plannedRecipient{email: email}
+	switch {
+	case dest.Proton:
+		p.kind, p.mimeType, p.armoredKey = pkgInternal, format, key
+	case pref.Encrypt && pref.Inline:
+		p.kind, p.mimeType, p.armoredKey = pkgPGPInline, mimeTypePlain, key
+	case pref.Encrypt:
+		p.kind, p.mimeType, p.armoredKey = pkgPGPMIME, mimeTypeMultipart, key
+	case eoPassword != "":
+		p.kind, p.mimeType = pkgEO, composer
+	case pref.Sign && pref.Inline:
+		p.kind, p.signature, p.mimeType = pkgClear, true, mimeTypePlain
+	case pref.Sign:
+		p.kind, p.signature, p.mimeType = pkgClearMIME, true, mimeTypeMultipart
+	default:
+		p.kind, p.mimeType = pkgClear, format
+	}
+	return p, nil
 }
 
-// planRecipients classifies every recipient of a message once, reporting whether
-// the shared body package and an encrypted-for-outside package are needed.
-func (s *Service) planRecipients(ctx context.Context, c Content, del Delivery) (plans []plannedRecipient, needBody, hasEO bool, err error) {
+// planRecipients plans every recipient of a message once, reporting whether any
+// of them is sent a password-protected copy.
+func (s *Service) planRecipients(ctx context.Context, c Content, del Delivery) (plans []plannedRecipient, hasEO bool, err error) {
+	defaults, err := s.SendDefaults(ctx)
+	if err != nil {
+		return nil, false, err
+	}
 	for _, email := range c.RecipientAddresses() {
-		p, err := s.planRecipient(ctx, email, del.EOPassword, del.PinnedKeys[email])
+		p, err := s.planRecipient(ctx, email, del.EOPassword, del.Contacts[email], defaults, c.mimeType())
 		if err != nil {
-			return nil, false, false, err
+			return nil, false, err
 		}
 		plans = append(plans, p)
-		// PGP/MIME and PGP-Inline recipients each get their own body package;
-		// everything else shares the single internal/EO/clear body.
-		if p.scheme != schemeExternalPGP && p.scheme != schemeExternalInline {
-			needBody = true
-		}
-		if p.scheme == schemeEO {
-			hasEO = true
-		}
+		hasEO = hasEO || p.kind == pkgEO
 	}
-	return plans, needBody, hasEO, nil
-}
-
-// pinEncrypts reports whether the pinned config asks us to encrypt. Presence of
-// a pinned key defaults encryption ON (matching the web client); an explicit
-// x-pm-encrypt:false opts out.
-func pinEncrypts(pin *PinnedRecipient) bool {
-	return pin.Encrypt == nil || *pin.Encrypt
+	return plans, hasEO, nil
 }
 
 // validForSending mirrors the web client's getIsValidForSending: a key must be
@@ -172,20 +273,18 @@ func validForSending(key *pgp.Key) bool {
 	return key.CanEncrypt() && !key.IsExpired() && !key.IsRevoked()
 }
 
-// planPinnedRecipient resolves a recipient's send scheme when their contact
-// pins a key, mirroring extractEncryptionPreferences:
-//   - internal / external-WKD: the recipient's primary API key must itself be
-//     pinned (same fingerprint); we then send to the pinned copy. A mismatch is
-//     the web client's PRIMARY_NOT_PINNED error.
-//   - external without a server/WKD key: encrypt (PGP/MIME) to the first valid
-//     pinned key.
-func planPinnedRecipient(ctx context.Context, email string, base sendScheme, apiArmored string, pin *PinnedRecipient) (plannedRecipient, error) {
+// pinnedSendKey picks the key mail to a recipient whose contact pins keys is
+// encrypted to, mirroring extractEncryptionPreferences: when the address has a
+// key of its own - a Proton key, or one its provider publishes - that key must
+// be among the pinned ones, and the pinned copy is used; otherwise the first
+// pinned key that can encrypt is.
+func pinnedSendKey(ctx context.Context, email, apiArmored string, cs ContactSettings) (string, error) {
 	// The three refusals below are about keys this account chose to pin, so each
 	// one is something the person sending can put right and none of them is a
 	// fault in this CLI. Saying so is what keeps them off the exit code that
 	// means "report this".
-	if !pin.SignatureVerified {
-		return plannedRecipient{}, errs.Problemf(
+	if !cs.SignatureVerified {
+		return "", errs.Problemf(
 			"The contact signature for %s could not be verified, so its pinned key is not trusted.", email).
 			Hint("open the contact in a Proton app to re-sign it, or unpin the key")
 	}
@@ -195,7 +294,7 @@ func planPinnedRecipient(ctx context.Context, email string, base sendScheme, api
 	// the refusal below says so and the message is not sent - so the log is here
 	// to say which of the pinned keys was the problem, not to warn about a
 	// listing that came up short.
-	for _, a := range pin.ArmoredKeys {
+	for _, a := range cs.Keys {
 		key, err := pgp.NewKeyFromArmored(a)
 		if err != nil {
 			slog.DebugContext(ctx, "mail: a pinned key is not readable armour",
@@ -210,41 +309,31 @@ func planPinnedRecipient(ctx context.Context, email string, base sendScheme, api
 		valid = append(valid, pinnedKey{armored: a, fingerprint: key.GetFingerprint()})
 	}
 	if len(valid) == 0 {
-		return plannedRecipient{}, errs.Problemf(
+		return "", errs.Problemf(
 			"No pinned key for %s can encrypt: they are expired, revoked, or not encryption keys.", email).
-			Hint("proton contacts keys unpin --email " + email)
+			Hint("proton contacts keys unpin " + email)
 	}
-	switch base {
-	case schemeInternal, schemeExternalPGP:
-		primaryFingerprint := ""
-		if apiArmored != "" {
-			// Recorded and not counted. The refusal below is on the screen and the
-			// message is not sent, so nothing is hidden - this is here because a
-			// primary key that could not be read and one that genuinely differs from
-			// the pinned key reach that refusal looking identical.
-			if k, err := pgp.NewKeyFromArmored(apiArmored); err != nil {
-				slog.DebugContext(ctx, "mail: a recipient's primary key is not readable armour",
-					"signer", email, "error", err)
-			} else {
-				primaryFingerprint = k.GetFingerprint()
-			}
-		}
-		sendScheme := base
-		if base == schemeExternalPGP {
-			// A WKD external recipient may prefer PGP-Inline over PGP/MIME.
-			sendScheme = externalScheme(pin.Scheme)
-		}
-		for _, v := range valid {
-			if v.fingerprint == primaryFingerprint {
-				return plannedRecipient{email: email, scheme: sendScheme, armoredKey: v.armored}, nil
-			}
-		}
-		return plannedRecipient{}, errs.Problemf(
-			"The pinned key(s) for %s do not match the recipient's current primary key.", email).
-			Hint("update the pinned key before sending",
-				"proton contacts keys pin --email "+email+" --key FILE")
-	default:
-		// External recipient with no server/WKD key: encrypt to the pinned key.
-		return plannedRecipient{email: email, scheme: externalScheme(pin.Scheme), armoredKey: valid[0].armored}, nil
+	if apiArmored == "" {
+		return valid[0].armored, nil
 	}
+	primaryFingerprint := ""
+	// Recorded and not counted. The refusal below is on the screen and the
+	// message is not sent, so nothing is hidden - this is here because a primary
+	// key that could not be read and one that genuinely differs from the pinned
+	// key reach that refusal looking identical.
+	if k, err := pgp.NewKeyFromArmored(apiArmored); err != nil {
+		slog.DebugContext(ctx, "mail: a recipient's primary key is not readable armour",
+			"signer", email, "error", err)
+	} else {
+		primaryFingerprint = k.GetFingerprint()
+	}
+	for _, v := range valid {
+		if v.fingerprint == primaryFingerprint {
+			return v.armored, nil
+		}
+	}
+	return "", errs.Problemf(
+		"The pinned key(s) for %s do not match the recipient's current primary key.", email).
+		Hint("update the pinned key before sending",
+			"proton contacts keys pin "+email+" --key FILE")
 }

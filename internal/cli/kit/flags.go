@@ -161,6 +161,7 @@ var Flags = map[string]Flag{
 	"pattern":                {Means: "select by glob against the name"},
 	"personal-website":       {Means: "a personal website, as opposed to a work one"},
 	"phone":                  {Means: "a phone number"},
+	"photo":                  {Means: "a contact's picture: an image file, - for stdin, or a web address"},
 	"postal-code":            {Means: "a postal code"},
 	"prefix":                 {Means: "the local part of an alias"},
 	"public-key":             {Means: "a public key"},
