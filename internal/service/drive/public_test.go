@@ -237,7 +237,7 @@ func (p *publicTree) seal(t *testing.T, details map[string]any, parentKR *pgp.Ke
 	if err != nil {
 		t.Fatalf("encrypt a name: %v", err)
 	}
-	hash, err := lookupHash(strings.ToLower(name), hashKey)
+	hash, err := lookupHash(name, hashKey)
 	if err != nil {
 		t.Fatalf("hash a name: %v", err)
 	}
@@ -536,13 +536,13 @@ func TestALinkOnlyGivesBackYourOwnRecentUploads(t *testing.T) {
 func TestRenamingYourOwnUploadInALinkNamesBothHashes(t *testing.T) {
 	tree := newPublicTree(t, testURLPassword, "Project", protonFolder)
 	s, doer := publicService(t, tree, proton.PublicLinkGeneratedPassword, signedInAs(t, testAddrMail), nil)
-	tree.hold(t, testRootID, uploadedFile("photo.jpg", testAddrMail, uploadedJustNow()))
+	file := tree.hold(t, testRootID, uploadedFile("IMG_0001.JPG", testAddrMail, uploadedJustNow()))
 
 	dc, err := s.OpenLink(context.Background(), LinkURL(testToken, testURLPassword), "")
 	if err != nil {
 		t.Fatalf("OpenLink: %v", err)
 	}
-	if err := s.Rename(context.Background(), dc, "/photo.jpg", "holiday.jpg"); err != nil {
+	if err := s.Rename(context.Background(), dc, "/IMG_0001.JPG", "Holiday.JPG"); err != nil {
 		t.Fatalf("Rename: %v", err)
 	}
 	req := doer.last()
@@ -556,11 +556,20 @@ func TestRenamingYourOwnUploadInALinkNamesBothHashes(t *testing.T) {
 	if body["NameSignatureEmail"] != testAddrMail {
 		t.Errorf("the new name is signed by %v, want %s", body["NameSignatureEmail"], testAddrMail)
 	}
-	if body["Hash"] == "" || body["OriginalHash"] == "" || body["Hash"] == body["OriginalHash"] {
-		t.Errorf("the rename names hashes %v and %v", body["Hash"], body["OriginalHash"])
+	// Proton's clients hash a name exactly as it is written, so the new hash is
+	// the one any of them would compute, and the old one is whatever Proton holds.
+	wantHash, err := lookupHash("Holiday.JPG", tree.rootHashKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if body["Hash"] != wantHash {
+		t.Errorf("the new name hashes to %v, want the hash of the name as written", body["Hash"])
+	}
+	if stored := file["Link"].(map[string]any)["NameHash"]; body["OriginalHash"] != stored {
+		t.Errorf("the rename names the old hash %v, want the one Proton holds, %v", body["OriginalHash"], stored)
 	}
 	name, err := decryptName(body["Name"].(string), tree.rootKR)
-	if err != nil || name != "holiday.jpg" {
+	if err != nil || name != "Holiday.JPG" {
 		t.Errorf("the new name reads %q (%v), and is sealed to the folder it sits in", name, err)
 	}
 }

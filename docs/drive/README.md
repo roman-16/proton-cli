@@ -282,6 +282,25 @@ proton drive shared remove Q3-report.pdf
 
 A saved link shows `public link` under SHARED BY. `shared remove` forgets it; the link itself keeps working, and `shared add` brings it back.
 
+## Report something shared with you
+
+Report a file, folder or photo somebody shared with you, or one behind a link, to Proton:
+
+```bash
+proton drive items abuse /invoice.exe --shared Project --category malware --good-faith
+proton drive items abuse / --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL' --category spam --good-faith
+proton drive items revisions abuse /report.pdf 5bH2mQxK --shared Project --category malware --good-faith
+proton drive invitations abuse 5bH2mQxK --category spam --good-faith
+```
+
+`--category` is `spam`, `copyright`, `child-abuse`, `non-consensual-intimate`, `stolen-data`, `malware` or `other`. A `copyright` or `stolen-data` report also needs `--message` and `--email`.
+
+`--good-faith` is your confirmation, in good faith, that what the report says is correct and complete. A report is refused without it.
+
+Proton receives the key to the whole of what was shared, not only the item you name. Nothing withdraws a report, and the item stays where it is: `proton drive shared leave` and `proton drive invitations decline` give it up.
+
+Your own files cannot be reported.
+
 ## Computers
 
 A computer running the Proton Drive desktop app syncs its files to your account, and they are a tree of their own rather than part of your files.
@@ -310,6 +329,8 @@ proton drive photos favorite 3Ns8pT2v
 Tags are `favorites`, `screenshots`, `videos`, `live-photos`, `motion-photos`, `selfies`, `portraits`, `bursts`, `panoramas` and `raw`.
 
 Photos have no path; address them by ID.
+
+`photos upload` leaves a photo the library already holds alone, with the same name and the same content, and says which photo it is. A different photo with the same name is uploaded beside it.
 
 ```bash
 proton drive photos albums create --name Holiday

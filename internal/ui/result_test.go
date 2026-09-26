@@ -176,6 +176,14 @@ func TestResultMessageShapes(t *testing.T) {
 		"nothing matched",
 		ResultSpec{Action: Trashed, Kind: "messages", Count: 0},
 		"✓ Nothing to move.",
+	}, {
+		"nothing to do, and why",
+		ResultSpec{Action: Uploaded, Count: 0, Name: "note.txt", Detail: "- /Documents already has note.txt"},
+		"✓ Nothing to upload - /Documents already has note.txt.",
+	}, {
+		"a preview of nothing to do says so rather than counting zero",
+		ResultSpec{Action: Uploaded, Count: 0, Name: "note.txt", Detail: "- /Documents already has note.txt", DryRun: true},
+		"Dry run - nothing to upload - /Documents already has note.txt.",
 	}} {
 		t.Run(tc.name, func(t *testing.T) {
 			u, out, errb := fixture(t, Options{})

@@ -448,6 +448,8 @@ proton drive photos unfavorite 5bH2mQxK
 
 Upload a photo to the library.
 
+A photo the library already holds, with the same name and the same content, is not uploaded again. A different photo with the same name is uploaded beside it.
+
 ```
 proton drive photos upload SRC
 ```

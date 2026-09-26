@@ -92,7 +92,7 @@ func (s *Service) openLink(ctx context.Context, token, urlPassword, customPasswo
 	if err != nil {
 		return nil, linkFailure(err)
 	}
-	shareKR, err := unlockLinkShare(share, password)
+	shareKR, passphrase, err := unlockLinkShare(share, password)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +104,8 @@ func (s *Service) openLink(ctx context.Context, token, urlPassword, customPasswo
 		Token: token, URL: LinkURL(token, urlPassword), LinkPassword: customPassword,
 		ShareKR: shareKR, VolumeID: share.VolumeID, RootLinkID: root.LinkID, rootLink: root,
 		Permissions: share.PublicPermissions, Anonymous: share.Anonymous,
-		Type: shareTypeStandard,
+		Type:            shareTypeStandard,
+		sharePassphrase: passphrase, linkProof: password,
 	}
 	s.noteLinkRevision(ctx, dc, root)
 	dc.RootName = rootName(ctx, token, dc.Type, root, shareKR)
@@ -172,35 +173,40 @@ func linkFailure(err error) error {
 	return err
 }
 
-// unlockLinkShare opens the share key a link's password locks.
-func unlockLinkShare(share *proton.PublicLinkShare, password string) (*pgp.KeyRing, error) {
+// unlockLinkShare opens the share key a link's password locks, and hands back
+// the passphrase that unlocked it.
+func unlockLinkShare(share *proton.PublicLinkShare, password string) (*pgp.KeyRing, []byte, error) {
 	salt, err := base64.StdEncoding.DecodeString(share.SharePasswordSalt)
 	if err != nil {
-		return nil, fmt.Errorf("decode the link's salt: %w", err)
+		return nil, nil, fmt.Errorf("decode the link's salt: %w", err)
 	}
 	hashed, err := srp.MailboxPassword([]byte(password), salt)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	enc, err := pgp.NewPGPMessageFromArmored(share.SharePassphrase)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	// Proton's key password is the last 31 bytes of the bcrypt hash, not the
 	// whole thing.
 	dec, err := pgp.DecryptMessageWithPassword(enc, hashed[len(hashed)-31:])
 	if err != nil {
-		return nil, fmt.Errorf("decrypt the link's share passphrase: %w", err)
+		return nil, nil, fmt.Errorf("decrypt the link's share passphrase: %w", err)
 	}
 	locked, err := pgp.NewKeyFromArmored(share.ShareKey)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	unlocked, err := locked.Unlock(dec.GetBinary())
 	if err != nil {
-		return nil, fmt.Errorf("unlock the link's share key: %w", err)
+		return nil, nil, fmt.Errorf("unlock the link's share key: %w", err)
 	}
-	return pgp.NewKeyRing(unlocked)
+	kr, err := pgp.NewKeyRing(unlocked)
+	if err != nil {
+		return nil, nil, err
+	}
+	return kr, dec.GetBinary(), nil
 }
 
 // linkRoot reads what a link points at.

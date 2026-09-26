@@ -308,6 +308,14 @@ func (s *showing) entries() []idcache.Entry {
 	return s.refs
 }
 
+// Mention is a reference as a sentence names it: short where the screen shows
+// short IDs, and remembered, so that short form resolves on the next command
+// line the way one a listing showed does.
+func (c *Invocation) Mention(id string) string {
+	c.remember([]idcache.Entry{{Collection: Holding(c.Cmd), Ref: id}})
+	return ui.Short(id, c.UI().ShortIDs())
+}
+
 // remember files what a response showed, so far as there is anywhere to file it.
 // A cache that cannot be written is not worth failing a command over: the
 // listing on the screen is the answer, and the memory of it is a convenience.

@@ -222,14 +222,13 @@ func Result(u *UI, spec ResultSpec) error {
 //	Uploaded report.pdf to /Docs.    one thing named, with no useful kind word
 //	Moved 3 messages to trash.       a count
 func (s ResultSpec) message() string {
+	if s.Count == 0 {
+		return "Nothing to " + s.untouched()
+	}
 	var b strings.Builder
 	b.WriteString(s.Action.Past)
 	b.WriteByte(' ')
 	switch {
-	case s.Count == 0:
-		b.Reset()
-		b.WriteString("Nothing to ")
-		b.WriteString(s.Action.Verb)
 	case s.Name != "" && s.Count == 1 && s.Kind != "":
 		b.WriteString(inflect.Singular(s.Kind))
 		b.WriteString(` "`)
@@ -248,7 +247,20 @@ func (s ResultSpec) message() string {
 }
 
 func (s ResultSpec) dryRunLine() string {
+	if s.Count == 0 {
+		return "Dry run - nothing to " + s.untouched()
+	}
 	return "Dry run - " + s.wouldLine("would", s.hasPreview())
+}
+
+// untouched finishes the sentence for a change that affects nothing, after its
+// "nothing to": the verb, and whatever says why.
+func (s ResultSpec) untouched() string {
+	line := s.Action.Verb
+	if s.Detail != "" {
+		line += " " + s.Detail
+	}
+	return line + "."
 }
 
 // hasPreview reports whether there is a table of affected things to draw.

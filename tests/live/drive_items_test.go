@@ -927,3 +927,44 @@ func TestDriveSettingsSetListsKeys(t *testing.T) {
 	stdout := runOK(t, "drive", "settings", "list")
 	assertContains(t, stdout, "version-history")
 }
+
+// A report is previewed rather than sent: a person at Proton reads every one, so
+// the suite proves everything a report resolves - the share, the item, the
+// version - and stops short of filing it. Earlier versions are open to editors
+// alone, so the share allows editing.
+func TestDriveItemsAbuseInSomethingSharedWithYou(t *testing.T) {
+	folder := "/" + testID() + "-abuse"
+	runOK(t, "drive", "items", "create", folder)
+	cleanupRun(t, fmt.Sprintf("Delete: proton drive items delete %s", folder),
+		"drive", "items", "delete", folder)
+	src := filepath.Join(t.TempDir(), "invoice.txt")
+	writeLocal(t, src, "abuse-payload")
+	runOK(t, "drive", "items", "upload", src, folder)
+
+	id, _ := sharedWithSecondary(t, folder, "--access", "editor")["link_id"].(string)
+
+	_, stderr := runOKStderrSecondary(t, "--dry-run", "drive", "items", "abuse",
+		"--shared", id, "--category", "malware", "--good-faith", "/invoice.txt")
+	assertContains(t, stderr, "Dry run - would report invoice.txt to Proton as malware.")
+
+	revisions := runJSONArraySecondary(t, "drive", "items", "revisions", "list", "/invoice.txt", "--shared", id)
+	if len(revisions) == 0 {
+		t.Fatal("the shared file lists no revisions")
+	}
+	revision, _ := revisions[0].(map[string]interface{})["id"].(string)
+	_, stderr = runOKStderrSecondary(t, "--dry-run", "drive", "items", "revisions", "abuse",
+		"--shared", id, "--category", "copyright", "--message", "Published without permission",
+		"--email", secondaryEmail(), "--good-faith", "/invoice.txt", revision)
+	assertContains(t, stderr, "Dry run - would report revision")
+	assertContains(t, stderr, "of invoice.txt to Proton as copyright infringement.")
+}
+
+// A link is reported by whoever holds it, with no membership of anything.
+func TestDriveItemsAbuseInALink(t *testing.T) {
+	_, url := sharedLink(t, "abuselink", "link-payload")
+
+	_, stderr := runOKStderrSecondary(t, "--dry-run", "drive", "items", "abuse",
+		"--link", url, "--category", "spam", "--good-faith", "/payload.txt")
+
+	assertContains(t, stderr, "Dry run - would report payload.txt to Proton as spam.")
+}

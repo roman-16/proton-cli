@@ -298,6 +298,7 @@ func shareRemoveCmd(s shared) *cobra.Command {
 func invitationsCmd() *cobra.Command {
 	c := &cobra.Command{Use: "invitations", Short: "Shares other people have offered you"}
 	c.AddCommand(
+		invitationsAbuseCmd(),
 		invitationsListCmd(),
 		invitationVerb("accept", "Accept invitations", ui.Accepted),
 		// Proton's own word is Decline, so that is the word here.

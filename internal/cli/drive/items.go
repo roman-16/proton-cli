@@ -20,7 +20,7 @@ import (
 
 func itemsCmd() *cobra.Command {
 	c := &cobra.Command{Use: "items", Short: "Files and folders"}
-	c.AddCommand(itemsListCmd(), itemsGetCmd(), itemsCreateCmd(), itemsUploadCmd(),
+	c.AddCommand(itemsAbuseCmd(), itemsListCmd(), itemsGetCmd(), itemsCreateCmd(), itemsUploadCmd(),
 		itemsDownloadCmd(), itemsUpdateCmd(), itemsMoveCmd(), itemsCopyCmd(),
 		itemsTrashCmd(), itemsDeleteCmd(), revisionsCmd(), shareCmd(filesShared()))
 	return c
@@ -792,7 +792,7 @@ func revisionsCmd() *cobra.Command {
 			"Uploading over a file with `--if-exists replace` keeps what was there as a\n" +
 			"revision. You can read any revision back, restore it, or delete it.",
 	}
-	c.AddCommand(revisionsListCmd(), revisionsDownloadCmd(), revisionsRestoreCmd(), revisionsDeleteCmd())
+	c.AddCommand(revisionsAbuseCmd(), revisionsListCmd(), revisionsDownloadCmd(), revisionsRestoreCmd(), revisionsDeleteCmd())
 	return c
 }
 

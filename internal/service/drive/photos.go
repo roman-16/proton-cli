@@ -1,7 +1,6 @@
 package drive
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha1"
 	"encoding/hex"
@@ -29,6 +28,8 @@ type Album struct {
 	LinkID     string `json:"link_id"`
 	Name       string `json:"name"`
 	PhotoCount int    `json:"photo_count"`
+
+	hash string
 }
 
 const photosPageSize = 500
@@ -181,7 +182,7 @@ func (s *Service) AlbumsList(ctx context.Context, dc *Context) ([]Album, error) 
 				slog.DebugContext(ctx, "drive: an album's name could not be decrypted",
 					"link", link.LinkID, "share", dc.ShareID, "error", err)
 			}
-			out = append(out, Album{LinkID: link.LinkID, Name: name, PhotoCount: counts[link.LinkID]})
+			out = append(out, Album{LinkID: link.LinkID, Name: name, PhotoCount: counts[link.LinkID], hash: link.Hash})
 		}
 	}
 	return out, nil
@@ -305,38 +306,121 @@ func (s *Service) PhotoDownload(ctx context.Context, dc *Context, linkID string,
 	return name, s.downloadFile(ctx, dc, link, res.NodeKR, activeRevisionID(link), link.Size, w, opts)
 }
 
-// PhotoUpload uploads a file to the photos volume, marking the revision as a
-// photo captured at captureTime (Unix seconds). The required ContentHash is the
-// HMAC of the content's SHA-1 digest under the photos-root hash key (used for
-// duplicate detection), matching the web client.
-func (s *Service) PhotoUpload(ctx context.Context, dc *Context, name string, r io.Reader, captureTime int64, opts UploadOptions) error {
-	data, err := io.ReadAll(r)
-	if err != nil {
-		return err
-	}
+// PhotoPlan is what uploading a photo will do, worked out before it does it:
+// nothing at all when the library already holds the photo.
+type PhotoPlan struct {
+	// Duplicate is the photo the library already holds under the same name and
+	// with the same content, and empty when it holds none.
+	Duplicate string
+
+	upload  *UploadPlan
+	hashKey []byte
+	open    func() (io.ReadCloser, error)
+}
+
+// PlanPhotoUpload decides what uploading the photo open reads, under name, will
+// do.
+//
+// A photo is a duplicate when the library holds one of the same name and the
+// same content, which is the test Proton's own apps apply: cameras reuse names,
+// so a name alone says nothing. The content is read for the comparison only
+// when the name matches.
+func (s *Service) PlanPhotoUpload(ctx context.Context, dc *Context, name string, open func() (io.ReadCloser, error)) (*PhotoPlan, error) {
 	root, rootKR, err := s.photosRoot(ctx, dc)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	hashKey, err := hashKeyOf(root, rootKR)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	sum := sha1.Sum(data) //nolint:gosec // Proton uses SHA-1 for the content digest
-	contentHash, err := lookupHash(hex.EncodeToString(sum[:]), hashKey)
+	duplicate, err := s.photoDuplicate(ctx, dc, name, hashKey, open)
+	if err != nil {
+		return nil, err
+	}
+	if duplicate != "" {
+		return &PhotoPlan{Duplicate: duplicate}, nil
+	}
+	upload, err := s.PlanUpload(ctx, dc, "/", name, ConflictRefuse)
+	if err != nil {
+		return nil, err
+	}
+	return &PhotoPlan{upload: upload, hashKey: hashKey, open: open}, nil
+}
+
+// linkActive is the state of an item that is neither a draft nor in the trash.
+const linkActive = 1
+
+// photoDuplicate names the photo in the library that has name and the content
+// open reads, or nothing.
+func (s *Service) photoDuplicate(ctx context.Context, dc *Context, name string, hashKey []byte, open func() (io.ReadCloser, error)) (string, error) {
+	nameHash, err := lookupHash(name, hashKey)
+	if err != nil {
+		return "", err
+	}
+	var r struct {
+		DuplicateHashes []struct {
+			Hash        string
+			ContentHash string
+			LinkState   int
+			LinkID      string
+		}
+	}
+	if err := s.C.Decode(ctx, proton.Request{
+		Method: "POST", Reads: true,
+		Path: fmt.Sprintf("/drive/volumes/%s/photos/duplicates", dc.VolumeID),
+		Body: map[string]any{"NameHashes": []string{nameHash}},
+	}, &r); err != nil {
+		return "", err
+	}
+	candidates := map[string]string{}
+	for _, d := range r.DuplicateHashes {
+		if d.Hash == nameHash && d.LinkState == linkActive && d.LinkID != "" && d.ContentHash != "" {
+			candidates[d.ContentHash] = d.LinkID
+		}
+	}
+	if len(candidates) == 0 {
+		return "", nil
+	}
+	digest, err := contentDigest(open)
+	if err != nil {
+		return "", err
+	}
+	contentHash, err := lookupHash(digest, hashKey)
+	if err != nil {
+		return "", err
+	}
+	return candidates[contentHash], nil
+}
+
+// contentDigest is the SHA-1 of what open reads, as the hex a revision records.
+func contentDigest(open func() (io.ReadCloser, error)) (string, error) {
+	r, err := open()
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = r.Close() }()
+	digest := sha1.New() //nolint:gosec // Proton records the content digest as SHA-1
+	if _, err := io.Copy(digest, r); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(digest.Sum(nil)), nil
+}
+
+// PhotoUpload writes the photo a plan describes into the library, as taken at
+// captureTime (Unix seconds). A plan that found the photo already there writes
+// nothing.
+func (s *Service) PhotoUpload(ctx context.Context, dc *Context, plan *PhotoPlan, captureTime int64, opts UploadOptions) error {
+	if plan.Duplicate != "" {
+		return nil
+	}
+	r, err := plan.open()
 	if err != nil {
 		return err
 	}
-	opts.Photo = map[string]any{
-		"MainPhotoLinkID": nil,
-		"CaptureTime":     captureTime,
-		"ContentHash":     contentHash,
-	}
-	plan, err := s.PlanUpload(ctx, dc, "/", name, ConflictRefuse)
-	if err != nil {
-		return err
-	}
-	return s.Upload(ctx, dc, plan, bytes.NewReader(data), opts)
+	defer func() { _ = r.Close() }()
+	opts.photo = &photoRevision{captureTime: captureTime, hashKey: plan.hashKey}
+	return s.Upload(ctx, dc, plan.upload, r, opts)
 }
 
 // AlbumCreate creates a new (unlocked) photo album and returns its link ID.
@@ -349,7 +433,7 @@ func (s *Service) AlbumCreate(ctx context.Context, dc *Context, name string) (st
 	if err != nil {
 		return "", err
 	}
-	hash, err := lookupHash(strings.ToLower(name), hashKey)
+	hash, err := lookupHash(name, hashKey)
 	if err != nil {
 		return "", err
 	}
@@ -394,7 +478,7 @@ func (s *Service) AlbumCreate(ctx context.Context, dc *Context, name string) (st
 // An album is a link in the photo volume, so it renames the way anything else
 // does: the new name encrypted to the volume root's key, and a hash of it so
 // Proton can refuse a name the root already holds without reading either.
-func (s *Service) AlbumRename(ctx context.Context, dc *Context, albumLinkID, oldName, newName string) error {
+func (s *Service) AlbumRename(ctx context.Context, dc *Context, album Album, newName string) error {
 	root, rootKR, err := s.photosRoot(ctx, dc)
 	if err != nil {
 		return err
@@ -403,11 +487,7 @@ func (s *Service) AlbumRename(ctx context.Context, dc *Context, albumLinkID, old
 	if err != nil {
 		return err
 	}
-	newHash, err := lookupHash(strings.ToLower(newName), hashKey)
-	if err != nil {
-		return err
-	}
-	oldHash, err := lookupHash(strings.ToLower(oldName), hashKey)
+	newHash, err := lookupHash(newName, hashKey)
 	if err != nil {
 		return err
 	}
@@ -417,9 +497,9 @@ func (s *Service) AlbumRename(ctx context.Context, dc *Context, albumLinkID, old
 	}
 	err = s.C.Decode(ctx, proton.Request{
 		Method: "PUT",
-		Path:   fmt.Sprintf("/drive/shares/%s/links/%s/rename", dc.ShareID, albumLinkID),
+		Path:   fmt.Sprintf("/drive/shares/%s/links/%s/rename", dc.ShareID, album.LinkID),
 		Body: map[string]any{
-			"Name": encName, "Hash": newHash, "OriginalHash": oldHash,
+			"Name": encName, "Hash": newHash, "OriginalHash": album.hash,
 			"NameSignatureEmail": dc.AddrEmail,
 		},
 	}, nil)
@@ -474,7 +554,7 @@ func (s *Service) AlbumAddPhotos(ctx context.Context, dc *Context, albumLinkID s
 		if err != nil {
 			return err
 		}
-		hash, err := lookupHash(strings.ToLower(name), albumHashKey)
+		hash, err := lookupHash(name, albumHashKey)
 		if err != nil {
 			return err
 		}
@@ -635,7 +715,7 @@ func (s *Service) favoriteMovedParams(ctx context.Context, dc *Context, link *Li
 	if err != nil {
 		return nil, err
 	}
-	hash, err := lookupHash(strings.ToLower(name), rootHashKey)
+	hash, err := lookupHash(name, rootHashKey)
 	if err != nil {
 		return nil, err
 	}

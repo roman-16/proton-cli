@@ -80,7 +80,7 @@ func (s *Service) PlanUpload(ctx context.Context, dc *Context, destPath, name st
 	if err != nil {
 		return nil, err
 	}
-	hash, err := lookupHash(strings.ToLower(name), hashKey)
+	hash, err := lookupHash(name, hashKey)
 	if err != nil {
 		return nil, err
 	}
@@ -297,7 +297,7 @@ func (s *Service) freeNames(ctx context.Context, parent *Resolved, hashKey []byt
 		hashes := make([]string, 0, hashBatch)
 		for i := start; i < start+hashBatch; i++ {
 			candidate := numberedName(i, base, ext)
-			hash, err := lookupHash(strings.ToLower(candidate), hashKey)
+			hash, err := lookupHash(candidate, hashKey)
 			if err != nil {
 				return available{}, err
 			}

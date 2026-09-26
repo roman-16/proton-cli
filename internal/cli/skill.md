@@ -51,6 +51,8 @@ How much is unread is `{{.Program}} mail conversations count`: one row per folde
 
 A message with `receipt_due` set to true asks to have its reading confirmed. Sending the confirmation tells the sender their mail was read and cannot be taken back, so `{{.Program}} mail messages receipt REF` is the user's to run: say that the sender asked, and leave the answer to them.
 
+`{{.Program}} drive items abuse` and `{{.Program}} drive invitations abuse` hand Proton the key to what was shared, and `--good-faith` is the user's own declaration that the report is true. Never pass it for them: say what looks wrong, and leave the report to them.
+
 ```bash
 {{.Program}} mail messages list --unread --output json
 {{.Program}} mail messages list --keyword invoice --folder all --output json

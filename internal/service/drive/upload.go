@@ -27,9 +27,29 @@ type UploadOptions struct {
 	// Progress receives byte counts; nil discards them.
 	Progress  progress.Sink
 	TotalHint int64
-	// Photo, when set, marks the committed revision as a photo (added to the
-	// commit body verbatim, e.g. {MainPhotoLinkID, CaptureTime, ContentHash}).
-	Photo map[string]any
+
+	photo *photoRevision
+}
+
+// photoRevision is what marks a revision as a photo: when it was taken, and the
+// library's hash key, which its content hash is made under so that the same
+// photo hashes the same whichever client uploads it.
+type photoRevision struct {
+	captureTime int64
+	hashKey     []byte
+}
+
+// describe is the photo half of a commit, for content whose SHA-1 is digest.
+func (p *photoRevision) describe(digest string) (map[string]any, error) {
+	contentHash, err := lookupHash(digest, p.hashKey)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{
+		"MainPhotoLinkID": nil,
+		"CaptureTime":     p.captureTime,
+		"ContentHash":     contentHash,
+	}, nil
 }
 
 // encBlock is one 4 MiB file chunk after encryption, carrying everything the
@@ -116,8 +136,12 @@ func (s *Service) Upload(ctx context.Context, dc *Context, plan *UploadPlan, r i
 	}
 	commit := map[string]any{"ManifestSignature": manifestSig, "XAttr": xattr}
 	by.attribute(commit)
-	if opts.Photo != nil {
-		commit["Photo"] = opts.Photo
+	if opts.photo != nil {
+		photo, err := opts.photo.describe(up.sha1)
+		if err != nil {
+			return err
+		}
+		commit["Photo"] = photo
 	}
 	return s.C.Decode(ctx, commitRequest(dc, linkID, revisionID, commit), nil)
 }

@@ -4,7 +4,29 @@ Shares other people have offered you.
 
 Every command under `proton drive invitations`, with the arguments and flags it takes. For these commands in use, see [the drive guide](README.md).
 
-Holds `accept`, `decline` and `list`.
+Holds `abuse`, `accept`, `decline` and `list`.
+
+## `abuse`
+
+Report what an invitation offers to Proton, without accepting it.
+
+Proton receives the key to the whole of what is offered. Copyright and stolen-data reports need --message and --email. Nothing withdraws a report, and the invitation stays until you accept or decline it.
+
+```
+proton drive invitations abuse REF
+```
+
+```bash
+proton drive invitations abuse 5bH2mQxK --category spam --good-faith
+proton drive invitations abuse 5bH2mQxK --category stolen-data --message 'These are our customer records' --email jane@proton.me --good-faith
+```
+
+| Flag | Description |
+| --- | --- |
+| `--category string` | What the report is about: spam, copyright, child-abuse, non-consensual-intimate, stolen-data, malware, other |
+| `--email string` | Where Proton can reach you about the report; required for copyright and stolen-data |
+| `--good-faith` | Confirm, in good faith, that what the report says is correct and complete |
+| `--message string` | What Proton should know; required for copyright and stolen-data |
 
 ## `accept`
 

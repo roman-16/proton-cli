@@ -80,6 +80,14 @@ type Context struct {
 	// fetched. Everything addressed by path starts from it, so resolving the
 	// share without it would only mean asking for it a moment later, alone.
 	rootLink *Link
+
+	// sharePassphrase unlocks the share key, memberKeyPacket is what opens it
+	// for a member of somebody else's share, and linkProof is the whole password
+	// a link was opened with. A report of abuse hands them to Proton, which is
+	// how it reads what is reported.
+	sharePassphrase []byte
+	memberKeyPacket string
+	linkProof       string
 }
 
 // Public reports whether this tree is a public link.
@@ -176,7 +184,10 @@ func (s *Service) unlockShare(ctx context.Context, shareID, rootLinkID, volumeID
 		CreateTime          int64
 		// Memberships is your own standing in the share, which Proton sends for a
 		// share somebody shared with you and leaves empty for one of your own.
-		Memberships []struct{ Permissions int }
+		Memberships []struct {
+			Permissions int
+			KeyPacket   string
+		}
 	}
 	var rootLink *Link
 	var u *keys.Unlocked
@@ -239,9 +250,11 @@ func (s *Service) unlockShare(ctx context.Context, shareID, rootLinkID, volumeID
 		VolumeID: volumeID, RootLinkID: rootLinkID, rootLink: rootLink,
 		Type: sh.Type, RootName: rootName(ctx, shareID, sh.Type, rootLink, shareKR),
 		Creator: sh.Creator, Created: sh.CreateTime,
+		sharePassphrase: dec.GetBinary(),
 	}
 	if len(sh.Memberships) > 0 {
 		dc.Permissions = sh.Memberships[0].Permissions
+		dc.memberKeyPacket = sh.Memberships[0].KeyPacket
 	}
 	return dc, nil
 }
@@ -820,7 +833,7 @@ type linkDetails struct {
 			XAttr         string
 		}
 	}
-	Sharing *struct{ ShareURLID string }
+	Sharing *struct{ ShareID, ShareURLID string }
 }
 
 // link is the record the rest of Drive reads, and nothing at all for a file no

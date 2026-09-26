@@ -37,8 +37,16 @@ func writePNG(t *testing.T, path string) {
 // nothing has to check whether the account has one first.
 func uploadedPhoto(t *testing.T) string {
 	t.Helper()
+	id, _ := uploadedPhotoNamed(t, testID()+".png")
+	return id
+}
+
+// uploadedPhotoNamed is uploadedPhoto under a name of the test's choosing, and
+// hands back the file it uploaded as well, for a test about uploading it again.
+func uploadedPhotoNamed(t *testing.T, name string) (id, path string) {
+	t.Helper()
 	before := photoLinkIDs(t)
-	img := filepath.Join(t.TempDir(), testID()+".png")
+	img := filepath.Join(t.TempDir(), name)
 	writePNG(t, img)
 	runOK(t, "drive", "photos", "upload", img)
 
@@ -57,7 +65,72 @@ func uploadedPhoto(t *testing.T) string {
 	}
 	cleanupRun(t, fmt.Sprintf("Delete photo: proton drive photos delete %s", photoID),
 		"drive", "photos", "delete", "--", photoID)
-	return photoID
+	return photoID, img
+}
+
+// A photo the library already holds is not uploaded again, and saying so names
+// the photo it already is. The name carries capitals, which is how a camera
+// names a file.
+func TestDrivePhotosUploadLeavesAPhotoTheLibraryHoldsAlone(t *testing.T) {
+	photoID, img := uploadedPhotoNamed(t, testID()+"-IMG.PNG")
+	held := photoLinkIDs(t)
+
+	_, preview := runOKStderr(t, "--dry-run", "drive", "photos", "upload", img)
+	assertContains(t, preview, "Dry run - nothing to upload")
+
+	_, stderr := runOKStderr(t, "drive", "photos", "upload", img)
+	assertContains(t, stderr, "Nothing to upload")
+	assertContains(t, stderr, "is already in your photo library as")
+
+	result := runJSON(t, "drive", "photos", "upload", img)
+	if result["duplicate_of"] != photoID {
+		t.Errorf("duplicate_of = %v, want the photo already in the library, %s", result["duplicate_of"], photoID)
+	}
+	if result["count"] != float64(0) {
+		t.Errorf("count = %v, want nothing uploaded", result["count"])
+	}
+	for id := range photoLinkIDs(t) {
+		if !held[id] {
+			t.Errorf("a second copy landed as %s", id)
+		}
+	}
+}
+
+// A photo of the same name with other content is a different photo, and the
+// library holds both: cameras reuse names.
+func TestDrivePhotosUploadKeepsADifferentPhotoOfTheSameName(t *testing.T) {
+	firstID, img := uploadedPhotoNamed(t, testID()+"-IMG.PNG")
+	held := photoLinkIDs(t)
+	f, err := os.Create(img)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := png.Encode(f, image.NewRGBA(image.Rect(0, 0, 2, 2))); err != nil {
+		t.Fatal(err)
+	}
+	_ = f.Close()
+
+	_, stderr := runOKStderr(t, "drive", "photos", "upload", img)
+
+	assertContains(t, stderr, "Uploaded")
+	var secondID string
+	waitFor(20*time.Second, 1*time.Second, func() bool {
+		for id := range photoLinkIDs(t) {
+			if !held[id] {
+				secondID = id
+				return true
+			}
+		}
+		return false
+	})
+	if secondID == "" {
+		t.Fatal("the second photo did not appear in the listing")
+	}
+	cleanupRun(t, fmt.Sprintf("Delete photo: proton drive photos delete %s", secondID),
+		"drive", "photos", "delete", "--", secondID)
+	if !photoLinkIDs(t)[firstID] {
+		t.Error("uploading a different photo of the same name took the first one away")
+	}
 }
 
 // createdAlbum makes an album and hands back the ID it landed under,

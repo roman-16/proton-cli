@@ -49,8 +49,9 @@ type invitationDetail struct {
 		Passphrase string
 	}
 	Link struct {
-		Name string
-		Type int
+		LinkID string
+		Name   string
+		Type   int
 	}
 }
 
@@ -86,19 +87,14 @@ func (s *Service) ListInvitations(ctx context.Context) ([]Invitation, error) {
 	})
 }
 
+// GetInvitation reads one invitation waiting for an answer.
+func (s *Service) GetInvitation(ctx context.Context, id string) (Invitation, error) {
+	return s.invitationDetails(ctx, id)
+}
+
 func (s *Service) invitationDetails(ctx context.Context, id string) (Invitation, error) {
-	var r invitationDetail
-	var u *keys.Unlocked
-	if err := fetch.Together(ctx,
-		func(ctx context.Context) error {
-			return s.C.Decode(ctx, proton.Request{Method: "GET", Path: "/drive/v2/shares/invitations/" + id}, &r)
-		},
-		func(ctx context.Context) error {
-			var err error
-			u, err = s.keys(ctx)
-			return err
-		},
-	); err != nil {
+	r, u, err := s.invitation(ctx, id)
+	if err != nil {
 		return Invitation{}, err
 	}
 	name, err := offeredName(u, r)
@@ -121,6 +117,26 @@ func (s *Service) invitationDetails(ctx context.Context, id string) (Invitation,
 	}, nil
 }
 
+// invitation is one invitation as Proton describes it, and the keys that open
+// it, asked for together.
+func (s *Service) invitation(ctx context.Context, id string) (invitationDetail, *keys.Unlocked, error) {
+	var r invitationDetail
+	var u *keys.Unlocked
+	if err := fetch.Together(ctx,
+		func(ctx context.Context) error {
+			return s.C.Decode(ctx, proton.Request{Method: "GET", Path: "/drive/v2/shares/invitations/" + id}, &r)
+		},
+		func(ctx context.Context) error {
+			var err error
+			u, err = s.keys(ctx)
+			return err
+		},
+	); err != nil {
+		return invitationDetail{}, nil, err
+	}
+	return r, u, nil
+}
+
 // offeredName is what the thing on offer is called.
 //
 // Everything it takes is in the answer that describes the invitation: the key
@@ -128,35 +144,19 @@ func (s *Service) invitationDetails(ctx context.Context, id string) (Invitation,
 // opens the passphrase, which unlocks the share key the item's name is sealed
 // to. So a listing can say what is being offered without asking again.
 func offeredName(u *keys.Unlocked, r invitationDetail) (string, error) {
-	addr, ok := inviteeAddr(u, r.Invitation.InviteeEmail)
-	if !ok {
-		return "", fmt.Errorf("no usable address key for %s", r.Invitation.InviteeEmail)
-	}
-	keyPacket, err := base64.StdEncoding.DecodeString(r.Invitation.KeyPacket)
-	if err != nil {
-		return "", fmt.Errorf("decode key packet: %w", err)
-	}
-	sessionKey, err := addr.Read.DecryptSessionKey(keyPacket)
-	if err != nil {
-		return "", fmt.Errorf("decrypt session key: %w", err)
-	}
-	enc, err := pgp.NewPGPMessageFromArmored(r.Share.Passphrase)
+	_, sessionKey, err := invitationKey(u, r)
 	if err != nil {
 		return "", err
 	}
-	split, err := enc.SplitMessage()
+	passphrase, err := invitationPassphrase(sessionKey, r)
 	if err != nil {
 		return "", err
-	}
-	passphrase, err := sessionKey.Decrypt(split.GetBinaryDataPacket())
-	if err != nil {
-		return "", fmt.Errorf("decrypt share passphrase: %w", err)
 	}
 	locked, err := pgp.NewKeyFromArmored(r.Share.ShareKey)
 	if err != nil {
 		return "", err
 	}
-	unlocked, err := locked.Unlock(passphrase.GetBinary())
+	unlocked, err := locked.Unlock(passphrase)
 	if err != nil {
 		return "", fmt.Errorf("unlock share key: %w", err)
 	}
@@ -167,26 +167,51 @@ func offeredName(u *keys.Unlocked, r invitationDetail) (string, error) {
 	return decryptName(r.Link.Name, shareKR)
 }
 
-func (s *Service) AcceptInvitation(ctx context.Context, invitationID string) error {
-	var details invitationDetail
-	if err := s.C.Decode(ctx, proton.Request{Method: "GET", Path: "/drive/v2/shares/invitations/" + invitationID}, &details); err != nil {
-		return fmt.Errorf("get invitation: %w", err)
-	}
-	u, err := s.keys(ctx)
-	if err != nil {
-		return err
-	}
-	addr, ok := inviteeAddr(u, details.Invitation.InviteeEmail)
+// invitationKey opens the key packet an invitation carries, with the address it
+// was sent to, which yields the session key the share's passphrase is sealed
+// under.
+func invitationKey(u *keys.Unlocked, r invitationDetail) (keys.Rings, *pgp.SessionKey, error) {
+	addr, ok := inviteeAddr(u, r.Invitation.InviteeEmail)
 	if !ok {
-		return fmt.Errorf("no usable address key for %s", details.Invitation.InviteeEmail)
+		return keys.Rings{}, nil, fmt.Errorf("no usable address key for %s", r.Invitation.InviteeEmail)
 	}
-	keyPacket, err := base64.StdEncoding.DecodeString(details.Invitation.KeyPacket)
+	keyPacket, err := base64.StdEncoding.DecodeString(r.Invitation.KeyPacket)
 	if err != nil {
-		return fmt.Errorf("decode key packet: %w", err)
+		return keys.Rings{}, nil, fmt.Errorf("decode key packet: %w", err)
 	}
 	sessionKey, err := addr.Read.DecryptSessionKey(keyPacket)
 	if err != nil {
-		return fmt.Errorf("decrypt session key: %w", err)
+		return keys.Rings{}, nil, fmt.Errorf("decrypt session key: %w", err)
+	}
+	return addr, sessionKey, nil
+}
+
+// invitationPassphrase is the share passphrase an invitation's session key
+// opens.
+func invitationPassphrase(sessionKey *pgp.SessionKey, r invitationDetail) ([]byte, error) {
+	enc, err := pgp.NewPGPMessageFromArmored(r.Share.Passphrase)
+	if err != nil {
+		return nil, err
+	}
+	split, err := enc.SplitMessage()
+	if err != nil {
+		return nil, err
+	}
+	passphrase, err := sessionKey.Decrypt(split.GetBinaryDataPacket())
+	if err != nil {
+		return nil, fmt.Errorf("decrypt share passphrase: %w", err)
+	}
+	return passphrase.GetBinary(), nil
+}
+
+func (s *Service) AcceptInvitation(ctx context.Context, invitationID string) error {
+	details, u, err := s.invitation(ctx, invitationID)
+	if err != nil {
+		return err
+	}
+	addr, sessionKey, err := invitationKey(u, details)
+	if err != nil {
+		return err
 	}
 	sig, err := addr.Write.SignDetachedWithContext(pgp.NewPlainMessage(sessionKey.Key), pgp.NewSigningContext(sigContextMember, true))
 	if err != nil {

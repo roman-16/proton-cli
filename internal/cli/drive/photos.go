@@ -2,6 +2,7 @@ package drive
 
 import (
 	stdctx "context"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -107,6 +108,10 @@ func photosUploadCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "upload SRC",
 		Short: "Upload a photo to the library",
+		Long: "Upload a photo to the library.\n\n" +
+			"A photo the library already holds, with the same name and the same content,\n" +
+			"is not uploaded again. A different photo with the same name is uploaded\n" +
+			"beside it.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			dc, err := photosContext(c)
 			if err != nil {
@@ -118,16 +123,24 @@ func photosUploadCmd() *cobra.Command {
 				return err
 			}
 			name := filepath.Base(src)
-			return kit.Mutate(c, ui.ResultSpec{
+			plan, err := c.App.Drive.PlanPhotoUpload(c.Ctx, dc, name, func() (io.ReadCloser, error) {
+				return os.Open(src)
+			})
+			if err != nil {
+				return err
+			}
+			spec := ui.ResultSpec{
 				Action: ui.Uploaded, Count: 1, Name: name,
 				Detail: "to your photo library", Extra: map[string]any{"size": fi.Size()},
-			}, func() error {
-				f, err := os.Open(src)
-				if err != nil {
-					return err
-				}
-				defer func() { _ = f.Close() }()
-				return c.App.Drive.PhotoUpload(c.Ctx, dc, name, f, fi.ModTime().Unix(),
+			}
+			if plan.Duplicate != "" {
+				spec.Count = 0
+				spec.Detail = fmt.Sprintf("- %s is already in your photo library as %s",
+					name, c.Mention(plan.Duplicate))
+				spec.Extra["duplicate_of"] = plan.Duplicate
+			}
+			return kit.Mutate(c, spec, func() error {
+				return c.App.Drive.PhotoUpload(c.Ctx, dc, plan, fi.ModTime().Unix(),
 					drivesvc.UploadOptions{
 						Label: "Uploading " + name, Progress: ui.NewProgress(c.UI()),
 						TotalHint: fi.Size(), Modified: fi.ModTime(),
@@ -303,7 +316,7 @@ func albumsUpdateCmd() *cobra.Command {
 				IDs: []string{album.LinkID},
 			}, func() error {
 				if name != "" {
-					if err := c.App.Drive.AlbumRename(c.Ctx, dc, album.LinkID, album.Name, name); err != nil {
+					if err := c.App.Drive.AlbumRename(c.Ctx, dc, album, name); err != nil {
 						return err
 					}
 				}

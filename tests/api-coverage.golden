@@ -204,6 +204,7 @@ POST /drive/v2/urls/{id}/bookmark
 POST /drive/v2/volumes/{id}/trash/delete_multiple
 POST /drive/v2/volumes/{id}/trash_multiple
 POST /drive/volumes/{id}/links/{id}/copy
+POST /drive/volumes/{id}/photos/duplicates
 POST /drive/volumes/{id}/shares
 POST /mail/v4/attachments
 POST /mail/v4/filters

@@ -9,6 +9,7 @@ Signing in runs [Secure Remote Password](https://en.wikipedia.org/wiki/Secure_Re
 - API requests to `https://mail.proton.me/api` over HTTPS, authenticated with your session tokens.
 - Encrypted payloads you asked to create: an encrypted message, an encrypted file block, an encrypted event, a key you generate or import for an address, locked so only your account opens it, the locked key a forwarding you accepted adds to your address, and the locked key a forwarding you set up derives for the other address, whose passphrase only that address can open.
 - The decrypted body of a message you report with `mail messages mark phishing`, so Proton's anti-abuse team can read what was sent to you. Nothing withdraws a report.
+- The key to something you report with `drive items abuse` or `drive invitations abuse`, so Proton's abuse team can open it. That key opens everything in what was shared with you, not only the item you named. Nothing withdraws a report.
 - The SRP proof during login, which does not reveal your password.
 - The verifier for a Pass extra password you set, which Proton checks a password against and cannot read one out of.
 - When you change a password or set a recovery phrase: the same kind of verifier for the new secret, and your keys locked again with it. The secret itself does not leave, and the keys are the ones you already had.

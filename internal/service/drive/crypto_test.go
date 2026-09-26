@@ -56,3 +56,22 @@ func TestAStreamsRecordClaimsNoModificationTime(t *testing.T) {
 		t.Error("the record should still say how many bytes there were")
 	}
 }
+
+// A name is hashed exactly as it is written, the way Proton's own clients hash
+// it, so a name the CLI writes is found by theirs and theirs by the CLI. Two
+// names that differ only in case are two names.
+func TestANameIsHashedExactlyAsWritten(t *testing.T) {
+	key := []byte("photo-library-hash-key-32-bytes!")
+	for name, want := range map[string]string{
+		"IMG_0001.JPG": "863178b65bc60610b4e8c01b3a6aa01dde5dece9b83a83c069f4cd506c79bf70",
+		"img_0001.jpg": "0bbeecc18a5ecb154cec1c1902670a040f02fce442dafbc29c9e5378feee8c5a",
+	} {
+		got, err := lookupHash(name, key)
+		if err != nil {
+			t.Fatalf("lookupHash(%q): %v", name, err)
+		}
+		if got != want {
+			t.Errorf("lookupHash(%q) = %s, want %s", name, got, want)
+		}
+	}
+}

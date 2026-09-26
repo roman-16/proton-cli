@@ -184,6 +184,14 @@ var untested = map[string]string{
 	// back. The flow was walked by hand against the live API instead.
 	"POST /core/v4/reports/phishing": "a report is read by a person at Proton and cannot be withdrawn",
 
+	// Reporting abuse in Drive hands Proton the key to a share, and a person at
+	// Proton reads the report. The suite previews reports on a share, a link, a
+	// revision and an invitation, which resolves everything a report names; the
+	// bodies are held to the shape Proton's SDK sends by the drive service's own
+	// tests against a stub.
+	"POST /drive/report/share":        "a report is read by a person at Proton and cannot be withdrawn",
+	"POST /drive/unauth/report/share": "a report is read by a person at Proton and cannot be withdrawn",
+
 	// A refresh happens when a session expires mid-run, which is Proton's to
 	// decide and no test can arrange - so whether a run reaches it is luck. It
 	// stays listed rather than being relied on: a golden line that appears and

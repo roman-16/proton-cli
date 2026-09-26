@@ -442,6 +442,10 @@ var examples = map[string][]string{
 		"proton drive computers update 'Work laptop' --name 'Office PC'",
 	},
 	"proton drive computers delete": {"proton drive computers delete 7Kd91mQx"},
+	"proton drive items abuse": {
+		"proton drive items abuse /invoice.exe --shared Project --category malware --good-faith",
+		"proton drive items abuse / --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL' --category copyright --message 'My photos, published without permission' --email jane@proton.me --good-faith",
+	},
 	"proton drive items list": {
 		"proton drive items list",
 		"proton drive items list /Documents",
@@ -491,6 +495,9 @@ var examples = map[string][]string{
 		"proton drive items delete --pattern '*.tmp' --scope /Build --recursive --yes",
 		"proton drive items delete /photo.jpg --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL'",
 	},
+	"proton drive items revisions abuse": {
+		"proton drive items revisions abuse /report.pdf 5bH2mQxK --shared Project --category malware --good-faith",
+	},
 	"proton drive items revisions list":     {"proton drive items revisions list /Documents/report.pdf"},
 	"proton drive items revisions restore":  {"proton drive items revisions restore /Documents/report.pdf 5bH2mQxK"},
 	"proton drive items revisions download": {"proton drive items revisions download /Documents/report.pdf 5bH2mQxK --dest-dir ."},
@@ -519,7 +526,11 @@ var examples = map[string][]string{
 		"proton drive items share confirm /Documents jane@example.com",
 	},
 	"proton drive items share remove": {"proton drive items share remove /Documents jane@example.com"},
-	"proton drive invitations list":   {"proton drive invitations list"},
+	"proton drive invitations abuse": {
+		"proton drive invitations abuse 5bH2mQxK --category spam --good-faith",
+		"proton drive invitations abuse 5bH2mQxK --category stolen-data --message 'These are our customer records' --email jane@proton.me --good-faith",
+	},
+	"proton drive invitations list": {"proton drive invitations list"},
 	"proton drive invitations accept": {
 		"proton drive invitations accept 5bH2mQxK",
 	},

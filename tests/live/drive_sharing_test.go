@@ -265,15 +265,15 @@ func TestDriveShareRemoveNotFound(t *testing.T) {
 
 // sharedWithSecondary hands something of the primary's to the second account and
 // waits for it to take it, answering with the item as the second account now
-// sees it.
+// sees it. flags go to `share add`, for a test that needs more than viewing.
 //
 // The invitation this causes is the one that was not there before: an invitation
 // names no item, so taking whichever came first would accept something another
 // test left behind.
-func sharedWithSecondary(t *testing.T, path string) map[string]interface{} {
+func sharedWithSecondary(t *testing.T, path string, flags ...string) map[string]interface{} {
 	t.Helper()
 	before := altInvitationIDs(t)
-	runOK(t, "drive", "items", "share", "add", path, secondaryEmail())
+	runOK(t, append([]string{"drive", "items", "share", "add"}, append(flags, path, secondaryEmail())...)...)
 	cleanupRun(t, fmt.Sprintf("Revoke member: proton drive items share remove %s %s", path, secondaryEmail()),
 		"drive", "items", "share", "remove", path, secondaryEmail())
 

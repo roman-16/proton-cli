@@ -130,9 +130,11 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton drive computers delete`](../drive/computers.md#delete) | Remove computers from Drive |
 | [`proton drive computers list`](../drive/computers.md#list) | List the computers syncing to Drive |
 | [`proton drive computers update`](../drive/computers.md#update) | Rename a computer |
+| [`proton drive invitations abuse`](../drive/invitations.md#abuse) | Report what an invitation offers to Proton |
 | [`proton drive invitations accept`](../drive/invitations.md#accept) | Accept invitations |
 | [`proton drive invitations decline`](../drive/invitations.md#decline) | Decline invitations |
 | [`proton drive invitations list`](../drive/invitations.md#list) | List invitations waiting for an answer |
+| [`proton drive items abuse`](../drive/items.md#abuse) | Report something shared with you to Proton |
 | [`proton drive items copy`](../drive/items.md#copy) | Copy files into another folder |
 | [`proton drive items create`](../drive/items.md#create) | Create a folder, and any missing folder above it |
 | [`proton drive items delete`](../drive/items.md#delete) | Delete files or folders permanently |
@@ -140,6 +142,7 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton drive items get`](../drive/items.md#get) | Show a file or folder's details |
 | [`proton drive items list`](../drive/items.md#list) | List what is in a folder |
 | [`proton drive items move`](../drive/items.md#move) | Move files or folders into another folder |
+| [`proton drive items revisions abuse`](../drive/items.md#revisions-abuse) | Report an earlier version of a shared file to Proton |
 | [`proton drive items revisions delete`](../drive/items.md#revisions-delete) | Delete an earlier version permanently |
 | [`proton drive items revisions download`](../drive/items.md#revisions-download) | Download an earlier version of a file |
 | [`proton drive items revisions list`](../drive/items.md#revisions-list) | List a file's earlier versions |

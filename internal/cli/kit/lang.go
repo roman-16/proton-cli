@@ -88,6 +88,7 @@ var Verbs = map[string]string{
 	"disable": "turn off",
 
 	// Sharing
+	"abuse":       "report something shared with you to Proton as abuse",
 	"transfer":    "hand ownership to somebody else",
 	"add":         "put a member into a container",
 	"remove":      "take a member out of a container",
@@ -222,7 +223,7 @@ var Mutating = map[string]bool{
 	"snooze": true, "unsnooze": true, "apply": true, "reorder": true, "favorite": true, "unfavorite": true, "pin": true,
 	"unpin": true, "hide": true, "unhide": true, "exclude": true, "include": true,
 	"trust": true, "untrust": true, "reactivate": true, "respond": true, "login": true, "logout": true,
-	"revoke": true, "uninstall": true, "transfer": true,
+	"revoke": true, "uninstall": true, "transfer": true, "abuse": true,
 	"grant": true, "request": true, "access": true,
 }
 

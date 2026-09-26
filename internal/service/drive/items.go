@@ -321,7 +321,7 @@ func folderOf(res *Resolved, path string) (*folder, error) {
 }
 
 func (s *Service) createFolder(ctx context.Context, dc *Context, by author, parent *folder, name string) (*folder, error) {
-	hash, err := lookupHash(strings.ToLower(name), parent.hashKey)
+	hash, err := lookupHash(name, parent.hashKey)
 	if err != nil {
 		return nil, err
 	}
@@ -399,15 +399,11 @@ func (s *Service) Rename(ctx context.Context, dc *Context, path, newName string)
 	if err != nil {
 		return err
 	}
-	newHash, err := lookupHash(strings.ToLower(newName), hk)
+	newHash, err := lookupHash(newName, hk)
 	if err != nil {
 		return err
 	}
-	oldHash, err := lookupHash(strings.ToLower(res.Name), hk)
-	if err != nil {
-		return err
-	}
-	err = s.rename(ctx, dc, res, newName, newHash, oldHash)
+	err = s.rename(ctx, dc, res, newName, newHash, res.Link.Hash)
 	if proton.AlreadyExists(err) {
 		// Proton is the one that knows the name is taken, so this is where that
 		// answer gets its words - and what is in the way is worth one request
@@ -576,7 +572,7 @@ func (s *Service) Move(ctx context.Context, dc *Context, sourcePath string, dst 
 	if err != nil {
 		return err
 	}
-	newHash, err := lookupHash(strings.ToLower(src.Name), hk)
+	newHash, err := lookupHash(src.Name, hk)
 	if err != nil {
 		return err
 	}
@@ -609,7 +605,7 @@ func (s *Service) Copy(ctx context.Context, dc *Context, sourcePath string, dst 
 	if err != nil {
 		return err
 	}
-	newHash, err := lookupHash(strings.ToLower(src.Name), hk)
+	newHash, err := lookupHash(src.Name, hk)
 	if err != nil {
 		return err
 	}

@@ -968,7 +968,7 @@ func (s *Service) savedLinks(ctx context.Context) ([]SharedItem, error) {
 		}
 		urlPassword, custom := splitLinkPassword(password)
 		item.URL, item.LinkPassword = LinkURL(b.Token.Token, urlPassword), custom
-		shareKR, err := unlockLinkShare(&proton.PublicLinkShare{
+		shareKR, _, err := unlockLinkShare(&proton.PublicLinkShare{
 			ShareKey: b.Token.ShareKey, SharePassphrase: b.Token.SharePassphrase,
 			SharePasswordSalt: b.Token.SharePasswordSalt,
 		}, password)

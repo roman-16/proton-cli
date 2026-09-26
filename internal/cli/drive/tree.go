@@ -53,10 +53,32 @@ func (t *tree) register(c *cobra.Command, r relation) {
 		kit.Exclusive(c, "computer", "shared")
 		return
 	}
+	t.registerLink(c)
+	kit.Exclusive(c, "computer", "shared", "link")
+}
+
+// registerTheirs adds the flags for a command that only works in a tree
+// somebody else holds: something shared with you, or, where the relation
+// allows one, a link. Your own files and your computers are not offered.
+func (t *tree) registerTheirs(c *cobra.Command, r relation) {
+	t.relation = r
+	c.Flags().StringVar(&t.shared, "shared", "", "Work inside an item shared with you, by name or ID")
+	if r == manages {
+		return
+	}
+	t.registerLink(c)
+	kit.Exclusive(c, "shared", "link")
+}
+
+func (t *tree) registerLink(c *cobra.Command) {
 	t.password = kit.LinkPasswordToOpen()
 	c.Flags().StringVar(&t.link, "link", "", "Work inside a public link somebody sent you, by URL")
-	kit.Exclusive(c, "computer", "shared", "link")
 	t.password.Declare(c)
+}
+
+// named reports whether the flags point at a tree other than your own files.
+func (t *tree) named() bool {
+	return t.computer != "" || t.shared != "" || t.link != ""
 }
 
 // supply claims standard input for the link password before anything else can
@@ -94,7 +116,7 @@ func (t *tree) context(c *kit.Invocation) (*drivesvc.Context, error) {
 		if item.IsLink() && t.relation == manages {
 			return nil, kit.Fail(
 				"%q is a public link somebody sent you. In a link you can list, download, "+
-					"upload, and rename or delete what you uploaded yourself.",
+					"upload, report, and rename or delete what you uploaded yourself.",
 				sharedName(item))
 		}
 		dc, err := c.App.Drive.OpenShared(c.Ctx, item)

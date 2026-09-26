@@ -12,12 +12,13 @@ import (
 // commands that take a link is a property of the design rather than of what each
 // command remembered to register.
 //
-// A link is read always, written to when it allows editing, and changed for what
-// you uploaded into it yourself. What is under an item - its history, who else it
-// is shared with, the trash it would land in - a link answers for nothing, so
-// those commands take no URL at all.
+// A link is read always, reported always, written to when it allows editing, and
+// changed for what you uploaded into it yourself. What is under an item - its
+// history, who else it is shared with, the trash it would land in - a link
+// answers for nothing, so those commands take no URL at all.
 func TestTheCommandsThatCanBePointedAtALink(t *testing.T) {
 	want := []string{
+		"drive items abuse",
 		"drive items create",
 		"drive items delete",
 		"drive items download",
@@ -49,6 +50,20 @@ func TestEveryCommandTakingALinkTakesItsPassword(t *testing.T) {
 		if c.Flags().Lookup("link-password-file") == nil {
 			t.Errorf("%s takes --link but not --link-password-file, "+
 				"so a link with a password cannot be opened", named(c))
+		}
+	})
+}
+
+// A report is only ever about something shared with you, so the commands that
+// make one offer no way into your own files or your computers, and refuse to run
+// without being pointed somewhere else.
+func TestAReportIsNeverPointedAtYourOwnFiles(t *testing.T) {
+	walk(New(), func(c *cobra.Command) {
+		if c.Name() != "abuse" {
+			return
+		}
+		if c.Flags().Lookup("computer") != nil {
+			t.Errorf("%s offers --computer, and a computer is always your own", named(c))
 		}
 	})
 }

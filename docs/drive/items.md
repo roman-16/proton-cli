@@ -4,7 +4,32 @@ Files and folders.
 
 Every command under `proton drive items`, with the arguments and flags it takes. For these commands in use, see [the drive guide](README.md).
 
-Holds `copy`, `create`, `delete`, `download`, `get`, `list`, `move`, `revisions`, `share`, `trash`, `update` and `upload`.
+Holds `abuse`, `copy`, `create`, `delete`, `download`, `get`, `list`, `move`, `revisions`, `share`, `trash`, `update` and `upload`.
+
+## `abuse`
+
+Report something shared with you to Proton.
+
+PATH is inside --shared REF, something somebody shared with you, or inside --link URL, a public link. Proton receives the key to the whole of what was shared, not only PATH. Copyright and stolen-data reports need --message and --email. Nothing withdraws a report, and the item stays where it is.
+
+```
+proton drive items abuse PATH
+```
+
+```bash
+proton drive items abuse /invoice.exe --shared Project --category malware --good-faith
+proton drive items abuse / --link 'https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL' --category copyright --message 'My photos, published without permission' --email jane@proton.me --good-faith
+```
+
+| Flag | Description |
+| --- | --- |
+| `--category string` | What the report is about: spam, copyright, child-abuse, non-consensual-intimate, stolen-data, malware, other |
+| `--email string` | Where Proton can reach you about the report; required for copyright and stolen-data |
+| `--good-faith` | Confirm, in good faith, that what the report says is correct and complete |
+| `--link string` | Work inside a public link somebody sent you, by URL |
+| `--link-password-file string` | Read the public link's password from a file, or - for stdin |
+| `--message string` | What Proton should know; required for copyright and stolen-data |
+| `--shared string` | Work inside an item shared with you, by name or ID |
 
 ## `copy`
 
@@ -220,7 +245,29 @@ Earlier versions of a file.
 
 Uploading over a file with `--if-exists replace` keeps what was there as a revision. You can read any revision back, restore it, or delete it.
 
-Holds `delete`, `download`, `list` and `restore`.
+Holds `abuse`, `delete`, `download`, `list` and `restore`.
+
+### `revisions abuse`
+
+Report an earlier version of a shared file to Proton.
+
+PATH is inside --shared REF, something somebody shared with you. Proton receives the key to the whole of what was shared, not only this version. Copyright and stolen-data reports need --message and --email. Nothing withdraws a report.
+
+```
+proton drive items revisions abuse PATH REVISION_REF
+```
+
+```bash
+proton drive items revisions abuse /report.pdf 5bH2mQxK --shared Project --category malware --good-faith
+```
+
+| Flag | Description |
+| --- | --- |
+| `--category string` | What the report is about: spam, copyright, child-abuse, non-consensual-intimate, stolen-data, malware, other |
+| `--email string` | Where Proton can reach you about the report; required for copyright and stolen-data |
+| `--good-faith` | Confirm, in good faith, that what the report says is correct and complete |
+| `--message string` | What Proton should know; required for copyright and stolen-data |
+| `--shared string` | Work inside an item shared with you, by name or ID |
 
 ### `revisions delete`
 

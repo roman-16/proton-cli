@@ -116,6 +116,8 @@ How much is unread is `proton mail conversations count`: one row per folder and 
 
 A message with `receipt_due` set to true asks to have its reading confirmed. Sending the confirmation tells the sender their mail was read and cannot be taken back, so `proton mail messages receipt REF` is the user's to run: say that the sender asked, and leave the answer to them.
 
+`proton drive items abuse` and `proton drive invitations abuse` hand Proton the key to what was shared, and `--good-faith` is the user's own declaration that the report is true. Never pass it for them: say what looks wrong, and leave the report to them.
+
 ```bash
 proton mail messages list --unread --output json
 proton mail messages list --keyword invoice --folder all --output json
@@ -194,9 +196,9 @@ One line per group, with the verbs under it. Arguments, flags and examples are i
 ### drive - Files and folders in Drive
 
 - `proton drive computers` - Computers syncing files to Drive: delete, list, update
-- `proton drive invitations` - Shares other people have offered you: accept, decline, list
-- `proton drive items` - Files and folders: copy, create, delete, download, get, list, move, trash, update, upload
-- `proton drive items revisions` - Earlier versions of a file: delete, download, list, restore
+- `proton drive invitations` - Shares other people have offered you: abuse, accept, decline, list
+- `proton drive items` - Files and folders: abuse, copy, create, delete, download, get, list, move, trash, update, upload
+- `proton drive items revisions` - Earlier versions of a file: abuse, delete, download, list, restore
 - `proton drive items share` - The people you share a file or folder with: add, confirm, get, remove, resend, update
 - `proton drive links` - Links that open a file or folder for anyone: create, get, list, revoke
 - `proton drive photos` - Your photo library: delete, download, favorite, list, trash, unfavorite, upload

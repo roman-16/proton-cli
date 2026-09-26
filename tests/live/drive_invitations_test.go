@@ -120,3 +120,40 @@ func TestDriveShareInvitationRoundTrip(t *testing.T) {
 		t.Errorf("alt is not listed as a member after accepting; members=%s", members)
 	}
 }
+
+// What an invitation offers is reported before it is answered, and previewing
+// the report leaves the invitation waiting.
+func TestDriveInvitationsAbuseWithoutAnswering(t *testing.T) {
+	name := testID() + "-abuse-invite"
+	folder := "/" + name
+	runOK(t, "drive", "items", "create", folder)
+	cleanupRun(t, fmt.Sprintf("Delete folder: proton drive items delete %s", folder),
+		"drive", "items", "delete", folder)
+
+	before := altInvitationIDs(t)
+	runOK(t, "drive", "items", "share", "add", folder, secondaryEmail())
+	cleanupRun(t, fmt.Sprintf("Revoke member: proton drive items share remove %s %s", folder, secondaryEmail()),
+		"drive", "items", "share", "remove", folder, secondaryEmail())
+
+	var invID string
+	waitFor(45*time.Second, 3*time.Second, func() bool {
+		for id := range altInvitationIDs(t) {
+			if !before[id] {
+				invID = id
+				return true
+			}
+		}
+		return false
+	})
+	if invID == "" {
+		t.Fatal("the second account never saw the invitation")
+	}
+
+	_, stderr := runOKStderrSecondary(t, "--dry-run", "drive", "invitations", "abuse",
+		"--category", "spam", "--good-faith", invID)
+
+	assertContains(t, stderr, "Dry run - would report "+name+" to Proton as spam.")
+	if !altInvitationIDs(t)[invID] {
+		t.Error("previewing a report answered the invitation")
+	}
+}
