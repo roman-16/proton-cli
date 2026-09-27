@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"sync"
 
 	"github.com/roman-16/proton-cli/internal/proton"
 	"github.com/roman-16/proton-cli/internal/skip"
@@ -17,20 +18,38 @@ type rawConversation struct {
 	Time                                   int64
 	Senders                                []map[string]any
 	Recipients                             []map[string]any
-	Labels                                 []struct{ ID string }
+	Labels                                 []rawConversationLabel
+	ExpiringByRetention                    bool
 }
 
-func toConversation(c rawConversation) Conversation {
+type rawConversationLabel struct {
+	ID                    string
+	ContextExpirationTime int64
+}
+
+func toConversation(c rawConversation, listed string) Conversation {
 	labels := make([]string, 0, len(c.Labels))
+	var expires int64
 	for _, l := range c.Labels {
 		labels = append(labels, l.ID)
+		if l.ID == listed {
+			expires = l.ContextExpirationTime
+		}
 	}
 	return Conversation{
 		ID: c.ID, Subject: c.Subject,
 		NumMessages: c.NumMessages, NumUnread: c.NumUnread, NumAttachments: c.NumAttachments,
 		Size: c.Size,
 		Time: c.Time, Senders: c.Senders, Recipients: c.Recipients, Labels: labels,
+		Expires: expires, ExpiryByRetention: c.ExpiringByRetention,
 	}
+}
+
+func listedIn(folder string) string {
+	if folder == "" || isCategory(folder) {
+		return labelInbox
+	}
+	return folder
 }
 
 func (s *Service) ConversationsList(ctx context.Context, opts ListOptions) ([]Conversation, int, error) {
@@ -50,7 +69,7 @@ func (s *Service) ConversationsList(ctx context.Context, opts ListOptions) ([]Co
 		}
 		out := make([]Conversation, 0, len(r.Conversations))
 		for _, c := range r.Conversations {
-			out = append(out, toConversation(c))
+			out = append(out, toConversation(c, listedIn(opts.Folder)))
 		}
 		return out, r.Total, nil
 	})
@@ -96,7 +115,7 @@ func (s *Service) ConversationRead(ctx context.Context, id string) (*Conversatio
 		}
 		msgs = append(msgs, asFull(m, body, sig))
 	}
-	return &ConversationFull{Conversation: toConversation(r.Conversation), Messages: msgs}, nil
+	return &ConversationFull{Conversation: toConversation(r.Conversation, labelAllMail), Messages: msgs}, nil
 }
 
 func (s *Service) AssertConversationKind(ctx context.Context, id string) error {
@@ -107,17 +126,48 @@ func (s *Service) AssertConversationKind(ctx context.Context, id string) error {
 	return s.crossTableProbe(ctx, id, err, "conversations")
 }
 
-// ConversationMessageIDs lists a thread's message IDs oldest first, which is the
+// ConversationMessages lists a thread's messages oldest first, which is the
 // order an exported thread reads in.
-func (s *Service) ConversationMessageIDs(ctx context.Context, convID string) ([]string, error) {
-	var r struct{ Messages []rawMessage }
+func (s *Service) ConversationMessages(ctx context.Context, convID string) ([]Message, error) {
+	var r struct{ Messages []rawListMessage }
 	if err := s.C.Decode(ctx, proton.Request{Method: "GET", Path: "/mail/v4/conversations/" + convID}, &r); err != nil {
 		return nil, s.crossTableProbe(ctx, convID, err, "conversations")
 	}
 	sort.SliceStable(r.Messages, func(i, j int) bool { return r.Messages[i].Time < r.Messages[j].Time })
-	out := make([]string, 0, len(r.Messages))
+	out := make([]Message, 0, len(r.Messages))
 	for _, m := range r.Messages {
-		out = append(out, m.ID)
+		out = append(out, toMessage(m))
 	}
 	return out, nil
+}
+
+func (s *Service) ConversationsMessages(ctx context.Context, ids []string) ([][]Message, error) {
+	out := make([][]Message, len(ids))
+	failures := make([]error, len(ids))
+	var wg sync.WaitGroup
+	slots := make(chan struct{}, bodiesAtOnce)
+	for i, id := range ids {
+		wg.Add(1)
+		slots <- struct{}{}
+		go func() {
+			defer wg.Done()
+			defer func() { <-slots }()
+			out[i], failures[i] = s.ConversationMessages(ctx, id)
+		}()
+	}
+	wg.Wait()
+	for _, err := range failures {
+		if err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
+func MessageIDs(msgs []Message) []string {
+	out := make([]string, 0, len(msgs))
+	for _, m := range msgs {
+		out = append(out, m.ID)
+	}
+	return out
 }

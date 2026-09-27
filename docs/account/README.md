@@ -186,7 +186,7 @@ These commands ask for your password again even when you are signed in:
 - `account settings security-keys create` · `account settings security-keys delete`
 - `account settings two-factor enable` · `account settings two-factor disable`
 - `calendar settings calendars delete`
-- `mail messages update`
+- `mail conversations update` · `mail messages update`
 - `mail settings addresses create`
 - `mail settings addresses delete`
 - `mail settings addresses disable`

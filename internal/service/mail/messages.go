@@ -47,7 +47,9 @@ func toMessage(m rawListMessage) Message {
 		Subject: m.Subject, Unread: m.Unread, Time: m.Time,
 		FromName: m.Sender.Name, FromAddress: m.Sender.Address,
 		NumAttachments: m.NumAttachments, Labels: m.LabelIDs, Size: m.Size,
-		DMARCFailed: v.dmarcFailed, MarkedLegitimate: v.markedLegitimate,
+		Expires: m.ExpirationTime, ExpiryFixed: m.Flags&flagExpiryFixed != 0,
+		ExpiryByRetention: m.Flags&flagExpiryByRetention != 0,
+		DMARCFailed:       v.dmarcFailed, MarkedLegitimate: v.markedLegitimate,
 		Phishing: v.phishing, Suspicious: v.suspicious,
 	}
 }
@@ -241,6 +243,11 @@ const (
 	flagSuspicious     = 1 << 33
 )
 
+const (
+	flagExpiryFixed       = 1 << 32
+	flagExpiryByRetention = 1 << 38
+)
+
 // verdict is what Proton concluded about one message, read off the flags every
 // envelope carries - a listing row as much as a single message, which is why a
 // listing can mark a flagged message without asking for anything more.
@@ -350,8 +357,8 @@ func asFull(m rawMessage, body string, sig pgphelper.VerifyResult) Full {
 	return Full{
 		ID: m.ID, ConversationID: m.ConversationID, Subject: m.Subject, Sender: m.Sender,
 		ToList: m.ToList, CCList: m.CCList, BCCList: m.BCCList,
-		Time: m.Time, Expires: m.ExpirationTime, Body: body, MIMEType: m.MIMEType,
-		AddressID: m.AddressID, Attachments: atts, Signature: sig,
+		Time: m.Time, Expires: m.ExpirationTime, ExpiryByRetention: m.Flags&flagExpiryByRetention != 0,
+		Body: body, MIMEType: m.MIMEType, AddressID: m.AddressID, Attachments: atts, Signature: sig,
 		DMARCFailed: v.dmarcFailed, MarkedLegitimate: v.markedLegitimate,
 		Phishing: v.phishing, Suspicious: v.suspicious,
 		ReceiptRequested: r.Requested, ReceiptSent: r.Sent, ReceiptDue: r.Answerable(),

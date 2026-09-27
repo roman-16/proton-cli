@@ -4,7 +4,7 @@ Whole threads.
 
 Every command under `proton mail conversations`, with the arguments and flags it takes. For these commands in use, see [the mail guide](README.md).
 
-Holds `attachments`, `count`, `delete`, `export`, `forward`, `get`, `label`, `list`, `mark`, `move`, `reply`, `snooze`, `star`, `trash`, `unlabel`, `unsnooze` and `unstar`.
+Holds `attachments`, `count`, `delete`, `export`, `forward`, `get`, `label`, `list`, `mark`, `move`, `reply`, `snooze`, `star`, `trash`, `unlabel`, `unsnooze`, `unstar` and `update`.
 
 ## `attachments`
 
@@ -571,6 +571,44 @@ proton mail conversations unstar 'Quarterly numbers'
 | `--starred` | Match starred messages |
 | `--subject string` | Match text in the subject |
 | `--to string` | Match a recipient's address |
+| `--unread` | Match unread messages |
+| `--via string` | Match mail that arrived at, or left from, this address of yours |
+
+## `update`
+
+Change when threads delete themselves.
+
+--expires takes a duration, or never to stop them expiring. It applies to every message in each thread, or with --folder to the ones in that folder. A message whose sender set its expiry keeps it, and none is set in trash or spam.
+
+```
+proton mail conversations update [REF...]
+```
+
+```bash
+proton mail conversations update 'Quarterly numbers' --expires 7d
+proton mail conversations update --folder archive --older-than 1y --expires 30d
+proton mail conversations update 5bH2mQxK --expires never
+```
+
+| Flag | Description |
+| --- | --- |
+| `--after string` | First day to include (YYYY-MM-DD) |
+| `--all` | Act on everything in scope, rather than a subset |
+| `--before string` | Last day to include (YYYY-MM-DD) |
+| `--expires string` | Delete them after DURATION (e.g. 7d, 24h), or never |
+| `--folder string` | Folder or label to look in (default: all) |
+| `--from string` | Match the sender's address |
+| `--has-attachments` | Match messages with attachments |
+| `--keyword string` | Match text in the subject, a name or an address, and in bodies once a mail index exists |
+| `--limit int` | Most messages to affect; 0 for no cap (default `150`) |
+| `--newer-than string` | Match messages newer than DURATION |
+| `--older-than string` | Match messages older than DURATION (e.g. 30d, 2w, 1h) |
+| `--password-file string` | Read the account password from a file, or - for stdin |
+| `--read` | Match read messages |
+| `--starred` | Match starred messages |
+| `--subject string` | Match text in the subject |
+| `--to string` | Match a recipient's address |
+| `--totp string` | Two-factor code |
 | `--unread` | Match unread messages |
 | `--via string` | Match mail that arrived at, or left from, this address of yours |
 

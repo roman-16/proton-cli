@@ -700,7 +700,7 @@ proton mail messages unsubscribe 5bH2mQxK
 
 Change when messages delete themselves.
 
---expires takes a duration, or never to stop them expiring. A message already counting down reports the moment it expires rather than how long is left.
+--expires takes a duration, or never to stop them expiring. A message already counting down reports the moment it expires rather than how long is left. A message whose sender set its expiry keeps it, and none is set in trash or spam.
 
 ```
 proton mail messages update [REF...]

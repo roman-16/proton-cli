@@ -53,7 +53,7 @@ Try:   pass a REF, or a filter such as --unread, --starred, --from, --subject or
 
 `--limit` defaults to 150 on a bulk verb: a guard against a mistyped filter, not a technical bound. A selection that fills it says so, `--limit N` reads as far as it takes to find N, and `--limit 0` lifts the cap altogether.
 
-Bulk verbs act on the IDs the selection resolved to, in batches of fifty, and report Proton's answer per item. Whatever was refused is named, and the count reports what actually landed.
+Bulk verbs report Proton's answer per item. Whatever was refused is named, and the count and the IDs in `--output json` report what actually landed.
 
 A filter that matches a folder and the files inside it selects the folder alone.
 

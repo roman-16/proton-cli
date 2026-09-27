@@ -563,21 +563,21 @@ func sendTestMail(t *testing.T, subject string) string {
 // sentToSelfPaid is the same on the paid account, which is how a paid test gets
 // a message of its own to act on: it acts only on what it made, and both copies
 // are deleted afterwards.
-func sentToSelfPaid(t *testing.T, subject string) string {
+func sentToSelfPaid(t *testing.T, subject string, flags ...string) string {
 	t.Helper()
-	return sentToSelf(t, account.Paid, subject)
+	return sentToSelf(t, account.Paid, subject, flags...)
 }
 
-func sentToSelf(t *testing.T, profile, subject string) string {
+func sentToSelf(t *testing.T, profile, subject string, flags ...string) string {
 	t.Helper()
 	address := accounts[profile].Address()
-	runOKProfile(t, profile, "mail", "messages", "send",
-		"--to", address, "--subject", subject, "--body", "Integration test body: "+subject)
-	if sentID := findMessageAs(t, profile, "sent", subject); sentID != "" {
+	runOKProfile(t, profile, append([]string{"mail", "messages", "send",
+		"--to", address, "--subject", subject, "--body", "Integration test body: " + subject}, flags...)...)
+	inboxID := findMessageAs(t, profile, "inbox", subject)
+	if sentID := findMessageAs(t, profile, "sent", subject); sentID != "" && sentID != inboxID {
 		cleanupAs(t, profile, "Delete sent mail: proton mail messages delete "+sentID,
 			"mail", "messages", "delete", "--", sentID)
 	}
-	inboxID := findMessageAs(t, profile, "inbox", subject)
 	if inboxID == "" {
 		t.Fatalf("mail %q was not delivered to the %s account", subject, profile)
 	}

@@ -116,7 +116,10 @@ type Message struct {
 	Labels         []string `json:"labels"`
 	// Size is how many bytes the message takes up, which is what --sort size
 	// orders by.
-	Size int64 `json:"size,omitempty"`
+	Size              int64 `json:"size,omitempty"`
+	Expires           int64 `json:"expires,omitempty"`
+	ExpiryFixed       bool  `json:"-"`
+	ExpiryByRetention bool  `json:"-"`
 
 	// What Proton concluded about the message. Each is written only when it is
 	// true: a message nobody doubts carries no verdict at all, and "phishing":
@@ -131,6 +134,19 @@ type Message struct {
 // Starred reports whether the message carries the Starred label. A star is a
 // label like any other, so this is a lookup rather than a field of its own.
 func (m Message) Starred() bool { return hasLabel(m.Labels, labelStarred) }
+
+func (m Message) Countdown() int64 { return countdown(m.Expires, m.ExpiryByRetention) }
+
+func (m Message) InTrashOrSpam() bool {
+	return hasLabel(m.Labels, labelTrash) || hasLabel(m.Labels, labelSpam)
+}
+
+func countdown(expires int64, byRetention bool) int64 {
+	if byRetention {
+		return 0
+	}
+	return expires
+}
 
 // Flagged reports whether Proton thinks this message is not what it says it is.
 //
@@ -156,12 +172,13 @@ type Full struct {
 	Time           int64            `json:"time,omitempty"`
 	// Expires is when Proton throws the message away, for the ones that
 	// self-destruct. It is zero for a message that stays.
-	Expires     int64                  `json:"expires,omitempty"`
-	Body        string                 `json:"body"`
-	MIMEType    string                 `json:"mime_type"`
-	AddressID   string                 `json:"address_id,omitempty"`
-	Attachments []Attachment           `json:"attachments"`
-	Signature   pgphelper.VerifyResult `json:"signature,omitempty"`
+	Expires           int64                  `json:"expires,omitempty"`
+	ExpiryByRetention bool                   `json:"-"`
+	Body              string                 `json:"body"`
+	MIMEType          string                 `json:"mime_type"`
+	AddressID         string                 `json:"address_id,omitempty"`
+	Attachments       []Attachment           `json:"attachments"`
+	Signature         pgphelper.VerifyResult `json:"signature,omitempty"`
 
 	DMARCFailed      bool `json:"dmarc_failed,omitempty"`
 	MarkedLegitimate bool `json:"marked_legitimate,omitempty"`
@@ -186,21 +203,27 @@ func (f Full) Flagged() bool {
 // half of a verdict that marking it legitimate overrules.
 func (f Full) SpamFlagged() bool { return f.Phishing || f.Suspicious }
 
+func (f Full) Countdown() int64 { return countdown(f.Expires, f.ExpiryByRetention) }
+
 type Conversation struct {
-	ID             string           `json:"id"`
-	Subject        string           `json:"subject"`
-	NumMessages    int              `json:"num_messages"`
-	NumUnread      int              `json:"num_unread"`
-	NumAttachments int              `json:"num_attachments"`
-	Size           int64            `json:"size,omitempty"`
-	Time           int64            `json:"time"`
-	Senders        []map[string]any `json:"senders"`
-	Recipients     []map[string]any `json:"recipients"`
-	Labels         []string         `json:"labels"`
+	ID                string           `json:"id"`
+	Subject           string           `json:"subject"`
+	NumMessages       int              `json:"num_messages"`
+	NumUnread         int              `json:"num_unread"`
+	NumAttachments    int              `json:"num_attachments"`
+	Size              int64            `json:"size,omitempty"`
+	Time              int64            `json:"time"`
+	Senders           []map[string]any `json:"senders"`
+	Recipients        []map[string]any `json:"recipients"`
+	Labels            []string         `json:"labels"`
+	Expires           int64            `json:"expires,omitempty"`
+	ExpiryByRetention bool             `json:"-"`
 }
 
 // Starred reports whether the thread carries the Starred label.
 func (c Conversation) Starred() bool { return hasLabel(c.Labels, labelStarred) }
+
+func (c Conversation) Countdown() int64 { return countdown(c.Expires, c.ExpiryByRetention) }
 
 func hasLabel(labels []string, want string) bool {
 	for _, l := range labels {

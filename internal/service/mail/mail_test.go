@@ -178,13 +178,29 @@ func TestToMessageMapping(t *testing.T) {
 
 func TestToConversationMapping(t *testing.T) {
 	raw := rawConversation{ID: "c1", Subject: "Thread", NumMessages: 3, NumUnread: 1, NumAttachments: 0, Time: 99}
-	raw.Labels = []struct{ ID string }{{ID: "0"}, {ID: "5"}}
-	c := toConversation(raw)
+	raw.Labels = []rawConversationLabel{{ID: "0", ContextExpirationTime: 500}, {ID: "5", ContextExpirationTime: 400}}
+	c := toConversation(raw, labelInbox)
 	if c.ID != "c1" || c.Subject != "Thread" || c.NumMessages != 3 || c.NumUnread != 1 || c.Time != 99 {
 		t.Errorf("toConversation scalar mapping wrong: %+v", c)
 	}
 	if len(c.Labels) != 2 || c.Labels[0] != "0" || c.Labels[1] != "5" {
 		t.Errorf("toConversation labels mapping wrong: %v", c.Labels)
+	}
+	if c.Expires != 500 {
+		t.Errorf("Expires = %d, want the listed folder's 500", c.Expires)
+	}
+	if all := toConversation(raw, labelAllMail); all.Expires != 400 {
+		t.Errorf("Expires across all mail = %d, want 400", all.Expires)
+	}
+}
+
+func TestAMessageRowSaysWhetherItsExpiryCanChange(t *testing.T) {
+	m := toMessage(rawListMessage{ID: "m", ExpirationTime: 900, Flags: flagExpiryFixed | flagExpiryByRetention})
+	if m.Expires != 900 || !m.ExpiryFixed || !m.ExpiryByRetention {
+		t.Errorf("toMessage = %+v, want the expiry, fixed and set by retention", m)
+	}
+	if m.Countdown() != 0 {
+		t.Errorf("Countdown = %d, want none for a retention-policy expiry", m.Countdown())
 	}
 }
 
@@ -214,7 +230,7 @@ func bodyLabelID(t *testing.T, r proton.Request) string {
 func TestTrashHitsLabelEndpoint(t *testing.T) {
 	f := &fakeDoer{}
 	s := New(f, testKeys(nil))
-	if err := s.Trash(context.Background(), []string{"a", "b"}); err != nil {
+	if _, err := s.Trash(context.Background(), []string{"a", "b"}); err != nil {
 		t.Fatalf("Trash: %v", err)
 	}
 	if f.last.Method != "PUT" || f.last.Path != "/mail/v4/messages/label" {
@@ -270,13 +286,16 @@ func TestOrganisingVerbsUseTheRightLabel(t *testing.T) {
 			if err != nil {
 				return err
 			}
-			return s.Label(context.Background(), []string{"a"}, box.ID)
+			_, err = s.Label(context.Background(), []string{"a"}, box.ID)
+			return err
 		}, labelArchive},
 		{"trash", func(s *Service) error {
-			return s.Trash(context.Background(), []string{"a"})
+			_, err := s.Trash(context.Background(), []string{"a"})
+			return err
 		}, labelTrash},
 		{"star", func(s *Service) error {
-			return s.Label(context.Background(), []string{"a"}, StarredLabelID)
+			_, err := s.Label(context.Background(), []string{"a"}, StarredLabelID)
+			return err
 		}, labelStarred},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

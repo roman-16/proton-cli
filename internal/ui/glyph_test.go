@@ -8,9 +8,9 @@ import (
 // vocabulary is every glyph the CLI draws, by what it means.
 func vocabulary() map[string]string {
 	return map[string]string{
-		"success": GlyphSuccess, "caution": GlyphCaution, "unread": GlyphUnread,
-		"starred": GlyphStarred, "swatch": GlyphSwatch, "rule": GlyphRule,
-		"bar filled": GlyphBarFilled,
+		"success": GlyphSuccess, "caution": GlyphCaution, "flagged": GlyphFlagged,
+		"unread": GlyphUnread, "starred": GlyphStarred, "expiring": GlyphExpiring,
+		"swatch": GlyphSwatch, "rule": GlyphRule, "bar filled": GlyphBarFilled,
 	}
 }
 

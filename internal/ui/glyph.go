@@ -16,6 +16,7 @@ const (
 	GlyphFlagged    = "✗" // a thing the service itself distrusts
 	GlyphUnread     = "●" // an unread message
 	GlyphStarred    = "★" // a starred message
+	GlyphExpiring   = "⧗" // mail that deletes itself
 	GlyphSwatch     = "■" // the colour a label, folder or calendar is shown in
 	GlyphRule       = "─" // a horizontal rule, under table headers
 	GlyphBarFilled  = "━" // progress, done

@@ -788,6 +788,11 @@ var examples = map[string][]string{
 	"proton mail conversations unsnooze": {
 		"proton mail conversations unsnooze 5bH2mQxK",
 	},
+	"proton mail conversations update": {
+		"proton mail conversations update 'Quarterly numbers' --expires 7d",
+		"proton mail conversations update --folder archive --older-than 1y --expires 30d",
+		"proton mail conversations update 5bH2mQxK --expires never",
+	},
 	"proton mail conversations reply": {
 		"proton mail conversations reply 'Quarterly numbers' --body 'Looks right to me.'",
 		"proton mail conversations reply 'Quarterly numbers' --everyone --body Agreed.",

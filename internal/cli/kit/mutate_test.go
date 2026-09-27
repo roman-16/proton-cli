@@ -3,6 +3,7 @@ package kit
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"strings"
@@ -271,4 +272,34 @@ func TestAChangeSaysWhatTheRunCouldNotRead(t *testing.T) {
 			t.Errorf("the preview does not carry the caveat:\n%s", errb.String())
 		}
 	})
+}
+
+type refusedThing struct{ id string }
+
+func (r refusedThing) String() string    { return "Refused " + r.id }
+func (r refusedThing) SkippedID() string { return r.id }
+
+func TestAPartialChangeListsOnlyWhatLanded(t *testing.T) {
+	var out, errb bytes.Buffer
+	a := signedIn(&app.App{})
+	a.UI = ui.New(ui.Options{Format: ui.FormatJSON, Out: &out, Err: &errb, NoInput: true})
+	c := &Invocation{Ctx: context.Background(), App: a}
+	spec := ui.ResultSpec{Action: ui.Starred, Kind: "messages", Count: 3, IDs: []string{"a", "b", "c"}}
+	err := Attempt(c, spec, func() ([]refusedThing, error) { return []refusedThing{{id: "b"}}, nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		Count int
+		IDs   []string
+	}
+	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
+		t.Fatalf("%v in %s", err, out.String())
+	}
+	if got.Count != 2 || strings.Join(got.IDs, ",") != "a,c" {
+		t.Errorf("count %d, ids %v; want 2 and a,c", got.Count, got.IDs)
+	}
+	if !strings.Contains(errb.String(), "Refused b") {
+		t.Errorf("the refusal was not named: %q", errb.String())
+	}
 }

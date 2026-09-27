@@ -228,6 +228,8 @@ func TestEmptyingAFolderNeedsToKnowWhichOne(t *testing.T) {
 func TestUpdatingAMessageNeedsAnInstruction(t *testing.T) {
 	refuses(t, 1, []string{"mail", "messages", "update", "any-ref"},
 		"Nothing to change", "--expires 7d")
+	refuses(t, 1, []string{"mail", "conversations", "update", "any-ref"},
+		"Nothing to change", "--expires 7d")
 }
 
 // Only the types whose Pass editor offers headings can carry a section, and

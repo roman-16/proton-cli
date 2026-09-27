@@ -229,6 +229,8 @@ proton mail messages update REF --expires never
 proton mail messages unsubscribe REF           # leave the list a message came from
 ```
 
+`update --expires` leaves a message whose sender set its expiry as it is, and sets none in trash or spam. `list` marks mail that deletes itself with `⧗`.
+
 `unsubscribe` uses whichever way the list offers, and the answer says which it used. To work from the senders instead of their mail, see [Mailing lists](#mailing-lists).
 
 ## Mailing lists
@@ -264,11 +266,14 @@ Conversations are whole threads, with the same verbs as messages.
 proton mail conversations get REF              # every message, chronological
 proton mail conversations get --summary REF    # one line per message
 proton mail conversations snooze REF --until 3d
+proton mail conversations update REF --expires 7d   # the whole thread deletes itself later
 ```
 
 Snooze works on **threads**, not messages: a conversation leaves the inbox as a whole and returns as a whole.
 
 `--until` takes a duration from now or a moment. A moment in the past is refused.
+
+`conversations update --expires` changes every message of each thread. With `--folder`, it changes only the messages in that folder.
 
 ## Attachments
 

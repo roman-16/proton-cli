@@ -2,8 +2,12 @@ package mail
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
+	"maps"
 	"net/url"
 
+	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/mailtext"
 	"github.com/roman-16/proton-cli/internal/proton"
 )
@@ -17,49 +21,91 @@ import (
 // and Proton's model line up, instead of a single `Mark(read, unread, starred,
 // unstar bool)` doing four unrelated things depending on which flag is set.
 
+type Refused struct {
+	ID     string
+	Reason string
+}
+
+func (r Refused) String() string { return fmt.Sprintf("Refused %s: %s", r.ID, r.Reason) }
+
+func (r Refused) SkippedID() string { return r.ID }
+
+func (s *Service) batch(ctx context.Context, path string, ids []string, fields map[string]any) ([]Refused, error) {
+	var refused []Refused
+	for start := 0; start < len(ids); start += pageMax {
+		chunk := ids[start:min(start+pageMax, len(ids))]
+		body := maps.Clone(fields)
+		if body == nil {
+			body = map[string]any{}
+		}
+		body["IDs"] = chunk
+		var r struct {
+			Responses []struct {
+				ID       string
+				Response struct {
+					Code  int
+					Error string
+				}
+			}
+		}
+		if err := s.C.Decode(ctx, proton.Request{Method: "PUT", Path: path, Body: body}, &r); err != nil {
+			return refused, err
+		}
+		before := len(refused)
+		code := 0
+		for i, answer := range r.Responses {
+			if proton.Succeeded(answer.Response.Code) {
+				continue
+			}
+			id := answer.ID
+			if id == "" && i < len(chunk) {
+				id = chunk[i]
+			}
+			reason := answer.Response.Error
+			if reason == "" {
+				reason = "Proton did not accept it"
+			}
+			refused = append(refused, Refused{ID: id, Reason: reason})
+			code = answer.Response.Code
+		}
+		if n := len(refused) - before; n > 0 {
+			// Recorded and not counted: every refusal is named on screen, and the
+			// count of what changed leaves it out.
+			slog.DebugContext(ctx, "mail: Proton refused part of a batch",
+				"path", path, "code", code, "count", n)
+		}
+	}
+	return refused, nil
+}
+
 // Label attaches a label to messages.
-func (s *Service) Label(ctx context.Context, ids []string, labelID string) error {
-	return s.C.Decode(ctx, proton.Request{
-		Method: "PUT", Path: "/mail/v4/messages/label",
-		Body: map[string]any{"LabelID": labelID, "IDs": ids},
-	}, nil)
+func (s *Service) Label(ctx context.Context, ids []string, labelID string) ([]Refused, error) {
+	return s.batch(ctx, "/mail/v4/messages/label", ids, map[string]any{"LabelID": labelID})
 }
 
 // Unlabel detaches a label from messages.
-func (s *Service) Unlabel(ctx context.Context, ids []string, labelID string) error {
-	return s.C.Decode(ctx, proton.Request{
-		Method: "PUT", Path: "/mail/v4/messages/unlabel",
-		Body: map[string]any{"LabelID": labelID, "IDs": ids},
-	}, nil)
+func (s *Service) Unlabel(ctx context.Context, ids []string, labelID string) ([]Refused, error) {
+	return s.batch(ctx, "/mail/v4/messages/unlabel", ids, map[string]any{"LabelID": labelID})
 }
 
 // Trash moves messages to the Trash folder, from where they can be restored.
-func (s *Service) Trash(ctx context.Context, ids []string) error {
+func (s *Service) Trash(ctx context.Context, ids []string) ([]Refused, error) {
 	return s.Label(ctx, ids, labelTrash)
 }
 
 // Delete removes messages irrecoverably.
-func (s *Service) Delete(ctx context.Context, ids []string) error {
-	return s.C.Decode(ctx, proton.Request{
-		Method: "PUT", Path: "/mail/v4/messages/delete",
-		Body: map[string]any{"IDs": ids},
-	}, nil)
+func (s *Service) Delete(ctx context.Context, ids []string) ([]Refused, error) {
+	return s.batch(ctx, "/mail/v4/messages/delete", ids, nil)
 }
 
 // MarkRead clears the unread flag on messages.
-func (s *Service) MarkRead(ctx context.Context, ids []string) error {
-	return s.C.Decode(ctx, proton.Request{
-		Method: "PUT", Path: "/mail/v4/messages/read",
-		Body: map[string]any{"IDs": ids},
-	}, nil)
+func (s *Service) MarkRead(ctx context.Context, ids []string) ([]Refused, error) {
+	return s.batch(ctx, "/mail/v4/messages/read", ids, nil)
 }
 
 // MarkUnread sets the unread flag on messages.
-func (s *Service) MarkUnread(ctx context.Context, ids []string) error {
-	return s.C.Decode(ctx, proton.Request{
-		Method: "PUT", Path: "/mail/v4/messages/unread",
-		Body: map[string]any{"IDs": ids},
-	}, nil)
+func (s *Service) MarkUnread(ctx context.Context, ids []string) ([]Refused, error) {
+	return s.batch(ctx, "/mail/v4/messages/unread", ids, nil)
 }
 
 // MarkLegitimate tells Proton a message it flagged is what it claims to be.
@@ -104,7 +150,14 @@ func (s *Service) ReportPhishing(ctx context.Context, id string) error {
 	}, nil); err != nil {
 		return err
 	}
-	return s.Label(ctx, []string{id}, labelSpam)
+	refused, err := s.Label(ctx, []string{id}, labelSpam)
+	if err != nil {
+		return err
+	}
+	if len(refused) > 0 {
+		return errs.Problemf("Reported the message, but it could not be moved to spam: %s", refused[0].Reason)
+	}
+	return nil
 }
 
 // Unschedule cancels a scheduled send, pulling the message out of the Scheduled
@@ -127,43 +180,35 @@ func (s *Service) Unschedule(ctx context.Context, ids []string) error {
 // unread, and deleting one, apply within a mailbox rather than globally, because
 // a thread can have messages in several. An empty scope means All Mail.
 
-func (s *Service) ConversationsLabel(ctx context.Context, ids []string, labelID string) error {
-	return s.C.Decode(ctx, proton.Request{
-		Method: "PUT", Path: "/mail/v4/conversations/label",
-		Body: map[string]any{"LabelID": labelID, "IDs": ids},
-	}, nil)
+func (s *Service) ConversationsLabel(ctx context.Context, ids []string, labelID string) ([]Refused, error) {
+	return s.batch(ctx, "/mail/v4/conversations/label", ids, map[string]any{"LabelID": labelID})
 }
 
-func (s *Service) ConversationsUnlabel(ctx context.Context, ids []string, labelID string) error {
-	return s.C.Decode(ctx, proton.Request{
-		Method: "PUT", Path: "/mail/v4/conversations/unlabel",
-		Body: map[string]any{"LabelID": labelID, "IDs": ids},
-	}, nil)
+func (s *Service) ConversationsUnlabel(ctx context.Context, ids []string, labelID string) ([]Refused, error) {
+	return s.batch(ctx, "/mail/v4/conversations/unlabel", ids, map[string]any{"LabelID": labelID})
 }
 
-func (s *Service) ConversationsTrash(ctx context.Context, ids []string) error {
+func (s *Service) ConversationsTrash(ctx context.Context, ids []string) ([]Refused, error) {
 	return s.ConversationsLabel(ctx, ids, labelTrash)
 }
 
-func (s *Service) ConversationsDelete(ctx context.Context, ids []string, scopeLabelID string) error {
-	return s.C.Decode(ctx, proton.Request{
-		Method: "PUT", Path: "/mail/v4/conversations/delete",
-		Body: map[string]any{"IDs": ids, "LabelID": scopeOf(scopeLabelID)},
-	}, nil)
+func (s *Service) ConversationsDelete(ctx context.Context, ids []string, scopeLabelID string) ([]Refused, error) {
+	return s.batch(ctx, "/mail/v4/conversations/delete", ids, map[string]any{"LabelID": scopeOf(scopeLabelID)})
 }
 
-func (s *Service) ConversationsMarkRead(ctx context.Context, ids []string) error {
-	return s.C.Decode(ctx, proton.Request{
-		Method: "PUT", Path: "/mail/v4/conversations/read",
-		Body: map[string]any{"IDs": ids},
-	}, nil)
+func (s *Service) ConversationsMarkRead(ctx context.Context, ids []string) ([]Refused, error) {
+	return s.batch(ctx, "/mail/v4/conversations/read", ids, nil)
 }
 
-func (s *Service) ConversationsMarkUnread(ctx context.Context, ids []string, scopeLabelID string) error {
-	return s.C.Decode(ctx, proton.Request{
-		Method: "PUT", Path: "/mail/v4/conversations/unread",
-		Body: map[string]any{"IDs": ids, "LabelID": scopeOf(scopeLabelID)},
-	}, nil)
+func (s *Service) ConversationsMarkUnread(ctx context.Context, ids []string, scopeLabelID string) ([]Refused, error) {
+	return s.batch(ctx, "/mail/v4/conversations/unread", ids, map[string]any{"LabelID": scopeOf(scopeLabelID)})
+}
+
+func InScope(m Message, scopeLabelID string) bool {
+	if scopeLabelID == "" {
+		return true
+	}
+	return inPlace(m.Labels, scopeLabelID)
 }
 
 func scopeOf(labelID string) string {
@@ -198,28 +243,20 @@ func (s *Service) EmptyFolder(ctx context.Context, folder string) error {
 // A zero time clears it, which is how a message that was going to disappear is
 // kept. Proton stores the moment, not the duration, so a message already counting
 // down reports when rather than how long.
-func (s *Service) SetExpiration(ctx context.Context, ids []string, at int64) error {
-	body := map[string]any{"IDs": ids, "ExpirationTime": nil}
+func (s *Service) SetExpiration(ctx context.Context, ids []string, at int64) ([]Refused, error) {
+	fields := map[string]any{"ExpirationTime": nil}
 	if at > 0 {
-		body["ExpirationTime"] = at
+		fields["ExpirationTime"] = at
 	}
-	return s.C.Decode(ctx, proton.Request{
-		Method: "PUT", Path: "/mail/v4/messages/expire", Body: body,
-	}, nil)
+	return s.batch(ctx, "/mail/v4/messages/expire", ids, fields)
 }
 
 // Snooze takes threads out of the inbox until a moment, and Unsnooze brings them
 // back early.
-func (s *Service) Snooze(ctx context.Context, ids []string, until int64) error {
-	return s.C.Decode(ctx, proton.Request{
-		Method: "PUT", Path: "/mail/v4/conversations/snooze",
-		Body: map[string]any{"IDs": ids, "SnoozeTime": until},
-	}, nil)
+func (s *Service) Snooze(ctx context.Context, ids []string, until int64) ([]Refused, error) {
+	return s.batch(ctx, "/mail/v4/conversations/snooze", ids, map[string]any{"SnoozeTime": until})
 }
 
-func (s *Service) Unsnooze(ctx context.Context, ids []string) error {
-	return s.C.Decode(ctx, proton.Request{
-		Method: "PUT", Path: "/mail/v4/conversations/unsnooze",
-		Body: map[string]any{"IDs": ids},
-	}, nil)
+func (s *Service) Unsnooze(ctx context.Context, ids []string) ([]Refused, error) {
+	return s.batch(ctx, "/mail/v4/conversations/unsnooze", ids, nil)
 }

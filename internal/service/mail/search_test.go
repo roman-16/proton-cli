@@ -168,7 +168,7 @@ func TestAThreadIsFoundByAnyOfItsMessages(t *testing.T) {
 	elsewhere := indexed("c", "Unrelated", "", 300, labelInbox)
 
 	in := []stored{first, reply, elsewhere}
-	threads := threadsOf(in, matching(in, ListOptions{Keyword: "parking permit"}))
+	threads := threadsOf(in, matching(in, ListOptions{Keyword: "parking permit"}), labelInbox)
 	if len(threads) != 1 {
 		t.Fatalf("threads = %d, want 1", len(threads))
 	}
@@ -327,5 +327,19 @@ func TestTheIndexKeepsATabToTheInbox(t *testing.T) {
 	}
 	if got := ids(matching(in, ListOptions{Folder: labelSocial})); !reflect.DeepEqual(got, []string{"kept"}) {
 		t.Errorf("--folder social matched %v, want only what is still in the inbox", got)
+	}
+}
+
+func TestAThreadRowCountsDownToItsFirstExpiryInTheListedFolder(t *testing.T) {
+	received := indexed("a", "Quarterly numbers", "", 100, labelInbox)
+	received.ConversationID, received.Expires = "thread", 500
+	sent := indexed("b", "Re: Quarterly numbers", "", 200, labelSent)
+	sent.ConversationID, sent.Expires = "thread", 300
+	in := []stored{received, sent}
+	for listed, want := range map[string]int64{labelInbox: 500, labelAllMail: 300} {
+		threads := threadsOf(in, in, listed)
+		if len(threads) != 1 || threads[0].Expires != want {
+			t.Errorf("listed in %s: %+v, want expires %d", listed, threads, want)
+		}
 	}
 }

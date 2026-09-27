@@ -2,6 +2,7 @@ package mail
 
 import (
 	"strconv"
+	"time"
 
 	mailsvc "github.com/roman-16/proton-cli/internal/service/mail"
 	"github.com/roman-16/proton-cli/internal/ui"
@@ -16,14 +17,14 @@ import (
 // header.
 
 // flags renders the compact status markers: unread, starred, flagged by Proton,
-// and how many files came with the message.
+// when it deletes itself, and how many files came with the message.
 //
 // The count is the attachment marker. A paperclip would have to be an emoji -
 // Unicode has none below the pictographic planes - and no monospace font carries
 // one, so every terminal drew it from a colour emoji font two cells wide and
 // nudged whatever followed. A digit costs one cell, needs no font, and says how
 // many rather than merely whether.
-func flags(unread, starred, flagged bool, attachments int) ui.Marks {
+func flags(unread, starred, flagged bool, expires int64, attachments int) ui.Marks {
 	var m ui.Marks
 	if unread {
 		m = append(m, ui.Mark{Glyph: ui.GlyphUnread, Role: ui.Accent})
@@ -37,6 +38,13 @@ func flags(unread, starred, flagged bool, attachments int) ui.Marks {
 		// Whether a message can be trusted is worth knowing before it is opened,
 		// which is the one thing a listing is for.
 		m = append(m, ui.Mark{Glyph: ui.GlyphFlagged, Role: ui.Danger})
+	}
+	if expires > 0 {
+		role := ui.Plain
+		if time.Until(time.Unix(expires, 0)) < 24*time.Hour {
+			role = ui.Danger
+		}
+		m = append(m, ui.Mark{Glyph: ui.GlyphExpiring, Role: role})
 	}
 	if attachments > 0 {
 		m = append(m, ui.Mark{Glyph: strconv.Itoa(attachments), Role: ui.Muted})
@@ -82,7 +90,7 @@ func messageColumns() []ui.Column[mailsvc.Message] {
 		{Header: "SUBJECT", Flex: true, Handle: true, Cell: func(m mailsvc.Message) string { return m.Subject }},
 		{Header: "DATE", Cell: func(m mailsvc.Message) string { return units.Time(m.Time) }},
 		{Header: "FLAGS", Marks: func(m mailsvc.Message) ui.Marks {
-			return flags(m.Unread == 1, m.Starred(), m.Flagged(), m.NumAttachments)
+			return flags(m.Unread == 1, m.Starred(), m.Flagged(), m.Countdown(), m.NumAttachments)
 		}},
 	}
 }
@@ -99,7 +107,7 @@ func conversationColumns() []ui.Column[mailsvc.Conversation] {
 		}},
 		{Header: "DATE", Cell: func(c mailsvc.Conversation) string { return units.Time(c.Time) }},
 		{Header: "FLAGS", Marks: func(c mailsvc.Conversation) ui.Marks {
-			return flags(c.NumUnread > 0, c.Starred(), false, c.NumAttachments)
+			return flags(c.NumUnread > 0, c.Starred(), false, c.Countdown(), c.NumAttachments)
 		}},
 	}
 }
@@ -112,7 +120,7 @@ func draftColumns() []ui.Column[mailsvc.Message] {
 		{Header: "SUBJECT", Flex: true, Handle: true, Cell: func(m mailsvc.Message) string { return m.Subject }},
 		{Header: "SAVED", Cell: func(m mailsvc.Message) string { return units.Time(m.Time) }},
 		{Header: "FLAGS", Marks: func(m mailsvc.Message) ui.Marks {
-			return flags(false, m.Starred(), false, m.NumAttachments)
+			return flags(false, m.Starred(), false, m.Countdown(), m.NumAttachments)
 		}},
 	}
 }

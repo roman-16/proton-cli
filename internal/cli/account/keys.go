@@ -738,6 +738,8 @@ func (l leftLocked) String() string {
 	return fmt.Sprintf("Key %s %s.", l.key.Key.ID, l.why)
 }
 
+func (l leftLocked) SkippedID() string { return l.key.Key.ID }
+
 // leftOut names every locked key the reactivation did not bring back, and why:
 // a user key the secret did not open, an address key whose user key stayed
 // shut, or a key that comes back only from a copy of its own.

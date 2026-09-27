@@ -578,6 +578,7 @@ func Attempt[T any](c *Invocation, spec ui.ResultSpec, apply func() ([]T, error)
 		return err
 	}
 	spec.Count -= len(skipped)
+	spec.IDs = landed(spec.IDs, skipped)
 	if err := c.result(spec); err != nil {
 		return err
 	}
@@ -587,4 +588,25 @@ func Attempt[T any](c *Invocation, spec ui.ResultSpec, apply func() ([]T, error)
 		c.Warn("%v", s)
 	}
 	return nil
+}
+
+type namesWhatItSkipped interface{ SkippedID() string }
+
+func landed[T any](ids []string, skipped []T) []string {
+	gone := map[string]bool{}
+	for _, s := range skipped {
+		if named, ok := any(s).(namesWhatItSkipped); ok {
+			gone[named.SkippedID()] = true
+		}
+	}
+	if len(gone) == 0 {
+		return ids
+	}
+	out := make([]string, 0, len(ids))
+	for _, id := range ids {
+		if !gone[id] {
+			out = append(out, id)
+		}
+	}
+	return out
 }

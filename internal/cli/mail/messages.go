@@ -1,6 +1,7 @@
 package mail
 
 import (
+	"log/slog"
 	"strconv"
 	"strings"
 	"time"
@@ -291,10 +292,10 @@ func moveCmd() *cobra.Command {
 			if err != nil {
 				return wrongTable(err, "move")
 			}
-			return kit.Mutate(c, ui.ResultSpec{
+			return kit.Attempt(c, ui.ResultSpec{
 				Action: ui.Moved, Kind: "messages", Count: sel.Len(), IDs: sel.IDs,
 				Detail: "to " + dest.Name, Preview: sel.Preview(),
-			}, func() error {
+			}, func() ([]mailsvc.Refused, error) {
 				return c.App.Mail.Label(c.Ctx, sel.IDs, dest.ID)
 			})
 		}),
@@ -308,14 +309,14 @@ func moveCmd() *cobra.Command {
 
 func labelCmd() *cobra.Command {
 	return labelVerb("label", "Attach a label to messages", ui.Labelled,
-		func(c *kit.Invocation, ids []string, labelID string) error {
+		func(c *kit.Invocation, ids []string, labelID string) ([]mailsvc.Refused, error) {
 			return c.App.Mail.Label(c.Ctx, ids, labelID)
 		})
 }
 
 func unlabelCmd() *cobra.Command {
 	return labelVerb("unlabel", "Detach a label from messages", ui.Unlabelled,
-		func(c *kit.Invocation, ids []string, labelID string) error {
+		func(c *kit.Invocation, ids []string, labelID string) ([]mailsvc.Refused, error) {
 			return c.App.Mail.Unlabel(c.Ctx, ids, labelID)
 		})
 }
@@ -326,7 +327,8 @@ func unlabelCmd() *cobra.Command {
 // web client and in the API's own /label and /unlabel endpoints. Folding them
 // together would mean `move` could take a label and report a move that never
 // happened.
-func labelVerb(use, short string, action ui.Action, apply func(*kit.Invocation, []string, string) error) *cobra.Command {
+func labelVerb(use, short string, action ui.Action,
+	apply func(*kit.Invocation, []string, string) ([]mailsvc.Refused, error)) *cobra.Command {
 	var f filters
 	var label string
 	c := &cobra.Command{
@@ -341,10 +343,10 @@ func labelVerb(use, short string, action ui.Action, apply func(*kit.Invocation, 
 			if err != nil {
 				return wrongTable(err, use)
 			}
-			return kit.Mutate(c, ui.ResultSpec{
+			return kit.Attempt(c, ui.ResultSpec{
 				Action: action, Kind: "messages", Count: sel.Len(), IDs: sel.IDs,
 				Detail: quoted(target.Name), Preview: sel.Preview(),
-			}, func() error {
+			}, func() ([]mailsvc.Refused, error) {
 				return apply(c, sel.IDs, target.ID)
 			})
 		}),
@@ -357,21 +359,21 @@ func labelVerb(use, short string, action ui.Action, apply func(*kit.Invocation, 
 
 func starCmd() *cobra.Command {
 	return starVerb("star", "Star messages", ui.Starred,
-		func(c *kit.Invocation, ids []string) error {
+		func(c *kit.Invocation, ids []string) ([]mailsvc.Refused, error) {
 			return c.App.Mail.Label(c.Ctx, ids, mailsvc.StarredLabelID)
 		})
 }
 
 func unstarCmd() *cobra.Command {
 	return starVerb("unstar", "Remove the star from messages", ui.Unstarred,
-		func(c *kit.Invocation, ids []string) error {
+		func(c *kit.Invocation, ids []string) ([]mailsvc.Refused, error) {
 			return c.App.Mail.Unlabel(c.Ctx, ids, mailsvc.StarredLabelID)
 		})
 }
 
 // starVerb builds `star` and `unstar`, which are `label` and `unlabel` with the
 // one label Proton gives a button of its own.
-func starVerb(use, short string, action ui.Action, apply func(*kit.Invocation, []string) error) *cobra.Command {
+func starVerb(use, short string, action ui.Action, apply func(*kit.Invocation, []string) ([]mailsvc.Refused, error)) *cobra.Command {
 	var f filters
 	c := &cobra.Command{
 		Use:   use + " [REF...]",
@@ -381,10 +383,10 @@ func starVerb(use, short string, action ui.Action, apply func(*kit.Invocation, [
 			if err != nil {
 				return wrongTable(err, use)
 			}
-			return kit.Mutate(c, ui.ResultSpec{
+			return kit.Attempt(c, ui.ResultSpec{
 				Action: action, Kind: "messages", Count: sel.Len(), IDs: sel.IDs,
 				Preview: sel.Preview(),
-			}, func() error { return apply(c, sel.IDs) })
+			}, func() ([]mailsvc.Refused, error) { return apply(c, sel.IDs) })
 		}),
 	}
 	f.register(c)
@@ -399,9 +401,13 @@ func markCmd() *cobra.Command {
 	c.AddCommand(
 		legitimateCmd(), phishingCmd(),
 		markVerb("read", "Mark messages as read", ui.MarkedRead,
-			func(c *kit.Invocation, ids []string) error { return c.App.Mail.MarkRead(c.Ctx, ids) }),
+			func(c *kit.Invocation, ids []string) ([]mailsvc.Refused, error) {
+				return c.App.Mail.MarkRead(c.Ctx, ids)
+			}),
 		markVerb("unread", "Mark messages as unread", ui.MarkedUnread,
-			func(c *kit.Invocation, ids []string) error { return c.App.Mail.MarkUnread(c.Ctx, ids) }),
+			func(c *kit.Invocation, ids []string) ([]mailsvc.Refused, error) {
+				return c.App.Mail.MarkUnread(c.Ctx, ids)
+			}),
 	)
 	return c
 }
@@ -461,7 +467,7 @@ func verdictVerb(use, short, long string, action ui.Action, detail string,
 	}
 }
 
-func markVerb(use, short string, action ui.Action, apply func(*kit.Invocation, []string) error) *cobra.Command {
+func markVerb(use, short string, action ui.Action, apply func(*kit.Invocation, []string) ([]mailsvc.Refused, error)) *cobra.Command {
 	var f filters
 	c := &cobra.Command{
 		Use:   use + " [REF...]",
@@ -471,10 +477,10 @@ func markVerb(use, short string, action ui.Action, apply func(*kit.Invocation, [
 			if err != nil {
 				return wrongTable(err, "mark "+use)
 			}
-			return kit.Mutate(c, ui.ResultSpec{
+			return kit.Attempt(c, ui.ResultSpec{
 				Action: action, Kind: "messages", Count: sel.Len(), IDs: sel.IDs,
 				Detail: "as " + use, Preview: sel.Preview(),
-			}, func() error { return apply(c, sel.IDs) })
+			}, func() ([]mailsvc.Refused, error) { return apply(c, sel.IDs) })
 		}),
 	}
 	f.register(c)
@@ -491,10 +497,10 @@ func trashCmd() *cobra.Command {
 			if err != nil {
 				return wrongTable(err, "trash")
 			}
-			return kit.Mutate(c, ui.ResultSpec{
+			return kit.Attempt(c, ui.ResultSpec{
 				Action: ui.Trashed, Kind: "messages", Count: sel.Len(), IDs: sel.IDs,
 				Detail: "to trash", Preview: sel.Preview(),
-			}, func() error { return c.App.Mail.Trash(c.Ctx, sel.IDs) })
+			}, func() ([]mailsvc.Refused, error) { return c.App.Mail.Trash(c.Ctx, sel.IDs) })
 		}),
 	}
 	f.register(c)
@@ -511,10 +517,10 @@ func deleteCmd() *cobra.Command {
 			if err != nil {
 				return wrongTable(err, "delete")
 			}
-			return kit.Mutate(c, ui.ResultSpec{
+			return kit.Attempt(c, ui.ResultSpec{
 				Action: ui.Deleted, Kind: "messages", Count: sel.Len(), IDs: sel.IDs,
 				Preview: sel.Preview(),
-			}, func() error { return c.App.Mail.Delete(c.Ctx, sel.IDs) })
+			}, func() ([]mailsvc.Refused, error) { return c.App.Mail.Delete(c.Ctx, sel.IDs) })
 		}),
 	}
 	f.register(c)
@@ -716,32 +722,33 @@ func updateCmd() *cobra.Command {
 		Short: "Change when messages delete themselves",
 		Long: "Change when messages delete themselves.\n\n" +
 			"--expires takes a duration, or never to stop them expiring. A message already\n" +
-			"counting down reports the moment it expires rather than how long is left.",
+			"counting down reports the moment it expires rather than how long is left.\n" +
+			"A message whose sender set its expiry keeps it, and none is set in trash or spam.",
 		RunE: kit.Run([]kit.Step{
 			kit.StepSelection(f.set, filterHint, "a whole folder"), kit.StepExpand,
 			reauth.Supply,
 		}, func(c *kit.Invocation) error {
-			if expires == "" {
-				return kit.Fail("Nothing to change.").
-					Hint("--expires 7d, or --expires never to stop them expiring")
-			}
-			d, err := kit.Expires(expires)
+			at, err := expiryMoment(expires)
 			if err != nil {
 				return err
-			}
-			var at int64
-			detail := "- they will not expire"
-			if d > 0 {
-				at, detail = time.Now().Add(d).Unix(), "in "+expires
 			}
 			sel, err := selectMessages(c, &f)
 			if err != nil {
 				return err
 			}
-			return kit.Mutate(c, ui.ResultSpec{
+			var take expirable
+			rows := make([]mailsvc.Message, 0, len(sel.Rows))
+			for _, m := range sel.Rows {
+				if take.offer(m) {
+					rows = append(rows, m)
+				}
+			}
+			take.warn(c)
+			sel.Rows, sel.IDs = rows, take.ids
+			return kit.Attempt(c, ui.ResultSpec{
 				Action: ui.Updated, Kind: "messages", Count: sel.Len(), IDs: sel.IDs,
-				Detail: detail, Preview: sel.Preview(),
-			}, func() error {
+				Detail: expiryDetail(expires, at, sel.Len()), Preview: sel.Preview(),
+			}, func() ([]mailsvc.Refused, error) {
 				return c.App.Mail.SetExpiration(c.Ctx, sel.IDs, at)
 			})
 		}),
@@ -753,6 +760,72 @@ func updateCmd() *cobra.Command {
 	// for another SRP exchange, so the command carries what it can answer with.
 	reauth.Declare(c)
 	return c
+}
+
+func expiryMoment(expires string) (int64, error) {
+	if expires == "" {
+		return 0, kit.Fail("Nothing to change.").
+			Hint("--expires 7d, or --expires never to stop them expiring")
+	}
+	d, err := kit.Expires(expires)
+	if err != nil || d == 0 {
+		return 0, err
+	}
+	return time.Now().Add(d).Unix(), nil
+}
+
+func expiryDetail(expires string, at int64, count int) string {
+	switch {
+	case count == 0:
+		return ""
+	case at > 0:
+		return "in " + expires
+	case count == 1:
+		return "- it will not expire"
+	}
+	return "- they will not expire"
+}
+
+type expirable struct {
+	ids    []string
+	fixed  int
+	binned int
+}
+
+func (e *expirable) offer(m mailsvc.Message) bool {
+	switch {
+	case m.ExpiryFixed:
+		e.fixed++
+	case m.InTrashOrSpam():
+		e.binned++
+	default:
+		e.ids = append(e.ids, m.ID)
+		return true
+	}
+	return false
+}
+
+func (e expirable) warn(c *kit.Invocation) {
+	switch {
+	case e.fixed == 1:
+		c.Warn("1 message keeps the expiry its sender set.")
+	case e.fixed > 1:
+		c.Warn("%d messages keep the expiry their senders set.", e.fixed)
+	}
+	switch {
+	case e.binned == 1:
+		c.Warn("1 message is in trash or spam, where no expiry is set.")
+	case e.binned > 1:
+		c.Warn("%d messages are in trash or spam, where no expiry is set.", e.binned)
+	}
+	for reason, n := range map[string]int{"sender-fixed": e.fixed, "trash-or-spam": e.binned} {
+		if n > 0 {
+			// Recorded and not counted: the warning above says what was left out,
+			// and the count of what changed never included it.
+			slog.DebugContext(c.Ctx, "mail: messages left out of an expiry change",
+				"count", n, "reason", reason)
+		}
+	}
 }
 
 // ── read receipts ──

@@ -14,10 +14,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Conversations are whole threads. They take the same verbs as messages wherever
-// the verb means the same thing, which is nearly everywhere - the exception being
-// `unschedule`, since a queued send is one message rather than a thread.
-
 func conversationsCmd() *cobra.Command {
 	c := &cobra.Command{Use: "conversations", Short: "Whole threads"}
 	c.AddCommand(
@@ -26,7 +22,7 @@ func conversationsCmd() *cobra.Command {
 		convMoveCmd(), convLabelCmd(), convUnlabelCmd(),
 		convStarCmd(), convUnstarCmd(), convMarkCmd(),
 		convTrashCmd(), convDeleteCmd(), convAttachmentsCmd(),
-		convSnoozeCmd(), convUnsnoozeCmd(),
+		convSnoozeCmd(), convUnsnoozeCmd(), convUpdateCmd(),
 	)
 	return c
 }
@@ -141,6 +137,8 @@ type threadPreview struct {
 	Preview     string `json:"preview"`
 	Attachments int    `json:"attachments"`
 	Flagged     bool   `json:"flagged,omitempty"`
+	Expires     int64  `json:"expires,omitempty"`
+	countdown   int64
 }
 
 // threadSummary renders a thread as a table, which is what a one-line-per-message
@@ -157,6 +155,8 @@ func threadSummary(c *kit.Invocation, conv *mailsvc.ConversationFull) error {
 			Preview:     mailtext.MessagePreview(m.Body, m.MIMEType),
 			Attachments: len(mailsvc.FilterInline(m.Attachments)),
 			Flagged:     m.Flagged(),
+			Expires:     m.Expires,
+			countdown:   m.Countdown(),
 		})
 	}
 	return kit.List(c, ui.TableSpec[threadPreview]{
@@ -168,7 +168,7 @@ func threadSummary(c *kit.Invocation, conv *mailsvc.ConversationFull) error {
 			{Header: "FROM", Flex: true, Cell: func(p threadPreview) string { return p.From }},
 			{Header: "PREVIEW", Flex: true, Cell: func(p threadPreview) string { return p.Preview }},
 			{Header: "FLAGS", Marks: func(p threadPreview) ui.Marks {
-				return flags(false, false, p.Flagged, p.Attachments)
+				return flags(false, false, p.Flagged, p.countdown, p.Attachments)
 			}},
 		},
 	}, rows)
@@ -191,10 +191,10 @@ func convMoveCmd() *cobra.Command {
 			if err != nil {
 				return wrongTable(err, "move")
 			}
-			return kit.Mutate(c, ui.ResultSpec{
+			return kit.Attempt(c, ui.ResultSpec{
 				Action: ui.Moved, Kind: "conversations", Count: sel.Len(), IDs: sel.IDs,
 				Detail: "to " + dest.Name, Preview: sel.Preview(),
-			}, func() error {
+			}, func() ([]mailsvc.Refused, error) {
 				return c.App.Mail.ConversationsLabel(c.Ctx, sel.IDs, dest.ID)
 			})
 		}),
@@ -208,19 +208,20 @@ func convMoveCmd() *cobra.Command {
 
 func convLabelCmd() *cobra.Command {
 	return convLabelVerb("label", "Attach a label to threads", ui.Labelled,
-		func(c *kit.Invocation, ids []string, labelID string) error {
+		func(c *kit.Invocation, ids []string, labelID string) ([]mailsvc.Refused, error) {
 			return c.App.Mail.ConversationsLabel(c.Ctx, ids, labelID)
 		})
 }
 
 func convUnlabelCmd() *cobra.Command {
 	return convLabelVerb("unlabel", "Detach a label from threads", ui.Unlabelled,
-		func(c *kit.Invocation, ids []string, labelID string) error {
+		func(c *kit.Invocation, ids []string, labelID string) ([]mailsvc.Refused, error) {
 			return c.App.Mail.ConversationsUnlabel(c.Ctx, ids, labelID)
 		})
 }
 
-func convLabelVerb(use, short string, action ui.Action, apply func(*kit.Invocation, []string, string) error) *cobra.Command {
+func convLabelVerb(use, short string, action ui.Action,
+	apply func(*kit.Invocation, []string, string) ([]mailsvc.Refused, error)) *cobra.Command {
 	var f filters
 	var label string
 	c := &cobra.Command{
@@ -235,10 +236,10 @@ func convLabelVerb(use, short string, action ui.Action, apply func(*kit.Invocati
 			if err != nil {
 				return wrongTable(err, use)
 			}
-			return kit.Mutate(c, ui.ResultSpec{
+			return kit.Attempt(c, ui.ResultSpec{
 				Action: action, Kind: "conversations", Count: sel.Len(), IDs: sel.IDs,
 				Detail: quoted(target.Name), Preview: sel.Preview(),
-			}, func() error { return apply(c, sel.IDs, target.ID) })
+			}, func() ([]mailsvc.Refused, error) { return apply(c, sel.IDs, target.ID) })
 		}),
 	}
 	c.Flags().StringVar(&label, "label", "", "The label to attach or detach, by name or ID")
@@ -249,28 +250,28 @@ func convLabelVerb(use, short string, action ui.Action, apply func(*kit.Invocati
 
 func convStarCmd() *cobra.Command {
 	return convSimpleVerb("star", "Star threads", ui.Starred, "",
-		func(c *kit.Invocation, ids []string, _ string) error {
+		func(c *kit.Invocation, ids []string, _ string) ([]mailsvc.Refused, error) {
 			return c.App.Mail.ConversationsLabel(c.Ctx, ids, mailsvc.StarredLabelID)
 		})
 }
 
 func convUnstarCmd() *cobra.Command {
 	return convSimpleVerb("unstar", "Remove the star from threads", ui.Unstarred, "",
-		func(c *kit.Invocation, ids []string, _ string) error {
+		func(c *kit.Invocation, ids []string, _ string) ([]mailsvc.Refused, error) {
 			return c.App.Mail.ConversationsUnlabel(c.Ctx, ids, mailsvc.StarredLabelID)
 		})
 }
 
 func convTrashCmd() *cobra.Command {
 	return convSimpleVerb("trash", "Move threads to the trash", ui.Trashed, "to trash",
-		func(c *kit.Invocation, ids []string, _ string) error {
+		func(c *kit.Invocation, ids []string, _ string) ([]mailsvc.Refused, error) {
 			return c.App.Mail.ConversationsTrash(c.Ctx, ids)
 		})
 }
 
 func convDeleteCmd() *cobra.Command {
 	return convSimpleVerb("delete", "Delete threads permanently", ui.Deleted, "",
-		func(c *kit.Invocation, ids []string, scope string) error {
+		func(c *kit.Invocation, ids []string, scope string) ([]mailsvc.Refused, error) {
 			return c.App.Mail.ConversationsDelete(c.Ctx, ids, scope)
 		})
 }
@@ -279,11 +280,11 @@ func convMarkCmd() *cobra.Command {
 	c := &cobra.Command{Use: "mark", Short: "Set whether threads count as read"}
 	c.AddCommand(
 		convSimpleVerb("read", "Mark threads as read", ui.MarkedRead, "as read",
-			func(c *kit.Invocation, ids []string, _ string) error {
+			func(c *kit.Invocation, ids []string, _ string) ([]mailsvc.Refused, error) {
 				return c.App.Mail.ConversationsMarkRead(c.Ctx, ids)
 			}),
 		convSimpleVerb("unread", "Mark threads as unread", ui.MarkedUnread, "as unread",
-			func(c *kit.Invocation, ids []string, scope string) error {
+			func(c *kit.Invocation, ids []string, scope string) ([]mailsvc.Refused, error) {
 				return c.App.Mail.ConversationsMarkUnread(c.Ctx, ids, scope)
 			}),
 	)
@@ -296,7 +297,7 @@ func convMarkCmd() *cobra.Command {
 // - marking unread, and deleting - within a mailbox rather than globally: a thread
 // can have messages in several places at once.
 func convSimpleVerb(use, short string, action ui.Action, detail string,
-	apply func(*kit.Invocation, []string, string) error) *cobra.Command {
+	apply func(*kit.Invocation, []string, string) ([]mailsvc.Refused, error)) *cobra.Command {
 	var f filters
 	c := &cobra.Command{
 		Use:   use + " [REF...]",
@@ -306,22 +307,29 @@ func convSimpleVerb(use, short string, action ui.Action, detail string,
 			if err != nil {
 				return wrongTable(err, use)
 			}
-			scope := ""
-			if f.folder != "" {
-				mailbox, err := c.App.Mail.ResolveMailbox(c.Ctx, f.folder)
-				if err != nil {
-					return err
-				}
-				scope = mailbox.ID
+			scope, err := threadScope(c, &f)
+			if err != nil {
+				return err
 			}
-			return kit.Mutate(c, ui.ResultSpec{
+			return kit.Attempt(c, ui.ResultSpec{
 				Action: action, Kind: "conversations", Count: sel.Len(), IDs: sel.IDs,
 				Detail: detail, Preview: sel.Preview(),
-			}, func() error { return apply(c, sel.IDs, scope) })
+			}, func() ([]mailsvc.Refused, error) { return apply(c, sel.IDs, scope) })
 		}),
 	}
 	f.register(c)
 	return c
+}
+
+func threadScope(c *kit.Invocation, f *filters) (string, error) {
+	if f.folder == "" {
+		return "", nil
+	}
+	mailbox, err := c.App.Mail.ResolveMailbox(c.Ctx, f.folder)
+	if err != nil {
+		return "", err
+	}
+	return mailbox.ID, nil
 }
 
 // ── replying to a thread ──
@@ -352,14 +360,14 @@ func convAnswerCmd(use, short string, forward bool) *cobra.Command {
 			if err != nil {
 				return wrongTable(err, use)
 			}
-			ids, err := c.App.Mail.ConversationMessageIDs(c.Ctx, convID)
+			msgs, err := c.App.Mail.ConversationMessages(c.Ctx, convID)
 			if err != nil {
 				return wrongTable(err, use)
 			}
-			if len(ids) == 0 {
+			if len(msgs) == 0 {
 				return kit.Fail("That thread has no messages.")
 			}
-			newest := ids[len(ids)-1]
+			newest := msgs[len(msgs)-1].ID
 			content, err := buildAnswer(c, newest, &f, answerAction(forward, replyAll), noQuote, noAttachments)
 			if err != nil {
 				return err
@@ -527,10 +535,10 @@ func convSnoozeCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return kit.Mutate(c, ui.ResultSpec{
+			return kit.Attempt(c, ui.ResultSpec{
 				Action: ui.Snoozed, Kind: "conversations", Count: sel.Len(), IDs: sel.IDs,
 				Detail: "until " + units.Time(at), Preview: sel.Preview(),
-			}, func() error {
+			}, func() ([]mailsvc.Refused, error) {
 				return c.App.Mail.Snooze(c.Ctx, sel.IDs, at)
 			})
 		}),
@@ -573,14 +581,128 @@ func convUnsnoozeCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return kit.Mutate(c, ui.ResultSpec{
+			return kit.Attempt(c, ui.ResultSpec{
 				Action: ui.Unsnoozed, Kind: "conversations", Count: sel.Len(), IDs: sel.IDs,
 				Preview: sel.Preview(),
-			}, func() error {
+			}, func() ([]mailsvc.Refused, error) {
 				return c.App.Mail.Unsnooze(c.Ctx, sel.IDs)
 			})
 		}),
 	}
 	f.register(c)
 	return c
+}
+
+func convUpdateCmd() *cobra.Command {
+	var f filters
+	var expires string
+	var reauth kit.Reauth
+	c := &cobra.Command{
+		Use:   "update [REF...]",
+		Short: "Change when threads delete themselves",
+		Long: "Change when threads delete themselves.\n\n" +
+			"--expires takes a duration, or never to stop them expiring. It applies to every\n" +
+			"message in each thread, or with --folder to the ones in that folder. A message\n" +
+			"whose sender set its expiry keeps it, and none is set in trash or spam.",
+		RunE: kit.Run([]kit.Step{
+			kit.StepSelection(f.set, filterHint, "a whole folder"), kit.StepExpand,
+			reauth.Supply,
+		}, func(c *kit.Invocation) error {
+			at, err := expiryMoment(expires)
+			if err != nil {
+				return err
+			}
+			sel, err := selectConversations(c, &f)
+			if err != nil {
+				return wrongTable(err, "update")
+			}
+			scope, err := threadScope(c, &f)
+			if err != nil {
+				return err
+			}
+			messages, err := c.App.Mail.ConversationsMessages(c.Ctx, sel.IDs)
+			if err != nil {
+				return wrongTable(err, "update")
+			}
+			var take expirable
+			var threads []expiringThread
+			rows := make([]mailsvc.Conversation, 0, len(sel.Rows))
+			for i, conv := range sel.Rows {
+				t := expiringThread{id: conv.ID}
+				for _, m := range messages[i] {
+					if mailsvc.InScope(m, scope) && take.offer(m) {
+						t.ids = append(t.ids, m.ID)
+					}
+				}
+				if len(t.ids) > 0 {
+					threads = append(threads, t)
+					rows = append(rows, conv)
+				}
+			}
+			take.warn(c)
+			sel.Rows, sel.IDs = rows, threadIDs(threads)
+			return kit.Attempt(c, ui.ResultSpec{
+				Action: ui.Updated, Kind: "conversations", Count: sel.Len(), IDs: sel.IDs,
+				Detail: expiryDetail(expires, at, sel.Len()), Preview: sel.Preview(),
+			}, func() ([]threadRefusal, error) {
+				refused, err := c.App.Mail.SetExpiration(c.Ctx, take.ids, at)
+				if err != nil {
+					return nil, err
+				}
+				return refusedThreads(threads, refused), nil
+			})
+		}),
+	}
+	c.Flags().StringVar(&expires, "expires", "",
+		"Delete them after DURATION (e.g. 7d, 24h), or never")
+	f.register(c)
+	reauth.Declare(c)
+	return c
+}
+
+type expiringThread struct {
+	id  string
+	ids []string
+}
+
+func threadIDs(threads []expiringThread) []string {
+	out := make([]string, 0, len(threads))
+	for _, t := range threads {
+		out = append(out, t.id)
+	}
+	return out
+}
+
+type threadRefusal struct {
+	id      string
+	refused int
+	of      int
+	reason  string
+}
+
+func (r threadRefusal) String() string {
+	return fmt.Sprintf("Refused %d of %d messages in %s: %s", r.refused, r.of, r.id, r.reason)
+}
+
+func (r threadRefusal) SkippedID() string { return r.id }
+
+func refusedThreads(threads []expiringThread, refused []mailsvc.Refused) []threadRefusal {
+	why := make(map[string]string, len(refused))
+	for _, r := range refused {
+		why[r.ID] = r.Reason
+	}
+	var out []threadRefusal
+	for _, t := range threads {
+		r := threadRefusal{id: t.id, of: len(t.ids)}
+		for _, id := range t.ids {
+			if reason, ok := why[id]; ok {
+				r.refused++
+				r.reason = reason
+			}
+		}
+		if r.refused > 0 {
+			out = append(out, r)
+		}
+	}
+	return out
 }

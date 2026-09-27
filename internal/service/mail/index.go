@@ -101,8 +101,9 @@ func (s stored) message() Message {
 		ID: s.ID, ConversationID: s.ConversationID, Subject: s.Subject,
 		FromName: s.SenderName, FromAddress: s.SenderAddress,
 		Time: s.Time, Unread: s.Unread, NumAttachments: s.Attachments, Labels: s.Labels,
-		Size:        s.Size,
-		DMARCFailed: v.dmarcFailed, MarkedLegitimate: v.markedLegitimate,
+		Size: s.Size, Expires: s.Expires, ExpiryFixed: s.Flags&flagExpiryFixed != 0,
+		ExpiryByRetention: s.Flags&flagExpiryByRetention != 0,
+		DMARCFailed:       v.dmarcFailed, MarkedLegitimate: v.markedLegitimate,
 		Phishing: v.phishing, Suspicious: v.suspicious,
 	}
 }

@@ -224,10 +224,10 @@ func draftsDeleteCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return kit.Mutate(c, ui.ResultSpec{
+			return kit.Attempt(c, ui.ResultSpec{
 				Action: ui.Deleted, Kind: "drafts", Count: sel.Len(), IDs: sel.IDs,
 				Preview: sel.Preview(),
-			}, func() error { return c.App.Mail.Delete(c.Ctx, sel.IDs) })
+			}, func() ([]mailsvc.Refused, error) { return c.App.Mail.Delete(c.Ctx, sel.IDs) })
 		}),
 	}
 }

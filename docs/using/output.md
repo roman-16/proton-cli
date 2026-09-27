@@ -17,7 +17,7 @@ ID        FROM              SUBJECT                DATE              FLAGS
 3 of 47 messages. Next page: --page 1
 ```
 
-`ID` is always the first column. `FLAGS` reads `●` for unread, `★` for starred, `✗` for a message Proton flagged as phishing or suspicious, and a number for attachments.
+`ID` is always the first column. `FLAGS` reads `●` for unread, `★` for starred, `✗` for a message Proton flagged as phishing or suspicious, `⧗` for mail that deletes itself, and a number for attachments.
 
 An empty collection prints nothing on stdout, so a redirect yields an empty file rather than a stray header. On stderr it says `No messages.`, or `No messages match.` when a filter was applied.
 

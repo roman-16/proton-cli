@@ -226,6 +226,7 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton mail conversations unlabel`](../mail/conversations.md#unlabel) | Detach a label from threads |
 | [`proton mail conversations unsnooze`](../mail/conversations.md#unsnooze) | Bring snoozed threads back to the inbox now |
 | [`proton mail conversations unstar`](../mail/conversations.md#unstar) | Remove the star from threads |
+| [`proton mail conversations update`](../mail/conversations.md#update) | Change when threads delete themselves |
 | [`proton mail drafts create`](../mail/drafts.md#create) | Save a draft without sending it |
 | [`proton mail drafts delete`](../mail/drafts.md#delete) | Delete drafts |
 | [`proton mail drafts list`](../mail/drafts.md#list) | List drafts |

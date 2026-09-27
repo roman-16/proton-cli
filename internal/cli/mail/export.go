@@ -129,10 +129,11 @@ func conversationExportCmd() *cobra.Command {
 			if err != nil {
 				return wrongTable(err, "export")
 			}
-			ids, err := c.App.Mail.ConversationMessageIDs(c.Ctx, convID)
+			msgs, err := c.App.Mail.ConversationMessages(c.Ctx, convID)
 			if err != nil {
 				return wrongTable(err, "export")
 			}
+			ids := mailsvc.MessageIDs(msgs)
 			if err := dest.Validate(shape == formatMbox || len(ids) == 1); err != nil {
 				return err
 			}

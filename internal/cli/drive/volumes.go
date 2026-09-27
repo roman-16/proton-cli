@@ -197,6 +197,8 @@ func (n notRestored) String() string {
 	return fmt.Sprintf("Volume %s %s.", n.volume.ID, n.why)
 }
 
+func (n notRestored) SkippedID() string { return n.volume.ID }
+
 // restoreTarget is the tree a locked volume's files come back into: the photo
 // library for a photo volume, and your own files for anything else.
 func restoreTarget(c *kit.Invocation, v drivesvc.Volume) (*drivesvc.Context, error) {

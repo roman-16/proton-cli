@@ -647,6 +647,8 @@ func (r Refused) String() string {
 	return fmt.Sprintf("Refused %s: %s", r.LinkID, r.Reason)
 }
 
+func (r Refused) SkippedID() string { return r.LinkID }
+
 // linkBatches acts on many links a batch at a time, collecting what Proton
 // refused. request builds the call for one batch, because the endpoints differ
 // in method and path but answer the same way.

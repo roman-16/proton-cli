@@ -391,6 +391,26 @@ func TestMailMessagesStarUnstar(t *testing.T) {
 	runOK(t, "mail", "messages", "unstar", "--", msgID)
 }
 
+func TestMailMessagesStarNamesWhatWasRefused(t *testing.T) {
+	msgID := mutableMail(t)
+	nothing := strings.TrimSpace(runOK(t, "mail", "drafts", "create",
+		"--to", selfEmail(), "--subject", testID()+"-gone", "--body", "deleted before it is starred"))
+	runOK(t, "mail", "drafts", "delete", "--", nothing)
+
+	stdout, stderr, code := run(t, "--output", "json", "mail", "messages", "star", "--", msgID, nothing)
+	cleanupRun(t, "Unstar: proton mail messages unstar "+msgID, "mail", "messages", "unstar", "--", msgID)
+	if code != 0 {
+		t.Fatalf("star exited %d:\nstdout: %s\nstderr: %s", code, stdout, stderr)
+	}
+
+	result := parseJSONObject(t, stdout)
+	ids, _ := result["ids"].([]interface{})
+	if result["count"] != float64(1) || len(ids) != 1 || ids[0] != msgID {
+		t.Errorf("result = %v, want the one real message alone", result)
+	}
+	assertContains(t, stderr, "Refused "+nothing)
+}
+
 func TestMailMessagesMoveDest(t *testing.T) {
 	msgID := mutableMail(t)
 

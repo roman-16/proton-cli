@@ -223,7 +223,7 @@ func orderMessages(msgs []stored, opts ListOptions) {
 }
 
 func matchingThreads(in []stored, opts ListOptions) []Conversation {
-	threads := threadsOf(in, matching(in, opts))
+	threads := threadsOf(in, matching(in, opts), listedIn(opts.Folder))
 	if opts.Read {
 		return slices.DeleteFunc(threads, func(c Conversation) bool { return c.NumUnread > 0 })
 	}
@@ -260,7 +260,7 @@ func pageOf[T any](rows []T, opts ListOptions) ([]T, int) {
 // Every message of a thread contributes to what the row says, including the ones
 // that did not match: a thread's subject is its newest message's, and its count
 // is how many messages it has, not how many matched.
-func threadsOf(all, matched []stored) []Conversation {
+func threadsOf(all, matched []stored, listed string) []Conversation {
 	wanted := make(map[string]bool, len(matched))
 	order := make([]string, 0, len(matched))
 	for _, m := range matched {
@@ -278,13 +278,13 @@ func threadsOf(all, matched []stored) []Conversation {
 	}
 	out := make([]Conversation, 0, len(order))
 	for _, id := range order {
-		out = append(out, thread(id, byThread[id]))
+		out = append(out, thread(id, byThread[id], listed))
 	}
 	return out
 }
 
 // thread is what a conversation row says, worked out from its messages.
-func thread(id string, msgs []stored) Conversation {
+func thread(id string, msgs []stored, listed string) Conversation {
 	sortMessages(msgs)
 	c := Conversation{ID: id, NumMessages: len(msgs)}
 	seenSender := map[string]bool{}
@@ -297,6 +297,9 @@ func thread(id string, msgs []stored) Conversation {
 		c.NumUnread += m.Unread
 		c.NumAttachments += m.Attachments
 		c.Size += m.Size
+		if m.Expires > 0 && inPlace(m.Labels, listed) && (c.Expires == 0 || m.Expires < c.Expires) {
+			c.Expires, c.ExpiryByRetention = m.Expires, m.Flags&flagExpiryByRetention != 0
+		}
 		if !seenSender[m.SenderAddress] {
 			seenSender[m.SenderAddress] = true
 			c.Senders = append(c.Senders, map[string]any{"Name": m.SenderName, "Address": m.SenderAddress})

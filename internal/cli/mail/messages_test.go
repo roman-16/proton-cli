@@ -1,7 +1,9 @@
 package mail
 
 import (
+	"strings"
 	"testing"
+	"time"
 
 	mailsvc "github.com/roman-16/proton-cli/internal/service/mail"
 	"github.com/roman-16/proton-cli/internal/ui"
@@ -141,14 +143,79 @@ func TestMessageHeaderKeepsTheIDLast(t *testing.T) {
 // The FLAGS column marks a message Proton distrusts, and stops as soon as the
 // reader says otherwise.
 func TestListFlagsMarkAMessageProtonFlagged(t *testing.T) {
-	marks := flags(false, false, true, 0).String()
+	marks := flags(false, false, true, 0, 0).String()
 	if marks != ui.GlyphFlagged {
 		t.Errorf("marks = %q, want %q", marks, ui.GlyphFlagged)
 	}
-	if got := flags(true, true, true, 2).String(); got != ui.GlyphUnread+ui.GlyphStarred+ui.GlyphFlagged+"2" {
-		t.Errorf("marks = %q, want the four in their fixed order", got)
+	week := time.Now().Add(7 * 24 * time.Hour).Unix()
+	if got := flags(true, true, true, week, 2).String(); got != ui.GlyphUnread+ui.GlyphStarred+ui.GlyphFlagged+ui.GlyphExpiring+"2" {
+		t.Errorf("marks = %q, want the five in their fixed order", got)
 	}
-	if got := flags(false, false, false, 0).String(); got != "" {
+	if got := flags(false, false, false, 0, 0).String(); got != "" {
 		t.Errorf("marks = %q, want nothing for an ordinary message", got)
+	}
+}
+
+func TestTheExpiryMarkTurnsRedInItsLastDay(t *testing.T) {
+	for _, tc := range []struct {
+		in   time.Duration
+		want ui.Role
+	}{{7 * 24 * time.Hour, ui.Plain}, {3 * time.Hour, ui.Danger}} {
+		marks := flags(false, false, false, time.Now().Add(tc.in).Unix(), 0)
+		if len(marks) != 1 || marks[0].Glyph != ui.GlyphExpiring || marks[0].Role != tc.want {
+			t.Errorf("expiring in %v: marks = %+v, want %s in role %v", tc.in, marks, ui.GlyphExpiring, tc.want)
+		}
+	}
+}
+
+func TestARetentionPolicyDrawsNoExpiryMark(t *testing.T) {
+	m := mailsvc.Message{Expires: time.Now().Add(time.Hour).Unix(), ExpiryByRetention: true}
+	if got := flags(false, false, false, m.Countdown(), 0).String(); got != "" {
+		t.Errorf("marks = %q, want none for an expiry a retention policy set", got)
+	}
+}
+
+func TestAnExpiryIsOfferedOnlyWhereOneCanBeSet(t *testing.T) {
+	var take expirable
+	for _, m := range []mailsvc.Message{
+		{ID: "kept", Labels: []string{"0"}},
+		{ID: "fixed", ExpiryFixed: true, Labels: []string{"0"}},
+		{ID: "trashed", Labels: []string{"3"}},
+		{ID: "spam", Labels: []string{"4"}},
+		{ID: "unknown"},
+	} {
+		take.offer(m)
+	}
+	if strings.Join(take.ids, ",") != "kept,unknown" || take.fixed != 1 || take.binned != 2 {
+		t.Errorf("offered %v, fixed %d, binned %d; want kept,unknown, 1, 2", take.ids, take.fixed, take.binned)
+	}
+}
+
+func TestTheExpiryLineAgreesWithTheCount(t *testing.T) {
+	for _, tc := range []struct {
+		expires string
+		at      int64
+		count   int
+		want    string
+	}{
+		{"7d", 1, 3, "in 7d"},
+		{"never", 0, 1, "- it will not expire"},
+		{"never", 0, 2, "- they will not expire"},
+		{"7d", 1, 0, ""},
+	} {
+		if got := expiryDetail(tc.expires, tc.at, tc.count); got != tc.want {
+			t.Errorf("expiryDetail(%q, %d, %d) = %q, want %q", tc.expires, tc.at, tc.count, got, tc.want)
+		}
+	}
+}
+
+func TestAThreadIsRefusedWhenAnyOfItsMessagesWas(t *testing.T) {
+	threads := []expiringThread{{id: "t1", ids: []string{"a", "b"}}, {id: "t2", ids: []string{"c"}}}
+	got := refusedThreads(threads, []mailsvc.Refused{{ID: "b", Reason: "Message does not exist"}})
+	if len(got) != 1 || got[0].SkippedID() != "t1" {
+		t.Fatalf("refused = %+v, want t1 alone", got)
+	}
+	if want := "Refused 1 of 2 messages in t1: Message does not exist"; got[0].String() != want {
+		t.Errorf("warning = %q, want %q", got[0].String(), want)
 	}
 }

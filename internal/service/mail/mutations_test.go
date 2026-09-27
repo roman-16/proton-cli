@@ -3,6 +3,7 @@ package mail
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -169,11 +170,80 @@ func equalStrings(a, b []string) bool {
 func TestAThreadActsOnItsInboxMessagesForATab(t *testing.T) {
 	for scope, want := range map[string]string{"": labelAllMail, labelSocial: labelInbox, labelArchive: labelArchive} {
 		f := &fakeDoer{}
-		if err := New(f, testKeys(nil)).ConversationsDelete(context.Background(), []string{"c"}, scope); err != nil {
+		if _, err := New(f, testKeys(nil)).ConversationsDelete(context.Background(), []string{"c"}, scope); err != nil {
 			t.Fatalf("ConversationsDelete: %v", err)
 		}
 		if got := bodyLabelID(t, f.last); got != want {
 			t.Errorf("scope %q: LabelID %q, want %q", scope, got, want)
+		}
+	}
+}
+
+type batchAPI struct {
+	sent      []map[string]any
+	refuse    map[string]string
+	anonymous bool
+}
+
+func (a *batchAPI) Do(context.Context, proton.Request) (*proton.Response, error) {
+	return &proton.Response{Status: 200, Body: []byte(`{"Code":1000}`)}, nil
+}
+
+func (a *batchAPI) Decode(_ context.Context, req proton.Request, out any) error {
+	body := req.Body.(map[string]any)
+	a.sent = append(a.sent, body)
+	var responses []map[string]any
+	for _, id := range body["IDs"].([]string) {
+		code, reason := 1000, ""
+		if why, ok := a.refuse[id]; ok {
+			code, reason = 2501, why
+		}
+		answer := map[string]any{"Response": map[string]any{"Code": code, "Error": reason}}
+		if !a.anonymous {
+			answer["ID"] = id
+		}
+		responses = append(responses, answer)
+	}
+	b, err := json.Marshal(map[string]any{"Code": 1001, "Responses": responses})
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(b, out)
+}
+
+func TestABatchGoesAHundredAndFiftyAtATime(t *testing.T) {
+	ids := make([]string, 320)
+	for i := range ids {
+		ids[i] = fmt.Sprintf("m%d", i)
+	}
+	api := &batchAPI{}
+	if _, err := New(api, testKeys(nil)).Label(context.Background(), ids, labelArchive); err != nil {
+		t.Fatal(err)
+	}
+	var sizes []int
+	for _, body := range api.sent {
+		sizes = append(sizes, len(body["IDs"].([]string)))
+		if body["LabelID"] != labelArchive {
+			t.Errorf("a batch lost its label: %v", body["LabelID"])
+		}
+	}
+	if fmt.Sprint(sizes) != "[150 150 20]" {
+		t.Errorf("batches of %v, want [150 150 20]", sizes)
+	}
+}
+
+func TestABatchNamesWhatProtonRefused(t *testing.T) {
+	for _, anonymous := range []bool{false, true} {
+		api := &batchAPI{refuse: map[string]string{"b": "Message does not exist"}, anonymous: anonymous}
+		refused, err := New(api, testKeys(nil)).SetExpiration(context.Background(), []string{"a", "b", "c"}, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(refused) != 1 || refused[0] != (Refused{ID: "b", Reason: "Message does not exist"}) {
+			t.Errorf("anonymous %v: refused = %+v, want b alone", anonymous, refused)
+		}
+		if at, ok := api.sent[0]["ExpirationTime"]; !ok || at != nil {
+			t.Errorf("never sent ExpirationTime %v, want null", at)
 		}
 	}
 }
