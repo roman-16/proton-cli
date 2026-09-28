@@ -107,6 +107,10 @@ var Verbs = map[string]string{
 	"unsnooze":    "bring something back to the inbox early",
 	"decline":     "refuse an invitation",
 
+	// Breaches
+	"resolve": "mark a breach as dealt with",
+	"reopen":  "mark a resolved breach as open again",
+
 	// Photos
 	"favorite":   "mark as a favourite",
 	"unfavorite": "unmark as a favourite",
@@ -225,6 +229,7 @@ var Mutating = map[string]bool{
 	"trust": true, "untrust": true, "reactivate": true, "respond": true, "login": true, "logout": true,
 	"revoke": true, "uninstall": true, "transfer": true, "abuse": true,
 	"grant": true, "request": true, "access": true,
+	"resolve": true, "reopen": true,
 }
 
 // SettingsPages declares every collection that lives under a `settings` group,
@@ -251,8 +256,10 @@ var SettingsPages = map[string]string{
 	"account settings recovery-email":    "Recovery",
 	"account settings recovery-phone":    "Recovery",
 	"account settings recovery-phrase":   "Recovery",
+	"account settings notifications":     "Subscription",
 	"account settings second-password":   "Account and password",
 	"account settings security-keys":     "Account and password",
+	"account settings sentinel":          "Security and privacy",
 	"account settings two-factor":        "Account and password",
 	"calendar settings calendars":        "Calendars",
 	"calendar settings holidays":         "Calendars",

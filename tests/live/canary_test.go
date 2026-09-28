@@ -61,6 +61,8 @@ var collections = []struct {
 	// compared beside the address: a run that left Proton no longer watching one
 	// is exactly as much of a residue as one that left an address behind.
 	{"watched addresses", []string{"pass", "breaches", "list"}, "address_id", []string{"email", "state"}},
+	{"breaches", []string{"account", "breaches", "list"}, "id", []string{"name", "state"}},
+	{"notifications", []string{"account", "settings", "notifications", "list"}, "name", []string{"on"}},
 	{"labels", []string{"mail", "settings", "labels", "list"}, "id", []string{"name"}},
 	{"folders", []string{"mail", "settings", "folders", "list"}, "id", []string{"name"}},
 	{"filters", []string{"mail", "settings", "filters", "list"}, "id", []string{"name"}},
@@ -90,6 +92,7 @@ var collections = []struct {
 // among them: a test may arm one, and this is what proves it was disarmed.
 var settingsPages = [][]string{
 	{"account", "settings", "get"},
+	{"account", "settings", "sentinel", "get"},
 	{"calendar", "settings", "get"},
 	{"drive", "settings", "get"},
 	{"mail", "settings", "autoreply", "get"},

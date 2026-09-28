@@ -728,3 +728,11 @@ proton mail settings addresses update me@proton.me --signature - < signature.htm
 Every key has a fixed set of values, checked before anything is sent. A value is given by its name, or by the number Proton stores for it where there is one.
 
 Signatures are stored as HTML. Plain text is escaped and its newlines become line breaks; `--html` passes markup through.
+
+### Get a daily email about new mail
+
+```bash
+proton mail settings set daily-notifications on
+```
+
+The email goes to your recovery address, and turning it on is refused while the account has none. Set one with [`proton account settings recovery-email set`](../account/README.md#set-a-recovery-email-or-phone).

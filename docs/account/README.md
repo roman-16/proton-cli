@@ -2,15 +2,16 @@
 
 Sign in once and your password is never asked for again on that machine.
 
-This page covers signing in and out, unattended and two-password sign-in, running several Proton accounts side by side, the sessions Proton holds across your devices, your encryption keys, unlocking data after a password reset, and your account settings.
+This page covers signing in and out, unattended and two-password sign-in, running several Proton accounts side by side, the sessions Proton holds across your devices, your encryption keys, unlocking data after a password reset, data breaches, your account settings, and deleting the account.
 
-For every command and flag, see the reference: [account](account.md), [keys](keys.md), [security-log](security-log.md), [sessions](sessions.md), [profiles](profiles.md), [settings](settings.md).
+For every command and flag, see the reference: [account](account.md), [breaches](breaches.md), [keys](keys.md), [security-log](security-log.md), [sessions](sessions.md), [profiles](profiles.md), [settings](settings.md).
 
 ## Check who you are signed in as
 
 ```console
 $ proton account get
 Email:       you@proton.me
+Username:    you
 Name:        Roman
 Storage:     ━━━━━───────────────   26%  119.6 GB of 465.7 GB
 Max Upload:  4.7 GB
@@ -172,6 +173,7 @@ proton account login --user alice@proton.me \
 
 These commands ask for your password again even when you are signed in:
 
+- `account delete`
 - `account keys create` · `account keys delete` · `account keys export --private` · `account keys import` · `account keys update`
 - `account keys reactivate`
 - `account security-log delete` · `account security-log disable` · `account security-log enable`
@@ -514,6 +516,32 @@ Try:   proton account security-log delete, then run this again
 
 `proton account security-log delete` removes every event and goes on recording. `disable --detailed` stops the IP addresses being recorded and leaves the events alone.
 
+## Check your addresses for data breaches
+
+Dark Web Monitoring lists the breaches your addresses were found in. This is the "Dark Web Monitoring" section of Proton's account settings.
+
+```bash
+proton account breaches list
+proton account breaches get Canva
+```
+
+`get` names what leaked, the last few characters of a password that leaked in the clear, and what to do about it. A breach is `new` until you read it in a Proton app, and `open` until you resolve it:
+
+```bash
+proton account breaches resolve Canva
+proton account breaches reopen Canva
+```
+
+The detail of each breach needs a plan that includes Dark Web Monitoring. Without one, `list` names a few and says how many it withholds.
+
+```bash
+proton account breaches disable            # stop looking for new breaches
+proton account breaches enable --emails    # look again, and email you what turns up
+proton account breaches disable --emails   # keep looking, without the emails
+```
+
+Your aliases and the addresses you added elsewhere are watched by Pass Monitor, under [`proton pass breaches`](../pass/README.md#breaches).
+
 ## Where the session lives
 
 In a file per profile on this machine, listed under [Files on disk](../using/settings.md#files-on-disk); what protects it is under [Security](../about/security.md#what-is-stored-on-disk). A session ends when it is revoked or when Proton expires it, and either means signing in again.
@@ -536,7 +564,7 @@ proton account settings set locale de_AT
 
 Values can be given by name or by number, and mistakes are caught before anything is sent.
 
-`get` shows more than `set` can change. Proton Sentinel and Dark Web Monitoring are readable here and turned on at [account.proton.me](https://account.proton.me), along with billing and account deletion. Your password, your second factor and the ways back into the account have collections of their own, below.
+`get` shows more than `set` can change. Proton Sentinel and Dark Web Monitoring are turned on and off by their own commands, below, and billing is managed at [account.proton.me](https://account.proton.me). Your password, your second factor and the ways back into the account have collections of their own, below.
 
 Mail, Calendar and Drive each have settings of their own, under `proton mail settings` and so on. Pass and Contacts have none.
 
@@ -686,3 +714,42 @@ Changed:  2026-04-16 09:12
 ```
 
 The status is one of `on`, `outdated`, `not set` and `off`. An outdated phrase was set before your keys were replaced: it still opens the data it was made for, and it will not get you back into the account. Setting a new phrase replaces the old one, and `disable` removes it.
+
+## Turn on Proton Sentinel
+
+```bash
+proton account settings sentinel get
+proton account settings sentinel enable
+proton account settings sentinel enable --emails   # also the emails it sends
+```
+
+Sentinel needs a plan that includes it. While it is on, Proton chooses which recovery methods the account may use. An organization that turns it on for its members decides it for them, and `get` says so.
+
+## Choose which emails Proton sends you
+
+```bash
+proton account settings notifications list
+proton account settings notifications disable offers newsletter
+proton account settings notifications enable newsletter
+```
+
+The list covers announcements, offers, product updates for each Proton app, the recovery checklist and in-app notifications. Critical account notifications are sent whatever is off. The daily email about new mail is a Mail setting: [`proton mail settings set daily-notifications`](../mail/README.md#get-a-daily-email-about-new-mail).
+
+## Delete your account
+
+```bash
+proton account delete --reason other-service --message "Moving everything to one provider"
+```
+
+This deletes every address, message, contact, event, file and password, and the account cannot be reactivated. You confirm, then give your password again. A member of a family or duo plan leaves the plan first.
+
+`--reason` is one of `different-account`, `too-expensive`, `missing-feature`, `other-service`, `merge` and `other`. `--message` says why in at least ten characters:
+
+```console
+$ proton account delete --reason missing-feature
+Error: --message is required: say in at least ten characters why you are leaving.
+```
+
+With `--reason merge` there is no message. Add the account's address to the other account straight away, or the address is lost for good.
+
+Afterwards this machine keeps nothing of the account: the profile's session, index and short-ID cache are removed. Try it first with `--dry-run`.

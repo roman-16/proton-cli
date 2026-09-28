@@ -12,6 +12,8 @@ A refusal that comes from Proton rather than from proton-cli belongs to [Trouble
 
 **Post-quantum keys are read, never generated or imported.** An account that opted in during Proton's rollout signs in, and mail and shares reach others who opted in. Turning the setting on is done in Proton's own settings. On such an account, adding an address and generating a key are refused, and a post-quantum key file is imported in a Proton client.
 
+**An account that signed up with another provider's address is not given a Proton address, and its unverified sign-in address is not corrected.** Both are done in [Proton's own settings](https://account.proton.me).
+
 **Account keys are listed and exported, never generated or deleted.** Generating an account key, and deleting one a password reset locked, are done in [Proton's own settings](https://account.proton.me).
 
 **A recurring event needs a zone that can be named.** proton reads one from `TZ`, `/etc/localtime` or `/etc/timezone`, then from your Proton calendar settings. Where none of those answers, a recurring event drifts by an hour when the clocks change. Pass `--zone Europe/Vienna` to be sure.

@@ -28,6 +28,7 @@ func New(c proton.Doer, k keys.Get) *Service { return &Service{C: c, keys: k} }
 type Account struct {
 	ID          string `json:"id"`
 	Email       string `json:"email"`
+	Username    string `json:"username,omitempty"`
 	DisplayName string `json:"display_name,omitempty"`
 	UsedSpace   int64  `json:"used_space"`
 	MaxSpace    int64  `json:"max_space"`
@@ -93,16 +94,16 @@ func (s *Service) Get(ctx context.Context) (*Account, error) {
 	if email == "" {
 		email = u.Name
 	}
-	name := u.DisplayName
-	if name == "" {
-		name = u.Name
+	username := u.Name
+	if username == email {
+		username = ""
 	}
 	locked := u.locked()
 	for _, addr := range a.Addresses {
 		locked += addr.locked()
 	}
 	return &Account{
-		ID: u.ID, Email: email, DisplayName: name,
+		ID: u.ID, Email: email, Username: username, DisplayName: u.DisplayName,
 		UsedSpace: u.UsedSpace, MaxSpace: u.MaxSpace,
 		MaxUpload: u.MaxUpload, CreateTime: u.CreateTime,
 		LockedKeys: locked,

@@ -88,6 +88,7 @@ var Flags = map[string]Flag{
 	"draft":                  {Means: "save instead of sending"},
 	"duration":               {Means: "how long something lasts"},
 	"email":                  {Means: "an email address"},
+	"emails":                 {Means: "the emails a security feature sends about what it finds"},
 	"eml":                    {Means: "an RFC 822 file to build the message from"},
 	"end":                    {Means: "the end of the thing being described"},
 	"eo-password-file":       {Means: "where to read the password for recipients outside Proton from; - is stdin"},

@@ -76,6 +76,7 @@ func runAs(profile string, stdin io.Reader, args ...string) (stdout, stderr stri
 // ones that carry the credential flags. It mirrors the set the CLI declares,
 // which internal/cli/conformance_test.go pins.
 var reauthCommands = [][]string{
+	{"account", "delete"},
 	{"account", "keys", "create"},
 	{"account", "keys", "delete"},
 	{"account", "keys", "export"},

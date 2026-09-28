@@ -7,9 +7,8 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
-	"sort"
-	"time"
 
+	"github.com/roman-16/proton-cli/internal/breach"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/fetch"
 	"github.com/roman-16/proton-cli/internal/proton"
@@ -65,7 +64,11 @@ type MonitoredAddress struct {
 	// shareID and itemID are the alias behind this row, for the endpoints that
 	// address an alias rather than an address.
 	shareID, itemID string
+
+	groupPaused bool
 }
+
+func (a MonitoredAddress) GroupPaused() bool { return a.groupPaused }
 
 // The three states a watched address can be in.
 const (
@@ -83,7 +86,7 @@ func (a *MonitoredAddress) settle() {
 	switch {
 	case !a.Verified:
 		a.State = StateUnverified
-	case !a.Monitored:
+	case !a.Monitored, a.groupPaused:
 		a.State = StatePaused
 	default:
 		a.State = StateWatched
@@ -93,59 +96,6 @@ func (a *MonitoredAddress) settle() {
 // monitoringDisabled is the flag Proton sets on an address it has been told to
 // stop watching.
 const monitoringDisabled = 1 << 0
-
-// Breach is one leak an address appeared in.
-type Breach struct {
-	ID string `json:"id"`
-	// Name is the breach as Proton names it, usually the service that lost the
-	// data.
-	Name  string `json:"name"`
-	Email string `json:"email"`
-	// Severity is Proton's judgement, as one of low, medium or high. It arrives
-	// as a number on a scale and is banded here, because a number between zero
-	// and one is not something to act on.
-	Severity string `json:"severity"`
-	// Published is when the breach happened, as far as Proton knows, as a Unix
-	// time.
-	Published int64 `json:"published,omitempty"`
-	// Exposed is what was leaked - an address, a password, a date of birth.
-	Exposed []string `json:"exposed"`
-	// Source is where it came from, when that is known.
-	Source string `json:"source,omitempty"`
-	// Size is roughly how many records the breach held.
-	Size int `json:"size,omitempty"`
-	// PasswordTail is the last few characters of the leaked password, when it
-	// was leaked in the clear. It is what tells you which password to change.
-	PasswordTail string `json:"password_tail,omitempty"`
-	// Resolved is whether the alert has been dealt with.
-	Resolved bool `json:"resolved"`
-}
-
-// BreachReport is what one address's breaches came back as, including the part
-// Proton declined to send.
-type BreachReport struct {
-	Breaches []Breach
-	// Withheld is how many breaches Proton counts for this address but would not
-	// describe, because the plan does not include the detail. Anything above
-	// zero means the list beside it is short.
-	Withheld int
-}
-
-// severityBands are Proton's own boundaries on a nought-to-one scale.
-func severityWord(v float64) string {
-	switch {
-	case v < 0.33:
-		return "low"
-	case v < 0.67:
-		return "medium"
-	default:
-		return "high"
-	}
-}
-
-// breachAlertResolved is the state Proton uses for an alert somebody has dealt
-// with; the other two are unread and read.
-const breachAlertResolved = 3
 
 type rawAddress struct {
 	AddressID      string
@@ -163,8 +113,14 @@ func (s *Service) Monitored(ctx context.Context) ([]MonitoredAddress, error) {
 	var (
 		addresses []MonitoredAddress
 		aliases   []MonitoredAddress
+		groups    Groups
 	)
 	err := fetch.Together(ctx,
+		func(ctx context.Context) error {
+			var err error
+			groups, err = s.WatchedGroups(ctx)
+			return err
+		},
 		func(ctx context.Context) error {
 			var err error
 			addresses, err = s.watchedAddresses(ctx)
@@ -182,6 +138,7 @@ func (s *Service) Monitored(ctx context.Context) ([]MonitoredAddress, error) {
 
 	out := append(addresses, aliases...)
 	for i := range out {
+		out[i].groupPaused = !groups.Watched(out[i].Type)
 		out[i].settle()
 	}
 	// Worst first, because the reason to run this is to find what to deal with.
@@ -320,33 +277,8 @@ func (s *Service) countAliasBreaches(row *MonitoredAddress) func(context.Context
 //
 // Proton refuses the question outright for an address whose code has not been
 // handed back, so the caller settles that before asking.
-//
-// Proton sends the detail only to an account whose plan includes it, and answers
-// the rest with a count and a handful of samples. That count is carried back
-// rather than dropped: a list of no breaches under an address with three of them
-// is a wrong answer, and only the count says so.
-func (s *Service) BreachesFor(ctx context.Context, address MonitoredAddress) (*BreachReport, error) {
-	var r struct {
-		Breaches struct {
-			IsEligible bool
-			Count      int
-			Breaches   []struct {
-				ID                string
-				Email             string
-				ResolvedState     int
-				Severity          float64
-				Name              string
-				PublishedAt       string
-				Size              *int
-				PasswordLastChars *string
-				ExposedData       []struct{ Name string }
-				Source            struct {
-					IsAggregated bool
-					Domain       *string
-				}
-			}
-		}
-	}
+func (s *Service) BreachesFor(ctx context.Context, address MonitoredAddress) (breach.Report, error) {
+	var r struct{ Breaches breach.Answer }
 	// The three paths are written out rather than chosen into a variable,
 	// because the guard that checks every request the CLI can send is reachable
 	// reads them off the source and cannot see through a variable.
@@ -365,43 +297,75 @@ func (s *Service) BreachesFor(ctx context.Context, address MonitoredAddress) (*B
 		}
 	}
 	if err := s.C.Decode(ctx, req, &r); err != nil {
-		return nil, err
+		return breach.Report{}, err
 	}
+	return r.Breaches.Report(), nil
+}
 
-	report := &BreachReport{Breaches: make([]Breach, 0, len(r.Breaches.Breaches))}
-	for _, b := range r.Breaches.Breaches {
-		row := Breach{
-			ID: b.ID, Name: b.Name, Email: b.Email,
-			Severity: severityWord(b.Severity),
-			Resolved: b.ResolvedState == breachAlertResolved,
-		}
-		if at, err := time.Parse(time.RFC3339, b.PublishedAt); err == nil {
-			row.Published = at.Unix()
-		}
-		for _, e := range b.ExposedData {
-			row.Exposed = append(row.Exposed, e.Name)
-		}
-		switch {
-		case b.Source.Domain != nil && *b.Source.Domain != "":
-			row.Source = *b.Source.Domain
-		case b.Source.IsAggregated:
-			row.Source = "several sources"
-		}
-		if b.Size != nil {
-			row.Size = *b.Size
-		}
-		if b.PasswordLastChars != nil {
-			row.PasswordTail = *b.PasswordLastChars
-		}
-		report.Breaches = append(report.Breaches, row)
+func (s *Service) ResolveBreaches(ctx context.Context, address MonitoredAddress) error {
+	var err error
+	switch address.Type {
+	case AddressAlias:
+		_, err = s.C.Do(ctx, proton.Request{
+			Method: "POST",
+			Path:   "/pass/v1/share/" + address.shareID + "/alias/" + address.itemID + "/breaches/resolved",
+		})
+	case AddressCustom:
+		_, err = s.C.Do(ctx, proton.Request{
+			Method: "PUT", Path: "/pass/v1/breach/custom_email/" + address.AddressID + "/resolved",
+		})
+	default:
+		_, err = s.C.Do(ctx, proton.Request{
+			Method: "POST", Path: "/pass/v1/breach/address/" + address.AddressID + "/resolved",
+		})
 	}
-	sort.SliceStable(report.Breaches, func(i, j int) bool {
-		return report.Breaches[i].Published > report.Breaches[j].Published
+	return err
+}
+
+type Groups struct {
+	Addresses bool
+	Aliases   bool
+	Paid      bool
+}
+
+func (g Groups) Watched(kind string) bool {
+	switch kind {
+	case AddressProton:
+		return g.Addresses
+	case AddressAlias:
+		return g.Aliases
+	}
+	return true
+}
+
+func (s *Service) WatchedGroups(ctx context.Context) (Groups, error) {
+	var r struct {
+		Access struct {
+			Plan    struct{ Type string }
+			Monitor struct{ ProtonAddress, Aliases bool }
+		}
+	}
+	if err := s.C.Decode(ctx, proton.Request{
+		Method: "GET", Path: "/pass/v1/user/access", Reads: true,
+	}, &r); err != nil {
+		return Groups{}, err
+	}
+	return Groups{
+		Addresses: r.Access.Monitor.ProtonAddress,
+		Aliases:   r.Access.Monitor.Aliases,
+		Paid:      r.Access.Plan.Type != freePlan,
+	}, nil
+}
+
+func (s *Service) WatchGroup(ctx context.Context, kind string, on bool) error {
+	field := "ProtonAddress"
+	if kind == AddressAlias {
+		field = "Aliases"
+	}
+	_, err := s.C.Do(ctx, proton.Request{
+		Method: "PUT", Path: "/pass/v1/user/monitor", Body: map[string]bool{field: on},
 	})
-	if !r.Breaches.IsEligible && r.Breaches.Count > len(report.Breaches) {
-		report.Withheld = r.Breaches.Count - len(report.Breaches)
-	}
-	return report, nil
+	return err
 }
 
 // WatchAddress asks Proton to watch an address this account does not own.

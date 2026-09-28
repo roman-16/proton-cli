@@ -91,6 +91,9 @@ var unreachable = map[string]string{
 
 	"POST /drive/volumes": "a volume is made once in an account's life, and every test account is long past that moment",
 
+	"PUT /core/v4/users/delete":                "deleting a test account would end every run after it; a dry run asks the check that comes first",
+	"DELETE /core/v4/organizations/membership": "only a family plan's member leaves it on the way to deleting the account, and deleting ends the account",
+
 	// Everything about reading a password-protected message. Proton seals a
 	// message to a password only for a recipient it has no keys for, so no address
 	// any test account holds can be sent one - and the link that names it arrives
@@ -162,6 +165,14 @@ var untested = map[string]string{
 	"PUT /pass/v1/breach/custom_email/{id}/verify":               "handing back a code that arrives in a mailbox no run can read",
 	"GET /pass/v1/breach/custom_email/{id}/breaches":             "needs a verified address added by hand, and no run can verify one",
 	"PUT /pass/v1/breach/custom_email/{id}/monitor":              "the same: Proton is not watching an unverified address, so there is nothing to pause",
+	"PUT /pass/v1/breach/custom_email/{id}/resolved":             "the same: only a verified address has breaches to resolve",
+
+	"POST /pass/v1/breach/address/{id}/resolved":            "the only addresses with breaches are somebody's own, and Pass cannot reopen them",
+	"POST /pass/v1/share/{id}/alias/{id}/breaches/resolved": "no test alias is in a breach, and none can be put in one",
+
+	"GET /core/v4/organizations/settings": "only an organization that enforces its policy is asked, and no test account is in one",
+
+	"PUT /account/v4/breaches/state": "Dark Web Monitoring has found no breach for any test account, so there is none to resolve or reopen",
 
 	// The auto-reply is a paid feature, so only the paid account could reach it -
 	// and it is the one setting a run cannot put back. Proton keeps the last

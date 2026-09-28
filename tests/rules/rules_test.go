@@ -162,6 +162,25 @@ func literalWords(call *ast.CallExpr) []string {
 	return out
 }
 
+func TestEveryAccountDeletionIsADryRun(t *testing.T) {
+	for _, name := range goFiles(t, liveDir) {
+		for _, fn := range functionsIn(t, filepath.Join(liveDir, name)) {
+			ast.Inspect(fn, func(n ast.Node) bool {
+				call, ok := n.(*ast.CallExpr)
+				if !ok {
+					return true
+				}
+				words := literalWords(call)
+				if argv.Has(words, "account", "delete") && !slices.Contains(words, "--dry-run") {
+					t.Errorf("%s: %s runs `account delete` without --dry-run, which would delete a test account",
+						name, fn.Name.Name)
+				}
+				return true
+			})
+		}
+	}
+}
+
 // A forwarding the paid account sets up leaves the fixture address.
 //
 // A forwarding redirects every message arriving at the address it is set on, and

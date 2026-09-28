@@ -156,7 +156,7 @@ func recoveryEmailEnableCmd() *cobra.Command {
 			switch {
 			case security.RecoveryEmail.Address == "":
 				return refuseNoRecoveryEmail()
-			case security.Sentinel:
+			case security.Sentinel.On:
 				return refuseSentinel()
 			case security.RecoveryEmail.AllowRecovery:
 				return kit.Fail("Password resets by email are already allowed.")

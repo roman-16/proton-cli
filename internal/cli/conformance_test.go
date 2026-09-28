@@ -401,14 +401,16 @@ var kitFlagUsage = map[string]string{
 // the flag actually means: two commands offering different values are asking
 // different questions whatever their usage strings say.
 //
-// domainsByCollection are the three that ask one question whose answers belong
+// domainsByCollection are the four that ask one question whose answers belong
 // to whatever is being acted on: which column to order by, which layout to
-// write, and what somebody may do with a shared thing. A message can be laid
-// down as eml or mbox and a vault cannot; a card sorts by name and a file by
-// size; a Pass vault has a manager and a Drive folder has nothing above editor.
-// The question is the same word in every one of them, and anything not named
-// here that offers a second set is not.
-var domainsByCollection = map[string]bool{"access": true, "format": true, "sort": true}
+// write, what somebody may do with a shared thing, and what kind of thing it
+// is. A message can be laid down as eml or mbox and a vault cannot; a card
+// sorts by name and a file by size; a Pass vault has a manager and a Drive
+// folder has nothing above editor; a Pass item is a login or a note and a
+// watched address is on the account or an alias. The question is the same word
+// in every one of them, and anything not named here that offers a second set is
+// not.
+var domainsByCollection = map[string]bool{"access": true, "format": true, "sort": true, "type": true}
 
 func TestAFlagNameNamesOneSetOfValues(t *testing.T) {
 	// Building the tree is what populates the registry.
@@ -863,6 +865,7 @@ func TestStandardInputHasOneOwner(t *testing.T) {
 // rather than a reflex, and the integration harness keeps the same list.
 func TestReauthCommandsAreDeclared(t *testing.T) {
 	want := []string{
+		"proton account delete",
 		"proton account keys create",
 		"proton account keys delete",
 		"proton account keys export",

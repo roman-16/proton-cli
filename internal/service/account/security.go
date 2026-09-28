@@ -27,7 +27,21 @@ type Security struct {
 	RecoveryPhrase  RecoveryPhrase `json:"recovery_phrase"`
 	// Sentinel is Proton's heightened protection programme, which takes the
 	// choice of recovery methods out of the account's hands.
-	Sentinel bool `json:"sentinel"`
+	Sentinel          Sentinel          `json:"sentinel"`
+	DarkWebMonitoring DarkWebMonitoring `json:"dark_web_monitoring"`
+}
+
+type Sentinel struct {
+	Eligible bool `json:"eligible"`
+	On       bool `json:"on"`
+	Emails   bool `json:"emails"`
+	Enforced bool `json:"enforced"`
+}
+
+type DarkWebMonitoring struct {
+	Eligible bool `json:"eligible"`
+	On       bool `json:"on"`
+	Emails   bool `json:"emails"`
 }
 
 // TwoFactor is what the account is asked for at a sign-in beyond its password.
@@ -94,7 +108,7 @@ const (
 	twoFactorFIDO2 = 2
 )
 
-// settings is the part of Proton's settings record the credentials live in.
+// settings is the part of Proton's settings record this CLI reads.
 type settings struct {
 	Email struct {
 		Value  string
@@ -108,7 +122,24 @@ type settings struct {
 	}
 	Password     struct{ Mode int }
 	Mnemonic     struct{ UpdateTime int64 }
-	HighSecurity struct{ Value int }
+	HighSecurity struct {
+		Eligible     int
+		Value        int
+		SummaryEmail int
+	}
+	BreachAlerts struct {
+		Eligible           int
+		Value              int
+		EmailNotifications int
+	}
+	OrganizationPolicy struct{ Enforced int }
+	News               int
+	Locale             string
+	DateFormat         any
+	TimeFormat         any
+	WeekStart          any
+	Telemetry          int
+	CrashReports       int
 	// Proton answers with a scalar TwoFactor beside this one, and an untagged
 	// field would bind to that and fail to decode.
 	TwoFactor struct {
@@ -123,11 +154,31 @@ type settings struct {
 }
 
 // Security reads the whole state of the account's credentials.
+func (s *Service) Security(ctx context.Context) (*Security, error) {
+	prefs, err := s.Preferences(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &prefs.Security, nil
+}
+
+type Preferences struct {
+	Security
+	Locale       string
+	DateFormat   any
+	TimeFormat   any
+	WeekStart    any
+	Telemetry    bool
+	CrashReports bool
+	News         int
+}
+
+// Preferences reads the settings record and what it says about the account.
 //
 // The settings and the account itself are asked for together: the recovery
 // phrase is the one part Proton keeps with the account rather than with the
 // settings, and neither answer is needed to ask for the other.
-func (s *Service) Security(ctx context.Context) (*Security, error) {
+func (s *Service) Preferences(ctx context.Context) (*Preferences, error) {
 	var (
 		env  struct{ UserSettings settings }
 		user struct {
@@ -145,29 +196,68 @@ func (s *Service) Security(ctx context.Context) (*Security, error) {
 		return nil, err
 	}
 	set := env.UserSettings
+	sentinel, err := s.sentinel(ctx, set)
+	if err != nil {
+		return nil, err
+	}
 	registered := make([]SecurityKey, 0, len(set.TwoFactor.RegisteredKeys))
 	for _, k := range set.TwoFactor.RegisteredKeys {
 		registered = append(registered, SecurityKey{ID: credentialID(k.CredentialID), Name: k.Name})
 	}
-	return &Security{
-		TwoFactor: TwoFactor{
-			AuthenticatorApp: set.TwoFactor.Enabled&twoFactorTOTP != 0,
-			SecurityKeys:     registered,
+	return &Preferences{
+		Security: Security{
+			TwoFactor: TwoFactor{
+				AuthenticatorApp: set.TwoFactor.Enabled&twoFactorTOTP != 0,
+				SecurityKeys:     registered,
+			},
+			TwoPasswordMode: set.Password.Mode == keys.PasswordModeTwo,
+			RecoveryEmail: RecoveryEmail{
+				Address:       set.Email.Value,
+				Verified:      set.Email.Status == verifiedStatus,
+				AllowRecovery: set.Email.Reset == 1,
+			},
+			RecoveryPhone: RecoveryPhone{
+				Number:        set.Phone.Value,
+				Verified:      set.Phone.Status == verifiedStatus,
+				AllowRecovery: set.Phone.Reset == 1,
+			},
+			RecoveryPhrase: phrase(user.User.MnemonicStatus, set.Mnemonic.UpdateTime),
+			Sentinel:       sentinel,
+			DarkWebMonitoring: DarkWebMonitoring{
+				Eligible: set.BreachAlerts.Eligible == 1,
+				On:       set.BreachAlerts.Eligible == 1 && set.BreachAlerts.Value == 1,
+				Emails:   set.BreachAlerts.EmailNotifications == 1,
+			},
 		},
-		TwoPasswordMode: set.Password.Mode == keys.PasswordModeTwo,
-		RecoveryEmail: RecoveryEmail{
-			Address:       set.Email.Value,
-			Verified:      set.Email.Status == verifiedStatus,
-			AllowRecovery: set.Email.Reset == 1,
-		},
-		RecoveryPhone: RecoveryPhone{
-			Number:        set.Phone.Value,
-			Verified:      set.Phone.Status == verifiedStatus,
-			AllowRecovery: set.Phone.Reset == 1,
-		},
-		RecoveryPhrase: phrase(user.User.MnemonicStatus, set.Mnemonic.UpdateTime),
-		Sentinel:       set.HighSecurity.Value == 1,
+		Locale:       set.Locale,
+		DateFormat:   set.DateFormat,
+		TimeFormat:   set.TimeFormat,
+		WeekStart:    set.WeekStart,
+		Telemetry:    set.Telemetry == 1,
+		CrashReports: set.CrashReports == 1,
+		News:         set.News,
 	}, nil
+}
+
+func (s *Service) sentinel(ctx context.Context, set settings) (Sentinel, error) {
+	sentinel := Sentinel{
+		Eligible: set.HighSecurity.Eligible == 1,
+		On:       set.HighSecurity.Value == 1,
+		Emails:   set.HighSecurity.SummaryEmail == 1,
+	}
+	if set.OrganizationPolicy.Enforced != 1 {
+		return sentinel, nil
+	}
+	var org struct{ HighSecurity int }
+	if err := s.C.Decode(ctx, proton.Request{
+		Method: "GET", Path: "/core/v4/organizations/settings",
+	}, &org); err != nil {
+		return Sentinel{}, err
+	}
+	if org.HighSecurity == 1 {
+		sentinel.On, sentinel.Enforced = true, true
+	}
+	return sentinel, nil
 }
 
 // phrase is where the account stands with its phrase, read off the two numbers

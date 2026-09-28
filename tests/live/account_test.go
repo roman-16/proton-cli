@@ -45,6 +45,25 @@ func TestAccountGetJSON(t *testing.T) {
 	assertNotContains(t, runOK(t, "account", "get"), "Locked keys:")
 }
 
+func TestAccountGetReportsTheUsername(t *testing.T) {
+	data := runJSON(t, "account", "get")
+	username, _ := data["username"].(string)
+	if username == "" || username == data["email"] {
+		t.Errorf("username = %q beside email %v, want the account's own username", username, data["email"])
+	}
+	assertContains(t, runOK(t, "account", "get"), "Username:")
+}
+
+func TestAccountDeleteDryRunAsksProtonFirst(t *testing.T) {
+	_, stderr := runOKStderr(t, "--dry-run", "account", "delete",
+		"--reason", "other", "--message", "Checking the preview")
+	assertContains(t, stderr, "Dry run - would delete account")
+	assertContains(t, stderr, "mail, contacts, events, files and passwords")
+	if runJSON(t, "account", "get")["session"] != "valid" {
+		t.Fatal("the dry run left the session unusable")
+	}
+}
+
 // Storage is reported as a share of a total, which is how a person reads it.
 func TestAccountGetStorageIsHumanReadable(t *testing.T) {
 	stdout := runOK(t, "account", "get")

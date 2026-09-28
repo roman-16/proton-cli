@@ -133,7 +133,7 @@ Adding a test that makes Proton write to the account means adding its subject to
 
 There are no plan-gated skips, and `tests/rules` fails on one. A skip in place of a test is a run that reports success for having done nothing - and it had the same feature tested twice, once in a test that always skipped and once in a test nobody ran.
 
-**A skip is for something about the world that no run can arrange.** Two are left in the whole suite, both about Pass Monitor needing an address that has actually been in a breach. Everything else is a `t.Fatal`: a message that never arrived, an invitation that never came, a fixture that is not there. A test that quietly did nothing is a worse answer than a red one.
+**A skip is for something about the world that no run can arrange**, such as an address that has actually been in a breach, or a recovery method the account happens to hold. Everything else is a `t.Fatal`: a message that never arrived, an invitation that never came, a fixture that is not there. A test that quietly did nothing is a worse answer than a red one.
 
 ## The suite runs one test at a time
 

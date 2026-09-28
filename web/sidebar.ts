@@ -51,6 +51,7 @@ export const sidebar: NonNullable<StarlightUserConfig["sidebar"]> = [
       "account/keys",
       "account/sessions",
       "account/security-log",
+      "account/breaches",
       "account/profiles",
       "account/settings",
     ],

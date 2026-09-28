@@ -78,7 +78,7 @@ These are the listings that can be narrowed, and what narrows them. The same fla
 - `proton mail settings smtp-tokens list --desc --limit int --page int --sort string`
 - `proton pass aliases contacts list REF --desc --limit int --page int --sort string`
 - `proton pass aliases list --desc --limit int --page int --sort string --vault string`
-- `proton pass breaches list --desc --limit int --page int --sort string`
+- `proton pass breaches list --desc --limit int --page int --sort string --type string`
 - `proton pass invitations list --desc --limit int --page int --sort string`
 - `proton pass items attachments list REF --removed`
 - `proton pass items list --desc --excluded --limit int --newer-than string --older-than string --page int --risk string --sort string --type string --vault string`
@@ -91,10 +91,12 @@ These are the listings that can be narrowed, and what narrows them. The same fla
 - `proton pass sharing list --desc --limit int --page int --sort string`
 - `proton pass trash list --desc --limit int --page int --sort string`
 - `proton pass vaults list --desc --limit int --page int --sort string`
+- `proton account breaches list --limit int --page int`
 - `proton account profiles list --desc --limit int --page int --sort string`
 - `proton account security-log list --limit int --page int`
 - `proton account sessions list --desc --limit int --page int --sort string`
 - `proton account settings emergency-access list --desc --incoming --limit int --page int --sort string`
+- `proton account settings notifications list --limit int --page int`
 - `proton account settings recovery-contacts list --desc --incoming --limit int --page int --sort string`
 - `proton account settings security-keys list --desc --limit int --page int --sort string`
 
@@ -155,6 +157,8 @@ A bulk verb acts on at most `--limit` things, 150 by default; `--limit 0` lifts 
 Secrets go in the same way they come out. `pass items create` and `pass items update` read them from `--secret-file NAME=FILE`, never from a flag value, because a flag value is in the shell history; `-` as the file reads standard input. The commands that change a credential read it from `--password-file` and `--new-password-file` the same way.
 
 `proton account settings security-keys create` cannot be run on somebody's behalf whatever it is handed: it waits for a person to touch the key in front of them.
+
+`proton account delete` deletes the account and everything in it, and nothing brings it back. It is the user's to run; `--dry-run` shows what it would do.
 
 ## Exit codes
 
@@ -245,7 +249,7 @@ One line per group, with the verbs under it. Arguments, flags and examples are i
 - `proton pass` - export, generate, import
 - `proton pass aliases` - Hide-my-email addresses that forward to you: create, disable, enable, list
 - `proton pass aliases contacts` - Addresses an alias can write to: allow, block, create, delete, list
-- `proton pass breaches` - Addresses that have appeared in a data breach: create, delete, disable, enable, get, list, resend, verify
+- `proton pass breaches` - Addresses that have appeared in a data breach: create, delete, disable, enable, get, list, resend, resolve, verify
 - `proton pass invitations` - What other people have offered you: accept, decline, list
 - `proton pass items` - Logins, notes, cards and the rest: create, delete, exclude, get, include, list, move, pin, totp, trash, unpin, update
 - `proton pass items attachments` - Files attached to an item: download, list, restore, update
@@ -266,13 +270,15 @@ One line per group, with the verbs under it. Arguments, flags and examples are i
 
 ### account - Your Proton account, its settings and your session
 
-- `proton account` - get, login, logout
+- `proton account` - delete, get, login, logout
+- `proton account breaches` - Breaches your addresses were found in: disable, enable, get, list, reopen, resolve
 - `proton account keys` - The keys your data is encrypted with: create, delete, export, get, import, list, reactivate, update
 - `proton account profiles` - Accounts signed in on this machine: delete, list
 - `proton account security-log` - Sign-ins and credential changes Proton recorded: delete, disable, enable, get, list
 - `proton account sessions` - Sessions Proton holds for this account: create, list, revoke
 - `proton account settings` - Account-wide preferences: get, list, set
 - `proton account settings emergency-access` - People who can get into your account if you cannot: access, add, cancel, get, grant, list, remove, request, update
+- `proton account settings notifications` - The emails and in-app notices Proton sends you: disable, enable, list
 - `proton account settings password` - The password you sign in with: set
 - `proton account settings recovery-contacts` - People who can help you back into your account: add, get, list, remove
 - `proton account settings recovery-email` - The address Proton writes to if you lose access: disable, enable, get, set, verify
@@ -280,6 +286,7 @@ One line per group, with the verbs under it. Arguments, flags and examples are i
 - `proton account settings recovery-phrase` - The twelve words that open your account without your password: disable, get, set
 - `proton account settings second-password` - The second password your keys can be locked with: disable, enable, get, set
 - `proton account settings security-keys` - The security keys this account signs in with: create, delete, list, update
+- `proton account settings sentinel` - Heightened protection for your account: disable, enable, get
 - `proton account settings two-factor` - What you are asked for at sign-in besides your password: disable, enable, generate, get
 
 ### index - An encrypted, searchable copy of your mail, files and events on this machine

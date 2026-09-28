@@ -1227,6 +1227,7 @@ proton mail settings set KEY VALUE
 proton mail settings set pm-signature off
 proton mail settings set view-mode conversations
 proton mail settings set font-face georgia
+proton mail settings set daily-notifications on
 ```
 
 ## `smtp-tokens`

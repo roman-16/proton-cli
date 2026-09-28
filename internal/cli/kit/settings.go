@@ -50,13 +50,23 @@ type IntRange struct {
 // At most one value domain is set. Neither means free text, which is right for
 // an opaque value such as a locale or an IANA time zone.
 type Setting struct {
-	Path  string
-	Field string
-	Page  string
-	Desc  string
+	Path   string
+	Field  string
+	Method string
+	Page   string
+	Desc   string
 
 	Enum  []Choice
 	Range *IntRange
+
+	Guard func(*Invocation, Choice) error
+}
+
+func (s Setting) method() string {
+	if s.Method == "" {
+		return "PUT"
+	}
+	return s.Method
 }
 
 // Parse finds the choice a user-supplied value names, rejecting anything the
@@ -293,6 +303,11 @@ func settingsSetCmd(scope string, specs map[string]Setting) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if spec.Guard != nil {
+				if err := spec.Guard(c, choice); err != nil {
+					return err
+				}
+			}
 			bodies := choice.Bodies
 			if bodies == nil {
 				bodies = []map[string]any{{spec.Field: choice.Value}}
@@ -304,7 +319,7 @@ func settingsSetCmd(scope string, specs map[string]Setting) *cobra.Command {
 			}, func() error {
 				for _, body := range bodies {
 					if err := c.App.API.Decode(c.Ctx, proton.Request{
-						Method: "PUT", Path: spec.Path, Body: body,
+						Method: spec.method(), Path: spec.Path, Body: body,
 					}, nil); err != nil {
 						return err
 					}

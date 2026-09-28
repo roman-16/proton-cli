@@ -1,6 +1,7 @@
 package live
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -230,4 +231,76 @@ func TestPassBreachesPauseAnAddressOnTheAccount(t *testing.T) {
 	if got, _ := runJSONPaid(t, "pass", "breaches", "get", address)["monitored"].(bool); !got {
 		t.Error("the address was resumed and still reports as paused")
 	}
+}
+
+func TestPassBreachesPauseEveryAlias(t *testing.T) {
+	_, address := paidAlias(t)
+	row := runJSONPaid(t, "pass", "breaches", "get", address)
+	if monitored, _ := row["monitored"].(bool); !monitored {
+		t.Fatal("the fixture alias is paused on its own; resume it: proton --profile paid pass breaches enable " + address)
+	}
+	pausedBefore := row["state"] == "paused"
+	back := "enable"
+	if pausedBefore {
+		back = "disable"
+	}
+	cleanup(t, "put watching for every alias back: proton --profile paid pass breaches "+back+" --type alias",
+		func() error {
+			_, stderr, code := runPaid(t, "pass", "breaches", back, "--type", "alias")
+			if code == 0 || strings.Contains(stderr, "already") {
+				return nil
+			}
+			return fmt.Errorf("exit %d: %s", code, strings.TrimSpace(stderr))
+		})
+
+	if pausedBefore {
+		runOKPaid(t, "pass", "breaches", "enable", "--type", "alias")
+	}
+	_, stderr := runOKStderrPaid(t, "pass", "breaches", "disable", "--type", "alias")
+	assertContains(t, stderr, "Hide-my-email aliases")
+	rows := runJSONArrayPaid(t, "pass", "breaches", "list", "--type", "alias")
+	if len(rows) == 0 {
+		t.Fatal("the paid account holds the fixture alias, so the listing of aliases cannot be empty")
+	}
+	for _, row := range rows {
+		m, _ := row.(map[string]interface{})
+		if m["type"] != "alias" {
+			t.Errorf("--type alias listed a %v", m["type"])
+		}
+		if m["state"] != "paused" {
+			t.Errorf("%v is %v while watching every alias is paused", m["email"], m["state"])
+		}
+	}
+	_, stderr, code := runPaid(t, "pass", "breaches", "enable", address)
+	if code != 1 {
+		t.Errorf("resuming one alias in a paused group: exit %d, want 1\nstderr: %s", code, truncateOutput(stderr))
+	}
+	assertContains(t, stderr, "enable --type alias")
+
+	runOKPaid(t, "pass", "breaches", "enable", "--type", "alias")
+	if state, _ := runJSONPaid(t, "pass", "breaches", "get", address)["state"].(string); state != "watched" {
+		t.Errorf("the alias is %s after watching every alias was resumed", state)
+	}
+	if pausedBefore {
+		runOKPaid(t, "pass", "breaches", "disable", "--type", "alias")
+	}
+}
+
+func TestPassBreachesPausingEveryAliasNeedsAPaidPlan(t *testing.T) {
+	for _, verb := range []string{"disable", "enable"} {
+		_, stderr, code := run(t, "pass", "breaches", verb, "--type", "alias")
+		if code != 1 {
+			t.Errorf("%s --type alias: exit %d, want 1\nstderr: %s", verb, code, truncateOutput(stderr))
+		}
+		assertContains(t, stderr, "needs a paid Pass plan")
+	}
+}
+
+func TestPassBreachesResolveRefusesAnAddressWithNothingOpen(t *testing.T) {
+	_, address := paidAlias(t)
+	_, stderr, code := runPaid(t, "pass", "breaches", "resolve", address)
+	if code != 1 {
+		t.Errorf("exit %d, want 1\nstderr: %s", code, truncateOutput(stderr))
+	}
+	assertContains(t, stderr, "has no open breaches")
 }

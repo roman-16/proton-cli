@@ -158,3 +158,39 @@ func TestMailSettingsImageProxyOffAlsoClearsStoringRemoteContent(t *testing.T) {
 		t.Errorf("ImageProxy after image-proxy on: got %d, want 2", got)
 	}
 }
+
+func TestMailSettingsDailyNotifications(t *testing.T) {
+	recovery, _ := runJSON(t, "account", "settings", "recovery-email", "get")["address"].(string)
+	if recovery == "" {
+		_, stderr, code := run(t, "mail", "settings", "set", "daily-notifications", "on")
+		if code != 1 {
+			t.Errorf("turning them on with no recovery email: exit %d, want 1\nstderr: %s", code, truncateOutput(stderr))
+		}
+		assertContains(t, stderr, "recovery email")
+		return
+	}
+	daily := func() string {
+		value, _ := runJSON(t, "mail", "settings", "get")["daily_notifications"].(string)
+		return value
+	}
+	before := daily()
+	flip := "on"
+	if before == "on" {
+		flip = "off"
+	}
+	cleanup(t, "put daily notifications back: proton --profile primary mail settings set daily-notifications "+before,
+		func() error {
+			if _, _, code := run(t, "mail", "settings", "set", "daily-notifications", before); code != 0 {
+				return fmt.Errorf("exit %d", code)
+			}
+			return nil
+		})
+	runOK(t, "mail", "settings", "set", "daily-notifications", flip)
+	if got := daily(); got != flip {
+		t.Errorf("daily_notifications = %s after setting it %s", got, flip)
+	}
+	runOK(t, "mail", "settings", "set", "daily-notifications", before)
+	if got := daily(); got != before {
+		t.Errorf("daily_notifications = %s after putting it back to %s", got, before)
+	}
+}

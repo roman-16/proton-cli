@@ -106,6 +106,8 @@ var (
 	Trusted          = Action{"Trusted", "trust", "trusted", Ordinary}
 	Untrusted        = Action{"Untrusted", "untrust", "untrusted", Ordinary}
 	Reactivated      = Action{"Reactivated", "reactivate", "reactivated", Ordinary}
+	Reopened         = Action{"Reopened", "reopen", "reopened", Ordinary}
+	Resolved         = Action{"Resolved", "resolve", "resolved", Ordinary}
 	Granted          = Action{"Granted", "grant", "granted", Ordinary}
 	Requested        = Action{"Requested", "request", "requested", Ordinary}
 	Accessed         = Action{"Signed in as", "access", "accessed", Ordinary}
@@ -136,7 +138,7 @@ var Actions = []Action{
 	MarkedLegitimate, Reported,
 	Enabled, Disabled, Added, Removed, Confirmed, Left, Accepted, Declined,
 	Favorited, Unfavorited, Pinned, Unpinned, Hidden, Unhidden, Excluded, Included, Trusted, Untrusted,
-	Reactivated, Responded, Set, Invited, Revoked, Granted,
+	Reactivated, Reopened, Resolved, Responded, Set, Invited, Revoked, Granted,
 	Requested, Accessed,
 	Transferred, SignedIn, SignedOut,
 }

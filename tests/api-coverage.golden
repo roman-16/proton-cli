@@ -7,6 +7,9 @@ DELETE /calendar/v1/{id}/members/{id}
 DELETE /calendar/v1/{id}/urls/{id}
 DELETE /core/v4/labels
 DELETE /core/v4/labels/{id}
+DELETE /core/v4/settings/breachalerts
+DELETE /core/v4/settings/highsecurity
+DELETE /core/v4/settings/highsecurity/summary/email
 DELETE /domains/{id}
 DELETE /drive/photos/volumes/{id}/albums/{id}
 DELETE /drive/photos/volumes/{id}/links/{id}/tags
@@ -38,6 +41,7 @@ DELETE /pass/v1/user/srp
 DELETE /pass/v1/vault/{id}
 GET /account/v1/access/incoming
 GET /account/v1/access/outgoing
+GET /account/v4/breaches
 GET /account/v4/personal-access-token
 GET /auth/v4/sessions
 GET /auth/v4/sessions/forks
@@ -75,6 +79,7 @@ GET /core/v4/organizations
 GET /core/v4/settings
 GET /core/v4/settings/2fa/totp/secret
 GET /core/v4/users
+GET /core/v4/users/delete
 GET /core/v5/events/{id}
 GET /domains
 GET /domains/available
@@ -157,6 +162,8 @@ GET /pass/v1/user/alias/mailbox
 GET /pass/v1/user/srp
 GET /pass/v1/user/srp/info
 GET /settings/calendar
+PATCH /account/v1/breaches/email-notifications
+PATCH /core/v4/settings/news
 POST /account/v1/access
 POST /account/v4/personal-access-token
 POST /auth/v4/sessions
@@ -173,6 +180,9 @@ POST /core/v4/keys/address
 POST /core/v4/keys/address/{id}/delete
 POST /core/v4/labels
 POST /core/v4/settings/2fa/totp
+POST /core/v4/settings/breachalerts
+POST /core/v4/settings/highsecurity
+POST /core/v4/settings/highsecurity/summary/email
 POST /core/v4/settings/mnemonic/disable
 POST /core/v4/verify/send
 POST /domains
@@ -338,6 +348,7 @@ PUT /pass/v1/share/{id}/item/{id}/flags
 PUT /pass/v1/share/{id}/user/{id}
 PUT /pass/v1/user/alias/settings/default_alias_domain
 PUT /pass/v1/user/alias/settings/default_mailbox_id
+PUT /pass/v1/user/monitor
 PUT /pass/v1/vault/{id}
 PUT /pass/v1/vault/{id}/owner
 PUT /settings/calendar

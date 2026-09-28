@@ -542,3 +542,22 @@ Three kinds of address are watched, shown in the TYPE column: `proton` for the o
 STATE says what has to happen next. An address you added is `unverified` until you hand back the code Proton emailed it with `verify`; `resend` sends the code again. Until then Proton is not watching it, so `get`, `enable` and `disable` refuse. `paused` means you told Proton to stop watching, which `enable` undoes.
 
 `delete` removes an address you added, and its breach history with it. To stop Proton watching one of your own addresses or an alias, use `disable`. Pausing an alias also leaves it out of the password checks above, which is the same switch.
+
+### Pause every alias at once
+
+```bash
+proton pass breaches disable --type alias
+proton pass breaches enable --type alias
+```
+
+This needs a paid Pass plan. `--type proton` does the same for the addresses on your account. While a kind is paused, every address of it lists as `paused`, and none can be switched on its own. Resuming leaves the ones you paused one at a time paused. Addresses you added are paused one at a time.
+
+### Mark breaches resolved
+
+```bash
+proton pass breaches resolve jane@proton.me
+```
+
+Every current breach of the address is marked resolved, and `get` shows each one's state. They cannot be reopened in Pass. A breach found later is reported as new. Resolving needs a plan that includes the detail of each breach.
+
+The breaches of the addresses on your account are also listed one by one in [Dark Web Monitoring](../account/README.md#check-your-addresses-for-data-breaches).

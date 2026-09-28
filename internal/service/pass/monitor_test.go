@@ -86,3 +86,74 @@ func TestTheWorstComeFirstAndAnUnknownCountBeforeTheClean(t *testing.T) {
 		t.Errorf("order = %v, want %v", order, want)
 	}
 }
+
+type recorded struct{ sent []proton.Request }
+
+func (r *recorded) Do(_ context.Context, req proton.Request) (*proton.Response, error) {
+	r.sent = append(r.sent, req)
+	return &proton.Response{Status: 200, Body: []byte(`{"Code":1000}`)}, nil
+}
+
+func (r *recorded) Decode(_ context.Context, req proton.Request, out any) error {
+	r.sent = append(r.sent, req)
+	return json.Unmarshal([]byte(`{"Access": {"Plan": {"Type": "plus"}, "Monitor": {"ProtonAddress": true, "Aliases": false}}}`), out)
+}
+
+func TestAnAddressInAPausedGroupIsPaused(t *testing.T) {
+	for _, tc := range []struct {
+		row  MonitoredAddress
+		want string
+	}{
+		{MonitoredAddress{Type: AddressAlias, Monitored: true, Verified: true, groupPaused: true}, StatePaused},
+		{MonitoredAddress{Type: AddressAlias, Monitored: true, Verified: true}, StateWatched},
+		{MonitoredAddress{Type: AddressProton, Monitored: false, Verified: true}, StatePaused},
+		{MonitoredAddress{Type: AddressCustom, Monitored: true, Verified: false, groupPaused: true}, StateUnverified},
+	} {
+		tc.row.settle()
+		if tc.row.State != tc.want {
+			t.Errorf("%+v settled as %s, want %s", tc.row, tc.row.State, tc.want)
+		}
+	}
+}
+
+func TestTheGroupSwitchesAreReadAndWrittenAsTheWebDoes(t *testing.T) {
+	r := &recorded{}
+	svc := New(r, nil)
+	groups, err := svc.WatchedGroups(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !groups.Watched(AddressProton) || groups.Watched(AddressAlias) || !groups.Watched(AddressCustom) || !groups.Paid {
+		t.Errorf("groups = %+v", groups)
+	}
+	for kind, want := range map[string]string{AddressProton: "map[ProtonAddress:true]", AddressAlias: "map[Aliases:true]"} {
+		r.sent = nil
+		if err := svc.WatchGroup(t.Context(), kind, true); err != nil {
+			t.Fatal(err)
+		}
+		if got := r.sent[0]; got.Method != "PUT" || got.Path != "/pass/v1/user/monitor" || fmt.Sprint(got.Body) != want {
+			t.Errorf("%s sent %s %s %v, want %s", kind, got.Method, got.Path, got.Body, want)
+		}
+	}
+}
+
+func TestResolvingAsksAtTheAddressesOwnPath(t *testing.T) {
+	r := &recorded{}
+	svc := New(r, nil)
+	for _, tc := range []struct {
+		address MonitoredAddress
+		want    string
+	}{
+		{MonitoredAddress{Type: AddressProton, AddressID: "addr"}, "POST /pass/v1/breach/address/addr/resolved"},
+		{MonitoredAddress{Type: AddressCustom, AddressID: "custom"}, "PUT /pass/v1/breach/custom_email/custom/resolved"},
+		{MonitoredAddress{Type: AddressAlias, shareID: "s", itemID: "i"}, "POST /pass/v1/share/s/alias/i/breaches/resolved"},
+	} {
+		r.sent = nil
+		if err := svc.ResolveBreaches(t.Context(), tc.address); err != nil {
+			t.Fatal(err)
+		}
+		if got := r.sent[0].Method + " " + r.sent[0].Path; got != tc.want {
+			t.Errorf("sent %s, want %s", got, tc.want)
+		}
+	}
+}

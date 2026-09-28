@@ -25,6 +25,29 @@ import (
 // rather than as a hundred unrelated fragments.
 var examples = map[string][]string{
 	// ── account ──
+	"proton account breaches list": {
+		"proton account breaches list",
+		"proton account breaches list --output json",
+	},
+	"proton account breaches get": {"proton account breaches get Canva"},
+	"proton account breaches resolve": {
+		"proton account breaches resolve Canva",
+		"proton account breaches resolve 7Hq2Lm9x Pz81Kd0a",
+	},
+	"proton account breaches reopen": {"proton account breaches reopen Canva"},
+	"proton account breaches enable": {
+		"proton account breaches enable",
+		"proton account breaches enable --emails",
+	},
+	"proton account breaches disable": {
+		"proton account breaches disable",
+		"proton account breaches disable --emails",
+	},
+	"proton account delete": {
+		"proton account delete --reason other-service --message 'Moving everything to one provider'",
+		"proton account delete --reason merge",
+		"proton account delete --reason other --message 'Checking the preview' --dry-run",
+	},
 	"proton account get": {
 		"proton account get",
 		"proton account get --output json",
@@ -133,6 +156,14 @@ var examples = map[string][]string{
 	"proton account settings emergency-access grant":   {"proton account settings emergency-access grant 7Kd2p1Qa --password-file /run/secrets/proton"},
 	"proton account settings emergency-access cancel":  {"proton account settings emergency-access cancel 7Kd2p1Qa"},
 	"proton account settings emergency-access remove":  {"proton account settings emergency-access remove 7Kd2p1Qa"},
+	"proton account settings notifications list":       {"proton account settings notifications list"},
+	"proton account settings notifications enable": {
+		"proton account settings notifications enable newsletter",
+	},
+	"proton account settings notifications disable": {
+		"proton account settings notifications disable offers newsletter",
+		"proton account settings notifications disable in-app",
+	},
 	"proton account settings password set": {
 		"proton account settings password set",
 		"proton account settings password set --password-file /run/secrets/proton --new-password-file /run/secrets/proton-new",
@@ -172,7 +203,16 @@ var examples = map[string][]string{
 		"proton account settings recovery-phrase set --output json",
 	},
 	"proton account settings recovery-phrase disable": {"proton account settings recovery-phrase disable"},
-	"proton account settings second-password get":     {"proton account settings second-password get"},
+	"proton account settings sentinel get":            {"proton account settings sentinel get"},
+	"proton account settings sentinel enable": {
+		"proton account settings sentinel enable",
+		"proton account settings sentinel enable --emails",
+	},
+	"proton account settings sentinel disable": {
+		"proton account settings sentinel disable",
+		"proton account settings sentinel disable --emails",
+	},
+	"proton account settings second-password get": {"proton account settings second-password get"},
 	"proton account settings second-password enable": {
 		"proton account settings second-password enable",
 		"proton account settings second-password enable --password-file /run/secrets/proton --new-password-file /run/secrets/proton-second",
@@ -881,6 +921,7 @@ var examples = map[string][]string{
 		"proton mail settings set pm-signature off",
 		"proton mail settings set view-mode conversations",
 		"proton mail settings set font-face georgia",
+		"proton mail settings set daily-notifications on",
 	},
 	"proton mail settings categories list": {"proton mail settings categories list"},
 	"proton mail settings categories enable": {
@@ -1176,6 +1217,7 @@ var examples = map[string][]string{
 	},
 	"proton pass breaches list": {
 		"proton pass breaches list",
+		"proton pass breaches list --type alias",
 	},
 	"proton pass breaches get": {
 		"proton pass breaches get jane@proton.me",
@@ -1194,9 +1236,14 @@ var examples = map[string][]string{
 	},
 	"proton pass breaches enable": {
 		"proton pass breaches enable jane@proton.me",
+		"proton pass breaches enable --type alias",
 	},
 	"proton pass breaches disable": {
 		"proton pass breaches disable jane@proton.me",
+		"proton pass breaches disable --type alias",
+	},
+	"proton pass breaches resolve": {
+		"proton pass breaches resolve jane@proton.me",
 	},
 	"proton pass export": {
 		"proton pass export --dest pass-backup.zip --passphrase-file ~/.backup-passphrase",

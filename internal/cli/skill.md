@@ -91,6 +91,8 @@ Secrets go in the same way they come out. `pass items create` and `pass items up
 
 `{{.Program}} account settings security-keys create` cannot be run on somebody's behalf whatever it is handed: it waits for a person to touch the key in front of them.
 
+`{{.Program}} account delete` deletes the account and everything in it, and nothing brings it back. It is the user's to run; `--dry-run` shows what it would do.
+
 ## Exit codes
 
 | Code | What happened | What to do |

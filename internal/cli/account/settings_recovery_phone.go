@@ -176,7 +176,7 @@ func recoveryPhoneEnableCmd() *cobra.Command {
 			switch {
 			case security.RecoveryPhone.Number == "":
 				return refuseNoRecoveryPhone()
-			case security.Sentinel:
+			case security.Sentinel.On:
 				return refuseSentinel()
 			case security.RecoveryPhone.AllowRecovery:
 				return kit.Fail("Password resets by SMS are already allowed.")

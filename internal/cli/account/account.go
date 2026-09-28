@@ -26,8 +26,8 @@ func New() *cobra.Command {
 		Use:   "account",
 		Short: "Your Proton account, its settings and your session",
 	}
-	c.AddCommand(getCmd(), keysCmd(), loginCmd(), logoutCmd(), profilesCmd(),
-		securityLogCmd(), sessionsCmd(), settingsCmd())
+	c.AddCommand(breachesCmd(), deleteCmd(), getCmd(), keysCmd(), loginCmd(), logoutCmd(),
+		profilesCmd(), securityLogCmd(), sessionsCmd(), settingsCmd())
 	return c
 }
 
@@ -79,6 +79,7 @@ func getCmd() *cobra.Command {
 				Object: st,
 				Fields: []ui.Field{
 					{Label: "Email", Value: acct.Email},
+					{Label: "Username", Value: acct.Username},
 					{Label: "Name", Value: acct.DisplayName},
 					{Label: "Storage", Value: storage(acct.UsedSpace, acct.MaxSpace)},
 					{Label: "Max Upload", Value: units.Size(acct.MaxUpload)},

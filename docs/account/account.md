@@ -4,7 +4,34 @@ Your Proton account, its settings and your session.
 
 Every command under `proton account`, with the arguments and flags it takes. For these commands in use, see [the account guide](README.md).
 
-Holds `get`, `keys`, `login`, `logout`, `profiles`, `security-log`, `sessions` and `settings`.
+Holds `breaches`, `delete`, `get`, `keys`, `login`, `logout`, `profiles`, `security-log`, `sessions` and `settings`.
+
+## `delete`
+
+Delete the account and everything in it: every address, message, contact, event, file and password. It cannot be reactivated.
+
+Proton may refuse before anything is asked. Otherwise you confirm, then give your password. A member of a family or duo plan leaves the plan first.
+
+--message says in at least ten characters why you are leaving, and is left out with --reason merge. It reaches the people who improve Proton, not support.
+
+Afterwards this machine keeps nothing of the account: the profile's session, index and short-ID cache are removed.
+
+```
+proton account delete
+```
+
+```bash
+proton account delete --reason other-service --message 'Moving everything to one provider'
+proton account delete --reason merge
+proton account delete --reason other --message 'Checking the preview' --dry-run
+```
+
+| Flag | Description |
+| --- | --- |
+| `--message string` | Why you are leaving, in at least ten characters |
+| `--password-file string` | Read the account password from a file, or - for stdin |
+| `--reason string` | The main reason you are leaving: different-account, too-expensive, missing-feature, other-service, merge, other |
+| `--totp string` | Two-factor code |
 
 ## `get`
 

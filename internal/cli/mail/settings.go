@@ -1,10 +1,13 @@
 package mail
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/roman-16/proton-cli/internal/cli/kit"
+	"github.com/roman-16/proton-cli/internal/fetch"
 	"github.com/roman-16/proton-cli/internal/proton"
+	acctsvc "github.com/roman-16/proton-cli/internal/service/account"
 	mailsvc "github.com/roman-16/proton-cli/internal/service/mail"
 	"github.com/roman-16/proton-cli/internal/ui"
 	"github.com/spf13/cobra"
@@ -65,6 +68,11 @@ var specs = map[string]kit.Setting{
 	"confirm-link": {
 		Path: settingsPath + "/confirmlink", Field: "ConfirmLink",
 		Page: pageComposing, Desc: "Confirm before opening an external link", Enum: kit.OnOffNumbers(),
+	},
+	"daily-notifications": {
+		Path: "/core/v4/settings/news", Field: "NewEmailNotif", Method: "PATCH",
+		Page: pageComposing, Desc: "Email your recovery address when new mail arrives",
+		Enum: kit.OnOffBooleans(), Guard: dailyNeedsRecoveryEmail,
 	},
 	"delay-send": {
 		Path: settingsPath + "/delaysend", Field: "DelaySendSeconds",
@@ -227,6 +235,7 @@ type settingsView struct {
 	CategoryViewCounters    string `json:"category_view_counters"`
 	ComposerMode            string `json:"composer_mode"`
 	ConfirmLink             string `json:"confirm_link"`
+	DailyNotifications      string `json:"daily_notifications"`
 	DelaySend               string `json:"delay_send"`
 	DraftType               string `json:"draft_type"`
 	FontFace                string `json:"font_face"`
@@ -371,6 +380,7 @@ func (v settingsView) fields() []ui.Field {
 		{Label: "Category View Counters", Value: v.CategoryViewCounters, Always: true},
 		{Label: "Composer Mode", Value: v.ComposerMode, Always: true},
 		{Label: "Confirm Link", Value: v.ConfirmLink, Always: true},
+		{Label: "Daily Notifications", Value: v.DailyNotifications, Always: true},
 		{Label: "Delay Send", Value: v.DelaySend, Always: true},
 		{Label: "Draft Type", Value: v.DraftType, Always: true},
 		{Label: "Font Face", Value: v.FontFace, Always: true},
@@ -395,20 +405,44 @@ func (v settingsView) fields() []ui.Field {
 
 func settingsCmd() *cobra.Command {
 	c := kit.Settings("mail", "How Mail behaves", specs, settingsView{}, func(c *kit.Invocation) error {
-		resp, err := c.App.API.Do(c.Ctx, proton.Request{Method: "GET", Path: settingsPath})
-		if err != nil {
-			return err
-		}
-		var env struct{ MailSettings storedSettings }
-		if err := json.Unmarshal(resp.Body, &env); err != nil {
+		var (
+			env  struct{ MailSettings storedSettings }
+			news acctsvc.News
+		)
+		if err := fetch.Together(c.Ctx,
+			func(ctx context.Context) error {
+				return c.App.API.Decode(ctx, proton.Request{Method: "GET", Path: settingsPath}, &env)
+			},
+			func(ctx context.Context) error {
+				var err error
+				news, err = c.App.Account.News(ctx)
+				return err
+			},
+		); err != nil {
 			return err
 		}
 		view := env.MailSettings.view()
+		view.DailyNotifications = kit.OnOffText(boolInt(news.DailyMail()))
 		return kit.Show(c, ui.RecordSpec{Object: view, Fields: view.fields()})
 	})
 	c.AddCommand(addressesCmd(), categoriesCmd(), domainsCmd(), foldersCmd(), importsCmd(), labelsCmd(),
 		filtersCmd(), autoreplyCmd(), forwardingCmd(), sendersCmd(), smtpTokensCmd())
 	return c
+}
+
+func dailyNeedsRecoveryEmail(c *kit.Invocation, choice kit.Choice) error {
+	if on, _ := choice.Value.(bool); !on {
+		return nil
+	}
+	news, err := c.App.Account.News(c.Ctx)
+	if err != nil {
+		return err
+	}
+	if news.RecoveryEmail != "" {
+		return nil
+	}
+	return kit.Fail("Daily notifications go to your recovery email, and this account has none.").
+		Hint(kit.Program + " account settings recovery-email set EMAIL")
 }
 
 func secondsText(n int) string {

@@ -10,9 +10,16 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 
 | Command | What it does |
 | --- | --- |
+| [`proton account delete`](../account/account.md#delete) | Delete the account and everything in it |
 | [`proton account get`](../account/account.md#get) | Show the account, its storage and this machine's session |
 | [`proton account login`](../account/account.md#login) | Sign in and save the session for this profile |
 | [`proton account logout`](../account/account.md#logout) | Discard the saved session for this profile |
+| [`proton account breaches disable`](../account/breaches.md#disable) | Turn Dark Web Monitoring off |
+| [`proton account breaches enable`](../account/breaches.md#enable) | Turn Dark Web Monitoring on |
+| [`proton account breaches get`](../account/breaches.md#get) | Show one breach, and what it exposed |
+| [`proton account breaches list`](../account/breaches.md#list) | List the breaches Proton found your addresses in |
+| [`proton account breaches reopen`](../account/breaches.md#reopen) | Mark resolved breaches as open again |
+| [`proton account breaches resolve`](../account/breaches.md#resolve) | Mark breaches as resolved |
 | [`proton account keys create`](../account/keys.md#create) | Generate a key for an address |
 | [`proton account keys delete`](../account/keys.md#delete) | Delete keys of an address |
 | [`proton account keys export`](../account/keys.md#export) | Write keys out to files |
@@ -42,6 +49,9 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton account settings emergency-access update`](../account/settings.md#emergency-access-update) | Change how long an emergency contact waits |
 | [`proton account settings get`](../account/settings.md#get) | Show the account settings now in effect |
 | [`proton account settings list`](../account/settings.md#list) | List the account settings that can be changed |
+| [`proton account settings notifications disable`](../account/settings.md#notifications-disable) | Stop emails or notices Proton sends you |
+| [`proton account settings notifications enable`](../account/settings.md#notifications-enable) | Have Proton send you emails or notices |
+| [`proton account settings notifications list`](../account/settings.md#notifications-list) | List what Proton sends you, and what is on |
 | [`proton account settings password set`](../account/settings.md#password-set) | Change your password |
 | [`proton account settings recovery-contacts add`](../account/settings.md#recovery-contacts-add) | Let somebody help you recover your account |
 | [`proton account settings recovery-contacts get`](../account/settings.md#recovery-contacts-get) | Show one recovery contact |
@@ -68,6 +78,9 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton account settings security-keys delete`](../account/settings.md#security-keys-delete) | Remove a security key from the account |
 | [`proton account settings security-keys list`](../account/settings.md#security-keys-list) | List the security keys registered with the account |
 | [`proton account settings security-keys update`](../account/settings.md#security-keys-update) | Rename a security key |
+| [`proton account settings sentinel disable`](../account/settings.md#sentinel-disable) | Turn Proton Sentinel off |
+| [`proton account settings sentinel enable`](../account/settings.md#sentinel-enable) | Turn Proton Sentinel on |
+| [`proton account settings sentinel get`](../account/settings.md#sentinel-get) | Show whether Proton Sentinel is on |
 | [`proton account settings set`](../account/settings.md#set) | Change one account setting |
 | [`proton account settings two-factor disable`](../account/settings.md#two-factor-disable) | Stop asking for an authenticator app code |
 | [`proton account settings two-factor enable`](../account/settings.md#two-factor-enable) | Ask for an authenticator app code at every sign-in |
@@ -352,6 +365,7 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton pass breaches get`](../pass/breaches.md#get) | Show the breaches one address has appeared in |
 | [`proton pass breaches list`](../pass/breaches.md#list) | List the addresses Proton watches, and how many breaches each is in |
 | [`proton pass breaches resend`](../pass/breaches.md#resend) | Send the confirmation code again |
+| [`proton pass breaches resolve`](../pass/breaches.md#resolve) | Mark an address's current breaches as resolved |
 | [`proton pass breaches verify`](../pass/breaches.md#verify) | Confirm an address with the code Proton emailed it |
 | [`proton pass invitations accept`](../pass/invitations.md#accept) | Take what somebody offered you |
 | [`proton pass invitations decline`](../pass/invitations.md#decline) | Turn down what somebody offered you |

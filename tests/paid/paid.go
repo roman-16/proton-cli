@@ -58,6 +58,9 @@ type Restriction struct {
 // Restrictions are the commands the paid account refuses.
 func Restrictions() []Restriction {
 	return []Restriction{{
+		Command: []string{"account", "delete"},
+		Why:     "it deletes somebody's account and everything in it, and nothing brings it back",
+	}, {
 		Command: []string{"account", "keys", "create"},
 		Why: "it makes a new key what somebody's address encrypts to and signs with, on every" +
 			" device they have",
@@ -259,7 +262,8 @@ func aimedAtOurs(rest []string) bool {
 }
 
 // Notices are the subjects Proton writes to the account about, unprompted, when
-// a test shares something and the other side answers.
+// a test shares something and the other side answers, or turns Proton Sentinel
+// on for the first time.
 //
 // Nothing on this end turns them off, so a run sweeps its own: mail from one of
 // NoticeSenders carrying one of these subjects that arrived after the run began
@@ -273,17 +277,19 @@ func Notices() []string {
 		"shared a calendar with you",
 		"Forwarding active",
 		"Forwarding request declined",
+		"Welcome to the Proton Sentinel program",
 	}
 }
 
 // NoticeSenders are the addresses Proton writes those from.
 //
 // There is more than one: sharing writes from the account's own no-reply
-// address, and forwarding writes from Mail's. A sweep that knew only the first
+// address, forwarding writes from Mail's, and Proton Sentinel welcomes the
+// account from the notification address. A sweep that knew only the first
 // left the second sitting in somebody's inbox, which the photograph then
 // reported as something the run had left behind.
 func NoticeSenders() []string {
-	return []string{"no-reply@proton.me", "no-reply@mail.proton.me"}
+	return []string{"no-reply@proton.me", "no-reply@mail.proton.me", "no-reply@notify.proton.me"}
 }
 
 // A Photograph is what the account held, as one line per thing, by collection.

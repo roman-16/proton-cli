@@ -51,7 +51,8 @@ func TestSecurityReadsWhatTheAccountIsProtectedWith(t *testing.T) {
 		"Phone": {"Value": "+43 660 1234567", "Status": 0, "Reset": 0},
 		"Password": {"Mode": 2},
 		"Mnemonic": {"UpdateTime": 1776000000},
-		"HighSecurity": {"Value": 1},
+		"HighSecurity": {"Eligible": 1, "Value": 1, "SummaryEmail": 0},
+		"BreachAlerts": {"Eligible": 1, "Value": 1, "EmailNotifications": 1},
 		"2FA": {"Enabled": 3, "RegisteredKeys": [{"Name": "the yubikey", "CredentialID": [255, 239, 191]}]}
 	}`, `{"MnemonicStatus": 3}`)
 
@@ -63,14 +64,56 @@ func TestSecurityReadsWhatTheAccountIsProtectedWith(t *testing.T) {
 		TwoFactor: TwoFactor{AuthenticatorApp: true, SecurityKeys: []SecurityKey{
 			{ID: "_--_", Name: "the yubikey"},
 		}},
-		TwoPasswordMode: true,
-		RecoveryEmail:   RecoveryEmail{Address: "jane.roe@example.com", Verified: true, AllowRecovery: true},
-		RecoveryPhone:   RecoveryPhone{Number: "+43 660 1234567"},
-		RecoveryPhrase:  RecoveryPhrase{Status: PhraseOn, Changed: 1776000000},
-		Sentinel:        true,
+		TwoPasswordMode:   true,
+		RecoveryEmail:     RecoveryEmail{Address: "jane.roe@example.com", Verified: true, AllowRecovery: true},
+		RecoveryPhone:     RecoveryPhone{Number: "+43 660 1234567"},
+		RecoveryPhrase:    RecoveryPhrase{Status: PhraseOn, Changed: 1776000000},
+		Sentinel:          Sentinel{Eligible: true, On: true},
+		DarkWebMonitoring: DarkWebMonitoring{Eligible: true, On: true, Emails: true},
 	}
 	if fmt.Sprint(*got) != fmt.Sprint(want) {
 		t.Errorf("read\n  %v\nwant\n  %v", *got, want)
+	}
+}
+
+func TestSentinelIsTheOrganizationsOnlyWhereItsPolicyIsEnforced(t *testing.T) {
+	for _, tc := range []struct {
+		enforced, org int
+		want          Sentinel
+		asked         bool
+	}{
+		{enforced: 0, org: 1, want: Sentinel{Eligible: true}},
+		{enforced: 1, org: 0, want: Sentinel{Eligible: true}, asked: true},
+		{enforced: 1, org: 1, want: Sentinel{Eligible: true, On: true, Enforced: true}, asked: true},
+	} {
+		a := serving(fmt.Sprintf(`{"HighSecurity": {"Eligible": 1, "Value": 0},
+			"OrganizationPolicy": {"Enforced": %d}}`, tc.enforced), `{}`)
+		a.body["GET /core/v4/organizations/settings"] = json.RawMessage(fmt.Sprintf(`{"HighSecurity": %d}`, tc.org))
+		got, err := New(a, nil).Security(context.Background())
+		if err != nil {
+			t.Fatalf("Security: %v", err)
+		}
+		if got.Sentinel != tc.want {
+			t.Errorf("enforced %d, organization %d: Sentinel = %+v, want %+v", tc.enforced, tc.org, got.Sentinel, tc.want)
+		}
+		asked := false
+		for _, r := range a.sent {
+			asked = asked || r.Path == "/core/v4/organizations/settings"
+		}
+		if asked != tc.asked {
+			t.Errorf("enforced %d: asked the organization = %v, want %v", tc.enforced, asked, tc.asked)
+		}
+	}
+}
+
+func TestDarkWebMonitoringIsOffWithoutThePlanForIt(t *testing.T) {
+	a := serving(`{"BreachAlerts": {"Eligible": 0, "Value": 1, "EmailNotifications": 1}}`, `{}`)
+	got, err := New(a, nil).Security(context.Background())
+	if err != nil {
+		t.Fatalf("Security: %v", err)
+	}
+	if want := (DarkWebMonitoring{Emails: true}); got.DarkWebMonitoring != want {
+		t.Errorf("DarkWebMonitoring = %+v, want %+v", got.DarkWebMonitoring, want)
 	}
 }
 

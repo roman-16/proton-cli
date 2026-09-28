@@ -4,7 +4,7 @@ Account-wide preferences.
 
 Every command under `proton account settings`, with the arguments and flags it takes. For these commands in use, see [the account guide](README.md).
 
-Holds `emergency-access`, `get`, `list`, `password`, `recovery-contacts`, `recovery-email`, `recovery-phone`, `recovery-phrase`, `second-password`, `security-keys`, `set` and `two-factor`.
+Holds `emergency-access`, `get`, `list`, `notifications`, `password`, `recovery-contacts`, `recovery-email`, `recovery-phone`, `recovery-phrase`, `second-password`, `security-keys`, `sentinel`, `set` and `two-factor`.
 
 ## `emergency-access`
 
@@ -204,6 +204,56 @@ proton account settings list
 ```bash
 proton account settings list
 ```
+
+## `notifications`
+
+The emails and in-app notices Proton sends you.
+
+Critical account notifications are sent whatever is off here. The daily email about new mail is a Mail setting: `proton mail settings set daily-notifications`.
+
+Holds `disable`, `enable` and `list`.
+
+### `notifications disable`
+
+Stop emails or notices Proton sends you.
+
+```
+proton account settings notifications disable REF...
+```
+
+```bash
+proton account settings notifications disable offers newsletter
+proton account settings notifications disable in-app
+```
+
+### `notifications enable`
+
+Have Proton send you emails or notices.
+
+```
+proton account settings notifications enable REF...
+```
+
+```bash
+proton account settings notifications enable newsletter
+```
+
+### `notifications list`
+
+List what Proton sends you, and what is on.
+
+```
+proton account settings notifications list
+```
+
+```bash
+proton account settings notifications list
+```
+
+| Flag | Description |
+| --- | --- |
+| `--limit int` | How many notifications per page; 0 for all of them |
+| `--page int` | Which page of results, counting from zero |
 
 ## `password`
 
@@ -760,6 +810,64 @@ proton account settings security-keys update "Spare key" --name "Key in the safe
 | Flag | Description |
 | --- | --- |
 | `--name string` | New name for the security key |
+
+## `sentinel`
+
+Proton Sentinel, the heightened protection for your account.
+
+It needs a plan that includes it. While it is on, Proton chooses which recovery methods the account may use. An organization that turns it on for its members decides it for them.
+
+Holds `disable`, `enable` and `get`.
+
+### `sentinel disable`
+
+Turn Proton Sentinel off.
+
+--emails stops only the emails it sends, and leaves it on.
+
+```
+proton account settings sentinel disable
+```
+
+```bash
+proton account settings sentinel disable
+proton account settings sentinel disable --emails
+```
+
+| Flag | Description |
+| --- | --- |
+| `--emails` | Only the emails it sends |
+
+### `sentinel enable`
+
+Turn Proton Sentinel on.
+
+--emails turns on the emails it sends about what it finds as well, and turns it on first if it was off.
+
+```
+proton account settings sentinel enable
+```
+
+```bash
+proton account settings sentinel enable
+proton account settings sentinel enable --emails
+```
+
+| Flag | Description |
+| --- | --- |
+| `--emails` | Also the emails it sends |
+
+### `sentinel get`
+
+Show whether Proton Sentinel is on.
+
+```
+proton account settings sentinel get
+```
+
+```bash
+proton account settings sentinel get
+```
 
 ## `set`
 
