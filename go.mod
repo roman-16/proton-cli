@@ -8,7 +8,7 @@ require (
 	github.com/ProtonMail/go-srp v0.0.7
 	github.com/ProtonMail/gopenpgp/v3 v3.4.1-proton
 	github.com/fxamacker/cbor/v2 v2.9.4
-	github.com/go-ctap/ctaphid v0.10.0
+	github.com/go-ctap/ctaphid v0.8.1
 	github.com/go-ctap/winhello v0.1.0
 	github.com/goccy/go-yaml v1.19.2
 	github.com/minio/selfupdate v0.6.0
