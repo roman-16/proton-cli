@@ -111,6 +111,10 @@ _checkout name url dir:
 [doc("Clone or update the Proton checkouts that openapi.yaml and the reference reading come from")]
 sources: (_checkout "Drive SDK" "https://github.com/ProtonDriveApps/sdk.git" driveSdk) (_checkout "WebClients" "https://github.com/ProtonMail/WebClients.git" webClients)
 
+[doc("Rewrite the link-cleaning rules and their parity cases from the TidyURL release WebClients pins")]
+tidyurl: sources
+    cd scripts && bun install --frozen-lockfile && bun tidyurl/index.ts {{ webClients }}
+
 [doc("Rewrite the list of domains that offer a two-factor code, from 2fa.directory")]
 twofa:
     go run ./scripts/twofa

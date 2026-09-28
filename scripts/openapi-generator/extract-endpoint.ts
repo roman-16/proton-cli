@@ -1,7 +1,13 @@
-import { SyntaxKind, Node, type ArrowFunction, type FunctionDeclaration } from "ts-morph";
+import {
+  SyntaxKind,
+  Node,
+  type ArrowFunction,
+  type FunctionDeclaration,
+  type Symbol as TsSymbol,
+  type Type,
+} from "ts-morph";
 import type { Endpoint } from "./types.js";
-import { STRING_CONSTANTS, NUMBER_CONSTANTS } from "./registry.js";
-import { findArrowFunction, extractDataParams, extractQueryParams } from "./extract-params.js";
+import { findArrowFunction, extractDataParams, typeToProperties } from "./extract-params.js";
 
 /**
  * Extract an endpoint from an arrow function variable declaration.
@@ -66,7 +72,7 @@ function buildEndpoint(name: string, obj: Node, fnNode: Node, declNode: Node): E
   let method: string | null = null;
   let hasBody = false;
   let hasParams = false;
-  let paramsObj: Node | null = null;
+  let paramsType: Type | null = null;
   let inputType = "";
   let outputType = "";
   let timeout = "";
@@ -78,12 +84,11 @@ function buildEndpoint(name: string, obj: Node, fnNode: Node, declNode: Node): E
     if (Node.isShorthandPropertyAssignment(prop)) {
       const propName = prop.getName();
       if (propName === "data") hasBody = true;
-      if (propName === "params") hasParams = true;
-      if (propName === "url") {
-        const local = prop.getValueSymbol()?.getValueDeclaration();
-        const init = local && Node.isVariableDeclaration(local) ? local.getInitializer() : undefined;
-        if (init) url = resolveStringValue(init);
+      if (propName === "params") {
+        hasParams = true;
+        paramsType = prop.getType();
       }
+      if (propName === "url") url = resolveDeclaredString(prop.getValueSymbol());
       continue;
     }
     if (Node.isSpreadAssignment(prop)) continue;
@@ -105,7 +110,7 @@ function buildEndpoint(name: string, obj: Node, fnNode: Node, declNode: Node): E
         break;
       case "params":
         hasParams = true;
-        paramsObj = init;
+        paramsType = init.getType();
         break;
       case "input":
         inputType = resolveStringValue(init) ?? "";
@@ -144,7 +149,7 @@ function buildEndpoint(name: string, obj: Node, fnNode: Node, declNode: Node): E
     hasDeprecatedTag(fnNode, declNode);
 
   const bodyParams = hasBody ? extractDataParams(fnNode) : [];
-  const queryParams = hasParams && paramsObj ? extractQueryParams(paramsObj) : [];
+  const queryParams = hasParams && paramsType ? typeToProperties(paramsType) : [];
 
   return {
     name,
@@ -170,6 +175,7 @@ function buildEndpoint(name: string, obj: Node, fnNode: Node, declNode: Node): E
 
 function resolveStringValue(node: Node): string | null {
   if (Node.isStringLiteral(node)) return node.getLiteralText();
+  if (Node.isIdentifier(node)) return resolveDeclaredString(node.getSymbol());
   if (Node.isNoSubstitutionTemplateLiteral(node)) return node.getLiteralText();
 
   if (Node.isTemplateExpression(node)) {
@@ -177,8 +183,7 @@ function resolveStringValue(node: Node): string | null {
     for (const span of node.getTemplateSpans()) {
       const expr = span.getExpression();
       if (Node.isIdentifier(expr)) {
-        const val = STRING_CONSTANTS.get(expr.getText());
-        result += val ?? `{${expr.getText()}}`;
+        result += resolveDeclaredString(expr.getSymbol()) ?? `{${expr.getText()}}`;
       } else {
         result += `{${expr.getText()}}`;
       }
@@ -190,15 +195,24 @@ function resolveStringValue(node: Node): string | null {
   return null;
 }
 
+// resolveDeclaredString is the string a name was declared as, followed through
+// an import to wherever it is declared.
+function resolveDeclaredString(symbol: TsSymbol | undefined): string | null {
+  const target = symbol?.isAlias() ? symbol.getAliasedSymbol() : symbol;
+  const decl = target?.getValueDeclaration();
+  const init = decl && Node.isVariableDeclaration(decl) ? decl.getInitializer() : undefined;
+  return init ? resolveStringValue(init) : null;
+}
+
 function resolveConstantValue(node: Node): string {
   if (Node.isNumericLiteral(node)) return node.getLiteralText();
   if (Node.isIdentifier(node)) {
-    const name = node.getText();
-    const num = NUMBER_CONSTANTS.get(name);
-    if (num !== undefined) return String(num);
-    const str = STRING_CONSTANTS.get(name);
-    if (str) return str;
-    return name;
+    let symbol = node.getSymbol();
+    if (symbol?.isAlias()) symbol = symbol.getAliasedSymbol();
+    const decl = symbol?.getValueDeclaration();
+    const init = decl && Node.isVariableDeclaration(decl) ? decl.getInitializer() : undefined;
+    if (init && Node.isNumericLiteral(init)) return init.getLiteralText();
+    return resolveDeclaredString(symbol) || node.getText();
   }
   return node.getText();
 }

@@ -1522,7 +1522,11 @@ var layers = map[string][]string{
 	"inflect":  {},
 	"units":    {},
 	"progress": {},
-	"mailtext": {},
+	// mailtext reaches tidyurl for the links a body carries: taking the tracking
+	// out of them is one more transform of the body, and tidyurl knows nothing
+	// about mail.
+	"mailtext": {"tidyurl"},
+	"tidyurl":  {},
 	// redact reaches ref for the reason ui does: it decides which part of an API
 	// path names a thing rather than an endpoint, and what a Proton ID looks like
 	// is declared where references are read and written. A rule of thumb here

@@ -11,6 +11,7 @@ import (
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
 	"github.com/roman-16/proton-cli/internal/account/keys"
 	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
+	"github.com/roman-16/proton-cli/internal/mailtext"
 	"github.com/roman-16/proton-cli/internal/proton"
 	"github.com/roman-16/proton-cli/internal/ref"
 	"github.com/roman-16/proton-cli/internal/search"
@@ -95,8 +96,6 @@ type Service struct {
 	keyMu      sync.Mutex
 	senderKeys map[string]*keys.Signers
 
-	// Mail settings are read once per run, for the outgoing signature's Proton
-	// footer. See signature.go.
 	settingsOnce  sync.Once
 	settingsCache mailSettings
 	settingsErr   error
@@ -192,6 +191,15 @@ type Full struct {
 	ReceiptRequested bool `json:"receipt_requested,omitempty"`
 	ReceiptSent      bool `json:"receipt_sent,omitempty"`
 	ReceiptDue       bool `json:"receipt_due,omitempty"`
+
+	LinksCleaned int `json:"links_cleaned,omitempty"`
+}
+
+// BlockTracking takes the tracking out of the message's links, as reading it
+// with Block email tracking on does.
+func (f *Full) BlockTracking() {
+	body, links := mailtext.CleanLinks(f.Body, mailtext.IsHTML(f.MIMEType))
+	f.Body, f.LinksCleaned = body, len(links)
 }
 
 // Flagged reports whether Proton thinks this message is not what it says it is.

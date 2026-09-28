@@ -22,11 +22,6 @@ const (
 )
 
 const (
-	storeRemoteImages = 1
-	proxyRemoteImages = 2
-)
-
-const (
 	defaultFontFace = "Arial"
 	defaultFontSize = 14
 )
@@ -127,11 +122,11 @@ var specs = map[string]kit.Setting{
 		Page: pagePrivacy, Desc: "Block email tracking in remote images and links",
 		Enum: []kit.Choice{
 			{Name: "off", Value: 0, Bodies: []map[string]any{
-				{"ImageProxy": storeRemoteImages, "Action": 0},
-				{"ImageProxy": proxyRemoteImages, "Action": 0},
+				{"ImageProxy": mailsvc.StoreRemoteImages, "Action": 0},
+				{"ImageProxy": mailsvc.ProxyRemoteImages, "Action": 0},
 			}},
-			{Name: "on", Value: proxyRemoteImages, Bodies: []map[string]any{
-				{"ImageProxy": proxyRemoteImages, "Action": 1},
+			{Name: "on", Value: mailsvc.ProxyRemoteImages, Bodies: []map[string]any{
+				{"ImageProxy": mailsvc.ProxyRemoteImages, "Action": 1},
 			}},
 		},
 	},
@@ -301,7 +296,7 @@ func (m storedSettings) view() settingsView {
 	}
 	return settingsView{
 		HideRemoteImages:        toggle(m.HideRemoteImages),
-		ImageProxy:              toggle(kit.IntOf(m.ImageProxy) & proxyRemoteImages),
+		ImageProxy:              toggle(kit.IntOf(m.ImageProxy) & mailsvc.ProxyRemoteImages),
 		AttachPublicKey:         toggle(m.AttachPublicKey),
 		PGPScheme:               name("pgp-scheme", m.PGPScheme),
 		PromptPin:               toggle(m.PromptPin),

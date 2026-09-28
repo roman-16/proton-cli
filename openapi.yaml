@@ -512,6 +512,35 @@ paths:
       tags: [Account]
       summary: Get Organization Logs Download
       operationId: getOrganizationLogsDownload
+      parameters:
+        - name: Page
+          in: query
+          schema:
+            type: integer
+        - name: Event
+          in: query
+          schema:
+            type: string
+        - name: Email
+          in: query
+          schema:
+            type: string
+        - name: Ip
+          in: query
+          schema:
+            type: string
+        - name: StartTime
+          in: query
+          schema:
+            type: string
+        - name: EndTime
+          in: query
+          schema:
+            type: string
+        - name: Sort
+          in: query
+          schema:
+            type: string
       responses:
         "200":
           description: Success
@@ -524,6 +553,35 @@ paths:
       tags: [Account]
       summary: Get Pass Logs Download
       operationId: getPassLogsDownload
+      parameters:
+        - name: Page
+          in: query
+          schema:
+            type: integer
+        - name: Event
+          in: query
+          schema:
+            type: string
+        - name: Email
+          in: query
+          schema:
+            type: string
+        - name: Ip
+          in: query
+          schema:
+            type: string
+        - name: StartTime
+          in: query
+          schema:
+            type: string
+        - name: EndTime
+          in: query
+          schema:
+            type: string
+        - name: Sort
+          in: query
+          schema:
+            type: string
       responses:
         "200":
           description: Success
@@ -536,6 +594,35 @@ paths:
       tags: [Account]
       summary: Get VPN Log Download
       operationId: getVPNLogDownload
+      parameters:
+        - name: Page
+          in: query
+          schema:
+            type: integer
+        - name: Event
+          in: query
+          schema:
+            type: string
+        - name: Email
+          in: query
+          schema:
+            type: string
+        - name: Ip
+          in: query
+          schema:
+            type: string
+        - name: StartTime
+          in: query
+          schema:
+            type: string
+        - name: EndTime
+          in: query
+          schema:
+            type: string
+        - name: Sort
+          in: query
+          schema:
+            type: string
       responses:
         "200":
           description: Success
@@ -548,6 +635,35 @@ paths:
       tags: [Account]
       summary: Get Organization Logs
       operationId: getOrganizationLogs
+      parameters:
+        - name: Page
+          in: query
+          schema:
+            type: integer
+        - name: Event
+          in: query
+          schema:
+            type: string
+        - name: Email
+          in: query
+          schema:
+            type: string
+        - name: Ip
+          in: query
+          schema:
+            type: string
+        - name: StartTime
+          in: query
+          schema:
+            type: string
+        - name: EndTime
+          in: query
+          schema:
+            type: string
+        - name: Sort
+          in: query
+          schema:
+            type: string
       responses:
         "200":
           description: Success
@@ -572,6 +688,35 @@ paths:
       tags: [Account]
       summary: Get Pass Logs
       operationId: getPassLogs
+      parameters:
+        - name: Page
+          in: query
+          schema:
+            type: integer
+        - name: Event
+          in: query
+          schema:
+            type: string
+        - name: Email
+          in: query
+          schema:
+            type: string
+        - name: Ip
+          in: query
+          schema:
+            type: string
+        - name: StartTime
+          in: query
+          schema:
+            type: string
+        - name: EndTime
+          in: query
+          schema:
+            type: string
+        - name: Sort
+          in: query
+          schema:
+            type: string
       responses:
         "200":
           description: Success
@@ -596,6 +741,35 @@ paths:
       tags: [Account]
       summary: Get VPN Logs
       operationId: getVPNLogs
+      parameters:
+        - name: Page
+          in: query
+          schema:
+            type: integer
+        - name: Event
+          in: query
+          schema:
+            type: string
+        - name: Email
+          in: query
+          schema:
+            type: string
+        - name: Ip
+          in: query
+          schema:
+            type: string
+        - name: StartTime
+          in: query
+          schema:
+            type: string
+        - name: EndTime
+          in: query
+          schema:
+            type: string
+        - name: Sort
+          in: query
+          schema:
+            type: string
       responses:
         "200":
           description: Success
@@ -648,7 +822,7 @@ paths:
                 Products:
                   type: integer
                 Lifetime:
-                  type: string
+                  type: integer
                 Action:
                   type: integer
                 Scopes:
@@ -706,7 +880,7 @@ paths:
                 Products:
                   type: integer
                 Lifetime:
-                  type: string
+                  type: integer
                 Action:
                   type: integer
                 Scopes:
@@ -885,7 +1059,7 @@ paths:
         - name: Recent
           in: query
           schema:
-            type: string
+            type: boolean
       responses:
         "200":
           description: Success
@@ -958,9 +1132,10 @@ paths:
                 RequestedModel:
                   type: string
                 HasGeneratedImages:
-                  type: string
+                  type: boolean
                 ToolsUsed:
-                  type: string
+                  type: array
+                  items: {}
                 Platform:
                   type: string
                 NativeAppVersion:
@@ -968,11 +1143,11 @@ paths:
                 AppVersion:
                   type: string
                 PromptTokens:
-                  type: string
+                  type: integer
                 CompletionTokens:
-                  type: string
+                  type: integer
                 ShareWithApertus:
-                  type: string
+                  type: boolean
                 Component:
                   type: string
                 Body:
@@ -1293,7 +1468,7 @@ paths:
                 TwoFactorCode:
                   type: string
                 FIDO2:
-                  type: string
+                  type: object
       responses:
         "200":
           description: Success
@@ -1488,11 +1663,11 @@ paths:
         - name: OrderBy
           in: query
           schema:
-            type: string
+            type: integer
         - name: ReturnFlags
           in: query
           schema:
-            type: string
+            type: integer
       responses:
         "200":
           description: Success
@@ -1517,7 +1692,7 @@ paths:
                 - Display
               properties:
                 IsImport:
-                  type: string
+                  type: integer
                 AddressID:
                   type: string
                 Name:
@@ -1610,11 +1785,11 @@ paths:
         - name: Start
           in: query
           schema:
-            type: string
+            type: integer
         - name: End
           in: query
           schema:
-            type: string
+            type: integer
       responses:
         "200":
           description: Success
@@ -1636,7 +1811,7 @@ paths:
         - name: StartTime
           in: query
           schema:
-            type: string
+            type: integer
       responses:
         "200":
           description: Success
@@ -1793,6 +1968,27 @@ paths:
       tags: [Calendar]
       summary: Get Event By UID
       operationId: getEventByUID
+      parameters:
+        - name: UID
+          in: query
+          schema:
+            type: string
+        - name: RecurrenceID
+          in: query
+          schema:
+            type: integer
+        - name: CalendarType
+          in: query
+          schema:
+            type: integer
+        - name: Page
+          in: query
+          schema:
+            type: string
+        - name: PageSize
+          in: query
+          schema:
+            type: string
       responses:
         "200":
           description: Success
@@ -1939,6 +2135,18 @@ paths:
           required: true
           schema:
             type: string
+        - name: Start
+          in: query
+          schema:
+            type: integer
+        - name: End
+          in: query
+          schema:
+            type: integer
+        - name: PageSize
+          in: query
+          schema:
+            type: integer
       responses:
         "200":
           description: Success
@@ -1957,6 +2165,14 @@ paths:
           required: true
           schema:
             type: string
+        - name: Page
+          in: query
+          schema:
+            type: integer
+        - name: PageSize
+          in: query
+          schema:
+            type: integer
       responses:
         "200":
           description: Success
@@ -1993,6 +2209,14 @@ paths:
           required: true
           schema:
             type: string
+        - name: Limit
+          in: query
+          schema:
+            type: integer
+        - name: AfterID
+          in: query
+          schema:
+            type: string
       responses:
         "200":
           description: Success
@@ -2023,7 +2247,7 @@ paths:
                 MemberID:
                   type: string
                 IsImport:
-                  type: string
+                  type: integer
                 Events:
                   type: array
                   items: {}
@@ -2107,7 +2331,7 @@ paths:
         - name: Page
           in: query
           schema:
-            type: string
+            type: integer
       responses:
         "200":
           description: Success
@@ -2184,7 +2408,8 @@ paths:
                 - Color
               properties:
                 Notifications:
-                  type: string
+                  type: array
+                  items: {}
                 Color:
                   type: string
       responses:
@@ -2313,7 +2538,7 @@ paths:
                   type: array
                   items: {}
                 Priority:
-                  type: string
+                  type: integer
       responses:
         "200":
           description: Success
@@ -2941,6 +3166,35 @@ paths:
           required: true
           schema:
             type: string
+        - name: PageSize
+          in: query
+          schema:
+            type: integer
+          description: Min 0, Max 100. Defaults to 100
+        - name: Page
+          in: query
+          schema:
+            type: integer
+          description: 0 based index. Defaults to 0
+        - name: Type
+          in: query
+          schema:
+            type: integer
+        - name: Start
+          in: query
+          schema:
+            type: integer
+          description: Unix timestamp
+        - name: End
+          in: query
+          schema:
+            type: integer
+          description: Unix timestamp
+        - name: Timezone
+          in: query
+          schema:
+            type: string
+          description: "The timezone currently used on the calendar, will impact which events are returned: \"Timezone=Europe/Paris\""
       responses:
         "200":
           description: Success
@@ -3016,11 +3270,11 @@ paths:
         - name: Page
           in: query
           schema:
-            type: string
+            type: integer
         - name: PageSize
           in: query
           schema:
-            type: string
+            type: integer
         - name: LabelID
           in: query
           schema:
@@ -3051,11 +3305,11 @@ paths:
                 Overwrite:
                   type: integer
                 Import:
-                  type: string
+                  type: integer
                 Labels:
-                  type: string
+                  type: integer
                 timeout:
-                  type: string
+                  type: integer
       responses:
         "200":
           description: Success
@@ -3089,11 +3343,11 @@ paths:
         - name: Page
           in: query
           schema:
-            type: string
+            type: integer
         - name: PageSize
           in: query
           schema:
-            type: string
+            type: integer
         - name: Email
           in: query
           schema:
@@ -3188,11 +3442,11 @@ paths:
         - name: Page
           in: query
           schema:
-            type: string
+            type: integer
         - name: PageSize
           in: query
           schema:
-            type: string
+            type: integer
         - name: LabelID
           in: query
           schema:
@@ -3713,7 +3967,7 @@ paths:
                 RedirectURI:
                   type: string
                 Persistent:
-                  type: string
+                  type: boolean
       responses:
         "200":
           description: Success
@@ -3737,7 +3991,7 @@ paths:
                 intent:
                   type: string
                 isTesting:
-                  type: string
+                  type: boolean
                 reauthScope:
                   type: string
       responses:
@@ -3763,7 +4017,7 @@ paths:
                 Token:
                   type: object
                 ClientSecret:
-                  type: string
+                  type: object
       responses:
         "200":
           description: Success
@@ -3903,7 +4157,7 @@ paths:
         - name: Limit
           in: query
           schema:
-            type: string
+            type: integer
       responses:
         "200":
           description: Success
@@ -3992,6 +4246,10 @@ paths:
           required: true
           schema:
             type: string
+        - name: GroupID
+          in: query
+          schema:
+            type: string
       responses:
         "200":
           description: Success
@@ -4007,6 +4265,10 @@ paths:
         - name: jwt
           in: path
           required: true
+          schema:
+            type: string
+        - name: GroupID
+          in: query
           schema:
             type: string
       responses:
@@ -4404,12 +4666,62 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
+  /core/v4/images:
+    get:
+      tags: [Core]
+      summary: Get Image
+      operationId: getImage
+      parameters:
+        - name: Url
+          in: query
+          schema:
+            type: string
+        - name: DryRun
+          in: query
+          schema:
+            type: integer
+        - name: UID
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
   /core/v4/images/logo:
     get:
       tags: [Core]
       summary: Get Logo
       operationId: getLogo
       description: Get logo corresponding to address
+      parameters:
+        - name: Address
+          in: query
+          schema:
+            type: string
+        - name: Domain
+          in: query
+          schema:
+            type: string
+        - name: Size
+          in: query
+          schema:
+            type: integer
+        - name: BimiSelector
+          in: query
+          schema:
+            type: string
+        - name: Mode
+          in: query
+          schema:
+            type: string
+        - name: UID
+          in: query
+          schema:
+            type: string
       responses:
         "200":
           description: Success
@@ -4613,7 +4925,7 @@ paths:
                 ID:
                   type: string
                 SignedKeyList:
-                  type: string
+                  type: object
       responses:
         "200":
           description: Success
@@ -4626,6 +4938,15 @@ paths:
       tags: [Core]
       summary: Get All Public Keys
       operationId: getAllPublicKeys
+      parameters:
+        - name: Email
+          in: query
+          schema:
+            type: string
+        - name: InternalOnly
+          in: query
+          schema:
+            type: integer
       responses:
         "200":
           description: Success
@@ -4820,6 +5141,15 @@ paths:
       tags: [Core]
       summary: Get Signed Key Lists Route
       operationId: getSignedKeyListsRoute
+      parameters:
+        - name: AfterRevision
+          in: query
+          schema:
+            type: integer
+        - name: Identifier
+          in: query
+          schema:
+            type: string
       responses:
         "200":
           description: Success
@@ -5075,7 +5405,7 @@ paths:
                 SignedKeyList:
                   type: object
                 Primary:
-                  type: string
+                  type: integer
       responses:
         "200":
           description: Success
@@ -5108,7 +5438,7 @@ paths:
         - name: Type
           in: query
           schema:
-            type: string
+            type: integer
       responses:
         "200":
           description: Success
@@ -5139,11 +5469,11 @@ paths:
                 ParentID:
                   type: string
                 Notify:
-                  type: string
+                  type: integer
                 Expanded:
-                  type: string
+                  type: integer
                 Sticky:
-                  type: string
+                  type: integer
       responses:
         "200":
           description: Success
@@ -5156,6 +5486,19 @@ paths:
       tags: [Core]
       summary: Check Label Availability
       operationId: checkLabelAvailability
+      parameters:
+        - name: Name
+          in: query
+          schema:
+            type: string
+        - name: Type
+          in: query
+          schema:
+            type: integer
+        - name: ParentID
+          in: query
+          schema:
+            type: string
       responses:
         "200":
           description: Success
@@ -5262,15 +5605,15 @@ paths:
                 Color:
                   type: string
                 Notify:
-                  type: string
+                  type: integer
                 ParentID:
                   type: string
                 Sticky:
-                  type: string
+                  type: integer
                 Expanded:
-                  type: string
+                  type: integer
                 Display:
-                  type: string
+                  type: integer
       responses:
         "200":
           description: Success
@@ -5322,6 +5665,15 @@ paths:
       tags: [Core]
       summary: Query Logs
       operationId: queryLogs
+      parameters:
+        - name: Page
+          in: query
+          schema:
+            type: integer
+        - name: PageSize
+          in: query
+          schema:
+            type: integer
       responses:
         "200":
           description: Success
@@ -5336,6 +5688,14 @@ paths:
       operationId: queryMembers
       parameters:
         - name: IncludeAddresses
+          in: query
+          schema:
+            type: integer
+        - name: Page
+          in: query
+          schema:
+            type: string
+        - name: PageSize
           in: query
           schema:
             type: string
@@ -5436,11 +5796,11 @@ paths:
                 maxSpace:
                   type: integer
                 maxAI:
-                  type: string
+                  type: integer
                 maxLumo:
-                  type: string
+                  type: integer
                 maxVPN:
-                  type: string
+                  type: integer
       responses:
         "200":
           description: Success
@@ -5554,6 +5914,19 @@ paths:
       tags: [Core]
       summary: Search Members Summary
       operationId: searchMembersSummary
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: excludeGroupId
+          in: query
+          schema:
+            type: string
       responses:
         "200":
           description: Success
@@ -5700,7 +6073,7 @@ paths:
                 Domain:
                   type: string
                 DisableE2EE:
-                  type: string
+                  type: boolean
       responses:
         "200":
           description: Success
@@ -5749,7 +6122,7 @@ paths:
               type: object
               properties:
                 Unlock:
-                  type: string
+                  type: boolean
       responses:
         "200":
           description: Success
@@ -5820,7 +6193,7 @@ paths:
                   type: array
                   items: {}
                 OrganizationKeyActivation:
-                  type: string
+                  type: object
       responses:
         "200":
           description: Success
@@ -6458,25 +6831,27 @@ paths:
               type: object
               properties:
                 ShowName:
-                  type: string
+                  type: boolean
                 ShowScribeWritingAssistant:
-                  type: string
+                  type: boolean
                 VideoConferencingEnabled:
-                  type: string
+                  type: boolean
                 MailCategoryViewEnabled:
-                  type: string
+                  type: boolean
                 SSOBackupPasswordDisabled:
-                  type: string
+                  type: boolean
                 PasswordReminderEnforced:
-                  type: string
+                  type: boolean
                 AllowedProducts:
-                  type: string
+                  type: array
+                  items: {}
                 PasswordPolicies:
-                  type: string
+                  type: array
+                  items: {}
                 InvoiceEmail:
                   type: string
                 InvoiceEmailState:
-                  type: string
+                  type: integer
       responses:
         "200":
           description: Success
@@ -6703,11 +7078,11 @@ paths:
         - name: Month
           in: query
           schema:
-            type: string
+            type: integer
         - name: Year
           in: query
           schema:
-            type: string
+            type: integer
       responses:
         "200":
           description: Success
@@ -6796,11 +7171,11 @@ paths:
                 - referralRegistrationSubscription
               properties:
                 plan:
-                  type: string
+                  type: object
                 referralData:
                   type: object
                 referralRegistrationSubscription:
-                  type: string
+                  type: object
       responses:
         "200":
           description: Success
@@ -6896,7 +7271,7 @@ paths:
         - name: RequesterID
           in: query
           schema:
-            type: string
+            type: integer
         - name: CreatedAt
           in: query
           schema:
@@ -6904,7 +7279,7 @@ paths:
         - name: BrandID
           in: query
           schema:
-            type: string
+            type: integer
       responses:
         "200":
           description: Success
@@ -7008,24 +7383,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
-  /core/v4/reset/byoe/{token}:
-    get:
-      tags: [Core]
-      summary: Validate Reset Token
-      operationId: validateResetToken
-      parameters:
-        - name: token
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
   /core/v4/reset/username:
     post:
       tags: [Core]
@@ -7036,6 +7393,29 @@ paths:
           application/json:
             schema:
               type: object
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+  /core/v4/reset/{username}/{token}:
+    get:
+      tags: [Core]
+      summary: Validate Reset Token
+      operationId: validateResetToken
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
       responses:
         "200":
           description: Success
@@ -7253,7 +7633,7 @@ paths:
         - name: CrossPlatform
           in: query
           schema:
-            type: string
+            type: integer
       responses:
         "200":
           description: Success
@@ -7353,7 +7733,7 @@ paths:
               type: object
               properties:
                 PersistPasswordScope:
-                  type: string
+                  type: boolean
       responses:
         "200":
           description: Success
@@ -7555,7 +7935,7 @@ paths:
                 Email:
                   type: string
                 PersistPasswordScope:
-                  type: string
+                  type: boolean
       responses:
         "200":
           description: Success
@@ -7579,7 +7959,7 @@ paths:
                 Reset:
                   type: integer
                 PersistPasswordScope:
-                  type: string
+                  type: boolean
       responses:
         "200":
           description: Success
@@ -7611,7 +7991,7 @@ paths:
                 Fido2CredentialsPinOptIn:
                   type: string
                 PersistPasswordScope:
-                  type: string
+                  type: boolean
       responses:
         "200":
           description: Success
@@ -7787,7 +8167,7 @@ paths:
                 MnemonicAuth:
                   type: object
                 PersistPasswordScope:
-                  type: string
+                  type: boolean
       responses:
         "200":
           description: Success
@@ -8042,7 +8422,7 @@ paths:
                 Phone:
                   type: string
                 PersistPasswordScope:
-                  type: string
+                  type: boolean
       responses:
         "200":
           description: Success
@@ -8066,7 +8446,7 @@ paths:
                 Reset:
                   type: integer
                 PersistPasswordScope:
-                  type: string
+                  type: boolean
       responses:
         "200":
           description: Success
@@ -8129,7 +8509,7 @@ paths:
                 Signature:
                   type: string
                 PersistPasswordScope:
-                  type: string
+                  type: boolean
       responses:
         "200":
           description: Success
@@ -8153,7 +8533,7 @@ paths:
                 SessionAccountRecovery:
                   type: integer
                 PersistPasswordScope:
-                  type: string
+                  type: boolean
       responses:
         "200":
           description: Success
@@ -8366,7 +8746,7 @@ paths:
                 TokenPayment:
                   type: string
                 Payload:
-                  type: string
+                  type: object
                 Salt:
                   type: string
                 VisitorId:
@@ -8391,7 +8771,7 @@ paths:
         - name: ParseDomain
           in: query
           schema:
-            type: string
+            type: integer
       responses:
         "200":
           description: Success
@@ -8538,7 +8918,7 @@ paths:
                 TokenPreVerifiedAddress:
                   type: string
                 Payload:
-                  type: string
+                  type: object
                 Salt:
                   type: string
                 VisitorId:
@@ -8982,9 +9362,9 @@ paths:
                 Event:
                   type: string
                 Values:
-                  type: string
+                  type: object
                 Dimensions:
-                  type: string
+                  type: object
       responses:
         "200":
           description: Success
@@ -9044,9 +9424,9 @@ paths:
                 Name:
                   type: string
                 AllowedForSSO:
-                  type: string
+                  type: boolean
                 AllowedForMail:
-                  type: string
+                  type: boolean
       responses:
         "200":
           description: Success
@@ -9114,7 +9494,7 @@ paths:
         - name: Refresh
           in: query
           schema:
-            type: string
+            type: integer
       responses:
         "200":
           description: Success
@@ -9215,13 +9595,13 @@ paths:
                   type: string
                   description: Deprecated, pass VolumeID instead
                 Thumbnail:
-                  type: string
+                  type: integer
                   description: Request for thumbnail upload
                 ThumbnailHash:
                   type: string
                   description: sha256 hash of thumbnail contents
                 ThumbnailSize:
-                  type: string
+                  type: integer
                   description: Size of thumbnail contents
                 BlockList:
                   type: array
@@ -9243,7 +9623,7 @@ paths:
                         type: array
                         items: {}
                       ThumbnailLink:
-                        type: string
+                        type: object
                       ThumbnailLinks:
                         type: array
                         items: {}
@@ -9351,9 +9731,9 @@ paths:
                 - Share
               properties:
                 Device:
-                  type: string
+                  type: object
                 Share:
-                  type: string
+                  type: object
       responses:
         "200":
           description: Success
@@ -9472,9 +9852,9 @@ paths:
                   - type: object
                     properties:
                       Code:
-                        type: string
+                        type: integer
                       Active:
-                        type: string
+                        type: boolean
   /drive/me/settings:
     get:
       tags: [Drive]
@@ -9522,16 +9902,17 @@ paths:
                   type: integer
                   description: Number of days revisions should be retained. If null, default will be used by backend. Changing the setting is only available to paid users, free users will always use the default.
                 DocsCommentsNotificationsEnabled:
-                  type: string
+                  type: boolean
                   description: Indicates if email notifications for comment activity in Proton Docs are enabled. If null, the default value to 0 = false will be used by backend.
                 DocsCommentsNotificationsIncludeDocumentName:
-                  type: string
+                  type: boolean
                   description: Indicates if email notifications for comment activity in Proton Docs should include the document name. If null, the default value to 0 = false will be used by backend.
                 DocsFontPreference:
                   type: string
                   description: Indicates user-preferred font in Proton Docs.
                 PhotoTags:
-                  type: string
+                  type: array
+                  items: {}
                   description: Order and visibility of Photo Tags, tags not in the list should not be shown; Use defaults when NULL; Show no tags if empty array.
       responses:
         "200":
@@ -9958,7 +10339,7 @@ paths:
         - name: DeleteAlbumPhotos
           in: query
           schema:
-            type: string
+            type: integer
           description: Whether or not to delete the album even with direct children.
       responses:
         "200":
@@ -9998,7 +10379,7 @@ paths:
                 CoverLinkID:
                   type: string
                 Link:
-                  type: string
+                  type: object
       responses:
         "200":
           description: Success
@@ -10051,9 +10432,10 @@ paths:
                   - type: object
                     properties:
                       Code:
-                        type: string
+                        type: integer
                       Responses:
-                        type: string
+                        type: array
+                        items: {}
   /drive/photos/volumes/{volumeID}/albums/{linkID}/children:
     get:
       tags: [Drive]
@@ -10082,19 +10464,19 @@ paths:
         - name: Desc
           in: query
           schema:
-            type: string
+            type: boolean
         - name: Tag
           in: query
           schema:
-            type: string
+            type: integer
         - name: OnlyChildren
           in: query
           schema:
-            type: string
+            type: boolean
         - name: IncludeTrashed
           in: query
           schema:
-            type: string
+            type: boolean
       responses:
         "200":
           description: Success
@@ -10198,9 +10580,10 @@ paths:
                   - type: object
                     properties:
                       Code:
-                        type: string
+                        type: integer
                       Responses:
-                        type: string
+                        type: array
+                        items: {}
   /drive/photos/volumes/{volumeID}/links:
     post:
       tags: [Drive]
@@ -10353,7 +10736,7 @@ paths:
               type: object
               properties:
                 PhotoData:
-                  type: string
+                  type: object
       responses:
         "200":
           description: Success
@@ -10579,7 +10962,7 @@ paths:
                       Finished:
                         type: boolean
                       Anchor:
-                        type: string
+                        type: object
                       Code:
                         type: integer
                         description: ProtonResponseCode
@@ -10744,7 +11127,7 @@ paths:
                   type: string
                   description: "Passphrase for reported Link's Node key, unencrypted, as a string, escaped for JSON."
                 BonaFide:
-                  type: string
+                  type: boolean
                   description: The user declares the report is submitted in good-faith (bona fide); Must always be true, but requires specific user-action (opt-in)
                 ShareURL:
                   type: string
@@ -10843,12 +11226,12 @@ paths:
         - name: ShowAll
           in: query
           schema:
-            type: string
+            type: integer
           description: Show disabled shares as well, i.e. Shares where the ShareMemberShip for the user is non-active (locked), otherwise only return with active Membership
         - name: ShareType
           in: query
           schema:
-            type: string
+            type: integer
           description: Filter on Share Type
       responses:
         "200":
@@ -10882,7 +11265,7 @@ paths:
         - name: Force
           in: query
           schema:
-            type: string
+            type: integer
           description: Forces the deletion of the share along with attached members and urls
       responses:
         "200":
@@ -10934,7 +11317,7 @@ paths:
                         type: string
                         description: "Format: email"
                       Locked:
-                        type: string
+                        type: boolean
                       CreateTime:
                         type: integer
                       ModifyTime:
@@ -11020,7 +11403,7 @@ paths:
                   type: string
                   description: Unencrypted signature of the content session key (plain text of the ContentKeyPacket), signed with the NodeKey.
                 DocumentType:
-                  type: string
+                  type: integer
                   description: Document=1, Sheet=2
                 Name:
                   type: string
@@ -11200,7 +11583,7 @@ paths:
                   type: string
                   description: "Client unique ID. Useful for marking client's drafts - in case of failure client can recognise its own draft and continue upload."
                 IntendedUploadSize:
-                  type: string
+                  type: integer
                   description: Intended upload file size, future BE size validation
                 Name:
                   type: string
@@ -11299,7 +11682,7 @@ paths:
                   type: string
                   description: "Client unique ID. Useful for marking client's drafts - in case of failure client can recognise its own draft and continue upload."
                 IntendedUploadSize:
-                  type: string
+                  type: integer
                   description: Intended upload file size, future BE size validation
       responses:
         "200":
@@ -11377,17 +11760,17 @@ paths:
         - name: PageSize
           in: query
           schema:
-            type: string
+            type: integer
           description: Number of blocks
         - name: FromBlockIndex
           in: query
           schema:
-            type: string
+            type: integer
           description: Block index from which to fetch block list
         - name: NoBlockUrls
           in: query
           schema:
-            type: string
+            type: boolean
           description: Do not generate download URLs for blocks
       responses:
         "200":
@@ -11447,20 +11830,21 @@ paths:
                   type: string
                   description: "Format: email"
                 BlockNumber:
-                  type: string
+                  type: integer
                   description: Unused. Was meant for shorter partial revisions.
                 XAttr:
                   type: string
                   description: Extended attributes encrypted with link key
                 Photo:
-                  type: string
+                  type: object
                 BlockList:
-                  type: string
+                  type: array
+                  items: {}
                   description: Ignored entirely by API. Field can be removed from request by client.
                 ThumbnailToken:
                   type: string
                 State:
-                  type: string
+                  type: integer
                   description: Ignored entirely by API, revision will always be committed (made active)
                 ChecksumVerified:
                   type: boolean
@@ -11538,7 +11922,7 @@ paths:
         - name: Type
           in: query
           schema:
-            type: string
+            type: integer
           description: Type of Thumbnail to fetch
       responses:
         "200":
@@ -11652,31 +12036,31 @@ paths:
         - name: Desc
           in: query
           schema:
-            type: string
+            type: integer
           description: Sort order
         - name: ShowAll
           in: query
           schema:
-            type: string
+            type: integer
           description: Show all files including those in non-active (drafts) state.
         - name: FoldersOnly
           in: query
           schema:
-            type: string
+            type: integer
           description: Show folders only
         - name: Thumbnails
           in: query
           schema:
-            type: string
+            type: integer
           description: Get thumbnail download URLs
         - name: PageSize
           in: query
           schema:
-            type: string
+            type: integer
         - name: Page
           in: query
           schema:
-            type: string
+            type: integer
       responses:
         "200":
           description: Success
@@ -11885,7 +12269,8 @@ paths:
                   type: array
                   items: {}
                 ClientUID:
-                  type: string
+                  type: array
+                  items: {}
                   description: Client UID list to filter pending drafts with. If not provided, all conflicting draft hashes will be returned in `PendingHashes`
       responses:
         "200":
@@ -12105,11 +12490,11 @@ paths:
         - name: LastIndex
           in: query
           schema:
-            type: string
+            type: integer
         - name: PageSize
           in: query
           schema:
-            type: string
+            type: integer
       responses:
         "200":
           description: Success
@@ -12171,16 +12556,16 @@ paths:
         - name: Thumbnails
           in: query
           schema:
-            type: string
+            type: integer
           description: Get thumbnail download URLs
         - name: PageSize
           in: query
           schema:
-            type: string
+            type: integer
         - name: Page
           in: query
           schema:
-            type: string
+            type: integer
       responses:
         "200":
           description: Success
@@ -12361,10 +12746,10 @@ paths:
                   type: integer
                   description: Maximum number of times this link can be accessed. 0 for infinite
                 ExpirationTime:
-                  type: string
+                  type: integer
                   description: UNIX timestamp (in seconds) after which this link is no longer accessible. Use this or ExpirationDuration for a relative expiration period. Max 90 days from now. Optional
                 ExpirationDuration:
-                  type: string
+                  type: integer
                   description: Number of seconds after which this link is no longer accessible. Maximum 90 days. Optional
                 Name:
                   type: string
@@ -12417,9 +12802,10 @@ paths:
                   - type: object
                     properties:
                       Code:
-                        type: string
+                        type: integer
                       Responses:
-                        type: string
+                        type: array
+                        items: {}
   /drive/shares/{shareID}/urls/{urlID}:
     delete:
       tags: [Drive]
@@ -12486,13 +12872,13 @@ paths:
                   type: integer
                   description: UNIX timestamp (in seconds) after which this link is no longer accessible. Use this or ExpirationDuration for a relative expiration period. Max 90 days from now.
                 ExpirationDuration:
-                  type: string
+                  type: integer
                   description: Number of seconds after which this link is no longer accessible. Maximum 90 days.
                 Name:
                   type: string
                   description: "PGP encrypted name. The name is encrypted with the user's address key. The name is only for user convenience."
                 Permissions:
-                  type: string
+                  type: integer
                   description: "Permission bitfield, cannot exceed the owner's permissions. Valid permissions: - 4: read access - 6: read + write access"
                 UrlPasswordSalt:
                   type: string
@@ -12503,7 +12889,7 @@ paths:
                 SRPModulusID:
                   type: string
                 Flags:
-                  type: string
+                  type: integer
                   description: "Bitmap: 1 = custom password set, 2 = random password set"
                 SharePassphraseKeyPacket:
                   type: string
@@ -12511,7 +12897,7 @@ paths:
                   type: string
                   description: "PGP encrypted password. The password is encrypted with the user's address key."
                 MaxAccesses:
-                  type: string
+                  type: integer
                   description: Maximum number of times this link can be accessed. 0 for infinite
       responses:
         "200":
@@ -12562,13 +12948,13 @@ paths:
                   type: string
                   description: Deprecated, pass VolumeID instead
                 Thumbnail:
-                  type: string
+                  type: integer
                   description: Request for thumbnail upload
                 ThumbnailHash:
                   type: string
                   description: sha256 hash of thumbnail contents
                 ThumbnailSize:
-                  type: string
+                  type: integer
                   description: Size of thumbnail contents
                 BlockList:
                   type: array
@@ -12590,7 +12976,7 @@ paths:
                         type: array
                         items: {}
                       ThumbnailLink:
-                        type: string
+                        type: object
                       ThumbnailLinks:
                         type: array
                         items: {}
@@ -12731,7 +13117,7 @@ paths:
                   type: string
                   description: Unencrypted signature of the content session key (plain text of the ContentKeyPacket), signed with the NodeKey.
                 DocumentType:
-                  type: string
+                  type: integer
                   description: Document=1, Sheet=2
                 Name:
                   type: string
@@ -12806,7 +13192,7 @@ paths:
                   type: string
                   description: "Client unique ID. Useful for marking client's drafts - in case of failure client can recognise its own draft and continue upload."
                 IntendedUploadSize:
-                  type: string
+                  type: integer
                   description: Intended upload file size, future BE size validation
                 Name:
                   type: string
@@ -12901,7 +13287,7 @@ paths:
                   type: string
                   description: "Client unique ID. Useful for marking client's drafts - in case of failure client can recognise its own draft and continue upload."
                 IntendedUploadSize:
-                  type: string
+                  type: integer
                   description: Intended upload file size, future BE size validation
       responses:
         "200":
@@ -13011,17 +13397,17 @@ paths:
         - name: PageSize
           in: query
           schema:
-            type: string
+            type: integer
           description: Number of blocks
         - name: FromBlockIndex
           in: query
           schema:
-            type: string
+            type: integer
           description: Block index from which to fetch block list
         - name: NoBlockUrls
           in: query
           schema:
-            type: string
+            type: boolean
           description: Do not generate download URLs for blocks
       responses:
         "200":
@@ -13073,20 +13459,21 @@ paths:
                   type: string
                   description: "Format: email"
                 BlockNumber:
-                  type: string
+                  type: integer
                   description: Unused. Was meant for shorter partial revisions.
                 XAttr:
                   type: string
                   description: Extended attributes encrypted with link key
                 Photo:
-                  type: string
+                  type: object
                 BlockList:
-                  type: string
+                  type: array
+                  items: {}
                   description: Ignored entirely by API. Field can be removed from request by client.
                 ThumbnailToken:
                   type: string
                 State:
-                  type: string
+                  type: integer
                   description: Ignored entirely by API, revision will always be committed (made active)
                 ChecksumVerified:
                   type: boolean
@@ -13193,7 +13580,7 @@ paths:
         - name: FoldersOnly
           in: query
           schema:
-            type: string
+            type: integer
       responses:
         "200":
           description: Success
@@ -13285,7 +13672,8 @@ paths:
                   type: array
                   items: {}
                 ClientUID:
-                  type: string
+                  type: array
+                  items: {}
                   description: Client UID list to filter pending drafts with. If not provided, all conflicting draft hashes will be returned in `PendingHashes`
       responses:
         "200":
@@ -13597,7 +13985,7 @@ paths:
                   type: string
                   description: Unencrypted signature of the content session key (plain text of the ContentKeyPacket), signed with the NodeKey.
                 DocumentType:
-                  type: string
+                  type: integer
                   description: Document=1, Sheet=2
                 Name:
                   type: string
@@ -13751,7 +14139,7 @@ paths:
                       VendorType:
                         type: integer
                       DirectAccess:
-                        type: string
+                        type: object
                         description: Only set if the user is authenticated AND has direct access to the share already
                       Code:
                         type: integer
@@ -13953,9 +14341,9 @@ paths:
                         items: {}
                         description: Array of completed checklist items
                       CreatedAt:
-                        type: string
+                        type: integer
                       ExpiresAt:
-                        type: string
+                        type: integer
                       UserWasRewarded:
                         type: boolean
                         description: User already has reward quota
@@ -14088,9 +14476,9 @@ paths:
                   - type: object
                     properties:
                       EndTime:
-                        type: string
+                        type: integer
                       Quota:
-                        type: string
+                        type: integer
                         description: Maximum available space for the free upload timer, in bytes (API allows going 10% over limit for zero-rating)
                       Code:
                         type: integer
@@ -14110,9 +14498,9 @@ paths:
                   - type: object
                     properties:
                       EndTime:
-                        type: string
+                        type: integer
                       Quota:
-                        type: string
+                        type: integer
                         description: Maximum available space for the free upload timer, in bytes (API allows going 10% over limit for zero-rating)
                       Code:
                         type: integer
@@ -14186,7 +14574,7 @@ paths:
         - name: PageSize
           in: query
           schema:
-            type: string
+            type: integer
       responses:
         "200":
           description: Success
@@ -14223,11 +14611,11 @@ paths:
         - name: PageSize
           in: query
           schema:
-            type: string
+            type: integer
         - name: ShareTargetTypes
           in: query
           schema:
-            type: string
+            type: array
       responses:
         "200":
           description: Success
@@ -14442,7 +14830,7 @@ paths:
                 ExternalInvitation:
                   type: object
                 EmailDetails:
-                  type: string
+                  type: object
       responses:
         "200":
           description: Success
@@ -14609,7 +14997,7 @@ paths:
                 Invitation:
                   type: object
                 EmailDetails:
-                  type: string
+                  type: object
       responses:
         "200":
           description: Success
@@ -14956,9 +15344,10 @@ paths:
                   - type: object
                     properties:
                       ContextShare:
-                        type: string
+                        type: object
                       Invitations:
-                        type: string
+                        type: array
+                        items: {}
                       Code:
                         type: integer
                         description: ProtonResponseCode
@@ -15036,7 +15425,7 @@ paths:
                   type: string
                   description: Unencrypted signature of the content session key (plain text of the ContentKeyPacket), signed with the NodeKey.
                 DocumentType:
-                  type: string
+                  type: integer
                   description: Document=1, Sheet=2
                 Name:
                   type: string
@@ -15158,7 +15547,7 @@ paths:
                   type: string
                   description: "Client unique ID. Useful for marking client's drafts - in case of failure client can recognise its own draft and continue upload."
                 IntendedUploadSize:
-                  type: string
+                  type: integer
                   description: Intended upload file size, future BE size validation
                 Name:
                   type: string
@@ -15306,7 +15695,7 @@ paths:
                   type: string
                   description: "Client unique ID. Useful for marking client's drafts - in case of failure client can recognise its own draft and continue upload."
                 IntendedUploadSize:
-                  type: string
+                  type: integer
                   description: Intended upload file size, future BE size validation
       responses:
         "200":
@@ -15438,17 +15827,17 @@ paths:
         - name: PageSize
           in: query
           schema:
-            type: string
+            type: integer
           description: Number of blocks
         - name: FromBlockIndex
           in: query
           schema:
-            type: string
+            type: integer
           description: Block index from which to fetch block list
         - name: NoBlockUrls
           in: query
           schema:
-            type: string
+            type: boolean
           description: Do not generate download URLs for blocks
       responses:
         "200":
@@ -15508,20 +15897,21 @@ paths:
                   type: string
                   description: "Format: email"
                 BlockNumber:
-                  type: string
+                  type: integer
                   description: Unused. Was meant for shorter partial revisions.
                 XAttr:
                   type: string
                   description: Extended attributes encrypted with link key
                 Photo:
-                  type: string
+                  type: object
                 BlockList:
-                  type: string
+                  type: array
+                  items: {}
                   description: Ignored entirely by API. Field can be removed from request by client.
                 ThumbnailToken:
                   type: string
                 State:
-                  type: string
+                  type: integer
                   description: Ignored entirely by API, revision will always be committed (made active)
                 ChecksumVerified:
                   type: boolean
@@ -15664,7 +16054,7 @@ paths:
         - name: FoldersOnly
           in: query
           schema:
-            type: string
+            type: integer
           description: Show folders only
       responses:
         "200":
@@ -15757,7 +16147,8 @@ paths:
                   type: array
                   items: {}
                 ClientUID:
-                  type: string
+                  type: array
+                  items: {}
                   description: Client UID list to filter pending drafts with. If not provided, all conflicting draft hashes will be returned in `PendingHashes`
       responses:
         "200":
@@ -16039,11 +16430,11 @@ paths:
         - name: PageSize
           in: query
           schema:
-            type: string
+            type: integer
         - name: Page
           in: query
           schema:
-            type: string
+            type: integer
       responses:
         "200":
           description: Success
@@ -16246,7 +16637,7 @@ paths:
                 - NameHash
               properties:
                 DocumentType:
-                  type: string
+                  type: integer
                   description: Document=1, Sheet=2
                 ParentLinkID:
                   type: string
@@ -16302,7 +16693,7 @@ paths:
                   type: string
                   description: "Client unique ID. Useful for marking client's drafts - in case of failure client can recognise its own draft and continue upload."
                 IntendedUploadSize:
-                  type: string
+                  type: integer
                   description: Intended upload file size, future BE size validation
                 ParentLinkID:
                   type: string
@@ -16482,7 +16873,7 @@ paths:
                 XAttr:
                   type: string
                 Photo:
-                  type: string
+                  type: object
                 ChecksumVerified:
                   type: boolean
                   description: Whether the checksum in xattr of the revision content was verified by the client during upload
@@ -16558,11 +16949,11 @@ paths:
         - name: PageSize
           in: query
           schema:
-            type: string
+            type: integer
         - name: Page
           in: query
           schema:
-            type: string
+            type: integer
       responses:
         "200":
           description: Success
@@ -17038,7 +17429,7 @@ paths:
                   type: string
                   description: "Format: email"
                 Photos:
-                  type: string
+                  type: object
                   description: Optional, except when moving a Photo-Link.
                 ContentKeyPacketSignature:
                   type: string
@@ -17076,11 +17467,11 @@ paths:
         - name: Desc
           in: query
           schema:
-            type: string
+            type: boolean
         - name: PageSize
           in: query
           schema:
-            type: string
+            type: integer
         - name: PreviousPageLastLinkID
           in: query
           schema:
@@ -17089,12 +17480,12 @@ paths:
         - name: MinimumCaptureTime
           in: query
           schema:
-            type: string
+            type: integer
           description: The minimum capture time of photos as UNIX timestamp (in seconds; to filter out older photos)
         - name: Tag
           in: query
           schema:
-            type: string
+            type: integer
       responses:
         "200":
           description: Success
@@ -17389,11 +17780,11 @@ paths:
         - name: PageSize
           in: query
           schema:
-            type: string
+            type: integer
         - name: Page
           in: query
           schema:
-            type: string
+            type: integer
       responses:
         "200":
           description: Success
@@ -17425,11 +17816,11 @@ paths:
         - name: PageSize
           in: query
           schema:
-            type: string
+            type: integer
         - name: Page
           in: query
           schema:
-            type: string
+            type: integer
       responses:
         "200":
           description: Success
@@ -17553,13 +17944,13 @@ paths:
                 Source:
                   type: string
                 Mail:
-                  type: string
+                  type: object
                 Calendar:
-                  type: string
+                  type: object
                 Contacts:
-                  type: string
+                  type: object
                 Drive:
-                  type: string
+                  type: object
       responses:
         "200":
           description: Success
@@ -17635,13 +18026,13 @@ paths:
                 ImporterID:
                   type: string
                 Mail:
-                  type: string
+                  type: object
                 Calendar:
-                  type: string
+                  type: object
                 Contacts:
-                  type: string
+                  type: object
                 Drive:
-                  type: string
+                  type: object
       responses:
         "200":
           description: Success
@@ -17688,13 +18079,13 @@ paths:
                 Source:
                   type: string
                 Mail:
-                  type: string
+                  type: object
                 Calendar:
-                  type: string
+                  type: object
                 Contacts:
-                  type: string
+                  type: object
                 Drive:
-                  type: string
+                  type: object
       responses:
         "200":
           description: Success
@@ -17707,6 +18098,11 @@ paths:
       tags: [Importer]
       summary: Get Authentication Method
       operationId: getAuthenticationMethod
+      parameters:
+        - name: Email
+          in: query
+          schema:
+            type: string
       responses:
         "200":
           description: Success
@@ -17739,7 +18135,7 @@ paths:
                 AutomaticImport:
                   type: boolean
                 QuotaThresholdRatio:
-                  type: string
+                  type: integer
       responses:
         "200":
           description: Success
@@ -17854,6 +18250,15 @@ paths:
       tags: [Importer]
       summary: Get Organization Users
       operationId: getOrganizationUsers
+      parameters:
+        - name: UseCachedData
+          in: query
+          schema:
+            type: string
+        - name: DomainName
+          in: query
+          schema:
+            type: string
       responses:
         "200":
           description: Success
@@ -18038,6 +18443,15 @@ paths:
       tags: [Keys]
       summary: Get Signed Key List Route
       operationId: getSignedKeyListRoute
+      parameters:
+        - name: Revision
+          in: query
+          schema:
+            type: integer
+        - name: Identifier
+          in: query
+          schema:
+            type: string
       responses:
         "200":
           description: Success
@@ -18130,7 +18544,7 @@ paths:
                 DataPacket:
                   type: object
                 Signature:
-                  type: string
+                  type: object
       responses:
         "200":
           description: Success
@@ -18313,15 +18727,15 @@ paths:
         - name: Page
           in: query
           schema:
-            type: string
+            type: integer
         - name: PageSize
           in: query
           schema:
-            type: string
+            type: integer
         - name: Limit
           in: query
           schema:
-            type: string
+            type: integer
         - name: LabelID
           in: query
           schema:
@@ -18333,15 +18747,15 @@ paths:
         - name: Desc
           in: query
           schema:
-            type: string
+            type: integer
         - name: Begin
           in: query
           schema:
-            type: string
+            type: integer
         - name: End
           in: query
           schema:
-            type: string
+            type: integer
         - name: BeginID
           in: query
           schema:
@@ -18369,15 +18783,15 @@ paths:
         - name: Attachments
           in: query
           schema:
-            type: string
+            type: integer
         - name: Starred
           in: query
           schema:
-            type: string
+            type: integer
         - name: Unread
           in: query
           schema:
-            type: string
+            type: integer
         - name: AddressID
           in: query
           schema:
@@ -18389,7 +18803,7 @@ paths:
         - name: AutoWildcard
           in: query
           schema:
-            type: string
+            type: integer
         - name: Anchor
           in: query
           schema:
@@ -18418,7 +18832,7 @@ paths:
         - name: OnlyInInboxForCategories
           in: query
           schema:
-            type: string
+            type: integer
       responses:
         "200":
           description: Success
@@ -18463,7 +18877,7 @@ paths:
                   type: array
                   items: {}
                 SpamAction:
-                  type: string
+                  type: integer
       responses:
         "200":
           description: Success
@@ -18525,7 +18939,7 @@ paths:
                   type: array
                   items: {}
                 SpamAction:
-                  type: string
+                  type: integer
       responses:
         "200":
           description: Success
@@ -18924,10 +19338,12 @@ paths:
                   type: string
                   description: Only for internal E2EE forwarding
                 ProxyInstances:
-                  type: string
+                  type: array
+                  items: {}
                   description: Only for E2EE forwarding
                 Tree:
-                  type: string
+                  type: array
+                  items: {}
                 Version:
                   type: string
       responses:
@@ -18998,11 +19414,11 @@ paths:
         - name: Page
           in: query
           schema:
-            type: string
+            type: integer
         - name: PageSize
           in: query
           schema:
-            type: string
+            type: integer
         - name: AddressID
           in: query
           schema:
@@ -19041,11 +19457,11 @@ paths:
         - name: Page
           in: query
           schema:
-            type: string
+            type: integer
         - name: PageSize
           in: query
           schema:
-            type: string
+            type: integer
         - name: AddressID
           in: query
           schema:
@@ -19216,15 +19632,15 @@ paths:
         - name: Location
           in: query
           schema:
-            type: string
+            type: integer
         - name: Page
           in: query
           schema:
-            type: string
+            type: integer
         - name: PageSize
           in: query
           schema:
-            type: string
+            type: integer
         - name: Keyword
           in: query
           schema:
@@ -19249,7 +19665,7 @@ paths:
                 - Location
               properties:
                 Overwrite:
-                  type: string
+                  type: boolean
                   description: If email is already registered in incomingDefaults we overwrite the location Avoids to find the already exiting item ID
                 Email:
                   type: string
@@ -19326,15 +19742,15 @@ paths:
         - name: Page
           in: query
           schema:
-            type: string
+            type: integer
         - name: PageSize
           in: query
           schema:
-            type: string
+            type: integer
         - name: Limit
           in: query
           schema:
-            type: string
+            type: integer
         - name: LabelID
           in: query
           schema:
@@ -19346,15 +19762,15 @@ paths:
         - name: Desc
           in: query
           schema:
-            type: string
+            type: integer
         - name: Begin
           in: query
           schema:
-            type: string
+            type: integer
         - name: End
           in: query
           schema:
-            type: string
+            type: integer
         - name: BeginID
           in: query
           schema:
@@ -19382,15 +19798,15 @@ paths:
         - name: Attachments
           in: query
           schema:
-            type: string
+            type: integer
         - name: Starred
           in: query
           schema:
-            type: string
+            type: integer
         - name: Unread
           in: query
           schema:
-            type: string
+            type: integer
         - name: AddressID
           in: query
           schema:
@@ -19402,7 +19818,7 @@ paths:
         - name: AutoWildcard
           in: query
           schema:
-            type: string
+            type: integer
         - name: Anchor
           in: query
           schema:
@@ -19414,7 +19830,7 @@ paths:
         - name: NewsletterSubscriptionID
           in: query
           schema:
-            type: string
+            type: array
       responses:
         "200":
           description: Success
@@ -19438,7 +19854,7 @@ paths:
                 ParentID:
                   type: string
                 Action:
-                  type: string
+                  type: integer
                 Message:
                   type: object
                 AttachmentKeyPackets:
@@ -19462,21 +19878,22 @@ paths:
               type: object
               properties:
                 SearchContext:
-                  type: string
+                  type: object
                 Version:
                   type: string
                 Sieve:
                   type: string
                 AllFilters:
-                  type: string
+                  type: integer
                 FilterIDs:
-                  type: string
+                  type: array
+                  items: {}
                 AllowList:
-                  type: string
+                  type: integer
                 BlockList:
-                  type: string
+                  type: integer
                 SpamList:
-                  type: string
+                  type: integer
       responses:
         "200":
           description: Success
@@ -19596,7 +20013,7 @@ paths:
         - name: OnlyInInboxForCategories
           in: query
           schema:
-            type: string
+            type: integer
       responses:
         "200":
           description: Success
@@ -19679,7 +20096,7 @@ paths:
                   type: array
                   items: {}
                 SpamAction:
-                  type: string
+                  type: integer
       responses:
         "200":
           description: Success
@@ -19740,15 +20157,15 @@ paths:
                 Message:
                   type: object
                 ParentID:
-                  type: string
+                  type: integer
                 Action:
-                  type: string
+                  type: integer
                 AttachmentKeys:
                   type: object
                 ExpirationTime:
-                  type: string
+                  type: integer
                 ExpiresIn:
-                  type: string
+                  type: integer
                 AutoSaveContacts:
                   type: integer
                 Packages:
@@ -20003,7 +20420,7 @@ paths:
               type: object
               properties:
                 Unsubscribed:
-                  type: string
+                  type: boolean
       responses:
         "200":
           description: Success
@@ -20035,7 +20452,7 @@ paths:
                 DestinationFolder:
                   type: string
                 MarkAsRead:
-                  type: string
+                  type: boolean
       responses:
         "200":
           description: Success
@@ -20082,15 +20499,15 @@ paths:
         - name: Location
           in: query
           schema:
-            type: string
+            type: integer
         - name: Page
           in: query
           schema:
-            type: string
+            type: integer
         - name: PageSize
           in: query
           schema:
-            type: string
+            type: integer
         - name: Keyword
           in: query
           schema:
@@ -20115,7 +20532,7 @@ paths:
                 - Location
               properties:
                 Overwrite:
-                  type: string
+                  type: boolean
                   description: If email is already registered in orgIncomingDefaults we overwrite the location Avoids to find the already exiting item ID
                 Email:
                   type: string
@@ -21048,15 +21465,15 @@ paths:
                 Timezone:
                   type: string
                 State:
-                  type: string
+                  type: integer
                 Type:
                   type: integer
                 CustomPassword:
                   type: integer
                 ProtonCalendar:
-                  type: string
+                  type: integer
                 WaitingRoom:
-                  type: string
+                  type: integer
                   description: // Make WaitingRoom mandatory when cleanup MeetWaitingRoom feature flag
       responses:
         "200":
@@ -21401,15 +21818,15 @@ paths:
                 Timezone:
                   type: string
                 State:
-                  type: string
+                  type: integer
                 Type:
                   type: integer
                 CustomPassword:
                   type: integer
                 ProtonCalendar:
-                  type: string
+                  type: integer
                 WaitingRoom:
-                  type: string
+                  type: integer
                   description: // Make WaitingRoom mandatory when cleanup MeetWaitingRoom feature flag
       responses:
         "200":
@@ -21786,6 +22203,19 @@ paths:
       tags: [Oauth-token]
       summary: Get Tokens By Feature
       operationId: getTokensByFeature
+      parameters:
+        - name: Account
+          in: query
+          schema:
+            type: string
+        - name: Features
+          in: query
+          schema:
+            type: array
+        - name: Provider
+          in: query
+          schema:
+            type: integer
       responses:
         "200":
           description: Success
@@ -22456,7 +22886,7 @@ paths:
                   type: integer
                   description: Number of chunks this file will have
                 EncryptionVersion:
-                  type: string
+                  type: integer
                   description: File encryption version. 1 for old, 2 for separate tags.
       responses:
         "200":
@@ -22841,28 +23271,28 @@ paths:
               type: object
               properties:
                 ShareMode:
-                  type: string
+                  type: integer
                   description: Allowed ways to share within the organization.
                 ShareAcceptMode:
-                  type: string
+                  type: integer
                   description: Who is allowed to accept an invite from outside the organization.
                 ItemShareMode:
-                  type: string
+                  type: integer
                   description: Is item sharing enabled.
                 PublicLinkMode:
-                  type: string
+                  type: integer
                   description: Are secure links enabled.
                 ForceLockSeconds:
-                  type: string
+                  type: integer
                   description: Force pass to lock after given seconds of time. 0 means disabled.
                 ExportMode:
-                  type: string
+                  type: integer
                   description: Allowed ways of exporting the data owned by the org.
                 VaultCreateMode:
-                  type: string
+                  type: integer
                   description: Who can create vaults in the organization.
                 AliasCreateMode:
-                  type: string
+                  type: integer
                   description: If it is allowed to create aliases in the organization.
       responses:
         "200":
@@ -22896,34 +23326,34 @@ paths:
                   type: boolean
                   description: Whether subusers are allowed to generate random passwords
                 RandomPasswordMinLength:
-                  type: string
+                  type: integer
                   description: Minimum password length. Default limit if null.
                 RandomPasswordMaxLength:
-                  type: string
+                  type: integer
                   description: Maximum password length. Default limit if null.
                 RandomPasswordMustIncludeNumbers:
-                  type: string
+                  type: boolean
                   description: Whether the password must include numbers. If true, it must. If false, it must not. Cannot be changed if not null. Can be changed if null.
                 RandomPasswordMustIncludeSymbols:
-                  type: string
+                  type: boolean
                   description: Whether the password must include symbols. If true, it must. If false, it must not. Cannot be changed if not null. Can be changed if null.
                 RandomPasswordMustIncludeUppercase:
-                  type: string
+                  type: boolean
                   description: Whether the password must include uppercase characters. If true, it must. If false, it must not. Cannot be changed if not null. Can be changed if null.
                 MemorablePasswordAllowed:
                   type: boolean
                   description: Whether subusers are allowed to generate memorable passwords
                 MemorablePasswordMinWords:
-                  type: string
+                  type: integer
                   description: Minimum amount of words for the memorable passwords. Default limit if null.
                 MemorablePasswordMaxWords:
-                  type: string
+                  type: integer
                   description: Maximum amount of words for the memorable passwords. Default limit if null.
                 MemorablePasswordMustCapitalize:
-                  type: string
+                  type: boolean
                   description: Whether the password must capitalize words. If true, it must. If false, it must not. Cannot be changed if not null. Can be changed if null.
                 MemorablePasswordMustIncludeNumbers:
-                  type: string
+                  type: boolean
                   description: Whether the password must include numbers. If true, it must. If false, it must not. Cannot be changed if not null. Can be changed if null.
       responses:
         "200":
@@ -23245,7 +23675,8 @@ paths:
                       Code:
                         type: integer
                       PublicLinks:
-                        type: string
+                        type: array
+                        items: {}
   /pass/v1/public_link/content/{contentId}:
     get:
       tags: [pass]
@@ -23388,10 +23819,12 @@ paths:
               type: object
               properties:
                 SharesToHide:
-                  type: string
+                  type: array
+                  items: {}
                   description: List of share IDs to hide
                 SharesToUnhide:
-                  type: string
+                  type: array
+                  items: {}
                   description: List of share IDs to unhide
       responses:
         "200":
@@ -24274,7 +24707,7 @@ paths:
               type: object
               properties:
                 Content:
-                  type: string
+                  type: object
                   description: If the content has to be updated this should contain the new content. Otherwise, null
       responses:
         "200":
@@ -24427,7 +24860,7 @@ paths:
                   type: string
                   description: Base64 encrypted invite message encrypted with the object key
                 ExpirationTime:
-                  type: string
+                  type: integer
                   description: Expiration time for the share
       responses:
         "200":
@@ -24550,7 +24983,7 @@ paths:
                   type: string
                   description: Invite encrypted folder ID (only in case the invite is of type Folder)
                 ExpirationTime:
-                  type: string
+                  type: integer
                   description: Expiration time for the share
       responses:
         "200":
@@ -24815,7 +25248,7 @@ paths:
                   items: {}
                   description: ItemIDs with their current revision. At most 100 items.
                 SkipTrash:
-                  type: string
+                  type: boolean
                   description: Skip checking that the items are in the trash. Allows to delete directly
       responses:
         "200":
@@ -25453,19 +25886,19 @@ paths:
               type: object
               properties:
                 SkipHealthCheck:
-                  type: string
+                  type: boolean
                   description: Whether to skip the security health checks. Null means leave it as it is now.
                 SkipWeakPasswordCheck:
-                  type: string
+                  type: boolean
                   description: Whether to skip the weak password check. Null means leave it as it is now.
                 SkipCompromisedPasswordCheck:
-                  type: string
+                  type: boolean
                   description: Whether to skip the compromised password check. Null means leave it as it is now.
                 SkipReusedPasswordCheck:
-                  type: string
+                  type: boolean
                   description: Whether to skip the reused password check. Null means leave it as it is now.
                 Skip2FACheck:
-                  type: string
+                  type: boolean
                   description: Whether to skip the 2FA check. Null means leave it as it is now.
       responses:
         "200":
@@ -25564,7 +25997,7 @@ paths:
               type: object
               properties:
                 LastUseTime:
-                  type: string
+                  type: integer
                   description: Time when the item was last used. If no value is passed then the current server time will be used.
       responses:
         "200":
@@ -25725,7 +26158,7 @@ paths:
                   type: integer
                   description: Expiration time for the link in seconds. Minimum 3600 (1h), at maximum 30 days in the future
                 MaxReadCount:
-                  type: string
+                  type: integer
                   description: Maximum amount of times that the item can be read. Unlimited reads if null
                 EncryptedItemKey:
                   type: string
@@ -25737,7 +26170,7 @@ paths:
                   type: integer
                   description: ShareKey rotation used for encrypting the encryptedLinkKey
                 LinkKeyEncryptedWithItemKey:
-                  type: string
+                  type: boolean
                   description: If the link key is being encrypted with the item key
       responses:
         "200":
@@ -26131,7 +26564,7 @@ paths:
                   type: string
                   description: ShareRoleID to apply to this share
                 ExpireTime:
-                  type: string
+                  type: integer
                   description: Expiration time to set for this share
       responses:
         "200":
@@ -26200,7 +26633,7 @@ paths:
                       Code:
                         type: integer
                       Data:
-                        type: string
+                        type: object
   /pass/v1/user/alias/count:
     get:
       tags: [pass]
@@ -26578,7 +27011,7 @@ paths:
               type: object
               properties:
                 TransferMailboxID:
-                  type: string
+                  type: integer
                   description: Mailbox ID to which to transfer all existing aliases (optional)
       responses:
         "200":
@@ -26740,7 +27173,7 @@ paths:
                       Code:
                         type: integer
                       Settings:
-                        type: string
+                        type: object
   /pass/v1/user/alias/settings/default_alias_domain:
     put:
       tags: [pass]
@@ -26890,10 +27323,10 @@ paths:
               type: object
               properties:
                 ProtonAddress:
-                  type: string
+                  type: boolean
                   description: Enable or disable monitor for proton addresses. Null leaves the value as is
                 Aliases:
-                  type: string
+                  type: boolean
                   description: Enable or disable monitor for aliases. Null leaves the value as is
       responses:
         "200":
@@ -26908,7 +27341,7 @@ paths:
                       Code:
                         type: integer
                       Monitor:
-                        type: string
+                        type: object
   /pass/v1/user/session/lock:
     delete:
       tags: [pass]

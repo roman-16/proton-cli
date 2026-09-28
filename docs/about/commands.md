@@ -256,6 +256,7 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton mail messages reply`](../mail/messages.md#reply) | Reply to a message |
 | [`proton mail messages send`](../mail/messages.md#send) | Compose and send a message |
 | [`proton mail messages star`](../mail/messages.md#star) | Star messages |
+| [`proton mail messages trackers list`](../mail/messages.md#trackers-list) | List the trackers blocked in a message |
 | [`proton mail messages trash`](../mail/messages.md#trash) | Move messages to the trash |
 | [`proton mail messages unlabel`](../mail/messages.md#unlabel) | Detach a label from messages |
 | [`proton mail messages unschedule`](../mail/messages.md#unschedule) | Cancel a scheduled send, returning the message to drafts |

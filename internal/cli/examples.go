@@ -659,6 +659,7 @@ var examples = map[string][]string{
 	"proton mail messages get": {
 		"proton mail messages get 'Invoice #2291'",
 		"proton mail messages get 5bH2mQxK --render html",
+		"proton mail messages get 5bH2mQxK --render raw",
 		"proton mail messages get 5bH2mQxK --body-only --strip-quotes",
 	},
 	"proton mail messages send": {
@@ -763,6 +764,10 @@ var examples = map[string][]string{
 		"proton mail messages attachments download 'Invoice #2291' --dest-dir .",
 		"proton mail messages attachments download 'Invoice #2291' invoice-2291.pdf --dest-dir .",
 		"proton mail messages attachments download 5bH2mQxK kQ81mDx4 --dest invoice.pdf",
+	},
+	"proton mail messages trackers list": {
+		"proton mail messages trackers list 'The north trail is open again'",
+		"proton mail messages trackers list 9xL4pQrT --output json",
 	},
 
 	// ── mail: conversations ──

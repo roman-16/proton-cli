@@ -225,6 +225,12 @@ type rawMessage struct {
 type rawAttachment struct {
 	ID, Name, MIMEType, KeyPackets, Disposition, ContentID string
 	Size                                                   int64
+	Headers                                                map[string]any
+}
+
+func (a rawAttachment) header(name string) string {
+	value, _ := a.Headers[name].(string)
+	return value
 }
 
 // Message flags the CLI acts on, from Proton's MESSAGE_FLAGS.

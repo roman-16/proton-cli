@@ -1,0 +1,4635 @@
+[
+  {
+    "name": "Global",
+    "match": {
+      "source": ".*",
+      "flags": ""
+    },
+    "match_href": false,
+    "rules": [
+      "utm_source",
+      "utm_medium",
+      "utm_term",
+      "utm_campaign",
+      "utm_content",
+      "utm_name",
+      "utm_cid",
+      "utm_reader",
+      "utm_viz_id",
+      "utm_pubreferrer",
+      "utm_swu",
+      "utm_social-type",
+      "utm_brand",
+      "utm_team",
+      "utm_feeditemid",
+      "utm_id",
+      "utm_marketing_tactic",
+      "utm_creative_format",
+      "utm_campaign_id",
+      "utm_source_platform",
+      "utm_timestamp",
+      "utm_souce",
+      "utm_couponvalue",
+      "itm_source",
+      "itm_medium",
+      "itm_term",
+      "itm_campaign",
+      "itm_content",
+      "itm_channel",
+      "itm_source_s",
+      "itm_medium_s",
+      "itm_campaign_s",
+      "itm_audience",
+      "int_source",
+      "int_cmp_name",
+      "int_cmp_id",
+      "int_cmp_creative",
+      "int_medium",
+      "int_campaign",
+      "int_content",
+      "pk_campaign",
+      "pk_cpn",
+      "pk_source",
+      "pk_medium",
+      "pk_keyword",
+      "pk_kwd",
+      "pk_content",
+      "pk_cid",
+      "piwik_campaign",
+      "piwik_cpn",
+      "piwik_source",
+      "piwik_medium",
+      "piwik_keyword",
+      "piwik_kwd",
+      "piwik_content",
+      "piwik_cid",
+      "gclid",
+      "ga_source",
+      "ga_medium",
+      "ga_term",
+      "ga_content",
+      "ga_campaign",
+      "ga_place",
+      "gclid",
+      "gclsrc",
+      "hsa_cam",
+      "hsa_grp",
+      "hsa_mt",
+      "hsa_src",
+      "hsa_ad",
+      "hsa_acc",
+      "hsa_net",
+      "hsa_kw",
+      "hsa_tgt",
+      "hsa_ver",
+      "hsa_la",
+      "hsa_ol",
+      "fbclid",
+      "oly_enc_id",
+      "oly_anon_id",
+      "vero_id",
+      "vero_conv",
+      "__s",
+      "_hsenc",
+      "_hsmi",
+      "__hssc",
+      "__hstc",
+      "__hsfp",
+      "hsCtaTracking",
+      "mkt_tok",
+      "mtm_campaign",
+      "mtm_keyword",
+      "mtm_kwd",
+      "mtm_source",
+      "mtm_medium",
+      "mtm_content",
+      "mtm_cid",
+      "mtm_group",
+      "mtm_placement",
+      "elqTrackId",
+      "elq",
+      "elqak",
+      "elqaid",
+      "elqat",
+      "elqCampaignId",
+      "elqTrack",
+      "mc_cid",
+      "mc_eid",
+      "ncid",
+      "cmpid",
+      "mbid",
+      "rdt_cid"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "audible.com",
+    "match": {
+      "source": "www.audible.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "qid",
+      "sr",
+      "pf_rd_p",
+      "pf_rd_r",
+      "plink",
+      "ref"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "bandcamp.com",
+    "match": {
+      "source": ".*.bandcamp.com",
+      "flags": "gi"
+    },
+    "match_href": false,
+    "rules": [
+      "from",
+      "search_item_id",
+      "search_item_type",
+      "search_match_part",
+      "search_page_id",
+      "search_page_no",
+      "search_rank",
+      "search_sig"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "amazon.com",
+    "match": {
+      "source": "amazon\\.[a-z0-9]{0,3}",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "psc",
+      "colid",
+      "coliid",
+      "linkId",
+      "tag",
+      "linkCode",
+      "ms3_c",
+      "pf_rd_s",
+      "pf_rd_t",
+      " pf_rd_i",
+      "pf_rd_m",
+      "pd_rd_w",
+      "qid",
+      "sr",
+      "keywords",
+      "dchild",
+      "ref",
+      "ref_",
+      "rnid",
+      "pf_rd_r",
+      "pf_rd_p",
+      "pd_rd_r",
+      "smid",
+      "pd_rd_wg",
+      "content-id",
+      "spLa",
+      "crid",
+      "sprefix",
+      "hvlocint",
+      "hvdvcmdl",
+      "hvptwo",
+      "hvpone",
+      "hvpos",
+      "qu",
+      "pd_rd_i",
+      "nc2",
+      "nc1",
+      "trk",
+      "sc_icampaign",
+      "trkCampaign",
+      "ufe",
+      "sc_icontent",
+      "sc_ichannel",
+      "sc_iplace",
+      "sc_country",
+      "sc_outcome",
+      "sc_geo",
+      "sc_campaign",
+      "sc_channel"
+    ],
+    "replace": [
+      {
+        "source": "(\\/ref|&ref_)=[^\\/?]*",
+        "flags": "i"
+      }
+    ],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "reddit.com",
+    "match": {
+      "source": ".*.reddit.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "ref_campaign",
+      "ref_source",
+      "tags",
+      "keyword",
+      "channel",
+      "campaign",
+      "user_agent",
+      "domain",
+      "base_url",
+      "$android_deeplink_path",
+      "$deeplink_path",
+      "$og_redirect",
+      "share_id",
+      "correlation_id",
+      "ref",
+      "rdt"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "app.link",
+    "match": {
+      "source": ".*\\.app\\.link",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "tags",
+      "keyword",
+      "channel",
+      "campaign",
+      "user_agent",
+      "domain",
+      "base_url",
+      "$android_deeplink_path",
+      "$deeplink_path",
+      "$og_redirect",
+      "compact_view",
+      "dnt",
+      "adblock",
+      "geoip_country",
+      "referrer_domain",
+      "referrer_url"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "twitch.tv",
+    "match": {
+      "source": "www.twitch.tv",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "tt_medium",
+      "tt_content",
+      "tt_email_id"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "twitch.tv-email",
+    "match": {
+      "source": "www.twitch.tv\\/r\\/e",
+      "flags": "i"
+    },
+    "match_href": true,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": {
+      "param": "",
+      "look_for": "",
+      "encoding": "",
+      "target_path": true,
+      "handler": "twitch.tv-email"
+    },
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "blog.twitch.tv",
+    "match": {
+      "source": "blog.twitch.tv",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "utm_referrer"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "pixiv.net",
+    "match": {
+      "source": "www.pixiv.net",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "p",
+      "i",
+      "g"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "spotify.com",
+    "match": {
+      "source": "open.spotify.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "si",
+      "utm_source",
+      "context",
+      "sp_cid",
+      "_branch_match_id",
+      "_branch_referrer"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [
+      "go",
+      "nd"
+    ],
+    "rev": false
+  },
+  {
+    "name": "aliexpress.com",
+    "match": {
+      "source": "^(?:https?:\\/\\/)?(?:[^.]+\\.)?aliexpress\\.(?:[a-z]{2,}){1,}",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "_t",
+      "spm",
+      "algo_pvid",
+      "algo_expid",
+      "btsid",
+      "ws_ab_test",
+      "initiative_id",
+      "origin",
+      "widgetId",
+      "tabType",
+      "productId",
+      "productIds",
+      "gps-id",
+      "scm",
+      "scm_id",
+      "scm-url",
+      "pvid",
+      "algo_exp_id",
+      "pdp_pi",
+      "fromRankId",
+      "sourceType",
+      "utparam",
+      "gatewayAdapt",
+      "_evo_buckets",
+      "tpp_rcmd_bucket_id",
+      "scenario",
+      "pdp_npi",
+      "tt",
+      "spreadType",
+      "srcSns",
+      "bizType",
+      "social_params",
+      "aff_fcid",
+      "aff_fsk",
+      "aff_platform",
+      "aff_trace_key",
+      "shareId",
+      "platform",
+      "businessType",
+      "terminal_id",
+      "afSmartRedirect",
+      "sk",
+      "gbraid"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [
+      "sku_id",
+      "pdp_ext_f"
+    ],
+    "rev": false
+  },
+  {
+    "name": "google.com",
+    "match": {
+      "source": "www.google\\..*",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "sourceid",
+      "client",
+      "aqs",
+      "sxsrf",
+      "uact",
+      "ved",
+      "iflsig",
+      "source",
+      "ei",
+      "oq",
+      "gs_lcp",
+      "sclient",
+      "bih",
+      "biw",
+      "sa",
+      "dpr",
+      "rlz",
+      "gs_lp",
+      "sca_esv",
+      "si",
+      "gs_l",
+      "gs_lcrp"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "url",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "youtube.com",
+    "match": {
+      "source": ".*.youtube.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "gclid",
+      "feature",
+      "app",
+      "src",
+      "lId",
+      "cId",
+      "embeds_referring_euri"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "q",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "humblebundle.com",
+    "match": {
+      "source": "www.humblebundle.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "hmb_source",
+      "hmb_medium",
+      "hmb_campaign",
+      "mcID",
+      "linkID"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [
+      "partner"
+    ],
+    "rev": false
+  },
+  {
+    "name": "greenmangaming.com",
+    "match": {
+      "source": "www.greenmangaming.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "CJEVENT",
+      "cjevent",
+      "irclickid",
+      "irgwc",
+      "pdpgatetoken"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "fanatical.com",
+    "match": {
+      "source": "www.fanatical.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "cj_pid",
+      "cj_aid",
+      "aff_track",
+      "CJEVENT",
+      "cjevent"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "newsweek.com",
+    "match": {
+      "source": "www.newsweek.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "subref",
+      "amp"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "imgur.com",
+    "match": {
+      "source": "imgur.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "source"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "plex.tv",
+    "match": {
+      "source": ".*.plex.tv",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "origin",
+      "plex_utm",
+      "sl",
+      "ckhid"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "imdb.com",
+    "match": {
+      "source": "^.*\\.imdb\\.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "ref_",
+      "ref\\_",
+      "pf_rd_m",
+      "pf_rd_r",
+      "pf_rd_p",
+      "pf_rd_s",
+      "pf_rd_t",
+      "pf_rd_i",
+      "ref_hp_hp_e_2",
+      "rf",
+      "ref"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "gog.com",
+    "match": {
+      "source": "www.gog.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "at_gd",
+      "rec_scenario_id",
+      "rec_sub_source_id",
+      "rec_item_id",
+      "vds_id",
+      "prod_id",
+      "rec_source"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "tiktok.com",
+    "match": {
+      "source": "www.tiktok.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "is_copy_url",
+      "is_from_webapp",
+      "sender_device",
+      "sender_web_id",
+      "sec_user_id",
+      "share_app_id",
+      "share_item_id",
+      "share_link_id",
+      "social_sharing",
+      "_r",
+      "source",
+      "user_id",
+      "u_code",
+      "tt_from",
+      "share_author_id",
+      "sec_uid",
+      "checksum",
+      "_d",
+      "refer",
+      "enter_from",
+      "enter_method",
+      "attr_medium",
+      "attr_source"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [
+      "lang"
+    ],
+    "rev": false
+  },
+  {
+    "name": "tiktok.com/link",
+    "match": {
+      "source": "tiktok\\.com\\/link\\/v2",
+      "flags": "i"
+    },
+    "match_href": true,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "target",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "facebook.com",
+    "match": {
+      "source": ".*.facebook.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "fbclid",
+      "fb_ref",
+      "fb_source",
+      "referral_code",
+      "referral_story_type",
+      "tracking",
+      "ref"
+    ],
+    "replace": [],
+    "exclude": [
+      {
+        "source": "www\\.facebook\\.com\\/sharer",
+        "flags": "gi"
+      }
+    ],
+    "redirect": "u",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "yandex.com",
+    "match": {
+      "source": "yandex.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "lr",
+      "from",
+      "grhow",
+      "origin",
+      "_openstat"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "store.steampowered.com",
+    "match": {
+      "source": "store.steampowered.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "snr"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "findojobs.co.nz",
+    "match": {
+      "source": "www.findojobs.co.nz",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "source"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "linkedin.com",
+    "match": {
+      "source": ".*.linkedin.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "contextUrn",
+      "destRedirectURL",
+      "lipi",
+      "licu",
+      "trk",
+      "trkInfo",
+      "originalReferer",
+      "upsellOrderOrigin",
+      "upsellTrk",
+      "upsellTrackingId",
+      "src",
+      "trackingId",
+      "midToken",
+      "midSig",
+      "trkEmail",
+      "eid"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [
+      "otpToken"
+    ],
+    "rev": false
+  },
+  {
+    "name": "indeed.com",
+    "match": {
+      "source": ".*.indeed.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "from",
+      "attributionid"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "discord.com",
+    "match": {
+      "source": "(?:.*\\.)?discord\\.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "source",
+      "ref"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "medium.com",
+    "match": {
+      "source": "medium.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "source"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "twitter.com",
+    "match": {
+      "source": "twitter.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "s",
+      "src",
+      "ref_url",
+      "ref_src"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "voidu.com",
+    "match": {
+      "source": "voidu.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "affiliate"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "wingamestore.com",
+    "match": {
+      "source": "wingamestore.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "ars"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "gamebillet.com",
+    "match": {
+      "source": "gamebillet.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "affiliate"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "gamesload.com",
+    "match": {
+      "source": "^www.gamesload.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "affil"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [
+      "REF"
+    ],
+    "rev": false
+  },
+  {
+    "name": "mightyape",
+    "match": {
+      "source": "mightyape.(co.nz|com.au)",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "m"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "apple.com",
+    "match": {
+      "source": ".*.apple.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "uo",
+      "app",
+      "at",
+      "ct",
+      "ls",
+      "pt",
+      "mt",
+      "itsct",
+      "itscg",
+      "referrer",
+      "src",
+      "cid"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "music.apple.com",
+    "match": {
+      "source": "music.apple.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "i",
+      "lId",
+      "cId",
+      "sr",
+      "src"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "play.google.com",
+    "match": {
+      "source": "play.google.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "referrer",
+      "pcampaignid"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "adtraction.com",
+    "match": {
+      "source": "adtraction.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "url",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "dpbolvw.net",
+    "match": {
+      "source": "dpbolvw.net",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "url",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "lenovo.com",
+    "match": {
+      "source": ".*.lenovo.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "PID",
+      "clickid",
+      "irgwc",
+      "cid",
+      "acid",
+      "linkTrack"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "itch.io",
+    "match": {
+      "source": "itch.io",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "fbclid"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "steamcommunity.com",
+    "match": {
+      "source": "steamcommunity.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "url",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "steamcommunity.com/linkfilter",
+    "match": {
+      "source": "steamcommunity.com\\/linkfilter",
+      "flags": "i"
+    },
+    "match_href": true,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "u",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "microsoft.com",
+    "match": {
+      "source": "microsoft.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "refd",
+      "icid"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "berrybase.de",
+    "match": {
+      "source": "berrybase.de",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "sPartner"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "instagram.com",
+    "match": {
+      "source": "instagram.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "igshid",
+      "igsh",
+      "source"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "u",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "hubspot.com",
+    "match": {
+      "source": "hubspot.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "hubs_content-cta",
+      "hubs_content"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "ebay.com",
+    "match": {
+      "source": "^(?:https?:\\/\\/)?(?:[^.]+\\.)?ebay\\.[a-z0-9]{0,3}",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "amdata",
+      "var",
+      "hash",
+      "_trkparms",
+      "_trksid",
+      "_from",
+      "mkcid",
+      "mkrid",
+      "campid",
+      "toolid",
+      "mkevt",
+      "customid",
+      "siteid",
+      "ufes_redirect",
+      "ff3",
+      "pub",
+      "media",
+      "widget_ver",
+      "ssspo",
+      "sssrc",
+      "ssuid"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [
+      "epid",
+      "_nkw"
+    ],
+    "rev": false
+  },
+  {
+    "name": "shopee.com",
+    "match": {
+      "source": "^(?:https?:\\/\\/)?(?:[^.]+\\.)?shopee\\.[a-z0-9]{0,3}",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "af_siteid",
+      "pid",
+      "af_click_lookback",
+      "af_viewthrough_lookback",
+      "is_retargeting",
+      "af_reengagement_window",
+      "af_sub_siteid",
+      "c"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "msn.com",
+    "match": {
+      "source": "www.msn.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "ocid",
+      "cvid",
+      "pc"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "nuuvem.com",
+    "match": {
+      "source": "www.nuuvem.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "ranMID",
+      "ranEAID",
+      "ranSiteID"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "sjv.io",
+    "match": {
+      "source": ".*.sjv.io",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "u",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "linksynergy.com",
+    "match": {
+      "source": ".*.linksynergy.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "id",
+      "mid"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "murl",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "cnbc.com",
+    "match": {
+      "source": "www.cnbc.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "__source"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "yahoo.com",
+    "match": {
+      "source": "yahoo.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "guce_referrer",
+      "guce_referrer_sig",
+      "guccounter",
+      "soc_src",
+      "soc_trk",
+      "tsrc"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "techcrunch.com",
+    "match": {
+      "source": "techcrunch.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "guce_referrer",
+      "guce_referrer_sig",
+      "guccounter"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "office.com",
+    "match": {
+      "source": "office.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "from"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "ticketmaster.co.nz",
+    "match": {
+      "source": "ticketmaster.co.nz",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "tm_link"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "bostonglobe.com",
+    "match": {
+      "source": "bostonglobe.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "p1"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "ampproject.org",
+    "match": {
+      "source": "cdn.ampproject.org",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "amp_gsa",
+      "amp_js_v",
+      "usqp",
+      "outputType"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "nbcnews.com",
+    "match": {
+      "source": "nbcnews.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "fbclid"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "countdown.co.nz",
+    "match": {
+      "source": "www.countdown.co.nz",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "promo_name",
+      "promo_creative",
+      "promo_position",
+      "itemID"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "etsy.com",
+    "match": {
+      "source": "www.etsy.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "click_key",
+      "click_sum",
+      "rec_type",
+      "ref",
+      "frs",
+      "sts",
+      "dd_referrer"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "wattpad.com",
+    "match": {
+      "source": "www.wattpad.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "wp_page",
+      "wp_uname",
+      "wp_originator"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "redirect.viglink.com",
+    "match": {
+      "source": "redirect.viglink.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "u",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "noctre.com",
+    "match": {
+      "source": "www.noctre.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "aff"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "dreamgame.com",
+    "match": {
+      "source": "www.dreamgame.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "affiliate"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "startpage.com",
+    "match": {
+      "source": ".*.startpage.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "source"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "2game.com",
+    "match": {
+      "source": "^2game.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "ref"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "jdoqocy.com",
+    "match": {
+      "source": "^www.jdoqocy.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "url",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "gamesplanet.com",
+    "match": {
+      "source": "^(?:.*\\.|)gamesplanet\\.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "ref"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "gamersgate.com",
+    "match": {
+      "source": "www.gamersgate.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "aff"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "gate.sc",
+    "match": {
+      "source": "gate.sc",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "url",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "getmusicbee.com",
+    "match": {
+      "source": "^getmusicbee.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "r",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "imp.i305175.net",
+    "match": {
+      "source": "^imp.i305175.net",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "u",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "qflm.net",
+    "match": {
+      "source": ".*.qflm.net",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "u",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "anrdoezrs.net",
+    "match": {
+      "source": "anrdoezrs.net",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "emjcd.com",
+    "match": {
+      "source": "^www.emjcd.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": {
+      "param": "d",
+      "look_for": "destinationUrl",
+      "encoding": "",
+      "target_path": false,
+      "handler": ""
+    },
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "go2cloud.org",
+    "match": {
+      "source": "^.*.go2cloud.org",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "aff_unique1",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "bn5x.net",
+    "match": {
+      "source": "^.*.bn5x.net",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "u",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "tvguide.com",
+    "match": {
+      "source": "^www.tvguide.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "ranker.com",
+    "match": {
+      "source": "^(www|blog).ranker.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "ref",
+      "rlf",
+      "l",
+      "li_source",
+      "li_medium"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "tkqlhce.com",
+    "match": {
+      "source": "^www.tkqlhce.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "url",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "flexlinkspro.com",
+    "match": {
+      "source": "^track.flexlinkspro.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "url",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "watchworthy.app",
+    "match": {
+      "source": "^watchworthy.app",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "ref"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "hbomax.com",
+    "match": {
+      "source": "^trk.hbomax.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "url",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "squarespace.com",
+    "match": {
+      "source": "^.*.squarespace.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "subchannel",
+      "source",
+      "subcampaign",
+      "campaign",
+      "channel",
+      "_ga"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "baidu.com",
+    "match": {
+      "source": "^www.baidu.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "rsv_spt",
+      "rsv_idx",
+      "rsv_pq",
+      "rsv_t",
+      "rsv_bp",
+      "rsv_dl",
+      "rsv_iqid",
+      "rsv_enter",
+      "rsv_sug1",
+      "rsv_sug2",
+      "rsv_sug3",
+      "rsv_sug4",
+      "rsv_sug5",
+      "rsv_sug6",
+      "rsv_sug7",
+      "rsv_sug8",
+      "rsv_sug9",
+      "rsv_sug7",
+      "rsv_btype",
+      "tn",
+      "sa",
+      "rsf",
+      "rqid",
+      "usm",
+      "__pc2ps_ab",
+      "p_signature",
+      "p_sign",
+      "p_timestamp",
+      "p_tk",
+      "oq"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [
+      "wd",
+      "ie"
+    ],
+    "rev": false
+  },
+  {
+    "name": "primevideo.com",
+    "match": {
+      "source": "^www.primevideo.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "dclid"
+    ],
+    "replace": [
+      {
+        "source": "\\/ref=[^\\/?]*",
+        "flags": "i"
+      }
+    ],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "threadless.com",
+    "match": {
+      "source": "^www.threadless.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "itm_source_s",
+      "itm_medium_s",
+      "itm_campaign_s"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "wsj.com",
+    "match": {
+      "source": "^www.wsj.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "mod"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "thewarehouse.co.nz",
+    "match": {
+      "source": "^www.thewarehouse.co.nz",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "sfmc_j",
+      "sfmc_id",
+      "sfmc_mid",
+      "sfmc_uid",
+      "sfmc_id",
+      "sfmc_activityid"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "awstrack.me",
+    "match": {
+      "source": "^.*awstrack.me",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "express.co.uk",
+    "match": {
+      "source": "^www.express.co.uk",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [
+      {
+        "source": "\\/amp$",
+        "flags": "i"
+      }
+    ],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "ko-fi.com",
+    "match": {
+      "source": "^ko-fi.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "ref",
+      "src"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "indiegala.com",
+    "match": {
+      "source": "^www.indiegala.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "ref"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "l.messenger.com",
+    "match": {
+      "source": "^l.messenger.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "u",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "transparency.fb.com",
+    "match": {
+      "source": "^transparency.fb.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "source"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "manymorestores.com",
+    "match": {
+      "source": "^www.manymorestores.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "ref"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "macgamestore.com",
+    "match": {
+      "source": "^www.macgamestore.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "ars"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "blizzardgearstore.com",
+    "match": {
+      "source": "^www.blizzardgearstore.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "_s"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "playbook.com",
+    "match": {
+      "source": "^www.playbook.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "p"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "cookiepro.com",
+    "match": {
+      "source": "^.*.cookiepro.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "source",
+      "referral"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "pinterest.com",
+    "match": {
+      "source": "^www\\.pinterest\\..*",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "rs"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "bing.com",
+    "match": {
+      "source": "^www\\.bing\\.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "qs",
+      "form",
+      "sp",
+      "pq",
+      "sc",
+      "sk",
+      "cvid",
+      "FORM",
+      "ck",
+      "simid",
+      "thid",
+      "cdnurl",
+      "pivotparams",
+      "ghsh",
+      "ghacc",
+      "ccid",
+      "",
+      "ru"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [
+      "q",
+      "tsc",
+      "iss",
+      "id",
+      "view",
+      "setlang"
+    ],
+    "rev": false
+  },
+  {
+    "name": "jf79.net",
+    "match": {
+      "source": "^jf79\\.net",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "li",
+      "wi",
+      "ws",
+      "ws2"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "frankenergie.nl",
+    "match": {
+      "source": "^www\\.frankenergie\\.nl",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "aff_id"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "nova.cz",
+    "match": {
+      "source": "^.*\\.nova\\.cz",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "sznclid"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "cnn.com",
+    "match": {
+      "source": ".*.cnn.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "hpt",
+      "iid"
+    ],
+    "replace": [],
+    "exclude": [
+      {
+        "source": "e.newsletters.cnn.com",
+        "flags": "gi"
+      }
+    ],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "amp.scmp.com",
+    "match": {
+      "source": "amp\\.scmp\\.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "justwatch.com",
+    "match": {
+      "source": "click\\.justwatch\\.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "cx",
+      "uct_country",
+      "uct_buybox",
+      "sid"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "r",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "psychologytoday.com",
+    "match": {
+      "source": "www\\.psychologytoday\\.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "amp"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "mouser.com",
+    "match": {
+      "source": "www\\.mouser\\.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "qs"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "awin1.com",
+    "match": {
+      "source": "www\\.awin1\\.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "awinmid",
+      "awinaffid",
+      "clickref"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "ued",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "syteapi.com",
+    "match": {
+      "source": "syteapi\\.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": {
+      "param": "url",
+      "look_for": "",
+      "encoding": "base64",
+      "target_path": false,
+      "handler": ""
+    },
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "castorama.fr",
+    "match": {
+      "source": "www\\.castorama\\.fr",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "syte_ref"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "quizlet.com",
+    "match": {
+      "source": "quizlet\\.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "funnelUUID",
+      "source"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "pbtech.co.nz",
+    "match": {
+      "source": "www\\.pbtech\\.co\\.nz",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "qr"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "matomo.org",
+    "match": {
+      "source": "matomo\\.org",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "menu",
+      "footer",
+      "header",
+      "hp-reasons-learn",
+      "hp-top",
+      "above-fold",
+      "step1-hp",
+      "mid-hp",
+      "take-back-control-hp",
+      "hp-reasons-icon",
+      "hp-reasons-heading",
+      "hp-reasons-p",
+      "hp-bottom",
+      "footer",
+      "menu"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "eufy.com",
+    "match": {
+      "source": "eufy\\.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "ref"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "newsflare.com",
+    "match": {
+      "source": "www\\.newsflare\\.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "jwsource"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "wish.com",
+    "match": {
+      "source": "www\\.wish\\.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "share"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "change.org",
+    "match": {
+      "source": "www\\.change\\.org",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "source_location"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "washingtonpost.com",
+    "match": {
+      "source": ".*\\.washingtonpost\\.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "itid",
+      "s_l"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "lowes.com",
+    "match": {
+      "source": "www\\.lowes\\.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "cm_mmc",
+      "ds_rl",
+      "gbraid"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "stacks.wellcomecollection.org",
+    "match": {
+      "source": "stacks\\.wellcomecollection\\.org",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "source"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "redbubble.com",
+    "match": {
+      "source": ".*\\.redbubble\\.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "ref"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "inyourarea.co.uk",
+    "match": {
+      "source": "inyourarea.co.uk",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "from_reach_primary_nav",
+      "from_reach_footer_nav",
+      "branding"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "fiverr.com",
+    "match": {
+      "source": ".*\\.fiverr\\.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "source",
+      "context_referrer",
+      "referrer_gig_slug",
+      "ref_ctx_id",
+      "funnel",
+      "imp_id"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "kqzyfj.com",
+    "match": {
+      "source": "www\\.kqzyfj\\.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "cjsku",
+      "pubdata"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "url",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "marca.com",
+    "match": {
+      "source": ".*\\.marca\\.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "intcmp",
+      "s_kw",
+      "emk"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "marcaentradas.com",
+    "match": {
+      "source": ".*\\.marcaentradas\\.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "intcmp",
+      "s_kw"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "honeycode.aws",
+    "match": {
+      "source": ".*\\.honeycode\\.aws",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "trackingId",
+      "sc_icampaign",
+      "sc_icontent",
+      "sc_ichannel",
+      "sc_iplace",
+      "sc_country",
+      "sc_outcome",
+      "sc_geo",
+      "sc_campaign",
+      "sc_channel",
+      "trkCampaign",
+      "trk"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "news.artnet.com",
+    "match": {
+      "source": "news\\.artnet\\.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [
+      {
+        "source": "\\/amp-page$",
+        "flags": "i"
+      }
+    ],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "studentbeans.com",
+    "match": {
+      "source": "www\\.studentbeans\\.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "source"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "boxofficemojo.com",
+    "match": {
+      "source": "boxofficemojo.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "ref_"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "solodeportes.com.ar",
+    "match": {
+      "source": "www.solodeportes.com.ar",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "nosto",
+      "refSrc"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "amp.dw.com",
+    "match": {
+      "source": "amp.dw.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "joybuggy.com",
+    "match": {
+      "source": "joybuggy.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "ref"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "etail.market",
+    "match": {
+      "source": "etail.market",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "tracking"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "myanimelist.net",
+    "match": {
+      "source": "myanimelist.net",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "_location",
+      "click_type",
+      "click_param"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "support-dev.discord.com",
+    "match": {
+      "source": "support-dev.discord.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "ref"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "dlgamer.com",
+    "match": {
+      "source": "dlgamer.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "affil"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "newsletter.manor.ch",
+    "match": {
+      "source": "newsletter.manor.ch",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "user_id_1"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": true
+  },
+  {
+    "name": "knowyourmeme.com",
+    "match": {
+      "source": "amp.knowyourmeme.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "ojrq.net",
+    "match": {
+      "source": "ojrq.net",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "return",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "click.pstmrk.it",
+    "match": {
+      "source": "click.pstmrk.it",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "track.roeye.co.nz",
+    "match": {
+      "source": "track.roeye.co.nz",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "path",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "producthunt.com",
+    "match": {
+      "source": "producthunt.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "ref"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "cbsnews.com",
+    "match": {
+      "source": "www.cbsnews.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "ftag",
+      "intcid"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "jobs.venturebeat.com",
+    "match": {
+      "source": "jobs.venturebeat.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "source"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "api.ffm.to",
+    "match": {
+      "source": "api.ffm.to",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": {
+      "param": "cd",
+      "look_for": "destUrl",
+      "encoding": "",
+      "target_path": false,
+      "handler": ""
+    },
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "wfaa.com",
+    "match": {
+      "source": "www.wfaa.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "ref"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "buyatoyota.com",
+    "match": {
+      "source": "www.buyatoyota.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "siteid"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "independent.co.uk",
+    "match": {
+      "source": "www.independent.co.uk",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "amp",
+      "regSourceMethod"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "lenovo.vzew.net",
+    "match": {
+      "source": "lenovo.vzew.net",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "u",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "stats.newswire.com",
+    "match": {
+      "source": "stats.newswire.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": {
+      "param": "final",
+      "look_for": "",
+      "encoding": "",
+      "target_path": false,
+      "handler": ""
+    },
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "cooking.nytimes.com",
+    "match": {
+      "source": "cooking.nytimes.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "smid",
+      "variant",
+      "algo",
+      "req_id",
+      "surface",
+      "imp_id",
+      "action",
+      "region",
+      "module",
+      "pgType"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "optigruen.com",
+    "match": {
+      "source": "www\\.optigruen\\.[a-z0-9]{0,3}",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "cHash",
+      "chash",
+      "mdrv"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "osi.rosenberger.com",
+    "match": {
+      "source": "osi.rosenberger.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "cHash",
+      "chash"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "cbc.ca",
+    "match": {
+      "source": "cbc.ca",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "__vfz",
+      "cmp",
+      "referrer"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "local12.com",
+    "match": {
+      "source": "local12.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "_gl"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "eufylife.com",
+    "match": {
+      "source": "eufylife.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "ref"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "walmart.com",
+    "match": {
+      "source": "walmart.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "athAsset",
+      "povid",
+      "wmlspartner",
+      "athcpid",
+      "athpgid",
+      "athznid",
+      "athmtid",
+      "athstid",
+      "athguid",
+      "athwpid",
+      "athtvid",
+      "athcgid",
+      "athieid",
+      "athancid",
+      "athbdg",
+      "campaign_id",
+      "eventST",
+      "bt",
+      "pos",
+      "rdf",
+      "tax",
+      "plmt",
+      "mloc",
+      "pltfm",
+      "pgId",
+      "pt",
+      "spQs",
+      "adUid",
+      "adsRedirect"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "rd",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "adclick.g.doubleclick.net",
+    "match": {
+      "source": "adclick.g.doubleclick.net",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "adurl",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "dyno.gg",
+    "match": {
+      "source": "dyno.gg",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "ref"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "eufylife.com",
+    "match": {
+      "source": "eufylife.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "ref"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "connect.studentbeans.com",
+    "match": {
+      "source": "connect.studentbeans.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "ref"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "urldefense.proofpoint.com",
+    "match": {
+      "source": "urldefense.proofpoint.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": {
+      "param": "u",
+      "look_for": "",
+      "encoding": "",
+      "target_path": false,
+      "handler": "urldefense.proofpoint.com"
+    },
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "curseforge.com",
+    "match": {
+      "source": "www.curseforge.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "remoteurl",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "s.pemsrv.com",
+    "match": {
+      "source": "s.pemsrv.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "cat",
+      "idzone",
+      "type",
+      "sub",
+      "block",
+      "el",
+      "tags",
+      "cookieconsent",
+      "scr_info"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "p",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "chess.com",
+    "match": {
+      "source": "www.chess.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "c"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "porndude.link",
+    "match": {
+      "source": "porndude.link",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "ref"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "xvideos.com",
+    "match": {
+      "source": "xvideos.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "sxcaf"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "xvideos.red",
+    "match": {
+      "source": "xvideos.red",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "sxcaf",
+      "pmsc",
+      "pmln"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "xhamster.com",
+    "match": {
+      "source": "xhamster.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "source"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "patchbot.io",
+    "match": {
+      "source": "patchbot.io",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": {
+      "param": "",
+      "look_for": "",
+      "encoding": "",
+      "target_path": true,
+      "handler": "patchbot.io"
+    },
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "milkrun.com",
+    "match": {
+      "source": "milkrun.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "_branch_match_id",
+      "_branch_referrer"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "gog.salesmanago.com",
+    "match": {
+      "source": "gog.salesmanago.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "smclient",
+      "smconv",
+      "smlid"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "url",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "dailymail.co.uk",
+    "match": {
+      "source": "dailymail.co.uk",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "reg_source",
+      "ito"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "stardockentertainment.info",
+    "match": {
+      "source": "www.stardockentertainment.info",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": {
+      "param": "",
+      "look_for": "",
+      "encoding": "",
+      "target_path": true,
+      "handler": "stardockentertainment.info"
+    },
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "steam.gs",
+    "match": {
+      "source": "steam.gs",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": {
+      "param": "",
+      "look_for": "",
+      "encoding": "",
+      "target_path": true,
+      "handler": "steam.gs"
+    },
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "0yxjo.mjt.lu",
+    "match": {
+      "source": "0yxjo.mjt.lu",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": {
+      "param": "",
+      "look_for": "",
+      "encoding": "",
+      "target_path": true,
+      "handler": "0yxjo.mjt.lu"
+    },
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "click.redditmail.com",
+    "match": {
+      "source": "click.redditmail.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": {
+      "param": "",
+      "look_for": "",
+      "encoding": "",
+      "target_path": true,
+      "handler": "click.redditmail.com"
+    },
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "deals.dominos.co.nz",
+    "match": {
+      "source": "deals.dominos.co.nz",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": {
+      "param": "",
+      "look_for": "",
+      "encoding": "",
+      "target_path": true,
+      "handler": "deals.dominos.co.nz"
+    },
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "hashnode.com",
+    "match": {
+      "source": "(?:.*\\.)?hashnode\\.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "source"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "s.amazon-adsystem.com",
+    "match": {
+      "source": "s.amazon-adsystem.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "dsig",
+      "d",
+      "ex-fch",
+      "ex-fargs",
+      "cb"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "rd",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "hypable.com",
+    "match": {
+      "source": "www.hypable.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "theguardian.com",
+    "match": {
+      "source": "theguardian.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "INTCMP",
+      "acquisitionData",
+      "REFPVID"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "indiatoday.in",
+    "match": {
+      "source": "www.indiatoday.in",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "seek.co.nz",
+    "match": {
+      "source": "www.seek.co.nz",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "tracking",
+      "sc_trk"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "seekvolunteer.co.nz",
+    "match": {
+      "source": "seekvolunteer.co.nz",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "tracking",
+      "sc_trk"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "seekbusiness.com.au",
+    "match": {
+      "source": "www.seekbusiness.com.au",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "tracking",
+      "cid"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "garageclothing.com",
+    "match": {
+      "source": "www.garageclothing.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "syte_ref",
+      "site_ref"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "urbandictionary.com",
+    "match": {
+      "source": "urbandictionary.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "amp"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "norml.org",
+    "match": {
+      "source": "norml.org",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "amp"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "nbcconnecticut.com",
+    "match": {
+      "source": "www.nbcconnecticut.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "amp"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "pbs.org",
+    "match": {
+      "source": "www.pbs.org",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "m.thewire.in",
+    "match": {
+      "source": "m.thewire.in",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "ladysmithchronicle.com",
+    "match": {
+      "source": "www.ladysmithchronicle.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "ref"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "businesstoday.in",
+    "match": {
+      "source": "www.businesstoday.in",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "turnto10.com",
+    "match": {
+      "source": "turnto10.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "gadgets360.com",
+    "match": {
+      "source": "www.gadgets360.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "m10news.com",
+    "match": {
+      "source": "m10news.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "amp"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "elprogreso.es",
+    "match": {
+      "source": "www.elprogreso.es",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "thenewsminute.com",
+    "match": {
+      "source": "www.thenewsminute.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "mirror.co.uk",
+    "match": {
+      "source": "www.mirror.co.uk",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "libretro.com",
+    "match": {
+      "source": "www.libretro.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "amp"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "the-sun.com",
+    "match": {
+      "source": "www.the-sun.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "bostonherald.com",
+    "match": {
+      "source": "bostonherald.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "g2i_source",
+      "g2i_medium",
+      "g2i_campaign"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "playshoptitans.com",
+    "match": {
+      "source": "playshoptitans.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "af_ad",
+      "pid",
+      "source_caller",
+      "shortlink",
+      "c"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "news.com.au",
+    "match": {
+      "source": "www.news.com.au",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "sourceCode"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "wvva.com",
+    "match": {
+      "source": "www.wvva.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "outputType"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "realestate.com.au",
+    "match": {
+      "source": "www.realestate.com.au",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "campaignType",
+      "campaignChannel",
+      "campaignName",
+      "campaignContent",
+      "campaignSource",
+      "campaignPlacement",
+      "sourcePage",
+      "sourceElement",
+      "cid"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "redirectingat.com",
+    "match": {
+      "source": "redirectingat.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "id",
+      "xcust",
+      "xs"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "url",
+    "decode": {
+      "param": "",
+      "look_for": "",
+      "encoding": "",
+      "target_path": true,
+      "handler": "redirectingat.com"
+    },
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "map.sewoon.org",
+    "match": {
+      "source": "map.sewoon.org",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "cid"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "vi-control.net",
+    "match": {
+      "source": "[&?]source=https:\\/\\/vi-control\\.net\\/community$",
+      "flags": ""
+    },
+    "match_href": true,
+    "rules": [
+      "source"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "rosequake.com",
+    "match": {
+      "source": "www.rosequake.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "edmID",
+      "linkID",
+      "userID",
+      "em",
+      "taskItemID"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "to",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "rekrute.com",
+    "match": {
+      "source": "www.rekrute.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "clear"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "keyword",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "go.skimresources.com",
+    "match": {
+      "source": "go.skimresources.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "id",
+      "xs",
+      "xcust"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "url",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "khnum-ezi.com",
+    "match": {
+      "source": "khnum-ezi.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "browserWidth",
+      "browserHeight",
+      "iframeDetected",
+      "webdriverDetected",
+      "gpu",
+      "timezone",
+      "visitid",
+      "type",
+      "timezoneName"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "theatlantic.com",
+    "match": {
+      "source": "(?:www|accounts)\\.theatlantic\\.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "source",
+      "referral"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "rumble.com",
+    "match": {
+      "source": "rumble.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "e9s"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "cointiply.com",
+    "match": {
+      "source": "cointiply.com",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [
+      "source_cta"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "dev.to",
+    "match": {
+      "source": "dev.to",
+      "flags": ""
+    },
+    "match_href": false,
+    "rules": [
+      "t",
+      "s",
+      "u"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "u",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "milda-clq.com",
+    "match": {
+      "source": "milda-clq.com",
+      "flags": ""
+    },
+    "match_href": false,
+    "rules": [
+      "visitid",
+      "type",
+      "browserWidth",
+      "browserHeight",
+      "webdriverDetected",
+      "timezone",
+      "gpu",
+      "iframeDetected",
+      "timezoneName"
+    ],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": false
+  },
+  {
+    "name": "app.message.asce",
+    "match": {
+      "source": ".*.app\\.message\\.asce\\.org",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [
+      "elq"
+    ],
+    "rev": false
+  },
+  {
+    "name": "fernsehlotterie.de",
+    "match": {
+      "source": "fernsehlotterie.de",
+      "flags": "i"
+    },
+    "match_href": false,
+    "rules": [],
+    "replace": [],
+    "exclude": [],
+    "redirect": "",
+    "decode": null,
+    "allow": [],
+    "rev": true
+  }
+]

@@ -443,10 +443,8 @@ func (c *Client) credentialFor(req Request) credential {
 
 type Response struct {
 	Status int
+	Header http.Header
 	Body   []byte
-
-	// retryHeader carries the raw Retry-After header value for 429 handling.
-	retryHeader string
 }
 
 // retryAfter is the delay the server named, and nothing when it named none or
@@ -455,7 +453,7 @@ func (r *Response) retryAfter() string {
 	if r == nil {
 		return ""
 	}
-	return r.retryHeader
+	return r.Header.Get("Retry-After")
 }
 
 // Do sends a request and returns the response. Non-2xx responses return a
@@ -897,7 +895,7 @@ func (c *Client) doOnce(ctx context.Context, req Request) (*Response, error) {
 		"method", req.Method, "path", req.Path, "status", resp.StatusCode,
 		"bytes", len(buf), "duration_ms", time.Since(start).Milliseconds())
 	c.observeTime(resp.Header.Get("Date"))
-	return &Response{Status: resp.StatusCode, Body: buf, retryHeader: resp.Header.Get("Retry-After")}, nil
+	return &Response{Status: resp.StatusCode, Header: resp.Header, Body: buf}, nil
 }
 
 // observeTime learns Proton's clock from what a response was dated.

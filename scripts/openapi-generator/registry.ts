@@ -1,22 +1,7 @@
-import { Node, type SourceFile } from "ts-morph";
+import { type SourceFile } from "ts-morph";
 import type { EnumInfo } from "./types.js";
 
-export const STRING_CONSTANTS = new Map<string, string>();
-export const NUMBER_CONSTANTS = new Map<string, number>();
 export const ENUM_MAP = new Map<string, EnumInfo>();
-
-export function collectConstants(sf: SourceFile): void {
-  for (const decl of sf.getVariableDeclarations()) {
-    const init = decl.getInitializer();
-    if (!init) continue;
-    if (Node.isStringLiteral(init) || Node.isNoSubstitutionTemplateLiteral(init)) {
-      STRING_CONSTANTS.set(decl.getName(), init.getLiteralText());
-    }
-    if (Node.isNumericLiteral(init)) {
-      NUMBER_CONSTANTS.set(decl.getName(), Number(init.getLiteralText()));
-    }
-  }
-}
 
 export function collectEnums(sf: SourceFile): void {
   for (const enumDecl of sf.getEnums()) {

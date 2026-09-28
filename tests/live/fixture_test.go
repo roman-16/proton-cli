@@ -390,6 +390,7 @@ var (
 	plainFixture       = sync.OnceValues(func() (seeded, error) { return findMail(fixture.Plain) })
 	quotedFixture      = sync.OnceValues(func() (seeded, error) { return findMail(fixture.Quoted) })
 	attachmentsFixture = sync.OnceValues(func() (seeded, error) { return findMail(fixture.Attachments) })
+	trackedFixture     = sync.OnceValues(func() (seeded, error) { return findMail(fixture.Tracked) })
 )
 
 func fixtureOr(t *testing.T, load func() (seeded, error)) seeded {
@@ -427,6 +428,14 @@ func attachedMail(t *testing.T) (msgID, convID, attID, attName string) {
 	t.Helper()
 	s := fixtureOr(t, attachmentsFixture)
 	return s.msgID, s.convID, s.attID, s.attName
+}
+
+// trackedMail is a delivered self-mail carrying a tracker's pixel and a link
+// with tracking in it. Read-only.
+func trackedMail(t *testing.T) (msgID, subject string) {
+	t.Helper()
+	s := fixtureOr(t, trackedFixture)
+	return s.msgID, s.subject
 }
 
 // ── the mutable pool ──

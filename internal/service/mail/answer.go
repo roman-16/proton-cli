@@ -3,7 +3,9 @@ package mail
 import (
 	"context"
 
+	"github.com/roman-16/proton-cli/internal/account/keys"
 	"github.com/roman-16/proton-cli/internal/errs"
+	"github.com/roman-16/proton-cli/internal/fetch"
 	"github.com/roman-16/proton-cli/internal/mailtext"
 )
 
@@ -39,8 +41,22 @@ type AnswerSpec struct {
 // parent's attachments on a forward, and lays the body out as new text,
 // signature, then the quoted original.
 func (s *Service) Answer(ctx context.Context, parentID string, spec AnswerSpec) (Content, error) {
-	raw, u, err := s.messageAndKeys(ctx, parentID)
-	if err != nil {
+	var raw *rawMessage
+	var u *keys.Unlocked
+	var set mailSettings
+	requests := []func(context.Context) error{func(ctx context.Context) error {
+		var err error
+		raw, u, err = s.messageAndKeys(ctx, parentID)
+		return err
+	}}
+	if !spec.NoQuote {
+		requests = append(requests, func(ctx context.Context) error {
+			var err error
+			set, err = s.settings(ctx)
+			return err
+		})
+	}
+	if err := fetch.Together(ctx, requests...); err != nil {
 		return Content{}, err
 	}
 
@@ -64,6 +80,9 @@ func (s *Service) Answer(ctx context.Context, parentID string, spec AnswerSpec) 
 		return Content{}, errs.Problemf("The message being answered could not be decrypted, so it cannot be quoted.").
 			Hint("--no-quote answers without it.").
 			Exit(errs.ExitBug)
+	}
+	if set.blocksTracking() {
+		body, _ = mailtext.CleanLinks(body, mailtext.IsHTML(raw.MIMEType))
 	}
 	parent := replyContext{
 		Sender:   Recipient{Address: senderAddress(raw.Sender), Name: senderName(raw.Sender)},

@@ -2,7 +2,7 @@ import { Project } from "ts-morph";
 import * as path from "path";
 import { readdirSync, statSync } from "fs";
 import type { Endpoint, EnumInfo } from "./types.js";
-import { collectConstants, collectEnums, ENUM_MAP } from "./registry.js";
+import { collectEnums, ENUM_MAP } from "./registry.js";
 import { extractFromArrow, extractFromFunction } from "./extract-endpoint.js";
 import { merge, type Route } from "./merge.js";
 import { parseDriveSdk } from "./parse-drive-sdk.js";
@@ -34,9 +34,7 @@ export function parseAll(
     addFilesRecursive(project, path.join(webClientsDir, pkg));
   }
 
-  // Build the constant/enum registry from all source files
   for (const sf of project.getSourceFiles()) {
-    collectConstants(sf);
     collectEnums(sf);
   }
 

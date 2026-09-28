@@ -3,6 +3,8 @@ package mail
 import (
 	"encoding/json"
 	"testing"
+
+	mailsvc "github.com/roman-16/proton-cli/internal/service/mail"
 )
 
 func TestGetReadsEachSettingTheWayTheWebDoes(t *testing.T) {
@@ -72,15 +74,15 @@ func TestImageProxyWritesTheWebsBitsInTheWebsOrder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(off.Bodies) != 2 || off.Bodies[0]["ImageProxy"] != storeRemoteImages ||
-		off.Bodies[1]["ImageProxy"] != proxyRemoteImages {
+	if len(off.Bodies) != 2 || off.Bodies[0]["ImageProxy"] != mailsvc.StoreRemoteImages ||
+		off.Bodies[1]["ImageProxy"] != mailsvc.ProxyRemoteImages {
 		t.Errorf("off sends %v, want the store bit removed and then the proxy bit", off.Bodies)
 	}
 	on, err := specs["image-proxy"].Parse("image-proxy", "on")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(on.Bodies) != 1 || on.Bodies[0]["ImageProxy"] != proxyRemoteImages || on.Bodies[0]["Action"] != 1 {
+	if len(on.Bodies) != 1 || on.Bodies[0]["ImageProxy"] != mailsvc.ProxyRemoteImages || on.Bodies[0]["Action"] != 1 {
 		t.Errorf("on sends %v, want the proxy bit added", on.Bodies)
 	}
 }

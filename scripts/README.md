@@ -11,6 +11,7 @@ Everything the maintainer or CI runs, in whatever language suits it: shell insta
 | `openapi-generator/` | Generates `openapi.yaml` from the WebClients and Drive SDK TypeScript source (`just openapi`) |
 | `openapi-guard/` | Checks a regenerated `openapi.yaml` before the weekly sync commits it |
 | `stats/` | Records the public counters the Stats page charts (`just stats`) |
+| `tidyurl/` | Writes the link-cleaning rules `internal/tidyurl` embeds, and the cases its parity test checks, from the TidyURL release WebClients pins (`just tidyurl`) |
 | `terminal-demo/` | Records the README panel against the primary account (`just demo`) |
 | `publish-npm.mjs` | Publishes the npm package on release |
 
@@ -91,10 +92,10 @@ Per endpoint:
 | Source | OpenAPI |
 |---|---|
 | Function name | `operationId`, `summary` |
-| `url` property | `paths` (constants resolved from source) |
+| `url` property | `paths`, with every name in it resolved to what it was declared as, through imports |
 | `method` property | HTTP method |
 | `data` parameter type | `requestBody` schema (types resolved through imports) |
-| `params` object | `parameters` (query) |
+| `params` type, whether written out, held in a variable or spread | `parameters` (query), with their types |
 | Template literal `${vars}` | `parameters` (path) |
 | `input: 'form'\|'binary'` | Request `content-type` (`multipart/form-data`, `application/octet-stream`) |
 | `output: 'stream'\|'arrayBuffer'\|'text'` | Response `content-type` |
@@ -135,14 +136,13 @@ Global:
 | Source | OpenAPI |
 |---|---|
 | All `enum` declarations | Enum reference comments with all values |
-| All `const = 'string'` | Used to resolve URL template constants |
-| TypeScript interfaces | Resolved for request body property types, optionality, and comments |
+| TypeScript interfaces | Resolved for request body and query property types, optionality, and comments; an optional or nullable field has the type it holds otherwise |
 
 ### How It Works
 
 1. **Checkout** - `just sources` puts the current upstream main of each repository in `/tmp`, and both directories are passed to the generator
 2. **Project setup** - creates a ts-morph `Project` with `tsconfig.base.json` for path resolution
-3. **Registry** - scans all source files for string/number constants and enum declarations
+3. **Registry** - scans all source files for enum declarations
 4. **Parse** - walks all declarations in `api/**/*.ts`, extracts endpoint metadata from the AST, then walks the Drive SDK's `paths` interface and the Pass `ApiRequestBody` and `ApiResponse` type chains
 5. **Type resolution** - follows TypeScript imports to resolve `data: SomeType` to actual property lists (including `extends`, `Partial<>`, `Omit<>`, etc.)
 6. **Merge** - a route is a URL with every placeholder blanked, so `{shareID}` and `{shareId}` are one route rather than two. Sources are ordered Drive SDK, then shared, then Pass: the first to declare an operation defines it, and the rest only fill in what they alone say - `deprecated`, `security: []`, `x-timeout`, `x-keepalive`, `x-expected-errors`
@@ -154,7 +154,7 @@ Global:
 openapi-generator/
 ├── index.ts              - entry point
 ├── parse.ts              - ts-morph project setup, file discovery
-├── registry.ts           - constant and enum collection
+├── registry.ts           - enum collection
 ├── extract-endpoint.ts   - endpoint extraction from AST nodes
 ├── extract-params.ts     - body/query param type resolution
 ├── merge.ts              - one operation per route, from overlapping sources

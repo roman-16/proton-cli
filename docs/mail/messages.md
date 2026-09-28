@@ -4,7 +4,7 @@ Individual messages.
 
 Every command under `proton mail messages`, with the arguments and flags it takes. For these commands in use, see [the mail guide](README.md).
 
-Holds `attachments`, `count`, `delete`, `empty`, `export`, `forward`, `get`, `label`, `list`, `mark`, `move`, `receipt`, `reply`, `send`, `star`, `trash`, `unlabel`, `unschedule`, `unstar`, `unsubscribe`, `update` and `watch`.
+Holds `attachments`, `count`, `delete`, `empty`, `export`, `forward`, `get`, `label`, `list`, `mark`, `move`, `receipt`, `reply`, `send`, `star`, `trackers`, `trash`, `unlabel`, `unschedule`, `unstar`, `unsubscribe`, `update` and `watch`.
 
 ## `attachments`
 
@@ -209,6 +209,8 @@ Show one message, decrypted.
 
 A message Proton flagged carries a Flagged line reading phishing or suspicious; `mark legitimate` overrules it. DMARC: failed means the sender's domain did not vouch for the message, so the address it claims to come from may not be the address it came from.
 
+While `mail settings set image-proxy` is on, links come without their tracking and a Links line counts the ones that had some. `--render raw` prints the body as it was sent.
+
 ```
 proton mail messages get REF
 ```
@@ -216,6 +218,7 @@ proton mail messages get REF
 ```bash
 proton mail messages get 'Invoice #2291'
 proton mail messages get 5bH2mQxK --render html
+proton mail messages get 5bH2mQxK --render raw
 proton mail messages get 5bH2mQxK --body-only --strip-quotes
 ```
 
@@ -564,6 +567,27 @@ proton mail messages star 'Invoice #2291'
 | `--to string` | Match a recipient's address |
 | `--unread` | Match unread messages |
 | `--via string` | Match mail that arrived at, or left from, this address of yours |
+
+## `trackers`
+
+Trackers blocked in a message.
+
+Holds `list`.
+
+### `trackers list`
+
+List the trackers blocked in a message.
+
+An image row names who serves it; nothing is loaded to find out. A link row names the tracking taken out of it, or redirect for a link that went through a click-tracking address, and `--output json` adds the cleaned link. Needs `mail settings set image-proxy on`.
+
+```
+proton mail messages trackers list REF
+```
+
+```bash
+proton mail messages trackers list 'The north trail is open again'
+proton mail messages trackers list 9xL4pQrT --output json
+```
 
 ## `trash`
 

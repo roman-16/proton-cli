@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
+	"sync"
 	"testing"
 
 	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
@@ -91,23 +93,50 @@ func TestReportPhishingRefusesABodyItCannotOpen(t *testing.T) {
 // recordingAPI answers a message read and records everything sent.
 type recordingAPI struct {
 	// message is what GET /mail/v4/messages/{id} answers with.
-	message  map[string]any
-	requests []proton.Request
+	message map[string]any
+	// settings is what GET /mail/v4/settings answers with.
+	settings map[string]any
+	// providers is who the image proxy says serves each image, and a status for
+	// the ones it refuses to check.
+	providers map[string]string
+	refused   map[string]int
+	mu        sync.Mutex
+	requests  []proton.Request
+}
+
+func (a *recordingAPI) record(req proton.Request) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.requests = append(a.requests, req)
 }
 
 func (a *recordingAPI) Do(_ context.Context, req proton.Request) (*proton.Response, error) {
-	a.requests = append(a.requests, req)
+	a.record(req)
+	if req.Path == "/core/v4/images" {
+		image := req.Query.Get("Url")
+		if status := a.refused[image]; status != 0 {
+			return nil, &proton.APIError{HTTPStatus: status, Code: 2902}
+		}
+		header := http.Header{}
+		if provider := a.providers[image]; provider != "" {
+			header.Set("x-pm-tracker-provider", provider)
+		}
+		return &proton.Response{Status: 204, Header: header}, nil
+	}
 	return &proton.Response{Status: 200, Body: []byte(`{"Code":1000}`)}, nil
 }
 
 func (a *recordingAPI) Decode(_ context.Context, req proton.Request, out any) error {
-	a.requests = append(a.requests, req)
+	a.record(req)
 	if out == nil {
 		return nil
 	}
 	answer := map[string]any{"Code": 1000}
 	if strings.HasPrefix(req.Path, "/mail/v4/messages/") && req.Method == "GET" {
 		answer["Message"] = a.message
+	}
+	if req.Path == "/mail/v4/settings" {
+		answer["MailSettings"] = a.settings
 	}
 	b, err := json.Marshal(answer)
 	if err != nil {

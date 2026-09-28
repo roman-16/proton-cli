@@ -19,6 +19,7 @@ Commands:
   reply        Reply to a message
   send         Compose and send a message
   star         Star messages
+  trackers     Trackers blocked in a message
   trash        Move messages to the trash
   unlabel      Detach a label from messages
   unschedule   Cancel a scheduled send, returning the message to drafts

@@ -65,6 +65,7 @@ GET /core/v4/addresses/canonical
 GET /core/v4/auth/modulus
 GET /core/v4/auth/scopes
 GET /core/v4/events/latest
+GET /core/v4/images
 GET /core/v4/keys/all
 GET /core/v4/keys/signedkeylists
 GET /core/v4/labels

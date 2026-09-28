@@ -22,7 +22,7 @@ Listings come back newest first. `--sort size` orders by how much room a message
 proton mail messages list --folder all --sort size --limit 10
 ```
 
-`get` shows the plain-text body by default. `--render html` gives you the original markup, `--render raw` the untouched body, and `--strip-quotes` drops quoted reply blocks.
+`get` shows the plain-text body by default. `--render html` gives you the markup, `--render raw` the body exactly as it was sent, and `--strip-quotes` drops quoted reply blocks.
 
 A `Signature:` line reports the verdict of the signature check against the sender's key.
 
@@ -67,6 +67,22 @@ proton mail messages mark phishing REF        # report it, and file it as spam
 `mark legitimate` settles the `Flagged:` verdict on that message alone, and the `DMARC:` line stays. To let a sender through from now on, see [Who reaches the inbox](#who-reaches-the-inbox).
 
 `mark phishing` sends the message to Proton decrypted, body included, for their anti-abuse team to read. Nothing withdraws a report. To keep a sender out without reporting anything, use `proton mail settings senders block`.
+
+## See who tried to track you
+
+While `image-proxy` is on, links in `get` come without their tracking, and a `Links:` line counts the ones that had some. Replies and forwards quote the cleaned links.
+
+```bash
+proton mail messages trackers list 'The north trail is open again'
+```
+
+Each row is an image a known tracker serves, or a link that carried tracking. An image row names who serves it, and nothing in the message is loaded to find out. A link row names the parameters taken out, or `redirect` for a link that went through a click-tracking address.
+
+With `image-proxy` off, links stay as they were sent and `trackers list` refuses. To turn it on:
+
+```bash
+proton mail settings set image-proxy on
+```
 
 ## Search
 

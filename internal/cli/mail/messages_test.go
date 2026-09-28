@@ -131,6 +131,20 @@ func TestMessageHeaderStatesWhereAReceiptStands(t *testing.T) {
 	}
 }
 
+func TestMessageHeaderCountsTheLinksThatLostTheirTracking(t *testing.T) {
+	if _, ok := field(messageHeader(&mailsvc.Full{}), "Links"); ok {
+		t.Error("a message whose links were left alone carries a Links line")
+	}
+	msg := mailsvc.Full{Body: `<a href="https://trailhead.example/north?utm_source=nl">Read</a>`, MIMEType: "text/html"}
+	msg.BlockTracking()
+	if got, ok := field(messageHeader(&msg), "Links"); !ok || got.Value != "1 cleaned" {
+		t.Errorf("Links = %q (present %v), want 1 cleaned", got.Value, ok)
+	}
+	if !strings.Contains(msg.Body, `href="https://trailhead.example/north"`) {
+		t.Errorf("body = %q, want the link without its tracking", msg.Body)
+	}
+}
+
 // The ID closes the block wherever a verdict lands, because that is the field a
 // reader copies to act on what they have just read.
 func TestMessageHeaderKeepsTheIDLast(t *testing.T) {

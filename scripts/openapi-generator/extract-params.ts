@@ -65,24 +65,6 @@ export function extractDataParams(fnNode: Node): Property[] {
   return [];
 }
 
-/**
- * Extract query params from a params object literal in the return value.
- */
-export function extractQueryParams(paramsNode: Node): Property[] {
-  if (!Node.isObjectLiteralExpression(paramsNode)) return [];
-
-  return paramsNode
-    .getProperties()
-    .filter((p) => Node.isPropertyAssignment(p) || Node.isShorthandPropertyAssignment(p))
-    .map((p) => ({
-      name: (p as any).getName?.() ?? "",
-      type: "string",
-      optional: false,
-      description: "",
-    }))
-    .filter((p) => p.name);
-}
-
 // Members of built-in prototypes (String, Number, Array, …) that leak as
 // schema properties when a body type resolves to a primitive/enum/`Omit<enum>`.
 // Derived from the runtime so it never drifts from the JS spec.
@@ -191,7 +173,8 @@ export function tsTypeToOpenApi(type: Type): string {
   if (type.isObject()) return "object";
   if (type.isEnum()) return "integer";
   if (type.isUnion()) {
-    const types = type.getUnionTypes();
+    const types = type.getUnionTypes().filter((t) => !t.isUndefined() && !t.isNull());
+    if (types.length === 1) return tsTypeToOpenApi(types[0]);
     if (types.every((t) => t.isNumberLiteral() || t.isNumber())) return "integer";
     if (types.every((t) => t.isStringLiteral() || t.isString())) return "string";
     if (types.every((t) => t.isBooleanLiteral() || t.isBoolean())) return "boolean";

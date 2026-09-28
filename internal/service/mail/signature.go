@@ -3,8 +3,6 @@ package mail
 import (
 	"context"
 	"strings"
-
-	"github.com/roman-16/proton-cli/internal/proton"
 )
 
 // Outgoing mail carries the sending address's signature followed by Proton's own
@@ -18,42 +16,6 @@ const protonFooterHTML = `Sent with <a href="https://proton.me/mail/home">Proton
 // Bit 2 marks it locked, which free accounts are - they cannot turn it off, so
 // the CLI must include it for them just as the web client does.
 const pmSignatureEnabled = 1
-
-type mailSettings struct {
-	PMSignature        int
-	PMSignatureContent string
-	MailCategoryView   any
-	AlmostAllMail      any
-	Sign               int
-	PGPScheme          int
-}
-
-func (m mailSettings) categoryViewOn() bool { return switchedOn(m.MailCategoryView) }
-
-func (m mailSettings) almostAllMail() bool { return switchedOn(m.AlmostAllMail) }
-
-func switchedOn(v any) bool {
-	switch v := v.(type) {
-	case bool:
-		return v
-	case float64:
-		return v != 0
-	}
-	return false
-}
-
-// settings fetches and caches the account's mail settings.
-func (s *Service) settings(ctx context.Context) (mailSettings, error) {
-	s.settingsOnce.Do(func() {
-		var resp struct{ MailSettings mailSettings }
-		if err := s.C.Decode(ctx, proton.Request{Method: "GET", Path: "/mail/v4/settings"}, &resp); err != nil {
-			s.settingsErr = err
-			return
-		}
-		s.settingsCache = resp.MailSettings
-	})
-	return s.settingsCache, s.settingsErr
-}
 
 // protonFooter returns Proton's footer when the account has it enabled, honouring
 // a custom PMSignatureContent when one is set.

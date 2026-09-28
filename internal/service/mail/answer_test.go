@@ -36,3 +36,27 @@ func TestAnswerRefusesToQuoteABodyItCannotOpen(t *testing.T) {
 		t.Errorf("hints = %v, want the way to answer anyway", problem.Hints())
 	}
 }
+
+func TestAnswerQuotesLinksWithoutTheirTrackingWhileTrackingIsBlocked(t *testing.T) {
+	for imageProxy, want := range map[int]string{
+		ProxyRemoteImages: `href="https://trailhead.example/north"`,
+		0:                 `href="https://trailhead.example/north?utm_source=newsletter"`,
+	} {
+		kr := genMailKeyRing(t)
+		message := encryptedMessage(t, kr,
+			`<a href="https://trailhead.example/north?utm_source=newsletter">Read the trail report</a>`, "text/html")
+		message["Sender"] = map[string]any{"Address": "news@trailhead.example", "Name": "Trailhead Weekly"}
+		api := &recordingAPI{message: message, settings: map[string]any{"ImageProxy": imageProxy}}
+		s := New(api, testKeys(unlockedRings("addr-1", kr)))
+
+		content, err := s.Answer(context.Background(), "m1", AnswerSpec{
+			Action: ActionForward, Body: "Worth a look.", To: []Recipient{{Address: "jane@example.com"}}, NoSignature: true,
+		})
+		if err != nil {
+			t.Fatalf("ImageProxy %d: Answer: %v", imageProxy, err)
+		}
+		if !strings.Contains(content.Body, want) {
+			t.Errorf("ImageProxy %d: the forward quotes\n%s\nwant it to carry %s", imageProxy, content.Body, want)
+		}
+	}
+}

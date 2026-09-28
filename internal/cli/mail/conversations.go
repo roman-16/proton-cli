@@ -1,6 +1,7 @@
 package mail
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -76,6 +77,10 @@ func convGetCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "get REF",
 		Short: "Show a whole thread, decrypted",
+		Long: "Show a whole thread, decrypted.\n\n" +
+			"While `mail settings set image-proxy` is on, links come without their\n" +
+			"tracking and each message's Links line counts the ones that had some.\n" +
+			"`--render raw` prints the bodies as they were sent.",
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			shape, err := render.Value()
 			if err != nil {
@@ -85,9 +90,19 @@ func convGetCmd() *cobra.Command {
 			if err != nil {
 				return wrongTable(err, "get")
 			}
-			conv, err := c.App.Mail.ConversationRead(c.Ctx, id)
+			var conv *mailsvc.ConversationFull
+			blocked, err := alongsideTrackingSetting(c, shape, func(ctx context.Context) error {
+				var err error
+				conv, err = c.App.Mail.ConversationRead(ctx, id)
+				return err
+			})
 			if err != nil {
 				return wrongTable(err, "get")
+			}
+			if blocked {
+				for i := range conv.Messages {
+					conv.Messages[i].BlockTracking()
+				}
 			}
 			if summary {
 				return threadSummary(c, conv)

@@ -65,6 +65,21 @@ var Attachments = Mail{
 	Inline:  "inline-image.png",
 }
 
+// Tracked is what a newsletter carries to follow its reader: a pixel a known
+// tracker serves, an image nobody tracks with, and a link with tracking in it.
+var Tracked = Mail{
+	Subject: "The north trail is open again",
+	Body: `<p>The north trail reopened this morning.</p>` +
+		`<p><a href="https://trailhead.example/north?utm_source=newsletter&amp;utm_medium=email&amp;utm_campaign=april">Read the trail report</a></p>` +
+		`<img src="https://proton.me/favicon.ico" width="16" height="16">` +
+		`<img src="` + TrackerPixel + `" width="1" height="1">`,
+	HTML: true,
+}
+
+// TrackerPixel is the pixel in Tracked, in the shape Mailchimp's open tracking
+// takes.
+const TrackerPixel = "https://trailhead.us1.list-manage.com/track/open.php?u=4f1c9e&id=77b2&e=1"
+
 // Mutable are messages a test may change and change back: marked unread,
 // starred, moved, trashed and restored. The change is the subject of those
 // tests, not the sending, so they take one of these instead of sending their
@@ -81,7 +96,7 @@ var Mutable = []Mail{
 }
 
 // AllMail is every message the suite expects, for the seed to reconcile.
-func AllMail() []Mail { return append([]Mail{Plain, Quoted, Attachments}, Mutable...) }
+func AllMail() []Mail { return append([]Mail{Plain, Quoted, Attachments, Tracked}, Mutable...) }
 
 // AliasName is the Pass alias on the free accounts that the suite reads rather
 // than makes.

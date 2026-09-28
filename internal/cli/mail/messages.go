@@ -1,6 +1,7 @@
 package mail
 
 import (
+	"context"
 	"log/slog"
 	"strconv"
 	"strings"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/roman-16/proton-cli/internal/cli/kit"
 	"github.com/roman-16/proton-cli/internal/errs"
+	"github.com/roman-16/proton-cli/internal/fetch"
 	"github.com/roman-16/proton-cli/internal/mailtext"
 	mailsvc "github.com/roman-16/proton-cli/internal/service/mail"
 	"github.com/roman-16/proton-cli/internal/ui"
@@ -21,7 +23,7 @@ func messagesCmd() *cobra.Command {
 		listCmd(), countCmd(false), watchCmd(), getCmd(), sendCmd(), replyCmd(), forwardCmd(), exportCmd(),
 		emptyCmd(), updateCmd(), unsubscribeCmd(), receiptCmd(),
 		moveCmd(), labelCmd(), unlabelCmd(), starCmd(), unstarCmd(), markCmd(),
-		trashCmd(), deleteCmd(), unscheduleCmd(), attachmentsCmd(),
+		trashCmd(), deleteCmd(), unscheduleCmd(), attachmentsCmd(), trackersCmd(),
 	)
 	return c
 }
@@ -90,7 +92,10 @@ func getCmd() *cobra.Command {
 			"A message Proton flagged carries a Flagged line reading phishing or\n" +
 			"suspicious; `mark legitimate` overrules it. DMARC: failed means the\n" +
 			"sender's domain did not vouch for the message, so the address it claims\n" +
-			"to come from may not be the address it came from.",
+			"to come from may not be the address it came from.\n\n" +
+			"While `mail settings set image-proxy` is on, links come without their\n" +
+			"tracking and a Links line counts the ones that had some. `--render raw`\n" +
+			"prints the body as it was sent.",
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			shape, err := render.Value()
 			if err != nil {
@@ -103,9 +108,17 @@ func getCmd() *cobra.Command {
 			if err != nil {
 				return wrongTable(err, "get")
 			}
-			msg, err := c.App.Mail.Read(c.Ctx, id)
+			var msg *mailsvc.Full
+			blocked, err := alongsideTrackingSetting(c, shape, func(ctx context.Context) error {
+				var err error
+				msg, err = c.App.Mail.Read(ctx, id)
+				return err
+			})
 			if err != nil {
 				return wrongTable(err, "get")
+			}
+			if blocked {
+				msg.BlockTracking()
 			}
 			if err := kit.Read(c, ui.DocumentSpec{
 				Object: msg,
@@ -126,6 +139,22 @@ func getCmd() *cobra.Command {
 	c.Flags().BoolVar(&stripQuotes, "strip-quotes", false, "Drop quoted reply blocks from the body")
 	c.Flags().BoolVar(&includeInline, "include-inline", false, "List inline attachments too, such as signature graphics")
 	return c
+}
+
+// alongsideTrackingSetting makes a read at the same time as it learns whether
+// the account blocks email tracking, which a body printed as it was sent has no
+// use for.
+func alongsideTrackingSetting(c *kit.Invocation, shape string, read func(context.Context) error) (bool, error) {
+	if shape == "raw" {
+		return false, read(c.Ctx)
+	}
+	var blocked bool
+	err := fetch.Together(c.Ctx, read, func(ctx context.Context) error {
+		var err error
+		blocked, err = c.App.Mail.BlocksTracking(ctx)
+		return err
+	})
+	return blocked, err
 }
 
 // messagePart turns a decrypted message into the header block, body and
@@ -196,6 +225,9 @@ func messageHeader(msg *mailsvc.Full) []ui.Field {
 	}
 	if msg.SpamFlagged() {
 		fields = append(fields, ui.Field{Label: "Flagged", Value: verdictLine(msg), Role: verdictRole(msg)})
+	}
+	if msg.LinksCleaned > 0 {
+		fields = append(fields, ui.Field{Label: "Links", Value: strconv.Itoa(msg.LinksCleaned) + " cleaned"})
 	}
 	return append(fields, ui.Field{Label: "ID", Value: msg.ID, ID: true})
 }

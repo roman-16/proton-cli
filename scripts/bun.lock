@@ -4,11 +4,14 @@
   "workspaces": {
     "": {
       "devDependencies": {
+        "@protontech/tidy-url": "1.18.5",
         "ts-morph": "^28.0.0",
       },
     },
   },
   "packages": {
+    "@protontech/tidy-url": ["@protontech/tidy-url@1.18.5", "", {}, "sha512-sNHj3vbRlPhL94V9uAH2wTPrz+5YrWolrPGpW3IZVmflrA6pnyLqhcRQ0xktp2nRwnAQExO5mIZ0KR+7OBC+dQ=="],
+
     "@ts-morph/common": ["@ts-morph/common@0.29.0", "", { "dependencies": { "minimatch": "^10.0.1", "path-browserify": "^1.0.1", "tinyglobby": "^0.2.14" } }, "sha512-35oUmphHbJvQ/+UTwFNme/t2p3FoKiGJ5auTjjpNTop2dyREspirjMy82PLSC1pnDJ8ah1GU98hwpVt64YXQsg=="],
 
     "balanced-match": ["balanced-match@4.0.4", "", {}, "sha512-BLrgEcRTwX2o6gGxGOCNyMvGSp35YofuYzw9h1IMTRmKqttAZZVU67bdb9Pr2vUHA8+j3i2tJfjO6C6+4myGTA=="],
