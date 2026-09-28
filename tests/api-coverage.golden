@@ -188,7 +188,6 @@ POST /core/v4/settings/breachalerts
 POST /core/v4/settings/highsecurity
 POST /core/v4/settings/highsecurity/summary/email
 POST /core/v4/settings/mnemonic/disable
-POST /core/v4/verify/send
 POST /domains
 POST /drive/blocks
 POST /drive/photos/volumes/{id}/albums
@@ -284,13 +283,9 @@ PUT /core/v4/keys/{id}/primary
 PUT /core/v4/labels/order
 PUT /core/v4/labels/{id}
 PUT /core/v4/settings/2fa/totp
-PUT /core/v4/settings/email
-PUT /core/v4/settings/email/reset
 PUT /core/v4/settings/logauth
 PUT /core/v4/settings/mnemonic
 PUT /core/v4/settings/password
-PUT /core/v4/settings/phone
-PUT /core/v4/settings/phone/reset
 PUT /core/v4/settings/weekstart
 PUT /core/v4/users/lock
 PUT /core/v4/users/password

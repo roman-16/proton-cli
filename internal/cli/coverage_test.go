@@ -255,11 +255,24 @@ var untested = map[string]string{
 	// got the fixture yet, and every test account has had it for a while.
 	"POST /core/v4/addresses": "the fixture address is minted once in an account's life, and every test account is past that moment",
 
+	// Changing a recovery address or number. Proton guards both against somebody
+	// taking the account over, and a suite that writes them on every run trips
+	// the guard: after a few runs every write is refused with 2028, as unusual
+	// activity targeting the account, and the refusal lasts days rather than
+	// minutes. Setting, allowing, verifying and removing both have been walked
+	// against the live API; what is left out is repeating it every run. What is
+	// tested is reading them, the preview, and every refusal settled before a
+	// write.
+	"PUT /core/v4/settings/email":       "Proton refuses a recovery address changed on every run as an attempt to take the account over",
+	"PUT /core/v4/settings/email/reset": "the same guard, and allowing recovery needs an address in place to allow it through",
+	"PUT /core/v4/settings/phone":       "the same guard, for the number",
+	"PUT /core/v4/settings/phone/reset": "the same guard, and allowing recovery needs a number in place to allow it through",
+	"POST /core/v4/verify/send":         "only an address in place is sent a verification, and the guard refuses putting one there",
+
 	// Both halves of verifying a recovery phone. Proton texts a code to a real
 	// number, and no test account has one: a number a run can set is one nobody
 	// receives the code at, so the send is all there is and the code cannot come
-	// back. Setting and removing the number is tested; the flow was walked by
-	// hand against the live API with a real phone.
+	// back. The flow was walked by hand against the live API with a real phone.
 	"POST /core/v4/users/code":   "Proton texts a code to a real phone, and no test account has one",
 	"POST /core/v4/verify/phone": "handing back a code that arrives on a phone no run can read",
 

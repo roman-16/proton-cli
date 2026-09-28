@@ -164,7 +164,7 @@ causes() {
         printf 'Proton rate-limited this run - wait a few minutes; these failures are not bugs.\n'
     fi
     if grep --quiet 'Proton has temporarily limited this account' "$log"; then
-        printf 'Proton shut the account out for a while - wait a few minutes; these failures are not bugs.\n'
+        printf 'Proton shut the account out - a burst clears in minutes, but a test refused this way run after run asks for more than Proton allows every run.\n'
     fi
     if grep --quiet 'could not sign' "$log"; then
         profile=$(sed --quiet 's/^could not sign \([a-z]*\) in.*/\1/p' "$log" | head --lines=1)

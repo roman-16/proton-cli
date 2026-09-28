@@ -160,15 +160,17 @@ snapshot: build
 # documentation site's node_modules, which is nobody's to test.
 notFast := "/tests/live$|/node_modules/"
 
+# How long a live run may take before something is wrong, not how long it takes:
+# several hundred tests that each wait on Proton in turn is the best part of an
+# hour of honest work.
+liveTimeout := "90m"
+
 # The live suite runs one test at a time. It is bound by waiting for Proton, so
 # overlapping would be faster - but what gives out first is whatever the free
-# plan meters hardest, and rate limiting arrives before any time is saved. The
-# timeout says how long a run may take before something is wrong, not how long it
-# takes: several hundred tests that each wait on Proton in turn is a good half
-# hour of honest work.
+# plan meters hardest, and rate limiting arrives before any time is saved.
 [doc("Every test there is: the fast ones, then the live suite against all three accounts")]
 test: test-fast
-    go test ./tests/live/ -v -count=1 -timeout 45m -parallel 1 -shuffle=on
+    go test ./tests/live/ -v -count=1 -timeout {{ liveTimeout }} -parallel 1 -shuffle=on
 
 [doc("Everything decidable without Proton: unit, golden, conformance, rules, offline")]
 test-fast:
@@ -178,7 +180,7 @@ test-fast:
 
 [doc("Run a single test (or a `|`-separated regex of test names)")]
 test-one pattern:
-    go test ./tests/live/ -v -count=1 -run '{{ pattern }}' -timeout 45m
+    go test ./tests/live/ -v -count=1 -run '{{ pattern }}' -timeout {{ liveTimeout }}
 
 # What one run reached is added to the recording rather than replacing it: a
 # subset cannot know that a line no longer belongs, so only the full `coverage`
@@ -190,7 +192,7 @@ coverage-one pattern:
     set -euo pipefail
     trace="${PROTON_CLI_TEST_TRACE:-/tmp/proton-cli-trace.jsonl}"
     PROTON_CLI_TEST_TRACE="$trace" PROTON_CLI_TEST_TRACE_REQUESTS=1 \
-        go test ./tests/live/ -v -count=1 -run '{{ pattern }}' -timeout 45m
+        go test ./tests/live/ -v -count=1 -run '{{ pattern }}' -timeout {{ liveTimeout }}
     reached=$(go run ./scripts/testreport --coverage "$trace")
     merged=$({ cat tests/api-coverage.golden; printf '%s\n' "$reached"; } | LC_ALL=C sort --unique)
     printf '%s\n' "$merged" > tests/api-coverage.golden
@@ -202,7 +204,7 @@ test-report *pattern=".":
     set -euo pipefail
     trace="${PROTON_CLI_TEST_TRACE:-/tmp/proton-cli-trace.jsonl}"
     PROTON_CLI_TEST_TRACE="$trace" PROTON_CLI_TEST_TRACE_REQUESTS=1 \
-        go test ./tests/live/ -v -count=1 -run '{{ pattern }}' -timeout 45m -parallel 1 || true
+        go test ./tests/live/ -v -count=1 -run '{{ pattern }}' -timeout {{ liveTimeout }} -parallel 1 || true
     go run ./scripts/testreport "$trace"
 
 [doc("Record which of Proton's API the live suite reaches, for the check that no change quietly narrows it")]
@@ -211,7 +213,7 @@ coverage:
     set -euo pipefail
     trace="${PROTON_CLI_TEST_TRACE:-/tmp/proton-cli-trace.jsonl}"
     PROTON_CLI_TEST_TRACE="$trace" PROTON_CLI_TEST_TRACE_REQUESTS=1 \
-        go test ./tests/live/ -v -count=1 -timeout 45m -parallel 1
+        go test ./tests/live/ -v -count=1 -timeout {{ liveTimeout }} -parallel 1
     go run ./scripts/testreport --coverage "$trace" > tests/api-coverage.golden
     git --no-pager diff --stat tests/api-coverage.golden || true
 

@@ -514,15 +514,15 @@ const (
 	jailed      = "] 2028: "
 )
 
-// refuseToPush stops the run the first time Proton pushes back.
+// refuseToPush fails the test the first time Proton pushes back.
 //
 // The client backs off from a rate limit and would very likely succeed, so the
 // suite would pass and nobody would learn anything - except that these are real
 // accounts, and a run that has started being throttled is a run that should be
 // asking for less rather than pressing on. A jail says the same thing with the
-// waiting already decided and counted in minutes, which is longer than any
-// command sits there for: everything the run does next is a request made into a
-// refusal.
+// waiting already decided, which is longer than any command sits there for:
+// minutes after a burst, and days for one action repeated run after run, which
+// is a test asking for more than Proton allows on every run.
 func refuseToPush(t *testing.T, stderr string) {
 	t.Helper()
 	switch {
@@ -530,7 +530,8 @@ func refuseToPush(t *testing.T, stderr string) {
 		t.Fatalf("Proton rate-limited this run. Give the account a few minutes before running it again.\n%s",
 			truncateOutput(stderr))
 	case strings.Contains(stderr, jailed):
-		t.Fatalf("Proton has temporarily limited this account. Give it a few minutes before running it again.\n%s",
+		t.Fatalf("Proton has temporarily limited this account. A burst clears in a few minutes; "+
+			"a test refused this way run after run asks for more than Proton allows every run.\n%s",
 			truncateOutput(stderr))
 	}
 }

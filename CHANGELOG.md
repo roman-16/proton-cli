@@ -6,6 +6,105 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 Adding a version section here is what publishes a release, so this file is the one place a version is decided: see [Releases](CONTRIBUTING.md#releases). Versions that shipped before this file existed are on the [releases page](https://github.com/roman-16/proton-cli/releases).
 
+## [5.0.0] - 2026-09-28
+
+### Highlights
+
+- **Sign in without typing a password** - `account login --qr` prints a code that a device already signed in approves, and `account sessions create` approves one from here, so a machine reached over SSH never sees your password.
+- **The rest of Proton's security pages** - `account keys` manages the keys of your addresses, `account settings emergency-access` and `recovery-contacts` choose who can help you back in, `account breaches` is Dark Web Monitoring, and `account delete` closes the account.
+- **An inbox with less noise** - `mail mailing-lists` shows who writes to you as a list and files or leaves them, `mail messages trackers list` names what a message tried to track, and links read without their tracking once `image-proxy` is on.
+- **Let people book a time with you** - `calendar booking-pages` hands out a link for booking an appointment in your calendar, and `calendar settings links` publishes a calendar as a feed anyone can follow.
+
+### Added
+
+- `account login --qr` signs in by approving a code on a device that already holds a session, with nothing typed here, and `account sessions create CODE` is the approving side.
+- `account keys` lists, shows, exports, creates, imports and deletes the keys of your account and addresses, and `keys update` moves the primary or marks a key obsolete or compromised. Every change asks for your password, even signed in.
+- `account settings emergency-access` and `account settings recovery-contacts` choose who can help you back into your account, and `list --incoming` shows who chose you. Emergency access needs a paid plan and opens after `--wait`, 7 days unless set; `emergency-access access --as PROFILE` then saves the account that trusted you as a profile.
+- `account breaches` is Dark Web Monitoring: the breaches your addresses were found in, what each exposed, `resolve` and `reopen`, and `enable` and `disable`, with `--emails` for the emails it sends.
+- `account settings sentinel` shows and switches Proton Sentinel, and `account settings notifications` switches each email and notice Proton sends you by name.
+- `account delete` deletes the account and everything in it, and then removes the profile from this machine.
+- `mail mailing-lists` lists the senders that write to you as a list, files their mail with `update --into` and `--mark-read`, and unsubscribes from them.
+- `mail messages trackers list` names each tracker a message's images carry and each link that had its tracking taken out. It needs `image-proxy on`.
+- `mail messages count` and `mail conversations count` show every folder, label and category tab with its total and unread count, or one with `--folder`.
+- `--request-receipt` on `mail messages send`, `reply`, `forward` and `mail drafts` asks for a read receipt, `messages get` shows a `Receipt` line, and `mail messages receipt` sends one back.
+- `mail settings imports` brings another mailbox in over IMAP, and follows, cancels, resumes, undoes or deletes an import, ones started in Proton's apps included.
+- `mail settings categories` shows or hides each category tab and turns its notifications on and off, and `--folder primary` lists the Primary tab.
+- `mail settings folders reorder` and `labels reorder` set the order Proton's apps show, naming the first ones or `--alphabetical`, and both listings come back in that order.
+- `mail settings set` takes `image-proxy` (Block email tracking), `category-view`, `category-view-counters`, `font-face`, `font-size`, `block-sender-confirmation` and `daily-notifications`.
+- Mail listings and bulk verbs take `--has-attachments`, `--read`, and `--via ADDRESS` for mail that arrived at or left from one of your addresses, which `--to` misses for Bcc, lists and catch-alls. Listings take `--sort size`.
+- `mail conversations update --expires DURATION|never` makes whole threads delete themselves, or stops it, and listings mark mail that will with `⧗` in FLAGS and `expires` in JSON.
+- `calendar booking-pages` makes a link anyone can open to book a time with you in the calendar you pick, Monday to Friday 09:00-17:00 unless `--available` says otherwise. Needs a paid plan.
+- `calendar settings links` publishes a calendar as an `.ics` feed anyone can follow, showing only busy times unless `--access full`, and lists, renames and revokes what has been handed out.
+- `calendar settings holidays list` shows the public holidays calendars Proton offers, and `calendars create --holidays Austria` adds one.
+- `calendar settings calendars leave` gives up a calendar somebody shared with you, and `calendars update --default` makes a calendar the default.
+- `calendar busy-times list EMAIL...` shows when people are busy, over the next 7 days unless `--after` or `--before` say otherwise. Needs a Duo, Family, Visionary or business plan.
+- `contacts create` and `update` take `--photo`: an image file, `-` or a web address.
+- `contacts emails list` and `update` set how mail to each address goes - `--email-format`, `--encrypt`, `--sign` and `--scheme` - and `proton` sends it that way.
+- A contact keeps every note, organization, job title, role, nickname, language and time zone it holds: each flag repeats, and `update` has a `--clear-` flag for each.
+- `drive photos albums share` and `drive photos share` share an album or a single photo with people, and `drive photos links` makes a public link for a photo. An album takes no public link.
+- `drive items abuse`, `drive items revisions abuse` and `drive invitations abuse` report to Proton something shared with you. `--good-faith` is required, and a report cannot be withdrawn.
+- `pass vaults hide` and `unhide` keep a vault out of your own listings, as the Pass app does.
+- `pass items exclude` and `include` take a login out of Pass Monitor's checks and put it back, and `items list --excluded` lists those.
+- `pass items get` shows when a Pass app last filled an item in, and `items list --sort used` orders by it.
+- `pass items update --simplelogin-note` and `--clear-simplelogin-note` change an alias's SimpleLogin note, `--clear-display-name` removes its display name, and `pass aliases create --note` gives a new alias a note.
+- `pass breaches resolve` marks an address's breaches resolved, and `enable` and `disable --type proton|alias` switch watching for every address of that kind on a paid plan; `list --type` filters by it.
+
+### Changed
+
+- **Breaking.** `contacts keys pin` and `unpin` are `contacts keys trust` and `untrust`, and report `trusted` and `untrusted`. Their `--scheme` and `--no-encrypt` are `contacts emails update --scheme` and `--encrypt off`, and `contacts keys list` drops ENCRYPT and SCHEME.
+- **Breaking.** Contact JSON carries `nicknames`, `organizations`, `job_titles`, `roles`, `notes`, `languages` and `timezones` lists in place of `nickname`, `org`, `title`, `role`, `note`, `language` and `timezone`.
+- **Breaking.** Mail sent outside Proton follows the account's `sign` and `pgp-scheme` settings where a contact states none, so with `sign on` or `pgp-scheme pgp-inline` it goes out signed that way.
+- **Breaking.** `calendar events create` and `events import` without `--calendar` go into your default calendar rather than the first one listed.
+- **Breaking.** `calendar settings calendars list` has a KIND column, a calendar shared with you is `shared` rather than `personal`, and each command refuses what a calendar's kind does not take - events into one you cannot write to, sharing one that is not yours.
+- **Breaking.** `--folder` with a category tab selects only mail still in the inbox, as the tab shows it. `mail messages empty` refuses a tab, inbox, drafts, sent, starred, archive, all and scheduled, and `move --into` refuses starred, drafts, sent, all, scheduled and snoozed.
+- **Breaking.** With `almost-all-mail on`, `--folder all` and a bulk verb given no `--folder` leave spam and trash out.
+- **Breaking.** `settings set --output json` reports `value` as the word `set` took (`"30d"`) rather than Proton's number, in every app. `remove-image-metadata` takes `on` or `off`, and `spam-action` takes `ask`.
+- **Breaking.** With `image-proxy on`, `mail messages get` and `conversations get` print links without their tracking, in text, html and JSON, and replies and forwards quote them that way. `--render raw` is the body as sent.
+- **Breaking.** `drive items share get --output json` names the item under `ref` rather than `path`.
+- **Breaking.** `pass breaches get --output json` reports each breach's `state` (`new`, `open` or `resolved`) instead of `resolved`.
+- **Breaking.** `account get` shows only the display name under Name, and the username on a row of its own.
+- **Breaking.** Pass listings across vaults and `pass trash empty` leave out vaults hidden in the Pass app. `--vault` still reaches one, and `pass export` still backs it up.
+- **Breaking.** `pass items update --display-name ""` is refused; use `--clear-display-name`.
+- `mail settings get` shows every key `set` takes, under the name `set` knows it by.
+- `mail messages watch` covers starred mail, and with categories on, only the tabs that notify.
+- `mail messages update --expires` keeps an expiry the sender set and sets none in trash or spam, and says what it left alone.
+- Bulk mail verbs name each message or thread Proton refused, and count only what landed.
+- A mail index built before this release is read again once: a filtered search says it has fallen behind until `index update` runs, which keeps the bodies.
+- `drive photos upload` leaves a photo the library already holds alone and prints `Nothing to upload` with its ID; JSON carries `duplicate_of`.
+- `drive invitations list` names what an invitation offers and what kind of thing it is.
+- A command that takes an address refuses anything but a bare address before signing in.
+- Flags that contradict each other are refused as `--a and --b contradict each other.` wherever they meet.
+- `--folder` completes your own folders and labels, and `--into` completes folders in mail and vaults in Pass.
+- The published `openapi.yaml` documents the image proxy, lists the query parameters of every request, and gives optional fields their real type rather than `string`. Regenerate anything built from it.
+
+### Removed
+
+- `calendar settings set default-calendar`. Use `calendar settings calendars update REF --default`.
+- `mail settings set message-buttons`, which no Proton app offers.
+- `member_count` from calendar JSON, which only ever counted your own memberships.
+
+### Fixed
+
+- Changing your default address made `account login --user` with the old one exit `4` until the profile was signed out, and could break every command that asks for your password again. Any of the account's addresses resumes the session.
+- `account login --dry-run` signed in for real. It previews and changes nothing.
+- `account sessions revoke` could not revoke another session from a script. It takes `--password-file`, which Proton asks for.
+- A mistyped address on `mail settings addresses get` and `update`, `mail settings forwarding create`, `mail settings smtp-tokens create` and `pass settings domains update --catch-all` acted on the account's only address, or read as ambiguous. It is not found, exit `3`.
+- `mail messages unsubscribe` only ever sent Proton's one-click request. It leaves by whichever of the three ways the list offers, says which, and refuses a list that offers none.
+- `mail settings folders create --parent` and `update --parent` took only an ID, though the example named a folder. They take a name or short ID, and `--parent none` moves a folder to the top level.
+- After a partly refused bulk change, `ids` under `--output json` listed what was asked rather than what changed. Affects the bulk mail verbs, `drive items trash` and `delete`, `drive photos delete`, `drive volumes restore` and `account keys reactivate`.
+- `pass breaches list` showed most breached aliases as clean. Each count lands on its own row, and one that does not come back reads `?` rather than `0`.
+- `calendar settings calendars update` dropped the reminder given `--remind` or `--remind-all-day` beside `--no-remind`. It refuses the pair.
+- An all-day event on a day the clocks change lasted `23h` or `25h` rather than `1d`.
+- A mistyped `--attendee` failed as a bug. It is refused before signing in.
+- An upload over a capitalised name another Proton app wrote landed beside it instead of being refused, and `drive photos upload` could recognise no photo Proton's apps backed up.
+- A passphrase from `pass generate --words` could hold one of four hyphenated words, so split on hyphens it read as more words than were asked for.
+- `pass vaults update` finds a vault by its name, as its example shows.
+- An error naming something of yours keeps your spelling of its name.
+
+### Security
+
+- A message signed by a key its owner marked compromised reads `Signature: invalid`, and Pass invitations and forwardings no longer trust such a key.
+
 ## [4.3.0] - 2026-09-22
 
 ### Highlights
