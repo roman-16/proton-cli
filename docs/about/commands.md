@@ -87,6 +87,11 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton account settings two-factor generate`](../account/settings.md#two-factor-generate) | Make a two-factor secret for an authenticator app |
 | [`proton account settings two-factor get`](../account/settings.md#two-factor-get) | Show what this account is asked for at sign-in |
 | [`proton api`](../api/api.md) | Send a raw authenticated request to the Proton API |
+| [`proton calendar booking-pages create`](../calendar/booking-pages.md#create) | Make a booking page and print its link |
+| [`proton calendar booking-pages delete`](../calendar/booking-pages.md#delete) | Delete booking pages |
+| [`proton calendar booking-pages get`](../calendar/booking-pages.md#get) | Show one booking page, link and all |
+| [`proton calendar booking-pages list`](../calendar/booking-pages.md#list) | List your booking pages |
+| [`proton calendar booking-pages update`](../calendar/booking-pages.md#update) | Change what a booking page offers |
 | [`proton calendar busy-times list`](../calendar/busy-times.md#list) | List when people are busy in a date range |
 | [`proton calendar events create`](../calendar/events.md#create) | Create an event |
 | [`proton calendar events delete`](../calendar/events.md#delete) | Delete events |

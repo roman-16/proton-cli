@@ -55,6 +55,7 @@ var collections = []struct {
 	// suite's business.
 	{"inbox", []string{"mail", "messages", "list", "--folder", "inbox", "--limit", "25"}, "id", []string{"subject"}},
 	{"calendars", []string{"calendar", "settings", "calendars", "list"}, "id", []string{"name"}},
+	{"booking pages", []string{"calendar", "booking-pages", "list"}, "id", []string{"title"}},
 	{"vaults", []string{"pass", "vaults", "list"}, "share_id", []string{"name"}},
 	{"pass items", []string{"pass", "items", "list"}, "item_id", []string{"name"}},
 	// The one listing whose rows carry a state a test can change, so the state is

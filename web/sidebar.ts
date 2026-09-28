@@ -90,6 +90,7 @@ export const sidebar: NonNullable<StarlightUserConfig["sidebar"]> = [
       { label: "Guide", slug: "calendar" },
       "calendar/events",
       "calendar/busy-times",
+      "calendar/booking-pages",
       "calendar/reminders",
       "calendar/invitations",
       "calendar/settings",

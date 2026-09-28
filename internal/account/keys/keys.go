@@ -46,6 +46,7 @@ type Unlocked struct {
 	// PaidMail says whether the account's plan includes Mail, which is what
 	// Proton gates setting up a forwarding behind.
 	PaidMail bool
+	PaidMeet bool
 	// Username is what the account signs in as, and the local part Proton fixes
 	// its short-domain address to.
 	Username string
@@ -229,8 +230,12 @@ func (u User) hasRecoveryPhrase() bool {
 // PRODUCT_BIT.MAIL in WebClients (packages/shared/lib/constants.ts).
 const productMail = 1
 
+const productMeet = 256
+
 // paidMail reports whether the account's plan covers Mail.
 func (u User) paidMail() bool { return u.Subscribed&productMail != 0 }
+
+func (u User) paidMeet() bool { return u.Subscribed&productMeet != 0 }
 
 // Address mirrors the fields of /core/v4/addresses the CLI needs. Order,
 // Status, Send and Receive drive sender selection: Proton only allows sending
@@ -456,7 +461,7 @@ func open(ctx context.Context, now func() time.Time, user *User, addrs []Address
 	}
 	u := &Unlocked{
 		UserKR: userKR, AddrKRs: addrKRs, Addresses: addrs, UserKeys: user.Keys,
-		PaidMail: user.paidMail(), Username: user.Name, Now: now,
+		PaidMail: user.paidMail(), PaidMeet: user.paidMeet(), Username: user.Name, Now: now,
 		recoveryPhrase: user.hasRecoveryPhrase(),
 		private:        user.Private == 1, role: user.Role,
 		keyPass: []byte(skp), lockedID: map[uint64]bool{},

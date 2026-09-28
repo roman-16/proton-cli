@@ -10,6 +10,7 @@ import (
 
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
+	"github.com/roman-16/proton-cli/internal/units"
 )
 
 // Proton stores the auto-responder as one settings object whose StartTime and
@@ -32,9 +33,6 @@ const (
 const autoReplySubject = "Auto"
 
 const daySeconds = 24 * 60 * 60
-
-// weekdayNames indexes weekdays the way Proton does, with Sunday at 0.
-var weekdayNames = []string{"sun", "mon", "tue", "wed", "thu", "fri", "sat"}
 
 var repeatNames = []struct {
 	Name string
@@ -263,17 +261,8 @@ func parseClock(raw string) (int64, error) {
 }
 
 func parseWeekday(raw string) (int, error) {
-	raw = strings.ToLower(raw)
-	for i, n := range weekdayNames {
-		if raw == n || raw == longWeekday(i) {
-			return i, nil
-		}
-	}
-	return 0, fmt.Errorf("%q is not a weekday (%s)", raw, strings.Join(weekdayNames, ", "))
-}
-
-func longWeekday(i int) string {
-	return strings.ToLower(time.Weekday(i).String())
+	day, err := units.ParseWeekday(raw)
+	return int(day), err
 }
 
 func encodeDays(names []string) ([]int, error) {
@@ -320,8 +309,8 @@ func (r apiAutoResponder) decode() AutoReply {
 	}
 	if r.Repeat == repeatDaily {
 		for _, d := range r.DaysSelected {
-			if d >= 0 && d < len(weekdayNames) {
-				out.Days = append(out.Days, weekdayNames[d])
+			if d >= 0 && d < 7 {
+				out.Days = append(out.Days, units.Weekday(time.Weekday(d)))
 			}
 		}
 	}
@@ -336,10 +325,10 @@ func decodeBound(v int64, repeat int, loc *time.Location) string {
 		return formatClock(v)
 	case repeatWeekly:
 		day := int(v / daySeconds)
-		if day < 0 || day >= len(weekdayNames) {
+		if day < 0 || day >= 7 {
 			day = 0
 		}
-		return weekdayNames[day] + ":" + formatClock(v%daySeconds)
+		return units.Weekday(time.Weekday(day)) + ":" + formatClock(v%daySeconds)
 	case repeatMonthly:
 		return strconv.Itoa(int(v/daySeconds)+1) + ":" + formatClock(v%daySeconds)
 	}

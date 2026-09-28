@@ -1,6 +1,7 @@
 package units
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -101,5 +102,31 @@ func TestDuration(t *testing.T) {
 		if got := Duration(d); got != want {
 			t.Errorf("Duration(%v) = %q, want %q", d, got, want)
 		}
+	}
+}
+
+func TestAWeekdayIsReadByItsShortOrItsFullName(t *testing.T) {
+	for in, want := range map[string]time.Weekday{
+		"mon": time.Monday, "Monday": time.Monday, " SUN ": time.Sunday, "saturday": time.Saturday,
+	} {
+		got, err := ParseWeekday(in)
+		if err != nil || got != want {
+			t.Errorf("ParseWeekday(%q) = %v, %v; want %v", in, got, err, want)
+		}
+	}
+	if _, err := ParseWeekday("mo"); err == nil || !strings.Contains(err.Error(), "sun, mon, tue") {
+		t.Errorf("ParseWeekday(mo) = %v, want the weekdays named", err)
+	}
+}
+
+func TestAWeekdayIsWrittenTheWayItIsRead(t *testing.T) {
+	for d := time.Sunday; d <= time.Saturday; d++ {
+		back, err := ParseWeekday(Weekday(d))
+		if err != nil || back != d {
+			t.Errorf("%v is written %q, which reads back as %v, %v", d, Weekday(d), back, err)
+		}
+	}
+	if got := Weekdays(); len(got) != 7 || got[0] != "sun" || got[1] != "mon" {
+		t.Errorf("Weekdays() = %v", got)
 	}
 }

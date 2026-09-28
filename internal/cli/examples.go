@@ -304,6 +304,28 @@ var examples = map[string][]string{
 		"proton calendar events update Offsite --all-day=false --start 2026-07-01T09:00 --end 2026-07-01T17:00",
 		"proton calendar events update Dentist --color pacific",
 	},
+	"proton calendar booking-pages create": {
+		"proton calendar booking-pages create --title 'Intro call'",
+		"proton calendar booking-pages create --title 'Office hours' --calendar Work --duration 1h --available tue=14:00-18:00 --notice 48h",
+		"proton calendar booking-pages create --title 'Site visit' --available 2026-10-05=09:00-12:00 --available 2026-10-06=14:00-17:00 --location 'Hauptplatz 1, Graz'",
+	},
+	"proton calendar booking-pages delete": {
+		"proton calendar booking-pages delete 'Intro call'",
+	},
+	"proton calendar booking-pages get": {
+		"proton calendar booking-pages get 'Intro call'",
+		"proton calendar booking-pages get 'Intro call' --output json",
+	},
+	"proton calendar booking-pages list": {
+		"proton calendar booking-pages list",
+		"proton calendar booking-pages list --sort created",
+	},
+	"proton calendar booking-pages update": {
+		"proton calendar booking-pages update 'Intro call' --duration 1h --notice 2h",
+		"proton calendar booking-pages update 'Intro call' --available mon-fri=09:00-12:00 --blocked-by Work",
+		"proton calendar booking-pages update 'Intro call' --location 'Café Central'",
+		"proton calendar booking-pages update 'Intro call' --meet --no-blocked-by",
+	},
 	"proton calendar events delete": {
 		"proton calendar events delete Dentist",
 		"proton calendar events delete 4f2a1b9c@2026-05-04T09:00 --onwards",

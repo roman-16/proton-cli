@@ -5,6 +5,7 @@ package units
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -85,6 +86,22 @@ func Duration(d time.Duration) string {
 	default:
 		return fmt.Sprintf("%dh%dm", h, m)
 	}
+}
+
+var weekdayNames = []string{"sun", "mon", "tue", "wed", "thu", "fri", "sat"}
+
+func Weekday(d time.Weekday) string { return weekdayNames[d] }
+
+func Weekdays() []string { return slices.Clone(weekdayNames) }
+
+func ParseWeekday(s string) (time.Weekday, error) {
+	s = strings.ToLower(strings.TrimSpace(s))
+	for i, name := range weekdayNames {
+		if s == name || s == strings.ToLower(time.Weekday(i).String()) {
+			return time.Weekday(i), nil
+		}
+	}
+	return 0, fmt.Errorf("%q is not a weekday (%s)", s, strings.Join(weekdayNames, ", "))
 }
 
 // ParseDuration accepts Go's time.ParseDuration formats plus trailing unit

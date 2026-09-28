@@ -96,7 +96,10 @@ type member struct {
 // One request answers all of it, which is how the web client opens a calendar
 // (getFullCalendar, packages/shared/lib/api/calendars.ts).
 type bootstrap struct {
-	Keys       []struct{ PrivateKey string }
+	Keys []struct {
+		PrivateKey string
+		Flags      int
+	}
 	Passphrase struct {
 		// ID names the passphrase the calendar's keys are locked with. Handing
 		// that passphrase to a link means saying which one it is.
@@ -171,7 +174,10 @@ type calKeys struct {
 	// files it by.
 	passphrase   []byte
 	passphraseID string
+	primary      *pgp.Key
 }
+
+const calendarKeyPrimary = 2
 
 // unlockCalendar opens a calendar's keys.
 func (s *Service) unlockCalendar(ctx context.Context, calendarID string) (*calKeys, error) {
@@ -238,6 +244,7 @@ func (s *Service) unlockCalendar(ctx context.Context, calendarID string) (*calKe
 		if err != nil {
 			return nil, err
 		}
+		var primary *pgp.Key
 		for _, k := range b.Keys {
 			locked, err := pgp.NewKeyFromArmored(k.PrivateKey)
 			if err != nil {
@@ -250,6 +257,9 @@ func (s *Service) unlockCalendar(ctx context.Context, calendarID string) (*calKe
 				continue
 			}
 			_ = calKR.AddKey(unlocked)
+			if k.Flags&calendarKeyPrimary != 0 {
+				primary = unlocked
+			}
 		}
 		if calKR.CountEntities() == 0 {
 			return nil, fmt.Errorf("none of this calendar's %d keys could be unlocked", len(b.Keys))
@@ -257,7 +267,7 @@ func (s *Service) unlockCalendar(ctx context.Context, calendarID string) (*calKe
 		return &calKeys{
 			calKR: calKR, addr: addr, memberID: me.ID, email: me.Email,
 			addressID: me.AddressID, passphraseKey: passphraseKey,
-			passphrase: calPass, passphraseID: b.Passphrase.ID,
+			passphrase: calPass, passphraseID: b.Passphrase.ID, primary: primary,
 		}, nil
 	})
 }

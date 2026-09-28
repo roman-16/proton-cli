@@ -1,8 +1,8 @@
 # Calendar
 
-Events, recurrence, reminders and invitations in Proton Calendar, when other people are busy, and `.ics` in and out. Everything is encrypted with your calendar key and signed with your address key.
+Events, recurrence, reminders and invitations in Proton Calendar, when other people are busy, booking pages, and `.ics` in and out. Everything is encrypted with your calendar key and signed with your address key.
 
-This page is what people actually do. For every command and flag, see the reference: [events](events.md), [busy times](busy-times.md), [reminders](reminders.md), [invitations](invitations.md), [settings](settings.md).
+This page is what people actually do. For every command and flag, see the reference: [events](events.md), [busy times](busy-times.md), [booking pages](booking-pages.md), [reminders](reminders.md), [invitations](invitations.md), [settings](settings.md).
 
 ## See what's on
 
@@ -240,6 +240,55 @@ An event's own colour travels as a `COLOR` property, so a round trip keeps it. O
 The replacement is a new event with a new ID, so a reference held from before no longer resolves. Use `--dry-run` to list what the file holds first.
 
 **Participants are left out.** An imported event is a record, not an invitation being reissued. Writing the guests back would make your account the organizer of a meeting it did not call, which for external addresses means email going out.
+
+## Let people book a time with you
+
+```bash
+proton calendar booking-pages create --title 'Intro call'
+proton calendar booking-pages create --title 'Office hours' --calendar Work --duration 1h \
+  --available tue=14:00-18:00 --available thu=14:00-18:00 --notice 48h
+proton calendar booking-pages list
+proton calendar booking-pages get 'Intro call'
+proton calendar booking-pages delete 'Intro call'
+```
+
+A booking page is a link anyone can open to see when you are free and book an appointment. Each appointment lands in the page's calendar as an event. `create` and `get` print the link, and a listing never does.
+
+`--available` says when appointments can be booked, as `DAY=START-END`, and can be given more than once:
+
+| Form | Offers |
+| --- | --- |
+| `mon=09:00-17:00` | Every Monday |
+| `mon-fri=09:00-12:00` | Every weekday morning |
+| `mon,wed=14:00-18:00` | Every Monday and Wednesday afternoon |
+| `2026-10-05=09:00-12:00` | That morning only |
+
+A page repeats every week or runs on set dates, never both. Without `--available` it offers Monday to Friday, 09:00-17:00, every week. Times are read in [your zone](#time-zones), and `24:00` ends a window at midnight.
+
+- `--duration` is `15m`, `30m`, `1h`, `1h30m` or `2h`. Without it, an appointment lasts what a new event lasts in the calendar.
+- `--location` sets a place. Without it, each appointment gets a Proton Meet link.
+- `--notice` is how soon before an appointment it can still be booked: `none`, `2h`, `48h` or `next-day`.
+- `--blocked-by` names another calendar whose events keep a time from being booked. The page's own calendar always does.
+
+A page offers at most 200 appointments.
+
+```bash
+proton calendar booking-pages update 'Intro call' --duration 1h --blocked-by Family
+proton calendar booking-pages update 'Intro call' --location 'Café Central'
+proton calendar booking-pages update 'Intro call' --meet --no-blocked-by
+```
+
+`update` leaves the link alone. `--available` replaces every window, and `--duration` alone re-cuts the windows the page offers now. The calendar a page books into cannot be changed.
+
+Deleting a page stops the link working. Appointments already booked stay in your calendar.
+
+How many pages you can have depends on your plan:
+
+| Plan | Booking pages |
+| --- | --- |
+| Free | None |
+| Mail Plus, Mail Essentials, Proton Unlimited, Proton Duo, Proton Family | 1 |
+| Mail Professional, Proton Business Suite, Workspace Standard, Workspace Premium, Visionary, Meet Professional, or any plan with Meet | 25 |
 
 ## Your calendars
 

@@ -16,7 +16,7 @@ func New() *cobra.Command {
 		Use:   "calendar",
 		Short: "Calendars and events",
 	}
-	c.AddCommand(busyTimesCmd(), eventsCmd(), invitationsCmd(), remindersCmd(), settingsCmd())
+	c.AddCommand(bookingPagesCmd(), busyTimesCmd(), eventsCmd(), invitationsCmd(), remindersCmd(), settingsCmd())
 	return c
 }
 
