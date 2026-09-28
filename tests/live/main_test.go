@@ -159,17 +159,7 @@ func signIn() {
 	for _, a := range account.All() {
 		name := a.Profile
 		a := accounts[name]
-		args := []string{"account", "login", "--user", a.Address()}
-		for _, secret := range []struct{ flag, file string }{
-			{"--password-file", a.passwordFile},
-			{"--second-password-file", a.secondFile},
-			{"--extra-password-file", a.extraFile},
-		} {
-			if secret.file != "" {
-				args = append(args, secret.flag, secret.file)
-			}
-		}
-		_, stderr, code, err := runAs(name, nil, args...)
+		_, stderr, code, err := runAs(name, nil, loginArgs(a, a.Address())...)
 		if err == nil && code == 0 {
 			continue
 		}
@@ -180,6 +170,20 @@ func signIn() {
 				"then run this again.\n", name)
 		os.Exit(1)
 	}
+}
+
+func loginArgs(a *testAccount, user string) []string {
+	args := []string{"account", "login", "--user", user}
+	for _, secret := range []struct{ flag, file string }{
+		{"--password-file", a.passwordFile},
+		{"--second-password-file", a.secondFile},
+		{"--extra-password-file", a.extraFile},
+	} {
+		if secret.file != "" {
+			args = append(args, secret.flag, secret.file)
+		}
+	}
+	return args
 }
 
 // selfEmail is the primary account's address.

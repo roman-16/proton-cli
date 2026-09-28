@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/roman-16/proton-cli/internal/proton"
@@ -14,14 +15,19 @@ import (
 type answers struct {
 	body map[string]json.RawMessage
 	sent []proton.Request
+	mu   sync.Mutex
 }
 
 func (a *answers) Do(_ context.Context, r proton.Request) (*proton.Response, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	a.sent = append(a.sent, r)
 	return &proton.Response{Status: 200, Body: []byte(`{"Code":1000}`)}, nil
 }
 
 func (a *answers) Decode(_ context.Context, r proton.Request, out any) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	a.sent = append(a.sent, r)
 	answer, ok := a.body[r.Method+" "+r.Path]
 	if !ok {

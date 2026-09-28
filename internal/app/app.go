@@ -254,8 +254,8 @@ func elsewhere(claims ...string) string {
 
 // saveSession writes the current client state to the profile's session file,
 // preserving the identity fields an earlier save established. Those come from
-// /core/v4/users, which the client has no business fetching, so they are set
-// once by rememberIdentity and carried forward from here on.
+// /core/v4/users, which the client has no business fetching, so a sign-in sets
+// them through rememberIdentity and every save carries them forward.
 func (a *App) saveSession() error {
 	uid, acc, refresh := a.API.Tokens()
 	a.sessionMu.Lock()
@@ -387,20 +387,16 @@ func (a *App) Authenticate(context.Context) error {
 // eager: an account whose Pass is protected and whose password nobody supplied
 // signs in exactly as before, and the first Pass command asks.
 //
-// It is idempotent. A profile already signed in as the same account is left
-// alone, so an unattended caller can run it unconditionally before its real
-// work and recover by itself from a session that expired or was revoked.
+// It is idempotent. A profile already signed in as the same account, named by
+// any of its addresses, is left alone, so an unattended caller can run it
+// unconditionally before its real work and recover by itself from a session
+// that expired or was revoked.
 //
 // user is the account to attach, empty to ask for one. It is passed rather than
 // resolved from the environment because this is the only place that names an
 // account: everything else acts as whichever profile it was given.
 func (a *App) Login(ctx context.Context, user string) error {
-	if a.SignedIn() {
-		if err := a.refuseRepoint(user); err != nil {
-			return err
-		}
-	}
-	if resumed, err := a.resume(ctx); resumed || err != nil {
+	if resumed, err := a.resume(ctx, user); resumed || err != nil {
 		return err
 	}
 	if user == "" {
@@ -416,7 +412,7 @@ func (a *App) Login(ctx context.Context, user string) error {
 	if err := a.API.Login(ctx, user, []byte(password)); err != nil {
 		return err
 	}
-	if err := a.saveSession(); err != nil {
+	if err := a.attach(ctx); err != nil {
 		return err
 	}
 	return a.settle(ctx)
@@ -429,15 +425,40 @@ func (a *App) Login(ctx context.Context, user string) error {
 // the only question left is whether the keys open, and proving the account again
 // cannot change that answer. Reporting why they did not beats a second exchange
 // that fails the same way, having asked for a secret to do it.
-func (a *App) resume(ctx context.Context) (bool, error) {
+func (a *App) resume(ctx context.Context, user string) (bool, error) {
 	if !a.SignedIn() {
 		return false, nil
 	}
-	if _, err := a.Account.Get(ctx); err != nil {
-		// The saved session no longer works, so sign in again over the top of it.
+	acct, err := a.Account.Get(ctx)
+	if err != nil {
+		slog.DebugContext(ctx, "the saved session did not answer, signing in again", "error", err.Error())
 		return false, nil
 	}
+	if user != "" && !acct.AnswersTo(user) {
+		slog.DebugContext(ctx, "sign-in refused", "reason", "not an address of the saved account")
+		return true, a.refuseAnotherAccount()
+	}
+	a.rememberIdentity(acct.ID, acct.Email)
 	return true, a.settle(ctx)
+}
+
+func (a *App) attach(ctx context.Context) error {
+	acct, err := a.Account.Get(ctx)
+	if err != nil {
+		return err
+	}
+	if a.userID != "" && acct.ID != a.userID {
+		slog.DebugContext(ctx, "sign-in refused", "reason", "another account")
+		// Leaving the session standing would put one on that account that nothing
+		// on this machine holds the tokens to.
+		uid, _, _ := a.API.Tokens()
+		if err := a.API.RevokeSession(ctx, uid); err != nil {
+			slog.DebugContext(ctx, "the refused session could not be revoked", "error", err.Error())
+		}
+		return a.refuseAnotherAccount()
+	}
+	a.rememberIdentity(acct.ID, acct.Email)
+	return a.saveSession()
 }
 
 // settle is the end of every sign-in: the keys open, an extra password that was
@@ -480,7 +501,7 @@ const (
 // It is idempotent for the same reason Login is: a profile whose session still
 // works is left alone rather than being made to mint a code nobody needs.
 func (a *App) LoginQR(ctx context.Context, show func(code string) error) error {
-	if resumed, err := a.resume(ctx); resumed || err != nil {
+	if resumed, err := a.resume(ctx, ""); resumed || err != nil {
 		return err
 	}
 	if err := a.API.AnonymousSession(ctx); err != nil {
@@ -508,24 +529,7 @@ func (a *App) LoginQR(ctx context.Context, show func(code string) error) error {
 		return err
 	}
 	a.API.AdoptSession(approved.UID, approved.AccessToken, approved.RefreshToken)
-
-	// Whose account it is, before anything about it is written down: a profile
-	// names one account everywhere else, and a code approved by a second one would
-	// otherwise repoint it silently.
-	acct, err := a.Account.Get(ctx)
-	if err != nil {
-		return err
-	}
-	if err := a.refuseRepoint(acct.Email); err != nil {
-		// The fork is spent either way, and leaving it standing would put a session
-		// on the account that nothing on this machine holds the tokens to.
-		if rerr := a.API.RevokeSession(ctx, approved.UID); rerr != nil {
-			slog.DebugContext(ctx, "the refused fork could not be revoked", "error", rerr.Error())
-		}
-		return err
-	}
-	a.rememberIdentity(acct.ID, acct.Email)
-	if err := a.saveSession(); err != nil {
+	if err := a.attach(ctx); err != nil {
 		return err
 	}
 	// A code that carried no key signs the machine in and unlocks nothing, which
@@ -691,17 +695,11 @@ func (a *App) Elevate(ctx context.Context, scope proton.Scope, reason string) (f
 	if err := a.Authenticate(ctx); err != nil {
 		return nil, err
 	}
-	user, err := a.Creds.User()
-	if err != nil {
-		return nil, err
-	}
 	password, err := a.Creds.Password(reason)
 	if err != nil {
 		return nil, err
 	}
-	if err := a.API.Elevate(ctx, scope, proton.ScopeCredentials{
-		Username: user, Password: []byte(password),
-	}); err != nil {
+	if err := a.API.Elevate(ctx, scope, proton.ScopeCredentials{Password: []byte(password)}); err != nil {
 		return nil, err
 	}
 	return func() { a.API.Relock(ctx) }, nil
@@ -713,13 +711,10 @@ func (a *App) UnlockPass(ctx context.Context, extra string) error {
 	return a.API.Elevate(ctx, proton.ScopePass, proton.ScopeCredentials{Password: []byte(extra)})
 }
 
-// refuseRepoint stops a profile being pointed at a second account behind its
-// own back. Re-pointing is a fine thing to want; it just has to be said out
+// refuseAnotherAccount stops a profile being pointed at a second account behind
+// its own back. Re-pointing is a fine thing to want; it just has to be said out
 // loud, because the profile names the account everywhere else.
-func (a *App) refuseRepoint(wanted string) error {
-	if wanted == "" || a.email == "" || strings.EqualFold(wanted, a.email) {
-		return nil
-	}
+func (a *App) refuseAnotherAccount() error {
 	return errs.Problemf("Profile %q is signed in as %s.", a.Profile, a.email).
 		Hint(fmt.Sprintf("proton account logout --profile %s", a.Profile)).Exit(4)
 }
@@ -769,10 +764,3 @@ func defaultUserAgent(version string) string {
 	}
 	return "proton-cli/" + version
 }
-
-// RememberIdentity records who the current session belongs to. Exported for the
-// account commands, which learn it from /core/v4/users after signing in.
-func (a *App) RememberIdentity(userID, email string) { a.rememberIdentity(userID, email) }
-
-// SaveSession writes the current session state to disk.
-func (a *App) SaveSession() error { return a.saveSession() }

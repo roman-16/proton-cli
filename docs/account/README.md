@@ -33,7 +33,7 @@ It asks for your email, password and two-factor code, attaches the account to a 
 
 Signing in also **unlocks your keys**, so your password is needed once per machine and not again. Your password never leaves your machine. See [Security](../about/security.md).
 
-Signing in again as the same account changes nothing, so an unattended job can run it ahead of its real work and recover on its own from a session that expired or was revoked:
+Signing in again as the same account, with any of its addresses, changes nothing, so an unattended job can run it ahead of its real work and recover on its own from a session that expired or was revoked:
 
 ```bash
 proton account login --user "$ACCOUNT" --password-file "$CRED"

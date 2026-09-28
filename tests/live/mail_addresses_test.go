@@ -167,20 +167,14 @@ func TestMailSettingsAddressesRefuseAShortDomainThatIsAlreadyOn(t *testing.T) {
 	}
 }
 
-// The default address is the first one, so making one the default is a reorder.
-// The account is put back in the order the run found it in.
-func TestMailSettingsAddressesReorderMakesAnAddressTheDefault(t *testing.T) {
-	address := paidForwarder(t)
+func TestMailSettingsAddressesReorderSetsTheOrderBelowTheDefault(t *testing.T) {
 	before := paidAddressOrder(t)
-	if len(before) < 2 {
-		t.Fatal("the paid account holds one address, so there is no order to set")
+	if len(before) < 3 {
+		t.Fatal("the paid account holds fewer than three addresses, so there is no order below the default to set")
 	}
-	if before[0] == address {
-		t.Fatalf("%s is already the default address, so a run before this one did not"+
-			" put the order back", address)
-	}
+	want := append([]string{before[0], before[2], before[1]}, before[3:]...)
 
-	runOKPaid(t, "mail", "settings", "addresses", "reorder", address)
+	runOKPaid(t, "mail", "settings", "addresses", "reorder", before[0], before[2], before[1])
 	cleanup(t, "Restore the address order: proton --profile paid mail settings addresses reorder "+
 		strings.Join(before, " "), func() error {
 		if slices.Equal(paidAddressOrder(t), before) {
@@ -192,8 +186,8 @@ func TestMailSettingsAddressesReorderMakesAnAddressTheDefault(t *testing.T) {
 		}
 		return nil
 	})
-	if got := paidAddressOrder(t); got[0] != address {
-		t.Errorf("the default address is %s, want %s", got[0], address)
+	if got := paidAddressOrder(t); !slices.Equal(got, want) {
+		t.Errorf("the addresses are in the order %v, want %v", got, want)
 	}
 
 	runOKPaid(t, append([]string{"mail", "settings", "addresses", "reorder"}, before...)...)

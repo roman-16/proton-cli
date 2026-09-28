@@ -8,6 +8,8 @@ package account
 
 import (
 	"context"
+	"slices"
+	"strings"
 
 	"github.com/roman-16/proton-cli/internal/account/keys"
 	"github.com/roman-16/proton-cli/internal/fetch"
@@ -38,6 +40,12 @@ type Account struct {
 	// counting the user's own and every address's. Everything sealed to them
 	// stays sealed until they are reactivated.
 	LockedKeys int `json:"locked_keys,omitempty"`
+
+	names []string
+}
+
+func (a *Account) AnswersTo(name string) bool {
+	return name != "" && slices.ContainsFunc(a.names, func(n string) bool { return strings.EqualFold(n, name) })
 }
 
 // keyed is anything Proton hands back with its keys: the user, an address.
@@ -75,7 +83,12 @@ func (s *Service) Get(ctx context.Context) (*Account, error) {
 			keyed
 		}
 	}
-	var a struct{ Addresses []keyed }
+	var a struct {
+		Addresses []struct {
+			Email string
+			keyed
+		}
+	}
 	if err := fetch.Together(ctx,
 		func(ctx context.Context) error {
 			return s.C.Decode(ctx, proton.Request{Method: "GET", Path: "/core/v4/users"}, &r)
@@ -99,13 +112,16 @@ func (s *Service) Get(ctx context.Context) (*Account, error) {
 		username = ""
 	}
 	locked := u.locked()
+	names := []string{u.Name}
 	for _, addr := range a.Addresses {
 		locked += addr.locked()
+		names = append(names, addr.Email)
 	}
 	return &Account{
 		ID: u.ID, Email: email, Username: username, DisplayName: u.DisplayName,
 		UsedSpace: u.UsedSpace, MaxSpace: u.MaxSpace,
 		MaxUpload: u.MaxUpload, CreateTime: u.CreateTime,
 		LockedKeys: locked,
+		names:      names,
 	}, nil
 }

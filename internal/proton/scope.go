@@ -75,13 +75,9 @@ const scopesPath = "/core/v4/auth/scopes"
 
 // ScopeCredentials is what an elevation needs from the person. A second factor
 // is not part of it: whether Proton wants one is answered by the parameters the
-// exchange fetches, so it is asked for then and not before.
-//
-// Username is what the account password is proved for, and is empty for the Pass
-// extra password: SRP stopped hashing the username at version 3, and the
-// verifier that one is checked against was written by a client at version 4.
+// exchange fetches, so it is asked for then and not before. Nor is an account
+// name: the session already says whose password is being proved.
 type ScopeCredentials struct {
-	Username string
 	Password []byte
 }
 
@@ -157,9 +153,9 @@ func (c *Client) Elevate(ctx context.Context, s Scope, cr ScopeCredentials) erro
 		return c.unlockPass(ctx, cr.Password)
 	}
 	if _, err := c.exchange(ctx, srpExchange{
-		parameters: c.accountParameters(cr.Username, s, false),
+		parameters: c.accountParameters("", s, false),
 		method:     "PUT", path: s.endpoint(),
-		username: cr.Username, password: cr.Password,
+		password:     cr.Password,
 		secondFactor: c.answerSecondFactor(ctx),
 	}); err != nil {
 		return fmt.Errorf("elevate to %s scope: %w", s, err)

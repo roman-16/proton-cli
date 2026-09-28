@@ -25,8 +25,8 @@ type handler func(link string, a handlerArgs) handlerResult
 var errHandler = errors.New("handler found no link")
 
 var (
-	redditmailTarget = regexp.MustCompile(`(?i)https://click\.redditmail\.com/CL0/(.*?)/`)
-	twitchTarget     = regexp.MustCompile(`www\.twitch\.tv/r/e/(.*?)/`)
+	redditmailTarget = regexp.MustCompile(`(?i)^https://click\.redditmail\.com/CL0/(.*?)/`)
+	twitchTarget     = regexp.MustCompile(`^https?://www\.twitch\.tv/r/e/(.*?)/`)
 )
 
 var handlers = map[string]handler{

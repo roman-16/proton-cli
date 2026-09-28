@@ -168,8 +168,9 @@ func loginCmd() *cobra.Command {
 			"is already signed in, and signs in as whoever approves it, so it takes none\n" +
 			"of the flags that name an account or carry a secret. A code lasts nine\n" +
 			"minutes.\n\n" +
-			"Signing in again as the same account changes nothing, so an unattended job\n" +
-			"can run it first to recover from an expired session.",
+			"Signing in again as the same account, with any of its addresses, changes\n" +
+			"nothing, so an unattended job can run it first to recover from an expired\n" +
+			"session.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			if qr {
 				if err := refuseCredentials(c); err != nil {
@@ -195,15 +196,7 @@ func loginCmd() *cobra.Command {
 			if err := signIn(c, qr, user); err != nil {
 				return err
 			}
-			acct, err := c.App.Account.Get(c.Ctx)
-			if err != nil {
-				return err
-			}
-			c.App.RememberIdentity(acct.ID, acct.Email)
-			if err := c.App.SaveSession(); err != nil {
-				return err
-			}
-			return kit.Mutate(c, signedIn(c, acct.Email), func() error { return nil })
+			return kit.Mutate(c, signedIn(c, c.App.Email()), func() error { return nil })
 		}),
 	}
 	// Naming an account belongs here. Every other command acts as whichever

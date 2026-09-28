@@ -219,6 +219,47 @@ func TestProfilesListNamesEverySignedInAccount(t *testing.T) {
 	}
 }
 
+type identity struct{ id, email string }
+
+func paidIdentity(t *testing.T) identity {
+	t.Helper()
+	id, _ := runJSONPaid(t, "account", "get")["id"].(string)
+	for _, r := range runJSONArray(t, "account", "profiles", "list") {
+		m, _ := r.(map[string]interface{})
+		if m["name"] == account.Paid {
+			email, _ := m["email"].(string)
+			return identity{id: id, email: email}
+		}
+	}
+	t.Fatal("the paid profile is missing from the profile list")
+	return identity{}
+}
+
+func TestSigningInAgainWithAnotherAddressOfTheAccountResumes(t *testing.T) {
+	address := paidForwarder(t)
+	before := paidIdentity(t)
+
+	_, stderr, code, err := runAs(account.Paid, nil, loginArgs(accounts[account.Paid], address)...)
+	if err != nil || code != 0 {
+		t.Fatalf("signing the paid profile in with %s exited %d: %v %s", address, code, err, truncateOutput(stderr))
+	}
+	if after := paidIdentity(t); after != before {
+		t.Errorf("the paid profile is %+v, want %+v as before", after, before)
+	}
+}
+
+func TestSigningInAsAnotherAccountIsRefused(t *testing.T) {
+	before := paidIdentity(t)
+
+	_, stderr, code, err := runAs(account.Paid, nil, loginArgs(accounts[account.Secondary], secondaryEmail())...)
+	if err != nil || code != 4 || !strings.Contains(stderr, "is signed in as") {
+		t.Errorf("signing the paid profile in as the secondary account exited %d: %v %s", code, err, truncateOutput(stderr))
+	}
+	if after := paidIdentity(t); after != before {
+		t.Errorf("the paid profile is %+v, want %+v as before", after, before)
+	}
+}
+
 func TestAccountSettings(t *testing.T) {
 	stdout := runOK(t, "account", "settings", "get")
 	for _, want := range []string{"Locale", "Date Format", "Time Format", "Week Start"} {

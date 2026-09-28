@@ -71,7 +71,7 @@ func (c *Credentials) from(src *passwordSource, flag, file string) error {
 //
 // Resolution, most specific first:
 //
-//	email     the account this profile is signed in as, else a prompt
+//	email     --user, else the account this profile is signed in as, else a prompt
 //	password  --password-file, else a prompt
 //	second    --second-password-file, else a prompt
 //	extra     --extra-password-file, else a prompt
@@ -82,15 +82,13 @@ func (c *Credentials) from(src *passwordSource, flag, file string) error {
 //
 // Each file flag reads standard input when its value is `-`.
 //
-// Only `account login` names an account, and it does so with its own --user.
+// Only `account login` names an account.
 //
 // Each value is asked for at most once per invocation: a command that needs the
 // password twice does not ask twice.
 type Credentials struct {
 	ui *ui.UI
 
-	// signedInAs is the account this profile already holds a session for, so
-	// elevating that session never asks for an address the CLI can see.
 	signedInAs string
 	flagTOTP   string
 	source     passwordSource
@@ -307,12 +305,7 @@ func extraPasswordHint(src passwordSource) []string {
 	return []string{"proton account login --extra-password-file FILE", "or run this in a terminal"}
 }
 
-// User returns the account email.
-//
-// Everything but signing in reaches this with a session already in hand, so the
-// address is known and nothing is asked. `account login` passes its own --user
-// rather than going through here, which is what keeps a stray address from
-// reaching the SRP exchange that elevates a session.
+// User returns the address a sign-in without --user signs in as.
 func (c *Credentials) User() (string, error) {
 	if c.haveUser {
 		return c.user, nil

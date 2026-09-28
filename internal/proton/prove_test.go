@@ -119,7 +119,7 @@ func proving(t *testing.T, s *provingServer, password, code string) *Client {
 		if scope != ScopePassword {
 			t.Errorf("asked for the %s scope, want the password one", scope)
 		}
-		return ScopeCredentials{Username: "me@proton.me", Password: []byte(password)}, nil
+		return ScopeCredentials{Password: []byte(password)}, nil
 	})
 	c.SetSecondFactorResolver(func(context.Context, SecondFactorOffer) (SecondFactorAnswer, error) {
 		return SecondFactorAnswer{TOTP: code}, nil

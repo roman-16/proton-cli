@@ -105,6 +105,8 @@ Only the newest slice of the inbox is looked at: the rest is somebody's real mai
 
 **What is allowed is what can be put back**, and the photograph is what decides the argument. The auto-reply looked reversible - `autoreply get` reads back everything `set` accepts - and is not: Proton keeps the last message even while it is off and offers no way to clear it, so a run leaves its own text in somebody's real settings for good. Turning it off restores the behaviour and not the state, and the photograph compares the state. So it is refused, and `PUT /mail/v4/settings/autoresponder` is a declared gap rather than a test. Lowering the version-history retention is refused for a blunter reason: Proton discards the revisions and nothing brings them back.
 
+**The default address never moves, not even for a moment.** Every client sends from it and a sign-in anywhere records it, all while it lasts, and a photograph taken either side of the run cannot see a moment. So the reorder test sets the order below the default and leaves the default where it is.
+
 ### The two fixtures the suite reads and never makes
 
 An alias address **cannot be un-minted**: deleting the item leaves the address spent for good. So `fixture.PaidAlias` names an alias somebody created once by hand, every run hangs contacts off that one and removes them again, and a run that cannot find it says what to run:

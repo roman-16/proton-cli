@@ -62,7 +62,7 @@ Human verification: Proton may ask you to prove you are human. The page is print
 
 --qr asks for nothing at all. It prints a code to approve on a device that is already signed in, and signs in as whoever approves it, so it takes none of the flags that name an account or carry a secret. A code lasts nine minutes.
 
-Signing in again as the same account changes nothing, so an unattended job can run it first to recover from an expired session.
+Signing in again as the same account, with any of its addresses, changes nothing, so an unattended job can run it first to recover from an expired session.
 
 ```
 proton account login

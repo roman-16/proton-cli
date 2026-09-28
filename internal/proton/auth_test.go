@@ -2,6 +2,7 @@ package proton
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"io"
@@ -9,6 +10,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/ProtonMail/go-srp"
 )
 
 // What a security key answers with has to reach Proton in the shape its own
@@ -379,5 +382,80 @@ func TestTheRefusalAResponseCarries(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+type legacyAccount struct {
+	*httptest.Server
+	asked []map[string]any
+}
+
+func newLegacyAccount(t *testing.T, username, password string) *legacyAccount {
+	t.Helper()
+	hashed, err := srp.NewAuth(2, username, []byte(password), "", signedTestModulus, "")
+	if err != nil {
+		t.Fatalf("hash: %v", err)
+	}
+	verifier, err := hashed.GenerateVerifier(srpBits)
+	if err != nil {
+		t.Fatalf("verifier: %v", err)
+	}
+	server, err := srp.NewServerFromSigned(signedTestModulus, verifier, srpBits)
+	if err != nil {
+		t.Fatalf("server setup: %v", err)
+	}
+	a := &legacyAccount{}
+	a.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		switch r.URL.Path {
+		case "/auth/v4/sessions":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"Code": 1000, "UID": "unauth", "AccessToken": "a", "RefreshToken": "r",
+			})
+		case "/core/v4/auth/info":
+			a.asked = append(a.asked, body)
+			ephemeral, err := server.GenerateChallenge()
+			if err != nil {
+				t.Errorf("challenge: %v", err)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"Code": 1000, "Version": 2, "Username": username,
+				"Modulus": signedTestModulus, "ServerEphemeral": base64.StdEncoding.EncodeToString(ephemeral),
+				"SRPSession": "srp-session",
+			})
+		case "/core/v4/auth", "/core/v4/users/password":
+			clientEphemeral, _ := base64.StdEncoding.DecodeString(text(body["ClientEphemeral"]))
+			clientProof, _ := base64.StdEncoding.DecodeString(text(body["ClientProof"]))
+			serverProof, err := server.VerifyProofs(clientEphemeral, clientProof)
+			if err != nil {
+				w.WriteHeader(http.StatusUnprocessableEntity)
+				_ = json.NewEncoder(w).Encode(map[string]any{
+					"Code": invalidLoginCode, "Error": "Incorrect login credentials",
+				})
+				return
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"Code": 1000, "UID": "uid", "AccessToken": "access", "RefreshToken": "refresh",
+				"ServerProof": base64.StdEncoding.EncodeToString(serverProof),
+			})
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	t.Cleanup(a.Close)
+	return a
+}
+
+func TestALegacyPasswordIsProvedForTheUsernameProtonAnswersWith(t *testing.T) {
+	account := newLegacyAccount(t, "alice.smith", "correct horse")
+	c := New(Options{BaseURL: account.URL, Logger: slog.New(slog.DiscardHandler)})
+
+	if err := c.Login(t.Context(), "alice@company.com", []byte("correct horse")); err != nil {
+		t.Fatalf("signing in with an address of a legacy account: %v", err)
+	}
+	if uid, _, _ := c.Tokens(); uid != "uid" {
+		t.Errorf("the session is %q, want the one the proof was granted", uid)
 	}
 }

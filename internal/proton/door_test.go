@@ -56,7 +56,7 @@ func TestARequestReachesTheHostItNamed(t *testing.T) {
 	})
 	c.SetTokens("uid", "access", "refresh")
 	c.SetScopeResolver(func(context.Context, Scope) (ScopeCredentials, error) {
-		return ScopeCredentials{Username: "me@proton.me", Password: []byte("correct horse")}, nil
+		return ScopeCredentials{Password: []byte("correct horse")}, nil
 	})
 
 	if err := c.Decode(t.Context(), Request{

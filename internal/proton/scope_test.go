@@ -1,6 +1,7 @@
 package proton
 
 import (
+	"log/slog"
 	"net/http"
 	"testing"
 )
@@ -89,5 +90,21 @@ func TestScopeFromBody(t *testing.T) {
 		if got := scopeFromBody([]byte(tc.body)); got != tc.want {
 			t.Errorf("scopeFromBody(%s) = %s, want %s", tc.body, got, tc.want)
 		}
+	}
+}
+
+func TestAnElevationNamesNoAccount(t *testing.T) {
+	account := newLegacyAccount(t, "alice.smith", "correct horse")
+	c := New(Options{BaseURL: account.URL, Logger: slog.New(slog.DiscardHandler)})
+	c.SetTokens("uid", "access", "refresh")
+
+	if err := c.Elevate(t.Context(), ScopePassword, ScopeCredentials{Password: []byte("correct horse")}); err != nil {
+		t.Fatalf("elevating: %v", err)
+	}
+	if len(account.asked) != 1 {
+		t.Fatalf("the parameters were asked for %d times, want once", len(account.asked))
+	}
+	if named, ok := account.asked[0]["Username"]; ok {
+		t.Errorf("the parameters were asked for %v, want the session's own account", named)
 	}
 }

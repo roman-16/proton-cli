@@ -20,6 +20,7 @@ type authInfo struct {
 	Version         int
 	Salt            string
 	SRPSession      string
+	Username        string
 	// TwoFA is answered only when the session asking is already signed in, which
 	// is how proving a session again learns what it may prove itself with.
 	TwoFA twoFA `json:"2FA"`
@@ -242,7 +243,6 @@ type srpExchange struct {
 	method string
 	path   string
 
-	username string
 	password []byte
 
 	// extra is what the endpoint wants alongside the proof.
@@ -316,9 +316,11 @@ func refusedSecondFactor(err error) error {
 // authenticates Proton to us.
 //
 // Mirrors srpAuth in WebClients (packages/shared/lib/srp.ts), whose
-// callAndValidate rejects an unexpected server proof for every caller.
+// callAndValidate rejects an unexpected server proof for every caller. A
+// password below SRP version 3 is hashed with the username Proton answers with,
+// as getSrp in @protontech/crypto does.
 func (c *Client) srpCall(ctx context.Context, x srpExchange, info *authInfo) (*Response, error) {
-	auth, err := srp.NewAuth(info.Version, x.username, x.password, info.Salt, info.Modulus, info.ServerEphemeral)
+	auth, err := srp.NewAuth(info.Version, info.Username, x.password, info.Salt, info.Modulus, info.ServerEphemeral)
 	if err != nil {
 		return nil, fmt.Errorf("SRP setup: %w", err)
 	}
@@ -398,7 +400,8 @@ func (c *Client) accountParameters(username string, scope Scope, accountHost boo
 	}
 }
 
-// getAuthInfo fetches the SRP parameters for username.
+// getAuthInfo fetches the SRP parameters for username, or for the account the
+// session belongs to when username is empty.
 //
 // Intent identifies the sign-in flow, and ReauthScope tells the server which
 // elevation the following exchange is for; both are what the web clients send
@@ -435,9 +438,9 @@ func (c *Client) loginSRP(ctx context.Context, username string, password []byte,
 	resp, err := c.exchange(ctx, srpExchange{
 		parameters: c.accountParameters(username, "", false),
 		method:     "POST", path: "/core/v4/auth",
-		username: username, password: password,
-		extra:   map[string]any{"Username": username},
-		hvToken: hvToken, hvType: hvType,
+		password: password,
+		extra:    map[string]any{"Username": username},
+		hvToken:  hvToken, hvType: hvType,
 	})
 	if err != nil {
 		return nil, err
@@ -473,9 +476,9 @@ func (c *Client) prove(ctx context.Context, req Request) (*Response, error) {
 		return nil, err
 	}
 	return c.exchange(ctx, srpExchange{
-		parameters: c.accountParameters(cr.Username, "", req.AccountHost),
+		parameters: c.accountParameters("", "", req.AccountHost),
 		method:     req.Method, path: req.Path, accountHost: req.AccountHost,
-		username: cr.Username, password: cr.Password,
+		password:     cr.Password,
 		extra:        extra,
 		secondFactor: c.answerSecondFactor(ctx),
 	})
