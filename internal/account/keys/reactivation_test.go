@@ -8,8 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	"github.com/roman-16/proton-cli/internal/crypto/bip39"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/proton"
 )
 
@@ -352,11 +353,15 @@ func TestReactivateWithARecoveryFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("serialize the key that was locked: %v", err)
 	}
-	message, err := pgp.EncryptMessageWithPassword(pgp.NewPlainMessage(binary), []byte(secret))
+	enc, err := pgphelper.PGP.Encryption().Password([]byte(secret)).New()
 	if err != nil {
 		t.Fatalf("make a recovery file: %v", err)
 	}
-	file, err := message.GetArmored()
+	message, err := enc.Encrypt(binary)
+	if err != nil {
+		t.Fatalf("make a recovery file: %v", err)
+	}
+	file, err := message.Armor()
 	if err != nil {
 		t.Fatalf("armor the recovery file: %v", err)
 	}

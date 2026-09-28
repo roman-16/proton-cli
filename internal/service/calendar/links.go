@@ -10,8 +10,9 @@ import (
 	"net/url"
 	"sort"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
 	"github.com/roman-16/proton-cli/internal/skip"
@@ -164,7 +165,7 @@ func (s *Service) LinkCreate(ctx context.Context, cal Calendar, n NewLink) (*Lin
 	}
 	var passphraseKey []byte
 	if n.Full {
-		sk, err := pgp.GenerateSessionKey()
+		sk, err := pgphelper.PGP.GenerateSessionKey()
 		if err != nil {
 			return nil, err
 		}
@@ -288,9 +289,9 @@ func (raw rawLink) label(ctx context.Context, ck *calKeys) string {
 	}
 	msg, err := pgp.NewPGPMessageFromArmored(raw.EncryptedPurpose)
 	if err == nil {
-		var opened *pgp.PlainMessage
-		if opened, err = ck.calKR.Decrypt(msg, nil, pgp.GetUnixTime()); err == nil {
-			return opened.GetString()
+		var opened *pgp.VerifiedDataResult
+		if opened, err = pgphelper.DecryptText(ck.calKR, nil, msg.Bytes(), pgp.Bytes); err == nil {
+			return opened.String()
 		}
 	}
 	// Recorded and not counted: the link is on the screen and works, and what
@@ -313,11 +314,11 @@ func sortLinks(links []Link) {
 // sealToCalendar encrypts to the calendar's keys, which is what reads a link's
 // own keys and its label back.
 func sealToCalendar(ck *calKeys, text string) (string, error) {
-	msg, err := ck.calKR.Encrypt(pgp.NewPlainMessageFromString(text), nil)
+	msg, err := pgphelper.EncryptText(ck.calKR, nil, text)
 	if err != nil {
 		return "", err
 	}
-	return msg.GetArmored()
+	return msg.Armor()
 }
 
 func openCacheKey(ck *calKeys, raw rawLink) (string, error) {
@@ -325,11 +326,11 @@ func openCacheKey(ck *calKeys, raw rawLink) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	opened, err := ck.calKR.Decrypt(msg, nil, pgp.GetUnixTime())
+	opened, err := pgphelper.DecryptText(ck.calKR, nil, msg.Bytes(), pgp.Bytes)
 	if err != nil {
 		return "", fmt.Errorf("open the key that opens the link: %w", err)
 	}
-	return opened.GetString(), nil
+	return opened.String(), nil
 }
 
 // maskPassphrase hides the calendar's passphrase behind a key made for one

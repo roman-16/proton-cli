@@ -9,13 +9,13 @@
     "import": "bun scripts/import-docs.ts"
   },
   "dependencies": {
-    "@astrojs/check": "^0.9.5",
-    "@astrojs/starlight": "^0.41.9",
-    "@scalar/api-reference": "^1.67.0",
-    "astro": "^7.2.9",
-    "starlight-links-validator": "^0.25.3",
-    "starlight-llms-txt": "^0.11.0",
+    "@astrojs/check": "^0.9.10",
+    "@astrojs/starlight": "^0.42.4",
+    "@scalar/api-reference": "^1.72.1",
+    "astro": "^7.3.5",
+    "starlight-links-validator": "^0.26.0",
+    "starlight-llms-txt": "^0.12.0",
     "starlight-theme-black": "^0.7.1",
-    "typescript": "^5.9.3"
+    "typescript": "^6.0.3"
   }
 }

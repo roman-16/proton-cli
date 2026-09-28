@@ -7,9 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 
 	"github.com/roman-16/proton-cli/internal/account/keys"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/proton"
 )
 
@@ -29,18 +30,14 @@ func TestJoiningAHolidaysCalendarMakesAMembershipThatOpens(t *testing.T) {
 	if err != nil {
 		t.Fatalf("the key packet is not base64: %v", err)
 	}
-	opened, err := addrKR.Decrypt(pgp.NewPGPSplitMessage(keyPacket, dataPacket).GetPGPMessage(), nil, 0)
+	opened, err := pgphelper.DecryptText(addrKR, nil, pgp.NewPGPSplitMessage(keyPacket, dataPacket).Bytes(), pgp.Bytes)
 	if err != nil {
 		t.Fatalf("the membership does not open with the address's key: %v", err)
 	}
-	if opened.GetString() != entry.Passphrase {
-		t.Fatalf("the membership opens to %q, want the calendar's passphrase", opened.GetString())
+	if opened.String() != entry.Passphrase {
+		t.Fatalf("the membership opens to %q, want the calendar's passphrase", opened.String())
 	}
-	signature, err := pgp.NewPGPSignatureFromArmored(body["Signature"].(string))
-	if err != nil {
-		t.Fatalf("the signature is not armored: %v", err)
-	}
-	if err := addrKR.VerifyDetached(opened, signature, pgp.GetUnixTime()); err != nil {
+	if err := pgphelper.VerifyText(addrKR, opened.String(), []byte(body["Signature"].(string)), pgp.Armor); err != nil {
 		t.Errorf("the signature does not verify over the passphrase: %v", err)
 	}
 
@@ -158,7 +155,7 @@ func TestAddingAHolidaysCalendarJoinsItAndLeavesYouLookingFree(t *testing.T) {
 
 func addressKeyRing(t *testing.T) *pgp.KeyRing {
 	t.Helper()
-	key, err := pgp.GenerateKey("Me", "me@proton.me", "x25519", 0)
+	key, err := pgphelper.GenerateKey("Me", "me@proton.me")
 	if err != nil {
 		t.Fatalf("generate: %v", err)
 	}
@@ -174,12 +171,12 @@ func addressKeyRing(t *testing.T) *pgp.KeyRing {
 // packet is joined to.
 func directoryEntryFor(t *testing.T, id, country, code, language, languageCode string) (directoryEntry, []byte) {
 	t.Helper()
-	sk, err := pgp.GenerateSessionKey()
+	sk, err := pgphelper.PGP.GenerateSessionKey()
 	if err != nil {
 		t.Fatalf("session key: %v", err)
 	}
 	passphrase := "passphrase of " + id
-	dataPacket, err := sk.Encrypt(pgp.NewPlainMessageFromString(passphrase))
+	dataPacket, err := pgphelper.EncryptTextWithSessionKey(sk, nil, passphrase)
 	if err != nil {
 		t.Fatalf("encrypt the passphrase: %v", err)
 	}

@@ -10,8 +10,9 @@ import (
 	"testing"
 	"time"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	"github.com/roman-16/proton-cli/internal/account/keys"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/ical"
 	"github.com/roman-16/proton-cli/internal/progress"
 	"github.com/roman-16/proton-cli/internal/proton"
@@ -200,7 +201,7 @@ func feed(d *routeDoer, page string) {
 // indexKeyRing is the account key an index is sealed to.
 func indexKeyRing(t *testing.T) *pgp.KeyRing {
 	t.Helper()
-	key, err := pgp.GenerateKey("test", "test@example.invalid", "x25519", 0)
+	key, err := pgphelper.GenerateKey("test", "test@example.invalid")
 	if err != nil {
 		t.Fatalf("generate a key: %v", err)
 	}

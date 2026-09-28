@@ -9,8 +9,9 @@ import (
 	"testing"
 	"time"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	"github.com/roman-16/proton-cli/internal/account/keys"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/proton"
 )
 
@@ -144,25 +145,17 @@ func lockLikeAReset(t *testing.T, u *keys.Unlocked, shareID string, kind int) *l
 	if err != nil {
 		t.Fatalf("read the share passphrase: %v", err)
 	}
-	split, err := msg.SplitMessage()
-	if err != nil {
-		t.Fatalf("split the share passphrase: %v", err)
-	}
-	sessionKey, err := rings.Read.DecryptSessionKey(split.GetBinaryKeyPacket())
+	sessionKey, err := pgphelper.DecryptSessionKey(rings.Read, msg.BinaryKeyPacket())
 	if err != nil {
 		t.Fatalf("read the share's session key: %v", err)
 	}
-	plain, err := sessionKey.Decrypt(split.GetBinaryDataPacket())
+	plain, err := pgphelper.DecryptTextWithSessionKey(sessionKey, msg.BinaryDataPacket())
 	if err != nil {
 		t.Fatalf("open the share passphrase: %v", err)
 	}
-	signature, err := rings.Write.SignDetached(pgp.NewPlainMessageFromString(plain.GetString()))
+	armoredSig, err := pgphelper.SignTextArmored(rings.Write, plain)
 	if err != nil {
 		t.Fatalf("sign the share passphrase: %v", err)
-	}
-	armoredSig, err := signature.GetArmored()
-	if err != nil {
-		t.Fatalf("armor the signature: %v", err)
 	}
 
 	shareKR, err := pgp.NewKeyRing(sharePriv)
@@ -179,7 +172,7 @@ func lockLikeAReset(t *testing.T, u *keys.Unlocked, shareID string, kind int) *l
 		"ShareID": shareID, "Key": shareKey, "Passphrase": sharePass,
 		"PassphraseSignature": armoredSig,
 		"PossibleKeyPackets": []map[string]string{
-			{"KeyPacket": base64.StdEncoding.EncodeToString(split.GetBinaryKeyPacket())},
+			{"KeyPacket": base64.StdEncoding.EncodeToString(msg.BinaryKeyPacket())},
 		},
 		"RootLinkRecoveryPassphrase": sealedRoot,
 	}
@@ -198,7 +191,7 @@ func lockLikeAReset(t *testing.T, u *keys.Unlocked, shareID string, kind int) *l
 func restoreInto(t *testing.T, u *keys.Unlocked, locked ...*lockedTree) (*Service, *Context, *pgp.KeyRing) {
 	t.Helper()
 	rings, _ := u.AddrRings(testAddrID)
-	shareKey, err := pgp.GenerateKey("Share", "", "x25519", 0)
+	shareKey, err := pgphelper.GenerateKey("Share", "")
 	if err != nil {
 		t.Fatalf("generate the share key: %v", err)
 	}
@@ -295,20 +288,16 @@ func TestRestoreHandsTheFilesBackSealedToTheNewTree(t *testing.T) {
 	if err != nil {
 		t.Fatalf("the node passphrase is not readable armour: %v", err)
 	}
-	plain, err := rootKR.Decrypt(msg, nil, pgp.GetUnixTime())
+	plain, err := pgphelper.DecryptText(rootKR, nil, msg.Bytes(), pgp.Bytes)
 	if err != nil {
 		t.Fatalf("the node passphrase does not open with the new tree's root key: %v", err)
 	}
-	if plain.GetString() != locked.rootPassphrase {
+	if plain.String() != locked.rootPassphrase {
 		t.Error("the node passphrase is not the locked root's own")
 	}
 
 	signature, _ := main["NodePassphraseSignature"].(string)
-	sig, err := pgp.NewPGPSignatureFromArmored(signature)
-	if err != nil {
-		t.Fatalf("the signature is not readable armour: %v", err)
-	}
-	if err := dc.Addr.Write.VerifyDetached(plain, sig, pgp.GetUnixTime()); err != nil {
+	if err := pgphelper.VerifyText(dc.Addr.Write, plain.String(), []byte(signature), pgp.Armor); err != nil {
 		t.Errorf("the passphrase is not signed by the address the files come back to: %v", err)
 	}
 	if _, ok := main["Hash"].(string); !ok || main["Hash"] == "" {
@@ -349,7 +338,7 @@ func TestRestoreResealsComputersAndPhotosWhereTheyAre(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: the key packet is not base64: %v", heading, err)
 		}
-		sk, err := dc.Addr.Write.DecryptSessionKey(raw)
+		sk, err := pgphelper.DecryptSessionKey(dc.Addr.Write, raw)
 		if err != nil {
 			t.Fatalf("%s: the key packet does not open with the address's key: %v", heading, err)
 		}

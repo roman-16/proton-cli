@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ProtonMail/go-crypto/openpgp"
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	openpgp "github.com/ProtonMail/go-crypto/openpgp/v2"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	"github.com/roman-16/proton-cli/internal/proton"
 )
 

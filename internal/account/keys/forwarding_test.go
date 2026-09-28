@@ -10,7 +10,9 @@ import (
 	"testing"
 
 	"github.com/ProtonMail/go-crypto/openpgp/packet"
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	"github.com/ProtonMail/gopenpgp/v3/armor"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
 )
@@ -84,7 +86,7 @@ func newHierarchy(t *testing.T, primaries int) *hierarchy {
 
 func generated(t *testing.T, name string) *pgp.Key {
 	t.Helper()
-	key, err := pgp.GenerateKey(name, name+"@example.invalid", "x25519", 0)
+	key, err := pgphelper.GenerateKey(name, name+"@example.invalid")
 	if err != nil {
 		t.Fatalf("generate the %s key: %v", name, err)
 	}
@@ -93,7 +95,7 @@ func generated(t *testing.T, name string) *pgp.Key {
 
 func locked(t *testing.T, key *pgp.Key, passphrase string) string {
 	t.Helper()
-	shut, err := key.Lock([]byte(passphrase))
+	shut, err := pgphelper.PGP.LockKey(key, []byte(passphrase))
 	if err != nil {
 		t.Fatalf("lock: %v", err)
 	}
@@ -108,22 +110,17 @@ func locked(t *testing.T, key *pgp.Key, passphrase string) string {
 // the user key, which is the shape decryptToken opens.
 func sealToken(t *testing.T, userKR *pgp.KeyRing, token string) (sealed, signature string) {
 	t.Helper()
-	message := pgp.NewPlainMessageFromString(token)
-	encrypted, err := userKR.Encrypt(message, nil)
+	encrypted, err := pgphelper.EncryptText(userKR, nil, token)
 	if err != nil {
 		t.Fatalf("seal the token: %v", err)
 	}
-	sealed, err = encrypted.GetArmored()
+	sealed, err = encrypted.Armor()
 	if err != nil {
 		t.Fatalf("armor the token: %v", err)
 	}
-	sig, err := userKR.SignDetached(message)
+	signature, err = pgphelper.SignTextArmored(userKR, token)
 	if err != nil {
 		t.Fatalf("sign the token: %v", err)
-	}
-	signature, err = sig.GetArmored()
-	if err != nil {
-		t.Fatalf("armor the token's signature: %v", err)
 	}
 	return sealed, signature
 }
@@ -256,21 +253,20 @@ func TestAddForwardingKeySignsTheKeyListWithEveryPrimaryKey(t *testing.T) {
 // signature is.
 func assertSignedByAll(t *testing.T, h *hierarchy, data, armored string, want int) {
 	t.Helper()
-	signature, err := pgp.NewPGPSignatureFromArmored(armored)
+	signature, err := armor.Unarmor(armored)
 	if err != nil {
 		t.Fatalf("the signature is not readable armour: %v", err)
 	}
-	if got := signaturePackets(t, signature.GetBinary()); got != want {
+	if got := signaturePackets(t, signature); got != want {
 		t.Errorf("the signature holds %d packets, want %d", got, want)
 	}
-	message := pgp.NewPlainMessageFromString(data)
 	context := pgp.NewVerificationContext(sklSigningContext, true, 0)
 	for _, key := range h.u.AddrKRs[h.addr.ID].Read.GetKeys() {
 		kr, err := pgp.NewKeyRing(key)
 		if err != nil {
 			t.Fatalf("NewKeyRing: %v", err)
 		}
-		if err := kr.VerifyDetachedWithContext(message, signature, pgp.GetUnixTime(), context); err != nil {
+		if err := pgphelper.VerifyTextInContext(kr, data, signature, pgp.Bytes, context); err != nil {
 			t.Errorf("the key list is not signed by one of the address's primary keys: %v", err)
 		}
 	}

@@ -7,7 +7,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/skip"
 )
@@ -49,14 +50,16 @@ func DelegatedToken() (string, error) {
 // verifies that signature when they open it, which is what says the token came
 // from the account it names rather than from whoever wrote the record.
 func SealDelegatedToken(token string, to, signWith *pgp.KeyRing) (string, error) {
-	msg, err := to.EncryptWithContext(
-		pgp.NewPlainMessageFromString(token), signWith,
-		pgp.NewSigningContext(delegatedTokenContext, true),
-	)
+	enc, err := pgphelper.PGP.Encryption().Recipients(to).SigningKeys(signWith).
+		SigningContext(pgp.NewSigningContext(delegatedTokenContext, true)).Utf8().New()
+	if err != nil {
+		return "", err
+	}
+	msg, err := enc.Encrypt([]byte(token))
 	if err != nil {
 		return "", fmt.Errorf("seal the delegated-access token: %w", err)
 	}
-	return msg.GetArmored()
+	return msg.Armor()
 }
 
 // OpenDelegatedToken opens a token this account was sent, with its own keys, and
@@ -65,16 +68,19 @@ func SealDelegatedToken(token string, to, signWith *pgp.KeyRing) (string, error)
 // whoever wrote the record. The plaintext is the passphrase that opens the
 // granting account's user keys.
 func OpenDelegatedToken(armored string, decrypt, verify *pgp.KeyRing) (string, error) {
-	msg, err := pgp.NewPGPMessageFromArmored(armored)
+	dec, err := pgphelper.PGP.Decryption().DecryptionKeys(decrypt).VerificationKeys(verify).
+		VerificationContext(pgp.NewVerificationContext(delegatedTokenContext, true, 0)).Utf8().New()
 	if err != nil {
 		return "", err
 	}
-	plain, err := decrypt.DecryptWithContext(msg, verify, pgp.GetUnixTime(),
-		pgp.NewVerificationContext(delegatedTokenContext, true, 0))
+	plain, err := dec.Decrypt([]byte(armored), pgp.Armor)
 	if err != nil {
 		return "", err
 	}
-	return plain.GetString(), nil
+	if err := pgphelper.SignatureError(plain, verify); err != nil {
+		return "", err
+	}
+	return plain.String(), nil
 }
 
 // UserKeysUnder re-locks every decrypted user key under the token, keeping each

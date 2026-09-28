@@ -5,7 +5,8 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
 )
@@ -123,7 +124,7 @@ func memberSessionKey(addrKR *pgp.KeyRing, keyPacket string) (*pgp.SessionKey, e
 	if err != nil {
 		return nil, fmt.Errorf("decode the membership's key packet: %w", err)
 	}
-	sessionKey, err := addrKR.DecryptSessionKey(raw)
+	sessionKey, err := pgphelper.DecryptSessionKey(addrKR, raw)
 	if err != nil {
 		return nil, fmt.Errorf("open the membership's key packet: %w", err)
 	}

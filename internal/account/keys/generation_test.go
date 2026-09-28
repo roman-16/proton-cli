@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/ProtonMail/go-crypto/openpgp/packet"
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	openpgp "github.com/ProtonMail/go-crypto/openpgp/v2"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 )
 
 // What a key this build writes looks like from outside.
@@ -30,8 +30,8 @@ func TestGenerationDatesAKeyByProtonsClock(t *testing.T) {
 	if got := key.GetEntity().PrimaryKey.CreationTime; !got.Equal(served) {
 		t.Errorf("the key is dated %s, want Proton's clock at %s", got, served)
 	}
-	identity := key.GetEntity().PrimaryIdentity()
-	if got := identity.SelfSignature.CreationTime; !got.Equal(served) {
+	selfSignature, _ := key.GetEntity().PrimaryIdentity(served, nil)
+	if got := selfSignature.CreationTime; !got.Equal(served) {
 		t.Errorf("the key's signature is dated %s, want %s", got, served)
 	}
 }
@@ -53,7 +53,7 @@ func TestGenerationFallsBackToThisMachinesClock(t *testing.T) {
 func TestGenerationWritesWhatProtonsClientsWrite(t *testing.T) {
 	key := generatedUnder(t, &Unlocked{})
 	entity := key.GetEntity()
-	identity := entity.PrimaryIdentity()
+	selfSignature, _ := entity.PrimaryIdentity(time.Now(), nil)
 
 	if got := entity.PrimaryKey.PubKeyAlgo; got != packet.PubKeyAlgoEdDSA {
 		t.Errorf("the key is algorithm %d, want EdDSA", got)
@@ -61,13 +61,13 @@ func TestGenerationWritesWhatProtonsClientsWrite(t *testing.T) {
 	if got := entity.PrimaryKey.Version; got != 4 {
 		t.Errorf("the key is version %d, want 4", got)
 	}
-	if identity.SelfSignature.Hash != crypto.SHA512 {
-		t.Errorf("the key's signature is hashed with %v, want SHA-512", identity.SelfSignature.Hash)
+	if selfSignature.Hash != crypto.SHA512 {
+		t.Errorf("the key's signature is hashed with %v, want SHA-512", selfSignature.Hash)
 	}
-	if got := identity.SelfSignature.PreferredHash; !slices.Equal(got, []uint8{10, 8}) {
+	if got := selfSignature.PreferredHash; !slices.Equal(got, []uint8{10, 8}) {
 		t.Errorf("the key prefers hashes %v, want SHA-512 then SHA-256", got)
 	}
-	if got := identity.SelfSignature.PreferredSymmetric; !slices.Equal(got, []uint8{9, 7}) {
+	if got := selfSignature.PreferredSymmetric; !slices.Equal(got, []uint8{9, 7}) {
 		t.Errorf("the key prefers ciphers %v, want AES-256 then AES-128", got)
 	}
 	if len(entity.Subkeys) != 1 {
@@ -76,8 +76,8 @@ func TestGenerationWritesWhatProtonsClientsWrite(t *testing.T) {
 	if got := entity.Subkeys[0].PublicKey.PubKeyAlgo; got != packet.PubKeyAlgoECDH {
 		t.Errorf("the subkey is algorithm %d, want ECDH, which a forwarding is derived from", got)
 	}
-	if entity.Subkeys[0].Sig.Hash != crypto.SHA512 {
-		t.Errorf("the subkey binding is hashed with %v, want SHA-512", entity.Subkeys[0].Sig.Hash)
+	if entity.Subkeys[0].Bindings[0].Packet.Hash != crypto.SHA512 {
+		t.Errorf("the subkey binding is hashed with %v, want SHA-512", entity.Subkeys[0].Bindings[0].Packet.Hash)
 	}
 }
 

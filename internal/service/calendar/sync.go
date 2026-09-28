@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/ical"
 	"github.com/roman-16/proton-cli/internal/proton"
@@ -117,7 +117,7 @@ func wrapForAttendees(attendees []protonAttendee, sk *pgp.SessionKey) ([]map[str
 	}
 	out := make([]map[string]any, 0, len(attendees))
 	for _, a := range attendees {
-		kp, err := a.kr.EncryptSessionKey(sk)
+		kp, err := pgphelper.EncryptSessionKey(a.kr, sk)
 		if err != nil {
 			return nil, fmt.Errorf("wrap the event key for %s: %w", a.email, err)
 		}

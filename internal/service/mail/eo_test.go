@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
-	"github.com/ProtonMail/gopenpgp/v2/helper"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/proton"
 )
 
@@ -95,14 +95,14 @@ func newEOServer(t *testing.T) *eoServer {
 	t.Helper()
 	s := &eoServer{t: t, sender: genMailKeyRing(t), attachment: []byte("%PDF-1.7 numbers"), expires: 1778000000}
 
-	sk, err := pgp.GenerateSessionKey()
+	sk, err := pgphelper.PGP.GenerateSessionKey()
 	if err != nil {
 		t.Fatalf("GenerateSessionKey: %v", err)
 	}
-	if s.attData, err = sk.Encrypt(pgp.NewPlainMessage(s.attachment)); err != nil {
+	if s.attData, err = pgphelper.EncryptBinaryWithSessionKey(sk, nil, s.attachment); err != nil {
 		t.Fatalf("encrypt the attachment: %v", err)
 	}
-	if s.attKeyPacke, err = pgp.EncryptSessionKeyWithPassword(sk, []byte(eoTestPassword)); err != nil {
+	if s.attKeyPacke, err = pgphelper.EncryptSessionKeyWithPassword([]byte(eoTestPassword), sk); err != nil {
 		t.Fatalf("seal the attachment key: %v", err)
 	}
 	return s
@@ -135,7 +135,7 @@ func (s *eoServer) Decode(_ context.Context, r proton.Request, out any) error {
 func (s *eoServer) answer(r proton.Request) ([]byte, error) {
 	switch r.Path {
 	case "/mail/v4/eo/token/" + eoTestID:
-		sealed, err := helper.EncryptMessageWithPassword([]byte(eoTestPassword), eoTestToken)
+		sealed, err := pgphelper.EncryptTextWithPassword([]byte(eoTestPassword), eoTestToken)
 		if err != nil {
 			return nil, err
 		}
@@ -153,7 +153,7 @@ func (s *eoServer) answer(r proton.Request) ([]byte, error) {
 }
 
 func (s *eoServer) message() ([]byte, error) {
-	body, err := helper.EncryptMessageWithPassword([]byte(eoTestPassword), eoTestBody)
+	body, err := pgphelper.EncryptTextWithPassword([]byte(eoTestPassword), eoTestBody)
 	if err != nil {
 		return nil, err
 	}
@@ -275,24 +275,24 @@ func TestAnAnswerIsSealedToTheSenderAndToThePassword(t *testing.T) {
 	if err != nil {
 		t.Fatalf("the sender's copy is not a PGP message: %v", err)
 	}
-	read, err := srv.sender.Decrypt(sealed, nil, 0)
+	read, err := pgphelper.DecryptText(srv.sender, nil, sealed.Bytes(), pgp.Bytes)
 	if err != nil {
 		t.Fatalf("the sender cannot open their copy: %v", err)
 	}
-	if !strings.Contains(read.GetString(), "Got them, thanks.") {
-		t.Errorf("the sender's copy reads %q", read.GetString())
+	if !strings.Contains(read.String(), "Got them, thanks.") {
+		t.Errorf("the sender's copy reads %q", read.String())
 	}
 	// The original is quoted under the answer, as it is in every other reply.
-	if !strings.Contains(read.GetString(), eoTestBody) {
-		t.Errorf("the sender's copy does not quote the original: %q", read.GetString())
+	if !strings.Contains(read.String(), eoTestBody) {
+		t.Errorf("the sender's copy does not quote the original: %q", read.String())
 	}
 
-	behind, err := helper.DecryptMessageWithPassword([]byte(eoTestPassword), parts["ReplyBody"])
+	behind, err := pgphelper.DecryptTextWithPassword([]byte(eoTestPassword), parts["ReplyBody"])
 	if err != nil {
 		t.Fatalf("the password does not open the copy left behind: %v", err)
 	}
-	if behind != read.GetString() {
-		t.Errorf("the two copies differ:\n%q\n%q", behind, read.GetString())
+	if behind != read.String() {
+		t.Errorf("the two copies differ:\n%q\n%q", behind, read.String())
 	}
 	if m.Replies != 1 {
 		t.Errorf("replies = %d, want the answer counted", m.Replies)
@@ -306,7 +306,7 @@ func TestAnAnswerCanLeaveTheOriginalOut(t *testing.T) {
 	if err := New(srv, testKeys(nil)).EOReply(t.Context(), m, EOReplySpec{Body: "Noted.", NoQuote: true}); err != nil {
 		t.Fatalf("EOReply: %v", err)
 	}
-	behind, err := helper.DecryptMessageWithPassword([]byte(eoTestPassword), eoFormParts(t, srv)["ReplyBody"])
+	behind, err := pgphelper.DecryptTextWithPassword([]byte(eoTestPassword), eoFormParts(t, srv)["ReplyBody"])
 	if err != nil {
 		t.Fatalf("open the copy left behind: %v", err)
 	}
@@ -332,12 +332,12 @@ func TestAnAnswerCarriesItsAttachments(t *testing.T) {
 		t.Errorf("the form names the attachment %q/%q", parts["Filename[]"], parts["MIMEType[]"])
 	}
 	packet := pgp.NewPGPSplitMessage([]byte(parts["KeyPackets[]"]), []byte(parts["DataPacket[]"]))
-	read, err := srv.sender.Decrypt(packet.GetPGPMessage(), nil, 0)
+	read, err := pgphelper.Decrypt(srv.sender, nil, packet.Bytes(), pgp.Bytes)
 	if err != nil {
 		t.Fatalf("the sender cannot open the attachment: %v", err)
 	}
-	if string(read.GetBinary()) != "signed bytes" {
-		t.Errorf("the attachment reads %q", read.GetBinary())
+	if string(read.Bytes()) != "signed bytes" {
+		t.Errorf("the attachment reads %q", read.Bytes())
 	}
 }
 

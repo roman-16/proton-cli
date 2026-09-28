@@ -5,7 +5,8 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/proton"
 )
 
@@ -32,11 +33,11 @@ func (s *Service) buildPackages(ctx context.Context, c Content, del Delivery, at
 		if err != nil {
 			return nil, err
 		}
-		sessionKey, err := pgp.GenerateSessionKey()
+		sessionKey, err := pgphelper.PGP.GenerateSessionKey()
 		if err != nil {
 			return nil, err
 		}
-		encBody, err := sessionKey.EncryptAndSign(pgp.NewPlainMessageFromString(body), c.From.Keys.Write)
+		encBody, err := pgphelper.EncryptTextWithSessionKey(sessionKey, c.From.Keys.Write, body)
 		if err != nil {
 			return nil, err
 		}
@@ -101,7 +102,7 @@ func subPackage(p plannedRecipient, sessionKey *pgp.SessionKey, del Delivery, at
 	if err != nil {
 		return nil, err
 	}
-	kp, err := recKR.EncryptSessionKey(sessionKey)
+	kp, err := pgphelper.EncryptSessionKey(recKR, sessionKey)
 	if err != nil {
 		return nil, err
 	}

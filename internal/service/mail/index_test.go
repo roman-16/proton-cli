@@ -13,8 +13,9 @@ import (
 	"sync/atomic"
 	"testing"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	"github.com/roman-16/proton-cli/internal/account/keys"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/progress"
 	"github.com/roman-16/proton-cli/internal/proton"
 	"github.com/roman-16/proton-cli/internal/search"
@@ -99,11 +100,11 @@ func (m *mailbox) add(t *testing.T, raw rawListMessage, body string) {
 // armored is a body as Proton hands one over: sealed to the account's key.
 func armored(t *testing.T, kr *pgp.KeyRing, body string) string {
 	t.Helper()
-	enc, err := kr.Encrypt(pgp.NewPlainMessageFromString(body), nil)
+	enc, err := pgphelper.EncryptText(kr, nil, body)
 	if err != nil {
 		t.Fatalf("encrypt: %v", err)
 	}
-	sealed, err := enc.GetArmored()
+	sealed, err := enc.Armor()
 	if err != nil {
 		t.Fatalf("armor: %v", err)
 	}

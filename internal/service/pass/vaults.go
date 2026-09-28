@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
 	"github.com/roman-16/proton-cli/internal/crypto/aead"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/fetch"
 	"github.com/roman-16/proton-cli/internal/proton"
@@ -121,11 +121,11 @@ func (s *Service) VaultCreate(ctx context.Context, name string) (string, error) 
 	if err != nil {
 		return "", err
 	}
-	encKey, err := ownKey.Encrypt(pgp.NewPlainMessage(rawKey), ownKey)
+	encKey, err := pgphelper.EncryptBinary(ownKey, ownKey, rawKey)
 	if err != nil {
 		return "", err
 	}
-	encVaultKey := base64.StdEncoding.EncodeToString(encKey.GetBinary())
+	encVaultKey := base64.StdEncoding.EncodeToString(encKey.Bytes())
 	pbBytes, err := proto.Marshal(vault)
 	if err != nil {
 		return "", err

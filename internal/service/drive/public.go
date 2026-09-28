@@ -9,7 +9,8 @@ import (
 	"strings"
 
 	srp "github.com/ProtonMail/go-srp"
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
 	"github.com/roman-16/proton-cli/internal/skip"
@@ -190,7 +191,7 @@ func unlockLinkShare(share *proton.PublicLinkShare, password string) (*pgp.KeyRi
 	}
 	// Proton's key password is the last 31 bytes of the bcrypt hash, not the
 	// whole thing.
-	dec, err := pgp.DecryptMessageWithPassword(enc, hashed[len(hashed)-31:])
+	dec, err := pgphelper.DecryptWithPassword(hashed[len(hashed)-31:], enc.Bytes(), pgp.Bytes)
 	if err != nil {
 		return nil, nil, fmt.Errorf("decrypt the link's share passphrase: %w", err)
 	}
@@ -198,7 +199,7 @@ func unlockLinkShare(share *proton.PublicLinkShare, password string) (*pgp.KeyRi
 	if err != nil {
 		return nil, nil, err
 	}
-	unlocked, err := locked.Unlock(dec.GetBinary())
+	unlocked, err := locked.Unlock(dec)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unlock the link's share key: %w", err)
 	}
@@ -206,7 +207,7 @@ func unlockLinkShare(share *proton.PublicLinkShare, password string) (*pgp.KeyRi
 	if err != nil {
 		return nil, nil, err
 	}
-	return kr, dec.GetBinary(), nil
+	return kr, dec, nil
 }
 
 // linkRoot reads what a link points at.

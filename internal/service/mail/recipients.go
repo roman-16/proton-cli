@@ -5,10 +5,11 @@ import (
 	"errors"
 	"log/slog"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
 	"github.com/roman-16/proton-cli/internal/vcard"
+	"time"
 )
 
 // Proton send-package types (PACKAGE_TYPE). A package's Type is the union of
@@ -270,7 +271,8 @@ func (s *Service) planRecipients(ctx context.Context, c Content, del Delivery) (
 // validForSending mirrors the web client's getIsValidForSending: a key must be
 // encryption-capable and neither expired nor revoked.
 func validForSending(key *pgp.Key) bool {
-	return key.CanEncrypt() && !key.IsExpired() && !key.IsRevoked()
+	now := time.Now().Unix()
+	return key.CanEncrypt(now) && !key.IsExpired(now) && !key.IsRevoked(now)
 }
 
 // pinnedSendKey picks the key mail to a recipient whose contact pins keys is

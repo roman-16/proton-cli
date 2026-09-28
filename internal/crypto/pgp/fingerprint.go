@@ -3,7 +3,7 @@ package pgp
 import (
 	"strings"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	gopenpgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 )
 
 // Fingerprint returns a short, human-comparable identifier for an armoured public
@@ -13,7 +13,7 @@ import (
 // because a table is for recognising a key, not for transporting one. Sixteen
 // digits is what a person can compare against another client's display.
 func Fingerprint(armored string) string {
-	key, err := pgp.NewKeyFromArmored(armored)
+	key, err := gopenpgp.NewKeyFromArmored(armored)
 	if err != nil {
 		return "(unreadable)"
 	}

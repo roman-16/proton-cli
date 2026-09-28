@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"testing"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	"github.com/roman-16/proton-cli/internal/account/keys"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 )
 
 // What Proton would answer about one share, and the identifiers a test names it
@@ -47,7 +48,7 @@ func (tr *tree) withMembership(t *testing.T, permissions int) *tree {
 
 func newTree(t *testing.T, shareType, rootType int, rootName string) *tree {
 	t.Helper()
-	addrKey, err := pgp.GenerateKey("Owner", testAddrMail, "x25519", 0)
+	addrKey, err := pgphelper.GenerateKey("Owner", testAddrMail)
 	if err != nil {
 		t.Fatalf("generate an address key: %v", err)
 	}

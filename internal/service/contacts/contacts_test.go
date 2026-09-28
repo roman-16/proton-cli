@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	gopenpgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	gopenpgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	"github.com/roman-16/proton-cli/internal/account/keys"
 	"github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/proton"
@@ -19,7 +19,7 @@ import (
 // testKeyRing generates a throwaway keyring to sign/verify contact cards.
 func testKeyRing(t *testing.T) *gopenpgp.KeyRing {
 	t.Helper()
-	key, err := gopenpgp.GenerateKey("test", "test@example.invalid", "x25519", 0)
+	key, err := pgp.GenerateKey("test", "test@example.invalid")
 	if err != nil {
 		t.Fatalf("GenerateKey: %v", err)
 	}
@@ -33,7 +33,7 @@ func testKeyRing(t *testing.T) *gopenpgp.KeyRing {
 // armoredPubKey returns a fresh armored public key plus its raw KEY-property value.
 func armoredPubKey(t *testing.T) (armored, keyValue string) {
 	t.Helper()
-	key, err := gopenpgp.GenerateKey("pin", "pin@example.invalid", "x25519", 0)
+	key, err := pgp.GenerateKey("pin", "pin@example.invalid")
 	if err != nil {
 		t.Fatalf("GenerateKey: %v", err)
 	}
@@ -124,7 +124,7 @@ func twoKeyRing(t *testing.T) *gopenpgp.KeyRing {
 		t.Fatalf("NewKeyRing: %v", err)
 	}
 	for _, name := range []string{"primary", "retired"} {
-		key, err := gopenpgp.GenerateKey(name, name+"@example.invalid", "x25519", 0)
+		key, err := pgp.GenerateKey(name, name+"@example.invalid")
 		if err != nil {
 			t.Fatalf("GenerateKey: %v", err)
 		}
@@ -169,13 +169,13 @@ func TestUpdateSealsTheEncryptedCardToThePrimaryUserKeyAlone(t *testing.T) {
 	if err != nil {
 		t.Fatalf("the encrypted card is not armored PGP: %v", err)
 	}
-	if ids, ok := msg.GetHexEncryptionKeyIDs(); !ok || len(ids) != 1 {
+	if ids, ok := msg.HexEncryptionKeyIDs(); !ok || len(ids) != 1 {
 		t.Fatalf("the card is sealed to %v, want exactly one key", ids)
 	}
-	if _, err := oneKeyRing(t, ring, 0).Decrypt(msg, nil, gopenpgp.GetUnixTime()); err != nil {
+	if _, err := pgp.DecryptText(oneKeyRing(t, ring, 0), nil, msg.Bytes(), gopenpgp.Bytes); err != nil {
 		t.Errorf("the primary user key cannot open the card it should have sealed: %v", err)
 	}
-	if _, err := oneKeyRing(t, ring, 1).Decrypt(msg, nil, gopenpgp.GetUnixTime()); err == nil {
+	if _, err := pgp.DecryptText(oneKeyRing(t, ring, 1), nil, msg.Bytes(), gopenpgp.Bytes); err == nil {
 		t.Error("the card was sealed to a key that is no longer primary")
 	}
 }
@@ -492,11 +492,11 @@ func TestUpdateClearsWhatItIsToldTo(t *testing.T) {
 	if err != nil {
 		t.Fatalf("the encrypted card is not armored PGP: %v", err)
 	}
-	plain, err := kr.Decrypt(msg, nil, gopenpgp.GetUnixTime())
+	plain, err := pgp.DecryptText(kr, nil, msg.Bytes(), gopenpgp.Bytes)
 	if err != nil {
 		t.Fatalf("Decrypt: %v", err)
 	}
-	f := vcard.ParseEncrypted(plain.GetString())
+	f := vcard.ParseEncrypted(plain.String())
 	if len(f.Notes) != 0 || f.Photo != "" || len(f.Phones) != 0 || f.Birthday != "" {
 		t.Errorf("what was cleared is still there: %+v", f)
 	}

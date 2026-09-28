@@ -34,7 +34,7 @@ cd proton-cli
 direnv allow      # or: devbox shell
 ```
 
-Without devbox you need Go 1.26 or newer, plus `actionlint`, `charm-freeze`, `golangci-lint`, `goreleaser`, `just`, `nixfmt`, `protoc`, `protoc-gen-go` and `shellcheck` for the tasks below.
+Without devbox you need Go 1.27 or newer, plus `actionlint`, `charm-freeze`, `golangci-lint`, `goreleaser`, `just`, `nixfmt`, `protoc`, `protoc-gen-go` and `shellcheck` for the tasks below.
 
 ## Everyday commands
 

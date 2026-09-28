@@ -7,7 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 )
 
 // The keys an account holds, and what can be done with them.
@@ -216,11 +217,11 @@ func TestAccountKeysCreateMarkAndDelete(t *testing.T) {
 // A key brought in from a file joins the address as one that reads, and goes
 // again.
 func TestAccountKeysImportAndDelete(t *testing.T) {
-	key, err := pgp.GenerateKey("proton-cli test", selfEmail(), "x25519", 0)
+	key, err := pgphelper.GenerateKey("proton-cli test", selfEmail())
 	if err != nil {
 		t.Fatalf("generate a key: %v", err)
 	}
-	locked, err := key.Lock([]byte("the file's passphrase"))
+	locked, err := pgphelper.PGP.LockKey(key, []byte("the file's passphrase"))
 	if err != nil {
 		t.Fatalf("lock the key: %v", err)
 	}

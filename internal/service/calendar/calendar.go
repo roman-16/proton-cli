@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	"github.com/roman-16/proton-cli/internal/account/keys"
 	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
@@ -206,18 +206,14 @@ func (s *Service) unlockCalendar(ctx context.Context, calendarID string) (*calKe
 			if err != nil {
 				return nil, err
 			}
-			sig, err := pgp.NewPGPSignatureFromArmored(mp.Signature)
-			if err != nil {
-				return nil, err
-			}
-			dec, err := addr.Read.Decrypt(msg, nil, pgp.GetUnixTime())
+			dec, err := pgphelper.Decrypt(addr.Read, nil, msg.Bytes(), pgp.Bytes)
 			if err != nil {
 				return nil, u.Explain(fmt.Errorf("decrypt calendar passphrase: %w", err), "calendar", msg)
 			}
-			if err := addr.Read.VerifyDetached(dec, sig, pgp.GetUnixTime()); err != nil {
+			if err := pgphelper.VerifyBinary(addr.Read, dec.Bytes(), []byte(mp.Signature), pgp.Armor); err != nil {
 				return nil, err
 			}
-			calPass = dec.GetBinary()
+			calPass = dec.Bytes()
 			// The session key is what a new member is given, so it is taken here
 			// where the passphrase is already being opened rather than by
 			// decrypting the same message a second time later.
@@ -226,10 +222,7 @@ func (s *Service) unlockCalendar(ctx context.Context, calendarID string) (*calKe
 			// nothing is missing from any answer. What it costs is sharing, which
 			// refuses on screen with a sentence of its own - and this is the only
 			// place that can say which of the two steps was the one that failed.
-			split, err := msg.SplitMessage()
-			if err == nil {
-				passphraseKey, err = addr.Read.DecryptSessionKey(split.GetBinaryKeyPacket())
-			}
+			passphraseKey, err = pgphelper.DecryptSessionKey(addr.Read, msg.BinaryKeyPacket())
 			if err != nil {
 				slog.DebugContext(ctx, "the key to a calendar's passphrase would not open",
 					"calendar", calendarID, "error", err)

@@ -13,7 +13,8 @@ import (
 	"sort"
 	"strings"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/mimetype"
 	"github.com/roman-16/proton-cli/internal/proton"
@@ -160,13 +161,12 @@ func (s *Service) AttachmentDownload(ctx context.Context, msgID, reference strin
 	if err != nil {
 		return nil, "", fmt.Errorf("decode key packets: %w", err)
 	}
-	split := pgp.NewPGPSplitMessage(kp, resp.Body)
-	msg := split.GetPGPMessage()
-	dec, err := rings.Read.Decrypt(msg, nil, 0)
+	msg := pgp.NewPGPSplitMessage(kp, resp.Body)
+	dec, err := pgphelper.Decrypt(rings.Read, nil, msg.Bytes(), pgp.Bytes)
 	if err != nil {
 		return nil, "", u.Explain(fmt.Errorf("decrypt attachment: %w", err), "attachment", msg)
 	}
-	return dec.GetBinary(), name, nil
+	return dec.Bytes(), name, nil
 }
 
 // ReadLocalAttachment reads a file into a LocalAttachment, typed by its name.
@@ -242,21 +242,19 @@ func (s *Service) uploadAttachments(ctx context.Context, addrKR *pgp.KeyRing, me
 // wrapped to the draft's address key), detached-signs it, and uploads it as a
 // multipart form against the draft.
 func (s *Service) uploadAttachment(ctx context.Context, addrKR *pgp.KeyRing, messageID string, a LocalAttachment) (*draftAttachment, error) {
-	msg := pgp.NewPlainMessage(a.Data)
-
-	sk, err := pgp.GenerateSessionKey()
+	sk, err := pgphelper.PGP.GenerateSessionKey()
 	if err != nil {
 		return nil, err
 	}
-	dataPacket, err := sk.Encrypt(msg)
+	dataPacket, err := pgphelper.EncryptBinaryWithSessionKey(sk, nil, a.Data)
 	if err != nil {
 		return nil, fmt.Errorf("encrypt attachment data: %w", err)
 	}
-	keyPacket, err := addrKR.EncryptSessionKey(sk)
+	keyPacket, err := pgphelper.EncryptSessionKey(addrKR, sk)
 	if err != nil {
 		return nil, fmt.Errorf("encrypt attachment key: %w", err)
 	}
-	sig, err := addrKR.SignDetached(msg)
+	sig, err := pgphelper.SignBinary(addrKR, a.Data, pgp.Bytes)
 	if err != nil {
 		return nil, fmt.Errorf("sign attachment: %w", err)
 	}
@@ -273,7 +271,7 @@ func (s *Service) uploadAttachment(ctx context.Context, addrKR *pgp.KeyRing, mes
 	}, []formFile{
 		{Name: "KeyPackets", Filename: "KeyPackets", Data: keyPacket},
 		{Name: "DataPacket", Filename: "DataPacket", Data: dataPacket},
-		{Name: "Signature", Filename: "Signature", Data: sig.GetBinary()},
+		{Name: "Signature", Filename: "Signature", Data: sig},
 	})
 	if err != nil {
 		return nil, err
@@ -338,7 +336,7 @@ func attachmentKeyPackets(recKR *pgp.KeyRing, atts []*draftAttachment) (map[stri
 		if a.SessionKey == nil {
 			return nil, fmt.Errorf("attachment %s: its key could not be read, so it cannot be sent", a.Name)
 		}
-		kp, err := recKR.EncryptSessionKey(a.SessionKey)
+		kp, err := pgphelper.EncryptSessionKey(recKR, a.SessionKey)
 		if err != nil {
 			return nil, err
 		}
@@ -358,7 +356,7 @@ func attachmentPasswordKeyPackets(atts []*draftAttachment, password string) (map
 		if a.SessionKey == nil {
 			return nil, fmt.Errorf("attachment %s: its key could not be read, so it cannot be sent", a.Name)
 		}
-		kp, err := pgp.EncryptSessionKeyWithPassword(a.SessionKey, []byte(password))
+		kp, err := pgphelper.EncryptSessionKeyWithPassword([]byte(password), a.SessionKey)
 		if err != nil {
 			return nil, err
 		}

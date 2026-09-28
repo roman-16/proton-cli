@@ -5,7 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 )
 
 // What a change to a key, an export or an import is given on the command line is
@@ -72,7 +73,7 @@ func TestAnImportOfKeysLockedDifferentlySaysToImportThemApart(t *testing.T) {
 
 func generatedKey(t *testing.T) *pgp.Key {
 	t.Helper()
-	key, err := pgp.GenerateKey("me", "me@example.invalid", "x25519", 0)
+	key, err := pgphelper.GenerateKey("me", "me@example.invalid")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +82,7 @@ func generatedKey(t *testing.T) *pgp.Key {
 
 func lockedWith(t *testing.T, passphrase string) string {
 	t.Helper()
-	locked, err := generatedKey(t).Lock([]byte(passphrase))
+	locked, err := pgphelper.PGP.LockKey(generatedKey(t), []byte(passphrase))
 	if err != nil {
 		t.Fatal(err)
 	}

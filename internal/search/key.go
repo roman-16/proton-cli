@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"os"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	"github.com/roman-16/proton-cli/internal/crypto/aead"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 )
 
 // KeyRing is the account's own keys, named here so the layers above hand theirs
@@ -86,28 +87,35 @@ func (s *Store) keys(ctx context.Context) (Keys, error) {
 }
 
 func sealKey(key []byte, rings Keys) (string, error) {
-	msg, err := rings.Seal.EncryptWithContext(
-		pgp.NewPlainMessage(key), rings.Seal, pgp.NewSigningContext(signedFor, true))
+	enc, err := pgphelper.PGP.Encryption().Recipients(rings.Seal).SigningKeys(rings.Seal).
+		SigningContext(pgp.NewSigningContext(signedFor, true)).New()
 	if err != nil {
 		return "", fmt.Errorf("search: seal index key: %w", err)
 	}
-	return msg.GetArmored()
+	msg, err := enc.Encrypt(key)
+	if err != nil {
+		return "", fmt.Errorf("search: seal index key: %w", err)
+	}
+	return msg.Armor()
 }
 
 // unsealKey opens the index key, checking that this account signed it for this
 // purpose. A key that will not open is the end of the index: there is nothing to
 // fall back to, and a new one would leave a log of records nothing reads.
 func unsealKey(armored string, rings Keys) ([]byte, error) {
-	msg, err := pgp.NewPGPMessageFromArmored(armored)
-	if err != nil {
-		return nil, fmt.Errorf("search: read index key: %w", err)
-	}
-	plain, err := rings.Open.DecryptWithContext(msg, rings.Open, pgp.GetUnixTime(),
-		pgp.NewVerificationContext(signedFor, true, 0))
+	dec, err := pgphelper.PGP.Decryption().DecryptionKeys(rings.Open).VerificationKeys(rings.Open).
+		VerificationContext(pgp.NewVerificationContext(signedFor, true, 0)).New()
 	if err != nil {
 		return nil, fmt.Errorf("search: open index key: %w", err)
 	}
-	key := plain.GetBinary()
+	plain, err := dec.Decrypt([]byte(armored), pgp.Armor)
+	if err != nil {
+		return nil, fmt.Errorf("search: open index key: %w", err)
+	}
+	if err := pgphelper.SignatureError(plain, rings.Open); err != nil {
+		return nil, fmt.Errorf("search: open index key: %w", err)
+	}
+	key := plain.Bytes()
 	if len(key) != aead.KeyLen {
 		return nil, fmt.Errorf("search: index key is %d bytes, want %d", len(key), aead.KeyLen)
 	}

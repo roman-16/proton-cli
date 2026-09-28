@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ProtonMail/go-crypto/openpgp/ecdh"
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/proton"
 )
 
@@ -152,7 +154,7 @@ func TestNewAddressKeyDerivesKeysLikeTheAccountsOwn(t *testing.T) {
 	// Whatever was rewritten, the key still has to be a whole one: the subkey's
 	// binding signature covers a fingerprint that moved with it.
 	entity := published.GetEntity()
-	if err := entity.PrimaryKey.VerifyKeySignature(entity.Subkeys[0].PublicKey, entity.Subkeys[0].Sig); err != nil {
+	if err := entity.PrimaryKey.VerifyKeySignature(entity.Subkeys[0].PublicKey, entity.Subkeys[0].Bindings[0].Packet); err != nil {
 		t.Errorf("the encryption subkey is not bound to the key it was published with: %v", err)
 	}
 }
@@ -189,7 +191,8 @@ func TestNewAddressKeyIsAddressedToTheAddress(t *testing.T) {
 	if err != nil {
 		t.Fatalf("the published key is not readable armour: %v", err)
 	}
-	if got := key.GetEntity().PrimaryIdentity().UserId.Email; got != addr.Email {
+	if _, identity := key.GetEntity().PrimaryIdentity(time.Now(), nil); identity.UserId.Email != addr.Email {
+		got := identity.UserId.Email
 		t.Errorf("the key is addressed to %q, want %q", got, addr.Email)
 	}
 	if key.IsForwardingKey() {
@@ -235,10 +238,6 @@ func TestNewAddressKeyPublishesAListNamingOnlyThatKey(t *testing.T) {
 
 func assertKeyListSignature(t *testing.T, key *pgp.Key, data, armored string) {
 	t.Helper()
-	signature, err := pgp.NewPGPSignatureFromArmored(armored)
-	if err != nil {
-		t.Fatalf("the signature is not readable armour: %v", err)
-	}
 	public, err := key.ToPublic()
 	if err != nil {
 		t.Fatalf("take the public half: %v", err)
@@ -247,8 +246,7 @@ func assertKeyListSignature(t *testing.T, key *pgp.Key, data, armored string) {
 	if err != nil {
 		t.Fatalf("NewKeyRing: %v", err)
 	}
-	if err := kr.VerifyDetachedWithContext(
-		pgp.NewPlainMessageFromString(data), signature, pgp.GetUnixTime(),
+	if err := pgphelper.VerifyTextInContext(kr, data, []byte(armored), pgp.Armor,
 		pgp.NewVerificationContext(sklSigningContext, true, 0),
 	); err != nil {
 		t.Errorf("the list is not signed by the key it names, under the key-list context: %v", err)

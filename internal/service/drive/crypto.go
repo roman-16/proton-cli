@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	"github.com/roman-16/proton-cli/internal/account/keys"
 	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
@@ -41,18 +41,17 @@ func unlockNode(l *Link, parentKR, addrKR *pgp.KeyRing) (*pgp.KeyRing, error) {
 	if err != nil {
 		return nil, err
 	}
-	dec, err := parentKR.Decrypt(enc, nil, pgp.GetUnixTime())
+	dec, err := pgphelper.Decrypt(parentKR, nil, enc.Bytes(), pgp.Bytes)
 	if err != nil {
 		return nil, fmt.Errorf("decrypt node passphrase: %w", err)
 	}
 	if l.NodePassphraseSignature != "" && addrKR != nil {
-		// Normalise to a text message: the passphrase is signed as text
-		// (NewPlainMessageFromString) at creation, so verifying the binary form
-		// would spuriously fail. The surfaced verdict lives on `info`; here we
-		// only log non-verification at debug level (shared nodes are signed by a
-		// key we may not hold, which detached verify can't tell from tampering).
-		norm := pgp.NewPlainMessageFromString(string(dec.GetBinary()))
-		if v := pgphelper.VerifyDetachedStatus(addrKR, norm, l.NodePassphraseSignature); v != pgphelper.Verified {
+		// Verified as text: the passphrase is signed as text at creation, so
+		// verifying the binary form would spuriously fail. The surfaced verdict
+		// lives on `info`; here we only log non-verification at debug level
+		// (shared nodes are signed by a key we may not hold, which detached
+		// verify can't tell from tampering).
+		if v := pgphelper.VerifyTextStatus(addrKR, string(dec.Bytes()), l.NodePassphraseSignature); v != pgphelper.Verified {
 			slog.Debug("drive: node passphrase signature not verified", "link", l.LinkID, "signer", l.SignatureEmail, "result", string(v))
 		}
 	}
@@ -60,7 +59,7 @@ func unlockNode(l *Link, parentKR, addrKR *pgp.KeyRing) (*pgp.KeyRing, error) {
 	if err != nil {
 		return nil, err
 	}
-	unlocked, err := locked.Unlock(dec.GetBinary())
+	unlocked, err := locked.Unlock(dec.Bytes())
 	if err != nil {
 		return nil, fmt.Errorf("unlock node key: %w", err)
 	}
@@ -72,11 +71,11 @@ func decryptName(encName string, parentKR *pgp.KeyRing) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	dec, err := parentKR.Decrypt(msg, nil, pgp.GetUnixTime())
+	dec, err := pgphelper.DecryptText(parentKR, nil, msg.Bytes(), pgp.Bytes)
 	if err != nil {
 		return "", err
 	}
-	return dec.GetString(), nil
+	return dec.String(), nil
 }
 
 func encryptName(name string, parentKR, addrKR *pgp.KeyRing) (string, error) {
@@ -88,11 +87,11 @@ func encryptName(name string, parentKR, addrKR *pgp.KeyRing) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	enc, err := pubKR.Encrypt(pgp.NewPlainMessageFromString(name), addrKR)
+	enc, err := pgphelper.EncryptText(pubKR, addrKR, name)
 	if err != nil {
 		return "", err
 	}
-	return enc.GetArmored()
+	return enc.Armor()
 }
 
 func reEncryptName(encryptedName, plainName string, oldKR, newKR, addrKR *pgp.KeyRing) (string, error) {
@@ -100,23 +99,19 @@ func reEncryptName(encryptedName, plainName string, oldKR, newKR, addrKR *pgp.Ke
 	if err != nil {
 		return "", err
 	}
-	split, err := msg.SplitMessage()
+	sk, err := pgphelper.DecryptSessionKey(oldKR, msg.BinaryKeyPacket())
 	if err != nil {
 		return "", err
 	}
-	sk, err := oldKR.DecryptSessionKey(split.GetBinaryKeyPacket())
+	newKP, err := pgphelper.EncryptSessionKey(newKR, sk)
 	if err != nil {
 		return "", err
 	}
-	newKP, err := newKR.EncryptSessionKey(sk)
+	dataPacket, err := pgphelper.EncryptTextWithSessionKey(sk, addrKR, plainName)
 	if err != nil {
 		return "", err
 	}
-	dataPacket, err := sk.EncryptAndSign(pgp.NewPlainMessageFromString(plainName), addrKR)
-	if err != nil {
-		return "", err
-	}
-	return pgp.NewPGPSplitMessage(newKP, dataPacket).GetPGPMessage().GetArmored()
+	return pgp.NewPGPSplitMessage(newKP, dataPacket).Armor()
 }
 
 func reEncryptNodePassphrase(l *Link, oldKR, newKR, addrKR *pgp.KeyRing) (string, string, error) {
@@ -124,35 +119,33 @@ func reEncryptNodePassphrase(l *Link, oldKR, newKR, addrKR *pgp.KeyRing) (string
 	if err != nil {
 		return "", "", err
 	}
-	split, err := enc.SplitMessage()
+	sk, err := pgphelper.DecryptSessionKey(oldKR, enc.BinaryKeyPacket())
 	if err != nil {
 		return "", "", err
 	}
-	sk, err := oldKR.DecryptSessionKey(split.GetBinaryKeyPacket())
+	dec, err := pgphelper.Decrypt(oldKR, nil, enc.Bytes(), pgp.Bytes)
 	if err != nil {
 		return "", "", err
 	}
-	dec, err := oldKR.Decrypt(enc, nil, pgp.GetUnixTime())
+	newKP, err := pgphelper.EncryptSessionKey(newKR, sk)
 	if err != nil {
 		return "", "", err
 	}
-	newKP, err := newKR.EncryptSessionKey(sk)
+	// The passphrase goes back as it came: text stays text, and its signature is
+	// made the same way.
+	var dataPacket []byte
+	var newSig string
+	if meta := dec.Metadata(); meta != nil && meta.IsUtf8() {
+		if dataPacket, err = pgphelper.EncryptTextWithSessionKey(sk, nil, string(dec.Bytes())); err == nil {
+			newSig, err = pgphelper.SignTextArmored(addrKR, string(dec.Bytes()))
+		}
+	} else if dataPacket, err = pgphelper.EncryptBinaryWithSessionKey(sk, nil, dec.Bytes()); err == nil {
+		newSig, err = pgphelper.SignBinaryArmored(addrKR, dec.Bytes())
+	}
 	if err != nil {
 		return "", "", err
 	}
-	dataPacket, err := sk.Encrypt(dec)
-	if err != nil {
-		return "", "", err
-	}
-	newPass, err := pgp.NewPGPSplitMessage(newKP, dataPacket).GetPGPMessage().GetArmored()
-	if err != nil {
-		return "", "", err
-	}
-	sig, err := addrKR.SignDetached(dec)
-	if err != nil {
-		return "", "", err
-	}
-	newSig, err := sig.GetArmored()
+	newPass, err := pgp.NewPGPSplitMessage(newKP, dataPacket).Armor()
 	if err != nil {
 		return "", "", err
 	}
@@ -175,11 +168,14 @@ func hashKeyOf(l *Link, nodeKR *pgp.KeyRing) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	dec, err := nodeKR.Decrypt(msg, nodeKR, pgp.GetUnixTime())
+	dec, err := pgphelper.Decrypt(nodeKR, nodeKR, msg.Bytes(), pgp.Bytes)
 	if err != nil {
 		return nil, err
 	}
-	return dec.GetBinary(), nil
+	if err := pgphelper.SignatureError(dec, nodeKR); err != nil {
+		return nil, err
+	}
+	return dec.Bytes(), nil
 }
 
 func lookupHash(name string, hashKey []byte) (string, error) {
@@ -194,11 +190,11 @@ func genNodeKeys(parentKR, addrKR *pgp.KeyRing) (nodeKey, passphrase, passSig st
 		return "", "", "", nil, err
 	}
 	phrase := base64.StdEncoding.EncodeToString(raw)
-	key, err := pgp.GenerateKey("Drive key", "", "x25519", 0)
+	key, err := pgphelper.GenerateKey("Drive key", "")
 	if err != nil {
 		return "", "", "", nil, err
 	}
-	locked, err := key.Lock([]byte(phrase))
+	locked, err := pgphelper.PGP.LockKey(key, []byte(phrase))
 	if err != nil {
 		return "", "", "", nil, err
 	}
@@ -218,20 +214,15 @@ func genNodeKeys(parentKR, addrKR *pgp.KeyRing) (nodeKey, passphrase, passSig st
 // signature is detached, so what Proton stores is the passphrase and a
 // signature beside it rather than one message holding both.
 func sealPassphrase(phrase string, parentKR, addrKR *pgp.KeyRing) (passphrase, signature string, err error) {
-	msg := pgp.NewPlainMessageFromString(phrase)
-	enc, err := parentKR.Encrypt(msg, nil)
+	enc, err := pgphelper.EncryptText(parentKR, nil, phrase)
 	if err != nil {
 		return "", "", err
 	}
-	armored, err := enc.GetArmored()
+	armored, err := enc.Armor()
 	if err != nil {
 		return "", "", err
 	}
-	sig, err := addrKR.SignDetached(msg)
-	if err != nil {
-		return "", "", err
-	}
-	armoredSig, err := sig.GetArmored()
+	armoredSig, err := pgphelper.SignTextArmored(addrKR, phrase)
 	if err != nil {
 		return "", "", err
 	}
@@ -247,11 +238,11 @@ func genShareKeys(nodeKR, addrKR *pgp.KeyRing) (nodeKey, passphrase, passSig str
 		return "", "", "", nil, nil, err
 	}
 	phrase := base64.StdEncoding.EncodeToString(raw)
-	key, err := pgp.GenerateKey("Drive key", "", "x25519", 0)
+	key, err := pgphelper.GenerateKey("Drive key", "")
 	if err != nil {
 		return "", "", "", nil, nil, err
 	}
-	locked, err := key.Lock([]byte(phrase))
+	locked, err := pgphelper.PGP.LockKey(key, []byte(phrase))
 	if err != nil {
 		return "", "", "", nil, nil, err
 	}
@@ -263,28 +254,23 @@ func genShareKeys(nodeKR, addrKR *pgp.KeyRing) (nodeKey, passphrase, passSig str
 	if err != nil {
 		return "", "", "", nil, nil, err
 	}
-	msg := pgp.NewPlainMessageFromString(phrase)
-	enc, err := combined.Encrypt(msg, nil)
+	sk, err := pgphelper.PGP.GenerateSessionKey()
 	if err != nil {
 		return "", "", "", nil, nil, err
 	}
-	armPass, err := enc.GetArmored()
+	sealer, err := pgphelper.PGP.Encryption().Recipients(combined).SessionKey(sk).Utf8().New()
 	if err != nil {
 		return "", "", "", nil, nil, err
 	}
-	split, err := enc.SplitMessage()
+	enc, err := sealer.Encrypt([]byte(phrase))
 	if err != nil {
 		return "", "", "", nil, nil, err
 	}
-	sk, err := nodeKR.DecryptSessionKey(split.GetBinaryKeyPacket())
+	armPass, err := enc.Armor()
 	if err != nil {
 		return "", "", "", nil, nil, err
 	}
-	sig, err := addrKR.SignDetached(msg)
-	if err != nil {
-		return "", "", "", nil, nil, err
-	}
-	armSig, err := sig.GetArmored()
+	armSig, err := pgphelper.SignTextArmored(addrKR, phrase)
 	if err != nil {
 		return "", "", "", nil, nil, err
 	}
@@ -317,15 +303,11 @@ func reEncryptSessionKeyTo(armored string, oldKR, newKR *pgp.KeyRing) (string, e
 	if err != nil {
 		return "", err
 	}
-	split, err := msg.SplitMessage()
+	sk, err := pgphelper.DecryptSessionKey(oldKR, msg.BinaryKeyPacket())
 	if err != nil {
 		return "", err
 	}
-	sk, err := oldKR.DecryptSessionKey(split.GetBinaryKeyPacket())
-	if err != nil {
-		return "", err
-	}
-	kp, err := newKR.EncryptSessionKey(sk)
+	kp, err := pgphelper.EncryptSessionKey(newKR, sk)
 	if err != nil {
 		return "", err
 	}
@@ -361,11 +343,11 @@ func encryptXAttr(x xAttr, nodeKR, signKR *pgp.KeyRing) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	enc, err := nodeKR.Encrypt(pgp.NewPlainMessageFromString(string(raw)), signKR)
+	enc, err := pgphelper.EncryptText(nodeKR, signKR, string(raw))
 	if err != nil {
 		return "", err
 	}
-	return enc.GetArmored()
+	return enc.Armor()
 }
 
 func decryptXAttr(armored string, nodeKR *pgp.KeyRing) (*xAttr, error) {
@@ -373,12 +355,12 @@ func decryptXAttr(armored string, nodeKR *pgp.KeyRing) (*xAttr, error) {
 	if err != nil {
 		return nil, err
 	}
-	dec, err := nodeKR.Decrypt(msg, nil, pgp.GetUnixTime())
+	dec, err := pgphelper.Decrypt(nodeKR, nil, msg.Bytes(), pgp.Bytes)
 	if err != nil {
 		return nil, err
 	}
 	var x xAttr
-	if err := json.Unmarshal(dec.GetBinary(), &x); err != nil {
+	if err := json.Unmarshal(dec.Bytes(), &x); err != nil {
 		return nil, err
 	}
 	return &x, nil
@@ -393,11 +375,11 @@ func genNodeHashKey(nodeKR, signingKR *pgp.KeyRing) ([]byte, string, error) {
 		return nil, "", err
 	}
 	hashKey := base64.StdEncoding.EncodeToString(raw)
-	enc, err := nodeKR.Encrypt(pgp.NewPlainMessageFromString(hashKey), signingKR)
+	enc, err := pgphelper.EncryptText(nodeKR, signingKR, hashKey)
 	if err != nil {
 		return nil, "", err
 	}
-	armored, err := enc.GetArmored()
+	armored, err := enc.Armor()
 	if err != nil {
 		return nil, "", err
 	}

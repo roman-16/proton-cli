@@ -1,5 +1,5 @@
 {
-  "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.17.5/.schema/devbox.schema.json",
+  "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.18.4/.schema/devbox.schema.json",
   "packages": {
     "actionlint":     "latest",
     "bun":            "latest",

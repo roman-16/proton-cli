@@ -10,7 +10,7 @@ import (
 
 	"github.com/roman-16/proton-cli/internal/account/keys"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
@@ -18,7 +18,7 @@ import (
 
 func genMailKeyRing(t *testing.T) *pgp.KeyRing {
 	t.Helper()
-	key, err := pgp.GenerateKey("test", "test@example.invalid", "x25519", 0)
+	key, err := pgphelper.GenerateKey("test", "test@example.invalid")
 	if err != nil {
 		t.Fatalf("GenerateKey: %v", err)
 	}
@@ -30,18 +30,18 @@ func genMailKeyRing(t *testing.T) *pgp.KeyRing {
 }
 
 // TestDecryptBody covers the verdict mapping and the key correctness property:
-// gopenpgp returns the decrypted body alongside a signature error, so a body
+// the signature's verdict comes beside the decrypted body, so a body
 // must still be recovered even when its signature cannot be verified.
 func TestDecryptBody(t *testing.T) {
 	kr := genMailKeyRing(t)
 	other := genMailKeyRing(t)
 	const plain = "secret body"
 
-	enc, err := kr.Encrypt(pgp.NewPlainMessageFromString(plain), kr) // encrypt+sign with kr
+	enc, err := pgphelper.EncryptText(kr, kr, plain) // encrypt+sign with kr
 	if err != nil {
 		t.Fatalf("Encrypt: %v", err)
 	}
-	armored, err := enc.GetArmored()
+	armored, err := enc.Armor()
 	if err != nil {
 		t.Fatalf("GetArmored: %v", err)
 	}

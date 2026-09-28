@@ -7,10 +7,11 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/ProtonMail/go-crypto/openpgp/ecdh"
 	"github.com/ProtonMail/go-crypto/openpgp/packet"
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	openpgp "github.com/ProtonMail/go-crypto/openpgp/v2"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
 	"github.com/roman-16/proton-cli/internal/skip"
@@ -150,7 +151,7 @@ func (u *Unlocked) GenerateAddressKey(ctx context.Context, email string) (*pgp.K
 		}
 		// The subkey's fingerprint moved with its key derivation, so what binds it
 		// to the key has to be signed again.
-		if err := sub.Sig.SignKey(sub.PublicKey, entity.PrivateKey, config); err != nil {
+		if err := sub.Bindings[0].Packet.SignKey(sub.PublicKey, entity.PrivateKey, config); err != nil {
 			return nil, fmt.Errorf("sign the encryption subkey: %w", err)
 		}
 		entity.Subkeys[i] = sub
@@ -245,26 +246,22 @@ func newAddressKeyToken(userKR *pgp.KeyRing) (*addressKeyToken, error) {
 	if _, err := rand.Read(raw); err != nil {
 		return nil, err
 	}
-	message := pgp.NewPlainMessageFromString(hex.EncodeToString(raw))
+	passphrase := hex.EncodeToString(raw)
 
-	encrypted, err := userKR.Encrypt(message, nil)
+	encrypted, err := pgphelper.EncryptText(userKR, nil, passphrase)
 	if err != nil {
 		return nil, fmt.Errorf("seal the address key's token: %w", err)
 	}
-	sealed, err := encrypted.GetArmored()
+	sealed, err := encrypted.Armor()
 	if err != nil {
 		return nil, err
 	}
-	signed, err := userKR.SignDetached(message)
+	signature, err := pgphelper.SignTextArmored(userKR, passphrase)
 	if err != nil {
 		return nil, fmt.Errorf("sign the address key's token: %w", err)
 	}
-	signature, err := signed.GetArmored()
-	if err != nil {
-		return nil, err
-	}
 	return &addressKeyToken{
-		passphrase: message.GetString(), sealed: sealed, signature: signature,
+		passphrase: passphrase, sealed: sealed, signature: signature,
 	}, nil
 }
 

@@ -8,8 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	"github.com/roman-16/proton-cli/internal/account/keys"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
 )
@@ -307,7 +308,7 @@ func (a *addressAPI) body(path string) map[string]any {
 // reads it: adding an address needs the user key and nothing else.
 func hierarchy(t *testing.T, addrs ...keys.Address) keys.Get {
 	t.Helper()
-	key, err := pgp.GenerateKey("user", "user@example.invalid", "x25519", 0)
+	key, err := pgphelper.GenerateKey("user", "user@example.invalid")
 	if err != nil {
 		t.Fatalf("GenerateKey: %v", err)
 	}

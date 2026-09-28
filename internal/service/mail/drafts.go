@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"strings"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	"github.com/roman-16/proton-cli/internal/account/keys"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/mailtext"
 	"github.com/roman-16/proton-cli/internal/proton"
 	"github.com/roman-16/proton-cli/internal/ref"
@@ -72,11 +73,11 @@ func (s *Service) attachmentBytes(ctx context.Context, a *draftAttachment) ([]by
 	if err != nil {
 		return nil, err
 	}
-	msg, err := a.SessionKey.Decrypt(resp.Body)
+	data, err := pgphelper.DecryptWithSessionKey(a.SessionKey, resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("decrypt attachment %s: %w", a.Name, err)
 	}
-	a.Data = msg.GetBinary()
+	a.Data = data
 	return a.Data, nil
 }
 
@@ -111,11 +112,11 @@ func prepareBody(c *Content) (string, error) {
 	if err := assignInlineContentIDs(c); err != nil {
 		return "", err
 	}
-	enc, err := c.From.Keys.Write.Encrypt(pgp.NewPlainMessageFromString(c.Body), c.From.Keys.Write)
+	enc, err := pgphelper.EncryptText(c.From.Keys.Write, c.From.Keys.Write, c.Body)
 	if err != nil {
 		return "", fmt.Errorf("encrypt draft: %w", err)
 	}
-	return enc.GetArmored()
+	return enc.Armor()
 }
 
 // draftPayload is the Message object createDraft and updateDraft both take. The
@@ -304,7 +305,7 @@ func (s *Service) rekeyCarried(u *keys.Unlocked, c Content) (map[string]string, 
 		if err != nil {
 			return nil, fmt.Errorf("carry attachment %s: %w", a.Name, err)
 		}
-		wrapped, err := c.From.Keys.Write.EncryptSessionKey(sk)
+		wrapped, err := pgphelper.EncryptSessionKey(c.From.Keys.Write, sk)
 		if err != nil {
 			return nil, fmt.Errorf("carry attachment %s: %w", a.Name, err)
 		}
@@ -335,7 +336,7 @@ func decodeSessionKey(kr *pgp.KeyRing, keyPackets string) (*pgp.SessionKey, erro
 	if err != nil {
 		return nil, fmt.Errorf("decode key packets: %w", err)
 	}
-	return kr.DecryptSessionKey(raw)
+	return pgphelper.DecryptSessionKey(kr, raw)
 }
 
 // normalizeContentID strips the angle brackets Proton stores Content-IDs with.

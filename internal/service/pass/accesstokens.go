@@ -9,10 +9,11 @@ import (
 	"strconv"
 	"time"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/roman-16/proton-cli/internal/crypto/aead"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
 	pb "github.com/roman-16/proton-cli/internal/service/pass/proto"
@@ -99,7 +100,7 @@ func (r rawToken) token(now int64) AccessToken {
 // keeps those for thirty days, and one that stopped working is worth seeing
 // beside the ones that have not.
 func (s *Service) AccessTokens(ctx context.Context) ([]AccessToken, error) {
-	now := pgp.GetUnixTime()
+	now := time.Now().Unix()
 	var out []AccessToken
 	since := ""
 	for {
@@ -171,15 +172,15 @@ func (s *Service) AccessTokenCreate(ctx context.Context, spec NewAccessToken) (*
 	if err != nil {
 		return nil, err
 	}
-	sealed, err := own.Encrypt(pgp.NewPlainMessage(raw), own)
+	sealed, err := pgphelper.EncryptBinary(own, own, raw)
 	if err != nil {
 		return nil, fmt.Errorf("seal the token's key: %w", err)
 	}
-	now := pgp.GetUnixTime()
+	now := time.Now().Unix()
 	body := map[string]any{
 		"Name":                   spec.Name,
 		"Products":               []string{tokenProduct},
-		"PersonalAccessTokenKey": base64.StdEncoding.EncodeToString(sealed.GetBinary()),
+		"PersonalAccessTokenKey": base64.StdEncoding.EncodeToString(sealed.Bytes()),
 		"ExpireTime":             now + int64(spec.Life/time.Second),
 		"Flags":                  nil,
 	}
@@ -357,11 +358,14 @@ func (s *Service) openTokenKey(ctx context.Context, token AccessToken) ([]byte, 
 		return nil, errs.Naming(token.Name, fmt.Errorf("the token's key is not base64: %w", err))
 	}
 	msg := pgp.NewPGPMessage(sealed)
-	opened, err := u.UserKR.Decrypt(msg, u.UserKR, pgp.GetUnixTime())
+	opened, err := pgphelper.Decrypt(u.UserKR, u.UserKR, sealed, pgp.Bytes)
+	if err == nil {
+		err = pgphelper.SignatureError(opened, u.UserKR)
+	}
 	if err != nil {
 		return nil, errs.Naming(token.Name, u.Explain(fmt.Errorf("open the token's key: %w", err), "access token", msg))
 	}
-	raw := opened.GetBinary()
+	raw := opened.Bytes()
 	if len(raw) != aead.KeyLen {
 		return nil, errs.Naming(token.Name, fmt.Errorf("the token's key is %d bytes, not %d", len(raw), aead.KeyLen))
 	}

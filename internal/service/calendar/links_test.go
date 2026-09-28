@@ -8,7 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 )
 
 // A link is handed out once and rebuilt from the account afterwards, so what
@@ -17,7 +18,7 @@ func TestALinksPassphraseSurvivesTheRoundTripThroughWhatProtonStores(t *testing.
 	s := &Service{}
 	ck := linkKeys(t)
 
-	sk, err := pgp.GenerateSessionKey()
+	sk, err := pgphelper.PGP.GenerateSessionKey()
 	if err != nil {
 		t.Fatalf("session key: %v", err)
 	}
@@ -154,7 +155,7 @@ func TestALinkRowCarriesNoURL(t *testing.T) {
 // linkKeys is a calendar opened: a key ring and the passphrase behind it.
 func linkKeys(t *testing.T) *calKeys {
 	t.Helper()
-	key, err := pgp.GenerateKey("Calendar", "", "x25519", 0)
+	key, err := pgphelper.GenerateKey("Calendar", "")
 	if err != nil {
 		t.Fatalf("generate: %v", err)
 	}

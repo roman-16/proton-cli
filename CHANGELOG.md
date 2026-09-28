@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 Adding a version section here is what publishes a release, so this file is the one place a version is decided: see [Releases](CONTRIBUTING.md#releases). Versions that shipped before this file existed are on the [releases page](https://github.com/roman-16/proton-cli/releases).
 
+## [5.0.1] - 2026-09-28
+
+### Changed
+
+- Building from source needs Go 1.27 or newer.
+
+### Removed
+
+- macOS 12 Monterey. Releases run on macOS 13 Ventura or later; on macOS 12, stay on 5.0.0.
+
+### Fixed
+
+- Files uploaded to Drive, attached to mail or added to Pass items were typed from the system's own list of file types, so on a system without one most were stored as `application/octet-stream` and the Drive index skipped their text. They get the type Proton's web client gives them, on every system.
+
+### Security
+
+- Releases are built with Go 1.27, which carries Go's August fixes to TLS, HTTP and URL handling that 5.0.0 was built without.
+
 ## [5.0.0] - 2026-09-28
 
 ### Highlights

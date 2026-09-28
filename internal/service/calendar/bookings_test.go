@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 
 	"github.com/roman-16/proton-cli/internal/account/keys"
 	"github.com/roman-16/proton-cli/internal/account/plan"
@@ -67,7 +67,7 @@ func TestASlotIsSignedAsTheJSONProtonsBookingPageRebuilds(t *testing.T) {
 func bookingKeys(t *testing.T) *calKeys {
 	t.Helper()
 	generate := func(name string) *pgp.Key {
-		key, err := pgp.GenerateKey(name, name+"@proton.me", "x25519", 0)
+		key, err := pgphelper.GenerateKey(name, name+"@proton.me")
 		if err != nil {
 			t.Fatalf("generate: %v", err)
 		}
@@ -152,8 +152,8 @@ func TestEverySignatureOnAPageVerifiesUnderItsOwnContext(t *testing.T) {
 		t.Fatal(err)
 	}
 	fingerprints := strings.Join(ck.primary.GetSHA256Fingerprints(), ";")
-	if err := ck.addr.Read.VerifyDetachedWithContext(pgp.NewPlainMessageFromString(fingerprints),
-		pgp.NewPGPSignature(sig), pgp.GetUnixTime(), pgp.NewVerificationContext("bookings.calendarKey.uid", true, 0)); err != nil {
+	if err := pgphelper.VerifyTextInContext(ck.addr.Read, fingerprints, sig, pgp.Bytes,
+		pgp.NewVerificationContext("bookings.calendarKey.uid", true, 0)); err != nil {
 		t.Errorf("the calendar key's signature: %v", err)
 	}
 	if _, err := signBookingPage(&calKeys{addr: ck.addr}, "cal1", "uid", counting(1), counting(2),

@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"strings"
 
-	gopenpgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	gopenpgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	"github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
@@ -210,7 +210,7 @@ func (s *Service) editSignedCard(ctx context.Context, id string, edit func(*vcar
 	var others []any
 	for _, c := range cards {
 		if c.Type == pgp.CardSigned && !haveSigned {
-			verdict = pgp.VerifyDetachedStatus(u.UserKR, gopenpgp.NewPlainMessageFromString(c.Data), c.Signature)
+			verdict = pgp.VerifyTextStatus(u.UserKR, c.Data, c.Signature)
 			signedData = c.Data
 			haveSigned = true
 			continue

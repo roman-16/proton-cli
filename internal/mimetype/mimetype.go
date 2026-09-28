@@ -6,6 +6,8 @@
 package mimetype
 
 import (
+	_ "embed"
+	"encoding/json"
 	"mime"
 	"net/http"
 	"path/filepath"
@@ -14,6 +16,24 @@ import (
 
 // Unknown is what a file nothing recognises is called.
 const Unknown = "application/octet-stream"
+
+// extensionsJSON is the table Proton Drive's web client types an upload with,
+// written by `just mimetypes` from the library it calls. It is carried here
+// rather than asked of the machine, whose own table differs from one system to
+// the next and is missing altogether on some.
+//
+//go:embed extensions.json
+var extensionsJSON []byte
+
+var extensions = loadExtensions()
+
+func loadExtensions() map[string]string {
+	var table map[string]string
+	if err := json.Unmarshal(extensionsJSON, &table); err != nil {
+		panic("mimetype: extensions.json: " + err.Error())
+	}
+	return table
+}
 
 // protonExtensions are the types Proton names itself, because the table
 // everything else comes from either disagrees or is silent.
@@ -68,8 +88,8 @@ func ByName(name string) string {
 	if t, ok := protonExtensions[ext]; ok {
 		return t
 	}
-	if t := mime.TypeByExtension("." + ext); t != "" {
-		return bare(t)
+	if t, ok := extensions[ext]; ok {
+		return t
 	}
 	if t, ok := rawExtensions[ext]; ok {
 		return t

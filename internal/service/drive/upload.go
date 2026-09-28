@@ -11,7 +11,8 @@ import (
 	"sync"
 	"time"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/mimetype"
 	"github.com/roman-16/proton-cli/internal/progress"
 	"github.com/roman-16/proton-cli/internal/proton"
@@ -122,11 +123,7 @@ func (s *Service) Upload(ctx context.Context, dc *Context, plan *UploadPlan, r i
 	if err != nil {
 		return err
 	}
-	sig, err := by.key(nodeKR).SignDetached(pgp.NewPlainMessage(manifestBytes))
-	if err != nil {
-		return err
-	}
-	manifestSig, err := sig.GetArmored()
+	manifestSig, err := pgphelper.SignBinaryArmored(by.key(nodeKR), manifestBytes)
 	if err != nil {
 		return err
 	}
@@ -416,19 +413,15 @@ func xorVerifier(verCode, enc []byte) []byte {
 }
 
 func genFileKeys(nodeKR *pgp.KeyRing) (*pgp.SessionKey, string, string, error) {
-	sk, err := pgp.GenerateSessionKey()
+	sk, err := pgphelper.PGP.GenerateSessionKey()
 	if err != nil {
 		return nil, "", "", err
 	}
-	kp, err := nodeKR.EncryptSessionKey(sk)
+	kp, err := pgphelper.EncryptSessionKey(nodeKR, sk)
 	if err != nil {
 		return nil, "", "", err
 	}
-	sig, err := nodeKR.SignDetached(pgp.NewPlainMessage(sk.Key))
-	if err != nil {
-		return nil, "", "", err
-	}
-	armoredSig, err := sig.GetArmored()
+	armoredSig, err := pgphelper.SignBinaryArmored(nodeKR, sk.Key)
 	if err != nil {
 		return nil, "", "", err
 	}
@@ -436,21 +429,19 @@ func genFileKeys(nodeKR *pgp.KeyRing) (*pgp.SessionKey, string, string, error) {
 }
 
 func encryptBlock(data []byte, sk *pgp.SessionKey, nodeKR, signKR *pgp.KeyRing) ([]byte, string, error) {
-	msg := pgp.NewPlainMessage(data)
-	enc, err := sk.Encrypt(msg)
+	enc, err := pgphelper.EncryptBinaryWithSessionKey(sk, nil, data)
 	if err != nil {
 		return nil, "", err
 	}
-	sig, err := signKR.SignDetached(msg)
+	sig, err := pgphelper.SignBinary(signKR, data, pgp.Bytes)
 	if err != nil {
 		return nil, "", err
 	}
-	sigMsg := pgp.NewPlainMessage(sig.GetBinary())
-	encSig, err := nodeKR.Encrypt(sigMsg, nil)
+	encSig, err := pgphelper.EncryptBinary(nodeKR, nil, sig)
 	if err != nil {
 		return nil, "", err
 	}
-	armSig, err := encSig.GetArmored()
+	armSig, err := encSig.Armor()
 	if err != nil {
 		return nil, "", err
 	}

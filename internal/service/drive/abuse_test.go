@@ -7,7 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/proton"
 )
 
@@ -50,11 +51,7 @@ func keyPacketOf(t *testing.T, armored string) []byte {
 	if err != nil {
 		t.Fatalf("read the message: %v", err)
 	}
-	split, err := msg.SplitMessage()
-	if err != nil {
-		t.Fatalf("split the message: %v", err)
-	}
-	return split.GetBinaryKeyPacket()
+	return msg.BinaryKeyPacket()
 }
 
 // asMember is what Proton answers about a share somebody shared with you: your
@@ -72,7 +69,7 @@ func (tr *tree) asMember(t *testing.T) (passphrase, sessionKey string) {
 	}}
 	tr.share = object(t, sh)
 
-	sk, err := tr.addrKR.DecryptSessionKey(kp)
+	sk, err := pgphelper.DecryptSessionKey(tr.addrKR, kp)
 	if err != nil {
 		t.Fatalf("open the key packet: %v", err)
 	}
@@ -80,11 +77,11 @@ func (tr *tree) asMember(t *testing.T) (passphrase, sessionKey string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dec, err := tr.addrKR.Decrypt(msg, nil, pgp.GetUnixTime())
+	dec, err := pgphelper.Decrypt(tr.addrKR, nil, msg.Bytes(), pgp.Bytes)
 	if err != nil {
 		t.Fatalf("open the passphrase: %v", err)
 	}
-	return base64.StdEncoding.EncodeToString(dec.GetBinary()), base64.StdEncoding.EncodeToString(sk.Key)
+	return base64.StdEncoding.EncodeToString(dec.Bytes()), base64.StdEncoding.EncodeToString(sk.Key)
 }
 
 func TestAReportOnSomethingSharedWithYouCarriesTheKeyToIt(t *testing.T) {
@@ -217,7 +214,7 @@ func TestAReportOnAnInvitationCarriesTheKeyItOffers(t *testing.T) {
 		t.Fatal(err)
 	}
 	kp := keyPacketOf(t, sharePass)
-	sk, err := addrKR.DecryptSessionKey(kp)
+	sk, err := pgphelper.DecryptSessionKey(addrKR, kp)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -225,7 +222,7 @@ func TestAReportOnAnInvitationCarriesTheKeyItOffers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	passphrase, err := addrKR.Decrypt(msg, nil, pgp.GetUnixTime())
+	passphrase, err := pgphelper.Decrypt(addrKR, nil, msg.Bytes(), pgp.Bytes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -254,7 +251,7 @@ func TestAReportOnAnInvitationCarriesTheKeyItOffers(t *testing.T) {
 
 	expect(t, reportBody(t, doer, "/drive/report/share"), map[string]any{
 		"AbuseCategory": "spam", "ShareID": "invited-share", "LinkID": "invited-link",
-		"SharePassphrase":  base64.StdEncoding.EncodeToString(passphrase.GetBinary()),
+		"SharePassphrase":  base64.StdEncoding.EncodeToString(passphrase.Bytes()),
 		"MemberSessionKey": base64.StdEncoding.EncodeToString(sk.Key),
 	})
 	if doer.sent("POST", "/drive/v2/shares/invitations/inv-1/accept") {

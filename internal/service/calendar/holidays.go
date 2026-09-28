@@ -11,8 +11,9 @@ import (
 	"strconv"
 	"strings"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/fetch"
 	"github.com/roman-16/proton-cli/internal/proton"
@@ -183,17 +184,13 @@ func holidaysMembership(e directoryEntry, addrKR *pgp.KeyRing, color string) (ma
 	if err != nil {
 		return nil, fmt.Errorf("read the holidays calendar's session key: %w", err)
 	}
-	keyPacket, err := addrKR.EncryptSessionKey(pgp.NewSessionKeyFromToken(token, e.SessionKey.Algorithm))
+	keyPacket, err := pgphelper.EncryptSessionKey(addrKR, pgp.NewSessionKeyFromToken(token, e.SessionKey.Algorithm))
 	if err != nil {
 		return nil, fmt.Errorf("seal the holidays calendar's key: %w", err)
 	}
-	signature, err := addrKR.SignDetached(pgp.NewPlainMessageFromString(e.Passphrase))
+	armored, err := pgphelper.SignTextArmored(addrKR, e.Passphrase)
 	if err != nil {
 		return nil, fmt.Errorf("sign the holidays calendar's passphrase: %w", err)
-	}
-	armored, err := signature.GetArmored()
-	if err != nil {
-		return nil, err
 	}
 	return map[string]any{
 		"PassphraseKeyPacket":         base64.StdEncoding.EncodeToString(keyPacket),

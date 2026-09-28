@@ -3,16 +3,16 @@ package pgp
 import (
 	"testing"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	gopenpgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 )
 
-func genKeyRing(t *testing.T) *pgp.KeyRing {
+func genKeyRing(t *testing.T) *gopenpgp.KeyRing {
 	t.Helper()
-	key, err := pgp.GenerateKey("test", "test@example.invalid", "x25519", 0)
+	key, err := GenerateKey("test", "test@example.invalid")
 	if err != nil {
 		t.Fatalf("GenerateKey: %v", err)
 	}
-	kr, err := pgp.NewKeyRing(key)
+	kr, err := gopenpgp.NewKeyRing(key)
 	if err != nil {
 		t.Fatalf("NewKeyRing: %v", err)
 	}
@@ -38,7 +38,7 @@ func TestDecryptCardsVerdicts(t *testing.T) {
 	tests := []struct {
 		name     string
 		card     Card
-		verifier *pgp.KeyRing
+		verifier *gopenpgp.KeyRing
 		wantData string
 		want     VerifyResult
 	}{

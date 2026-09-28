@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	gopenpgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	gopenpgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	"github.com/roman-16/proton-cli/internal/account/keys"
 	"github.com/roman-16/proton-cli/internal/contentline"
 	"github.com/roman-16/proton-cli/internal/crypto/pgp"

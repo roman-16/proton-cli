@@ -10,7 +10,7 @@ import (
 	"time"
 
 	srp "github.com/ProtonMail/go-srp"
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	"github.com/roman-16/proton-cli/internal/account/keys"
 	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/proton"
@@ -105,11 +105,11 @@ func newPublicTree(t *testing.T, password, rootName string, rootType int) *publi
 	keyPassword := hashed[len(hashed)-31:]
 
 	passphrase := "the-share-passphrase"
-	shareKey, err := pgp.GenerateKey("Link", "", "x25519", 0)
+	shareKey, err := pgphelper.GenerateKey("Link", "")
 	if err != nil {
 		t.Fatalf("generate a share key: %v", err)
 	}
-	locked, err := shareKey.Lock([]byte(passphrase))
+	locked, err := pgphelper.PGP.LockKey(shareKey, []byte(passphrase))
 	if err != nil {
 		t.Fatalf("lock the share key: %v", err)
 	}
@@ -117,13 +117,9 @@ func newPublicTree(t *testing.T, password, rootName string, rootType int) *publi
 	if err != nil {
 		t.Fatalf("armor the share key: %v", err)
 	}
-	sealed, err := pgp.EncryptMessageWithPassword(pgp.NewPlainMessageFromString(passphrase), keyPassword)
+	armoredPassphrase, err := pgphelper.EncryptTextWithPassword(keyPassword, passphrase)
 	if err != nil {
 		t.Fatalf("seal the passphrase to the link's password: %v", err)
-	}
-	armoredPassphrase, err := sealed.GetArmored()
-	if err != nil {
-		t.Fatalf("armor the passphrase: %v", err)
 	}
 	shareKR, err := pgp.NewKeyRing(shareKey)
 	if err != nil {
@@ -297,7 +293,7 @@ func (p *publicTree) answers(t *testing.T) func(proton.Request) []byte {
 // decides whether an item behind a link is theirs to take back.
 func signedInAs(t *testing.T, email string) *keys.Unlocked {
 	t.Helper()
-	addrKey, err := pgp.GenerateKey("Owner", email, "x25519", 0)
+	addrKey, err := pgphelper.GenerateKey("Owner", email)
 	if err != nil {
 		t.Fatalf("generate an address key: %v", err)
 	}
@@ -806,12 +802,11 @@ func TestWritingIntoALinkAsNobodySignsWithTheParentKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read the passphrase: %v", err)
 	}
-	dec, err := tree.rootKR.Decrypt(enc, nil, pgp.GetUnixTime())
+	dec, err := pgphelper.Decrypt(tree.rootKR, nil, enc.Bytes(), pgp.Bytes)
 	if err != nil {
 		t.Fatalf("the passphrase is not sealed to what the link points at: %v", err)
 	}
-	norm := pgp.NewPlainMessageFromString(string(dec.GetBinary()))
-	if verdict := pgphelper.VerifyDetachedStatus(tree.rootKR, norm, signature); verdict != pgphelper.Verified {
+	if verdict := pgphelper.VerifyTextStatus(tree.rootKR, string(dec.Bytes()), signature); verdict != pgphelper.Verified {
 		t.Errorf("the passphrase signature is %s against the key it hangs from", verdict)
 	}
 }
@@ -819,7 +814,7 @@ func TestWritingIntoALinkAsNobodySignsWithTheParentKey(t *testing.T) {
 // Signed in, a file written into a link names the address that wrote it, which
 // is what shows the link's owner who uploaded into their folder.
 func TestWritingIntoALinkSignedInNamesYourAddress(t *testing.T) {
-	addrKey, err := pgp.GenerateKey("Owner", testAddrMail, "x25519", 0)
+	addrKey, err := pgphelper.GenerateKey("Owner", testAddrMail)
 	if err != nil {
 		t.Fatalf("generate an address key: %v", err)
 	}

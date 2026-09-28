@@ -7,8 +7,10 @@ import (
 	"log/slog"
 	"time"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	"github.com/ProtonMail/gopenpgp/v3/armor"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	"github.com/roman-16/proton-cli/internal/account/keys"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/fetch"
 	"github.com/roman-16/proton-cli/internal/proton"
@@ -373,11 +375,7 @@ func openLocked(u *keys.Unlocked, sh lockedShare) (*opened, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read the share passphrase: %w", err)
 	}
-	split, err := msg.SplitMessage()
-	if err != nil {
-		return nil, err
-	}
-	packets := split.GetBinaryKeyPacket()
+	packets := msg.BinaryKeyPacket()
 	if len(sh.PossibleKeyPackets) > 0 {
 		packets = nil
 		for _, p := range sh.PossibleKeyPackets {
@@ -394,14 +392,14 @@ func openLocked(u *keys.Unlocked, sh lockedShare) (*opened, error) {
 		if !ok {
 			continue
 		}
-		if sk, err = rings.Read.DecryptSessionKey(packets); err == nil {
+		if sk, err = pgphelper.DecryptSessionKey(rings.Read, packets); err == nil {
 			break
 		}
 	}
 	if sk == nil {
 		return nil, fmt.Errorf("no key of the account's opens the share passphrase")
 	}
-	plain, err := sk.Decrypt(split.GetBinaryDataPacket())
+	plain, err := pgphelper.DecryptWithSessionKey(sk, msg.BinaryDataPacket())
 	if err != nil {
 		return nil, fmt.Errorf("decrypt the share passphrase: %w", err)
 	}
@@ -412,11 +410,11 @@ func openLocked(u *keys.Unlocked, sh lockedShare) (*opened, error) {
 	if err != nil {
 		return nil, err
 	}
-	shareKey, err := locked.Unlock(plain.GetBinary())
+	shareKey, err := locked.Unlock(plain)
 	if err != nil {
 		return nil, fmt.Errorf("unlock the share key: %w", err)
 	}
-	o := &opened{shareID: sh.shareID, kind: sh.kind, sessionKey: sk, passphrase: plain.GetBinary()}
+	o := &opened{shareID: sh.shareID, kind: sh.kind, sessionKey: sk, passphrase: plain}
 	if sh.kind != shareTypeMain {
 		return o, nil
 	}
@@ -431,28 +429,27 @@ func openLocked(u *keys.Unlocked, sh lockedShare) (*opened, error) {
 	if err != nil {
 		return nil, err
 	}
-	dec, err := shareKR.Decrypt(root, nil, pgp.GetUnixTime())
+	dec, err := pgphelper.Decrypt(shareKR, nil, root.Bytes(), pgp.Bytes)
 	if err != nil {
 		return nil, fmt.Errorf("decrypt the root passphrase: %w", err)
 	}
-	o.rootPassphrase = dec.GetBinary()
+	o.rootPassphrase = dec.Bytes()
 	return o, nil
 }
 
 // signedByAccount checks that a passphrase was signed by one of the account's
 // own keys, which is what says the share is the account's to restore.
-func signedByAccount(u *keys.Unlocked, plain *pgp.PlainMessage, armoredSig string) error {
-	sig, err := pgp.NewPGPSignatureFromArmored(armoredSig)
+func signedByAccount(u *keys.Unlocked, plain []byte, armoredSig string) error {
+	sig, err := armor.Unarmor(armoredSig)
 	if err != nil {
 		return fmt.Errorf("read the share passphrase signature: %w", err)
 	}
-	text := pgp.NewPlainMessageFromString(string(plain.GetBinary()))
 	for _, addr := range u.Addresses {
 		rings, ok := u.AddrRings(addr.ID)
 		if !ok {
 			continue
 		}
-		if rings.Read.VerifyDetached(text, sig, pgp.GetUnixTime()) == nil {
+		if pgphelper.VerifyText(rings.Read, string(plain), sig, pgp.Bytes) == nil {
 			return nil
 		}
 	}
@@ -554,15 +551,11 @@ func restoredFolder(into *Context, rootKR *pgp.KeyRing, o opened, name string) (
 // tree's address: its session key sealed to that address's key, and its
 // passphrase signed by it.
 func resealedShare(into *Context, o opened) (map[string]any, error) {
-	packet, err := into.Addr.Write.EncryptSessionKey(o.sessionKey)
+	packet, err := pgphelper.EncryptSessionKey(into.Addr.Write, o.sessionKey)
 	if err != nil {
 		return nil, err
 	}
-	sig, err := into.Addr.Write.SignDetached(pgp.NewPlainMessageFromString(string(o.passphrase)))
-	if err != nil {
-		return nil, err
-	}
-	signature, err := sig.GetArmored()
+	signature, err := pgphelper.SignTextArmored(into.Addr.Write, string(o.passphrase))
 	if err != nil {
 		return nil, err
 	}

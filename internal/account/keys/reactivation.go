@@ -8,9 +8,10 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/ProtonMail/go-crypto/openpgp"
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	openpgp "github.com/ProtonMail/go-crypto/openpgp/v2"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	"github.com/roman-16/proton-cli/internal/crypto/bip39"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
 	"github.com/roman-16/proton-cli/internal/skip"
@@ -353,9 +354,9 @@ func (f RecoveryFile) open(ctx context.Context, _ proton.Doer, u *Unlocked, lock
 			continue
 		}
 		secrets++
-		plain, err := pgp.DecryptMessageWithPassword(msg, []byte(k.RecoverySecret))
+		plain, err := pgphelper.DecryptWithPassword([]byte(k.RecoverySecret), msg.Bytes(), pgp.Bytes)
 		if err == nil {
-			keys = plain.GetBinary()
+			keys = plain
 			break
 		}
 		slog.DebugContext(ctx, "keys: a recovery secret did not open the recovery file",

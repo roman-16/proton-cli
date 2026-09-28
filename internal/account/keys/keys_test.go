@@ -16,10 +16,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ProtonMail/go-crypto/openpgp"
+	openpgp "github.com/ProtonMail/go-crypto/openpgp/v2"
 	"github.com/ProtonMail/go-srp"
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	"github.com/roman-16/proton-cli/internal/account/localkey"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
 	"github.com/roman-16/proton-cli/internal/skip"
@@ -69,7 +70,7 @@ func TestPrimaryUserKeyIsOneKeyAndTheFirst(t *testing.T) {
 		t.Fatalf("NewKeyRing: %v", err)
 	}
 	for _, name := range []string{"primary", "retired"} {
-		key, err := pgp.GenerateKey(name, name+"@example.invalid", "x25519", 0)
+		key, err := pgphelper.GenerateKey(name, name+"@example.invalid")
 		if err != nil {
 			t.Fatalf("GenerateKey: %v", err)
 		}
@@ -198,11 +199,11 @@ func newAccount(t *testing.T, secret string, twoPassword bool) *account {
 
 func lockedKey(t *testing.T, name, passphrase string) string {
 	t.Helper()
-	key, err := pgp.GenerateKey(name, name+"@example.invalid", "x25519", 0)
+	key, err := pgphelper.GenerateKey(name, name+"@example.invalid")
 	if err != nil {
 		t.Fatalf("generate %s key: %v", name, err)
 	}
-	locked, err := key.Lock([]byte(passphrase))
+	locked, err := pgphelper.PGP.LockKey(key, []byte(passphrase))
 	if err != nil {
 		t.Fatalf("lock %s key: %v", name, err)
 	}
@@ -708,7 +709,7 @@ func postQuantumKey(t *testing.T, name, passphrase string) string {
 	if err != nil {
 		t.Fatalf("parse %s: %v", name, err)
 	}
-	locked, err := key.Lock([]byte(passphrase))
+	locked, err := pgphelper.PGP.LockKey(key, []byte(passphrase))
 	if err != nil {
 		t.Fatalf("lock %s: %v", name, err)
 	}
@@ -817,7 +818,7 @@ func TestSigningSetsCompromisedKeysApart(t *testing.T) {
 // armoredPublicKey is a fresh public key, for a test that needs a second one.
 func armoredPublicKey(t *testing.T, name string) string {
 	t.Helper()
-	key, err := pgp.GenerateKey(name, name+"@example.invalid", "x25519", 0)
+	key, err := pgphelper.GenerateKey(name, name+"@example.invalid")
 	if err != nil {
 		t.Fatalf("generate %s key: %v", name, err)
 	}
@@ -842,10 +843,10 @@ func TestAKeyThatCannotEncryptDoesNotStopTheAddressEncrypting(t *testing.T) {
 		t.Fatalf("unlockKeyRing: %v", err)
 	}
 
-	if _, err := rings.Write.Encrypt(pgp.NewPlainMessageFromString("out"), nil); err != nil {
+	if _, err := pgphelper.EncryptText(rings.Write, nil, "out"); err != nil {
 		t.Errorf("the address cannot encrypt: %v", err)
 	}
-	if _, err := rings.Read.Encrypt(pgp.NewPlainMessageFromString("out"), nil); err == nil {
+	if _, err := pgphelper.EncryptText(rings.Read, nil, "out"); err == nil {
 		t.Error("every key the address holds encrypted, so this test no longer proves what it says")
 	}
 }
@@ -863,16 +864,16 @@ func TestReadingGoesUnderEveryKeyThatOpened(t *testing.T) {
 		t.Fatalf("unlockKeyRing: %v", err)
 	}
 
-	sealed, err := ringOf(t, retired, "the passphrase").Encrypt(pgp.NewPlainMessageFromString("what arrived"), nil)
+	sealed, err := pgphelper.EncryptText(ringOf(t, retired, "the passphrase"), nil, "what arrived")
 	if err != nil {
 		t.Fatalf("seal to the retired key: %v", err)
 	}
-	opened, err := rings.Read.Decrypt(sealed, nil, pgp.GetUnixTime())
+	opened, err := pgphelper.DecryptText(rings.Read, nil, sealed.Bytes(), pgp.Bytes)
 	if err != nil {
 		t.Fatalf("what was sealed to the retired key did not open: %v", err)
 	}
-	if opened.GetString() != "what arrived" {
-		t.Errorf("opened %q, want what was sealed", opened.GetString())
+	if opened.String() != "what arrived" {
+		t.Errorf("opened %q, want what was sealed", opened.String())
 	}
 	if rings.Write.CountEntities() != 1 {
 		t.Errorf("the writing ring holds %d keys, want the primary alone", rings.Write.CountEntities())
@@ -1004,7 +1005,7 @@ func sealedTo(t *testing.T, key *pgp.Key) *pgp.PGPMessage {
 	if err != nil {
 		t.Fatalf("NewKeyRing: %v", err)
 	}
-	msg, err := kr.Encrypt(pgp.NewPlainMessageFromString("something of yours"), nil)
+	msg, err := pgphelper.EncryptText(kr, nil, "something of yours")
 	if err != nil {
 		t.Fatalf("encrypt: %v", err)
 	}

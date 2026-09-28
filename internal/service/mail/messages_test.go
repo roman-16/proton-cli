@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	"github.com/roman-16/proton-cli/internal/account/keys"
 	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/proton"
@@ -95,11 +95,11 @@ func TestFlaggedRespectsWhatAnOverruleCanSettle(t *testing.T) {
 func TestOpenBodyReportsWhyItCouldNotOpenABody(t *testing.T) {
 	kr := genMailKeyRing(t)
 	other := genMailKeyRing(t)
-	enc, err := kr.Encrypt(pgp.NewPlainMessageFromString("secret body"), nil)
+	enc, err := pgphelper.EncryptText(kr, nil, "secret body")
 	if err != nil {
 		t.Fatalf("Encrypt: %v", err)
 	}
-	armored, err := enc.GetArmored()
+	armored, err := enc.Armor()
 	if err != nil {
 		t.Fatalf("GetArmored: %v", err)
 	}
@@ -152,11 +152,11 @@ func TestOpenBodyReportsWhyItCouldNotOpenABody(t *testing.T) {
 // address this account no longer holds.
 func TestOpenBodyFallsBackToTheFirstAddress(t *testing.T) {
 	kr := genMailKeyRing(t)
-	enc, err := kr.Encrypt(pgp.NewPlainMessageFromString("body"), nil)
+	enc, err := pgphelper.EncryptText(kr, nil, "body")
 	if err != nil {
 		t.Fatalf("Encrypt: %v", err)
 	}
-	armored, err := enc.GetArmored()
+	armored, err := enc.Armor()
 	if err != nil {
 		t.Fatalf("GetArmored: %v", err)
 	}
@@ -268,11 +268,11 @@ func TestASignatureByACompromisedKeyIsInvalid(t *testing.T) {
 		{"a key the sender does not publish", stranger, pgphelper.Unverified},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			sealed, err := address.Encrypt(pgp.NewPlainMessageFromString("the body"), tc.signer)
+			sealed, err := pgphelper.EncryptText(address, tc.signer, "the body")
 			if err != nil {
 				t.Fatalf("Encrypt: %v", err)
 			}
-			armored, err := sealed.GetArmored()
+			armored, err := sealed.Armor()
 			if err != nil {
 				t.Fatalf("GetArmored: %v", err)
 			}

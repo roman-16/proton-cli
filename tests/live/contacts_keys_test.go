@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	gopenpgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 )
 
 // Trusted keys: telling Proton which key belongs to somebody, whatever it would
@@ -22,7 +22,7 @@ import (
 // public key to a temp .asc file, returning the path.
 func writeGeneratedPubKey(t *testing.T) string {
 	t.Helper()
-	key, err := gopenpgp.GenerateKey("trust-test", "trust@example.invalid", "x25519", 0)
+	key, err := pgphelper.GenerateKey("trust-test", "trust@example.invalid")
 	if err != nil {
 		t.Fatal(err)
 	}

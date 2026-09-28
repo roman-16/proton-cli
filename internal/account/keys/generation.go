@@ -5,7 +5,8 @@ import (
 	"time"
 
 	"github.com/ProtonMail/go-crypto/openpgp/packet"
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 )
 
 // The shape of a key this build writes, in one place.
@@ -52,9 +53,9 @@ func (u *Unlocked) clock() func() time.Time {
 // The armour carries no headers because Proton's clients write none, and a key
 // is compared with theirs byte for byte in places nobody here can see.
 func LockAndArmor(key *pgp.Key, passphrase []byte) (string, error) {
-	locked, err := key.Lock(passphrase)
+	locked, err := pgphelper.PGP.LockKey(key, passphrase)
 	if err != nil {
 		return "", err
 	}
-	return locked.ArmorWithCustomHeaders("", "")
+	return locked.Armor()
 }

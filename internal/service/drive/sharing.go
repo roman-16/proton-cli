@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	srp "github.com/ProtonMail/go-srp"
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	"github.com/roman-16/proton-cli/internal/account/keys"
 	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
@@ -211,7 +211,7 @@ func (s *Service) verifyCreator(ctx context.Context, dc *Context, res *Resolved,
 	if err != nil {
 		return "unknown"
 	}
-	dec, err := res.ParentKR.Decrypt(enc, nil, pgp.GetUnixTime())
+	dec, err := pgphelper.Decrypt(res.ParentKR, nil, enc.Bytes(), pgp.Bytes)
 	if err != nil {
 		return "unknown"
 	}
@@ -230,8 +230,7 @@ func (s *Service) verifyCreator(ctx context.Context, dc *Context, res *Resolved,
 	}
 	// Verify against the text form: the passphrase is signed as text at
 	// creation, so the binary form would spuriously fail.
-	norm := pgp.NewPlainMessageFromString(string(dec.GetBinary()))
-	return string(pgphelper.VerifyDetachedStatus(verKR, norm, link.NodePassphraseSignature))
+	return string(pgphelper.VerifyTextStatus(verKR, string(dec.Bytes()), link.NodePassphraseSignature))
 }
 
 func (s *Service) EnsureLink(ctx context.Context, t Target, opts LinkOptions) (*ShareLink, error) {
@@ -472,17 +471,13 @@ func (s *Service) shareSessionKey(ctx context.Context, dc *Context, shareID stri
 	if err != nil {
 		return nil, err
 	}
-	split, err := enc.SplitMessage()
-	if err != nil {
-		return nil, err
-	}
-	kp := split.GetBinaryKeyPacket()
+	kp := enc.BinaryKeyPacket()
 	// Modern shares wrap the passphrase to the link node key; legacy shares to
 	// the address key.
-	if sk, err := res.NodeKR.DecryptSessionKey(kp); err == nil {
+	if sk, err := pgphelper.DecryptSessionKey(res.NodeKR, kp); err == nil {
 		return sk, nil
 	}
-	return dc.Addr.Read.DecryptSessionKey(kp)
+	return pgphelper.DecryptSessionKey(dc.Addr.Read, kp)
 }
 
 func (s *Service) fetchShareURLs(ctx context.Context, shareID string) ([]shareURLResp, error) {
@@ -501,11 +496,11 @@ func (s *Service) decryptURLPassword(dc *Context, u shareURLResp) (generated, cu
 	if err != nil {
 		return "", ""
 	}
-	dec, err := dc.Addr.Read.Decrypt(msg, nil, pgp.GetUnixTime())
+	dec, err := pgphelper.DecryptText(dc.Addr.Read, nil, msg.Bytes(), pgp.Bytes)
 	if err != nil {
 		return "", ""
 	}
-	full := dec.GetString()
+	full := dec.String()
 	if u.Flags&flagGeneratedPassword != 0 && len(full) >= generatedPasswordLen {
 		generated = full[:generatedPasswordLen]
 		if u.Flags&flagCustomPasswordBit != 0 {
@@ -536,15 +531,15 @@ func (s *Service) buildPasswordFields(ctx context.Context, dc *Context, sk *pgp.
 	}
 	// Proton's key password is the last 31 bytes of the bcrypt hash, not the
 	// whole thing.
-	kp, err := pgp.EncryptSessionKeyWithPassword(sk, hashed[len(hashed)-31:])
+	kp, err := pgphelper.EncryptSessionKeyWithPassword(hashed[len(hashed)-31:], sk)
 	if err != nil {
 		return nil, err
 	}
-	encPass, err := dc.Addr.Write.Encrypt(pgp.NewPlainMessage([]byte(fullPassword)), nil)
+	encPass, err := pgphelper.EncryptBinary(dc.Addr.Write, nil, []byte(fullPassword))
 	if err != nil {
 		return nil, err
 	}
-	armPass, err := encPass.GetArmored()
+	armPass, err := encPass.Armor()
 	if err != nil {
 		return nil, err
 	}
@@ -1013,8 +1008,8 @@ func decryptSavedPassword(u *keys.Unlocked, armored string) (string, error) {
 		if !ok {
 			continue
 		}
-		if dec, err := rings.Read.Decrypt(msg, nil, pgp.GetUnixTime()); err == nil {
-			return dec.GetString(), nil
+		if dec, err := pgphelper.DecryptText(rings.Read, nil, msg.Bytes(), pgp.Bytes); err == nil {
+			return dec.String(), nil
 		}
 	}
 	return "", fmt.Errorf("no address key opens it")
@@ -1109,9 +1104,9 @@ func (s *Service) savingAddress(ctx context.Context) (addrID, keyID string, kr *
 // sealLinkPassword encrypts a link's password to your own address key and signs
 // it with the same, which is what makes a saved link yours to read back.
 func sealLinkPassword(password string, addrKR *pgp.KeyRing) (string, error) {
-	enc, err := addrKR.Encrypt(pgp.NewPlainMessageFromString(password), addrKR)
+	enc, err := pgphelper.EncryptText(addrKR, addrKR, password)
 	if err != nil {
 		return "", err
 	}
-	return enc.GetArmored()
+	return enc.Armor()
 }

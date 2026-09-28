@@ -6,8 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	"github.com/roman-16/proton-cli/internal/account/keys"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/fetch"
 	"github.com/roman-16/proton-cli/internal/proton"
@@ -183,12 +184,15 @@ func (s *Service) decryptShareKeys(ctx context.Context, shareID string) (*shareK
 				continue
 			}
 			msg := pgp.NewPGPMessage(kb)
-			dec, err := u.UserKR.Decrypt(msg, u.UserKR, pgp.GetUnixTime())
+			dec, err := pgphelper.Decrypt(u.UserKR, u.UserKR, kb, pgp.Bytes)
+			if err == nil {
+				err = pgphelper.SignatureError(dec, u.UserKR)
+			}
 			if err != nil {
 				skip.Record(ctx, skip.KindKey, shareID, u.Shut(msg), err)
 				continue
 			}
-			out.keys[k.KeyRotation] = dec.GetBinary()
+			out.keys[k.KeyRotation] = dec.Bytes()
 		}
 		if len(out.keys) == 0 {
 			return nil, fmt.Errorf("failed to decrypt share keys for %s", shareID)

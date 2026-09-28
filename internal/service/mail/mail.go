@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	"github.com/roman-16/proton-cli/internal/account/keys"
 	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/mailtext"
@@ -332,30 +332,22 @@ func (o ListOptions) Narrowed() bool {
 }
 
 // decryptBody decrypts an armored PGP body with decKR and, when verKR is
-// non-nil, verifies the embedded signature against it. gopenpgp returns the
-// decrypted body alongside a SignatureVerificationError, so a bad/absent
-// signature never hides the body - it only changes the verdict.
+// non-nil, verifies the embedded signature against it. The verdict comes
+// beside the decrypted body, so a bad/absent signature never hides the body -
+// it only changes the verdict.
 func decryptBody(armored string, decKR, verKR *pgp.KeyRing) (string, pgphelper.VerifyResult, error) {
 	msg, err := pgp.NewPGPMessageFromArmored(armored)
 	if err != nil {
 		return "", pgphelper.Unverified, fmt.Errorf("parse message: %w", err)
 	}
-	var verifyTime int64
-	if verKR != nil {
-		verifyTime = pgp.GetUnixTime()
-	}
-	dec, err := decKR.Decrypt(msg, verKR, verifyTime)
+	dec, err := pgphelper.DecryptText(decKR, verKR, msg.Bytes(), pgp.Bytes)
 	if err != nil {
-		var sigErr pgp.SignatureVerificationError
-		if errors.As(err, &sigErr) {
-			return dec.GetString(), pgphelper.Classify(err), nil
-		}
 		return "", pgphelper.Unverified, fmt.Errorf("decrypt message: %w", err)
 	}
 	if verKR == nil {
-		return dec.GetString(), pgphelper.Unverified, nil
+		return dec.String(), pgphelper.Unverified, nil
 	}
-	return dec.GetString(), pgphelper.Verified, nil
+	return dec.String(), pgphelper.Classify(pgphelper.SignatureError(dec, verKR)), nil
 }
 
 // crossTableProbe wraps an HTTP 422 from a single-resource GET with a

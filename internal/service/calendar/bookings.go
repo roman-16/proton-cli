@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 
 	"github.com/roman-16/proton-cli/internal/account/plan"
 	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
@@ -800,12 +800,16 @@ func bookingKeyPassword(calendarID string, secret, salt []byte) ([]byte, error) 
 }
 
 func sealBookingSecret(ck *calKeys, calendarID string, secret []byte) (string, error) {
-	msg, err := ck.addr.Write.EncryptWithContext(pgp.NewPlainMessage(secret), ck.addr.Write,
-		pgp.NewSigningContext("bookings.secret."+calendarID, true))
+	enc, err := pgphelper.PGP.Encryption().Recipients(ck.addr.Write).SigningKeys(ck.addr.Write).
+		SigningContext(pgp.NewSigningContext("bookings.secret."+calendarID, true)).New()
 	if err != nil {
 		return "", fmt.Errorf("seal the booking page's secret: %w", err)
 	}
-	return base64.StdEncoding.EncodeToString(msg.GetBinary()), nil
+	msg, err := enc.Encrypt(secret)
+	if err != nil {
+		return "", fmt.Errorf("seal the booking page's secret: %w", err)
+	}
+	return base64.StdEncoding.EncodeToString(msg.Bytes()), nil
 }
 
 func openBookingSecret(ck *calKeys, calendarID, sealed string) ([]byte, pgphelper.VerifyResult, error) {
@@ -813,12 +817,16 @@ func openBookingSecret(ck *calKeys, calendarID, sealed string) ([]byte, pgphelpe
 	if err != nil {
 		return nil, pgphelper.Unverified, fmt.Errorf("read the booking page's secret: %w", err)
 	}
-	opened, err := ck.addr.Read.DecryptWithContext(pgp.NewPGPMessage(bin), ck.addr.Read, pgp.GetUnixTime(),
-		pgp.NewVerificationContext("bookings.secret."+calendarID, true, 0))
-	if opened == nil {
+	dec, err := pgphelper.PGP.Decryption().DecryptionKeys(ck.addr.Read).VerificationKeys(ck.addr.Read).
+		VerificationContext(pgp.NewVerificationContext("bookings.secret."+calendarID, true, 0)).New()
+	if err != nil {
 		return nil, pgphelper.Unverified, fmt.Errorf("open the booking page's secret: %w", err)
 	}
-	return opened.GetBinary(), pgphelper.Classify(err), nil
+	opened, err := dec.Decrypt(bin, pgp.Bytes)
+	if err != nil {
+		return nil, pgphelper.Unverified, fmt.Errorf("open the booking page's secret: %w", err)
+	}
+	return opened.Bytes(), pgphelper.Classify(pgphelper.SignatureError(opened, ck.addr.Read)), nil
 }
 
 func openBookingContent(ck *calKeys, password []byte, uid, sealed string) (bookingContent, pgphelper.VerifyResult, error) {
@@ -826,24 +834,20 @@ func openBookingContent(ck *calKeys, password []byte, uid, sealed string) (booki
 	if err != nil {
 		return bookingContent{}, pgphelper.Unverified, fmt.Errorf("read the booking page's content: %w", err)
 	}
-	split, err := pgp.NewPGPMessage(bin).SplitMessage()
-	if err != nil {
-		return bookingContent{}, pgphelper.Unverified, fmt.Errorf("read the booking page's content: %w", err)
-	}
-	sk, err := pgp.DecryptSessionKeyWithPassword(split.KeyPacket, password)
+	dec, err := pgphelper.PGP.Decryption().Password(password).VerificationKeys(ck.addr.Read).
+		VerificationContext(pgp.NewVerificationContext("bookings.content."+uid, true, 0)).Utf8().New()
 	if err != nil {
 		return bookingContent{}, pgphelper.Unverified, fmt.Errorf("open the booking page's content: %w", err)
 	}
-	opened, err := sk.DecryptAndVerifyWithContext(split.DataPacket, ck.addr.Read, pgp.GetUnixTime(),
-		pgp.NewVerificationContext("bookings.content."+uid, true, 0))
-	if opened == nil {
+	opened, err := dec.Decrypt(bin, pgp.Bytes)
+	if err != nil {
 		return bookingContent{}, pgphelper.Unverified, fmt.Errorf("open the booking page's content: %w", err)
 	}
 	var content bookingContent
-	if jerr := json.Unmarshal(opened.GetBinary(), &content); jerr != nil {
+	if jerr := json.Unmarshal(opened.Bytes(), &content); jerr != nil {
 		return bookingContent{}, pgphelper.Unverified, fmt.Errorf("read the booking page's content: %w", jerr)
 	}
-	return content, pgphelper.Classify(err), nil
+	return content, pgphelper.Classify(pgphelper.SignatureError(opened, ck.addr.Read)), nil
 }
 
 type signedBookingPage struct {
@@ -866,13 +870,13 @@ func signBookingPage(ck *calKeys, calendarID, uid string, secret, salt []byte, c
 		return nil, err
 	}
 	fingerprints := strings.Join(ck.primary.GetSHA256Fingerprints(), ";")
-	keySig, err := ck.addr.Write.SignDetachedWithContext(pgp.NewPlainMessageFromString(fingerprints),
-		pgp.NewSigningContext("bookings.calendarKey."+uid, true))
+	keySig, err := pgphelper.SignTextInContext(ck.addr.Write, fingerprints,
+		pgp.NewSigningContext("bookings.calendarKey."+uid, true), pgp.Bytes)
 	if err != nil {
 		return nil, fmt.Errorf("sign the calendar's key: %w", err)
 	}
 	signed := &signedBookingPage{
-		content: sealedContent, calendarKey: base64.StdEncoding.EncodeToString(keySig.GetBinary()),
+		content: sealedContent, calendarKey: base64.StdEncoding.EncodeToString(keySig),
 		slots: make([]map[string]any, 0, len(slots)),
 	}
 	for _, sl := range slots {
@@ -880,13 +884,13 @@ func signBookingPage(ck *calKeys, calendarID, uid string, secret, salt []byte, c
 		if err != nil {
 			return nil, err
 		}
-		sig, err := ck.addr.Write.SignDetachedWithContext(pgp.NewPlainMessageFromString(text),
-			pgp.NewSigningContext("bookings.slot."+uid, true))
+		sig, err := pgphelper.SignTextInContext(ck.addr.Write, text,
+			pgp.NewSigningContext("bookings.slot."+uid, true), pgp.Bytes)
 		if err != nil {
 			return nil, fmt.Errorf("sign a booking slot: %w", err)
 		}
 		signed.slots = append(signed.slots, map[string]any{
-			"DetachedSignature": base64.StdEncoding.EncodeToString(sig.GetBinary()),
+			"DetachedSignature": base64.StdEncoding.EncodeToString(sig),
 			"EndTime":           sl.End,
 			"RRule":             rruleOf(sl),
 			"StartTime":         sl.Start,
@@ -901,20 +905,28 @@ func sealBookingContent(ck *calKeys, password []byte, uid string, content bookin
 	if err != nil {
 		return "", err
 	}
-	sk, err := pgp.GenerateSessionKey()
+	sk, err := pgphelper.PGP.GenerateSessionKey()
 	if err != nil {
 		return "", err
 	}
-	data, err := sk.EncryptAndSignWithContext(pgp.NewPlainMessageFromString(text), ck.addr.Write,
-		pgp.NewSigningContext("bookings.content."+uid, true))
+	enc, err := pgphelper.PGP.Encryption().SessionKey(sk).SigningKeys(ck.addr.Write).
+		SigningContext(pgp.NewSigningContext("bookings.content."+uid, true)).Utf8().New()
 	if err != nil {
 		return "", fmt.Errorf("seal the booking page's content: %w", err)
 	}
-	keyPacket, err := pgp.EncryptSessionKeyWithPassword(sk, password)
+	data, err := enc.Encrypt([]byte(text))
 	if err != nil {
 		return "", fmt.Errorf("seal the booking page's content: %w", err)
 	}
-	return base64.StdEncoding.EncodeToString(append(keyPacket, data...)), nil
+	toPassword, err := pgphelper.PGP.Encryption().Password(password).New()
+	if err != nil {
+		return "", fmt.Errorf("seal the booking page's content: %w", err)
+	}
+	keyPacket, err := toPassword.EncryptSessionKey(sk)
+	if err != nil {
+		return "", fmt.Errorf("seal the booking page's content: %w", err)
+	}
+	return base64.StdEncoding.EncodeToString(append(keyPacket, data.BinaryDataPacket()...)), nil
 }
 
 func verifySlot(ck *calKeys, uid string, raw rawBookingSlot) pgphelper.VerifyResult {
@@ -926,8 +938,8 @@ func verifySlot(ck *calKeys, uid string, raw rawBookingSlot) pgphelper.VerifyRes
 	if err != nil {
 		return pgphelper.Unverified
 	}
-	verdict := pgphelper.Classify(ck.addr.Read.VerifyDetachedWithContext(pgp.NewPlainMessageFromString(text),
-		pgp.NewPGPSignature(sig), pgp.GetUnixTime(), pgp.NewVerificationContext("bookings.slot."+uid, true, 0)))
+	verdict := pgphelper.Classify(pgphelper.VerifyTextInContext(ck.addr.Read, text, sig, pgp.Bytes,
+		pgp.NewVerificationContext("bookings.slot."+uid, true, 0)))
 	if verdict == pgphelper.Invalid {
 		return pgphelper.Unverified
 	}

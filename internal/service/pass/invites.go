@@ -10,10 +10,11 @@ import (
 	"sort"
 	"strings"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 
 	"github.com/roman-16/proton-cli/internal/account/keys"
 	"github.com/roman-16/proton-cli/internal/crypto/aead"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
 )
@@ -274,15 +275,17 @@ func sealKeys(open map[int][]byte, to, signWith *pgp.KeyRing, email string) ([]m
 
 	sealed := make([]map[string]any, 0, len(rotations))
 	for _, rotation := range rotations {
-		msg, err := to.EncryptWithContext(
-			pgp.NewPlainMessage(open[rotation]), signWith,
-			pgp.NewSigningContext(inviteContext, true),
-		)
+		enc, err := pgphelper.PGP.Encryption().Recipients(to).SigningKeys(signWith).
+			SigningContext(pgp.NewSigningContext(inviteContext, true)).New()
+		if err != nil {
+			return nil, err
+		}
+		msg, err := enc.Encrypt(open[rotation])
 		if err != nil {
 			return nil, fmt.Errorf("encrypt the key for %s: %w", email, err)
 		}
 		sealed = append(sealed, map[string]any{
-			"Key":         base64.StdEncoding.EncodeToString(msg.GetBinary()),
+			"Key":         base64.StdEncoding.EncodeToString(msg.Bytes()),
 			"KeyRotation": rotation,
 		})
 	}
@@ -292,11 +295,11 @@ func sealKeys(open map[int][]byte, to, signWith *pgp.KeyRing, email string) ([]m
 // newUserSigned is what an offer to an address outside Proton commits to: the
 // address and the share's newest key, together, so neither can be changed under
 // the other between the offer and the keys.
-func newUserSigned(email string, shareKey []byte) *pgp.PlainMessage {
+func newUserSigned(email string, shareKey []byte) []byte {
 	body := make([]byte, 0, len(email)+1+len(shareKey))
 	body = append(body, email...)
 	body = append(body, '|')
-	return pgp.NewPlainMessage(append(body, shareKey...))
+	return append(body, shareKey...)
 }
 
 func (s *Service) signForNewUser(ctx context.Context, shareID, email string, signWith *pgp.KeyRing) (string, error) {
@@ -305,12 +308,12 @@ func (s *Service) signForNewUser(ctx context.Context, shareID, email string, sig
 		return "", err
 	}
 	shareKey, _ := sk.latest()
-	sig, err := signWith.SignDetachedWithContext(
-		newUserSigned(email, shareKey), pgp.NewSigningContext(newUserContext, true))
+	sig, err := pgphelper.SignBinaryInContext(signWith, newUserSigned(email, shareKey),
+		pgp.NewSigningContext(newUserContext, true), pgp.Bytes)
 	if err != nil {
 		return "", fmt.Errorf("sign the offer to %s: %w", email, err)
 	}
-	return base64.StdEncoding.EncodeToString(sig.GetBinary()), nil
+	return base64.StdEncoding.EncodeToString(sig), nil
 }
 
 // sentInvite is an offer to somebody who already had a Proton account.
@@ -448,8 +451,8 @@ func (s *Service) confirm(ctx context.Context, shareID string, held newUserInvit
 	if err != nil {
 		return fmt.Errorf("the offer's signature is not base64: %w", err)
 	}
-	if err := addrRings.Write.VerifyDetachedWithContext(
-		newUserSigned(held.InvitedEmail, shareKey), pgp.NewPGPSignature(raw), pgp.GetUnixTime(),
+	if err := pgphelper.VerifyBinaryInContext(addrRings.Write,
+		newUserSigned(held.InvitedEmail, shareKey), raw, pgp.Bytes,
 		pgp.NewVerificationContext(newUserContext, true, 0)); err != nil {
 		return errs.Problemf(
 			"The offer to %s is not the one this account signed, so no key will be handed over.",
@@ -640,16 +643,19 @@ func (s *Service) openInviteKey(i rawUserInvite, u *keys.Unlocked, inviter *pgp.
 		if err != nil {
 			return nil, err
 		}
-		opened, err := addrRings.Read.DecryptWithContext(pgp.NewPGPMessage(raw), inviter, pgp.GetUnixTime(),
-			pgp.NewVerificationContext(inviteContext, true, 0))
+		dec, err := pgphelper.PGP.Decryption().DecryptionKeys(addrRings.Read).VerificationKeys(inviter).
+			VerificationContext(pgp.NewVerificationContext(inviteContext, true, 0)).New()
 		if err != nil {
-			var unsigned pgp.SignatureVerificationError
-			if errors.As(err, &unsigned) {
-				return nil, fmt.Errorf("%w: %v", errUnsigned, err)
-			}
 			return nil, err
 		}
-		return opened.GetBinary(), nil
+		opened, err := dec.Decrypt(raw, pgp.Bytes)
+		if err != nil {
+			return nil, err
+		}
+		if err := pgphelper.SignatureError(opened, inviter); err != nil {
+			return nil, fmt.Errorf("%w: %v", errUnsigned, err)
+		}
+		return opened.Bytes(), nil
 	}
 	return nil, fmt.Errorf("the invitation carries no key for rotation %d", rotation)
 }
@@ -688,12 +694,12 @@ func (s *Service) InviteAccept(ctx context.Context, token string) error {
 		if err != nil {
 			return fmt.Errorf("open the vault key sent to you: %w", err)
 		}
-		sealed, err := ownKey.Encrypt(pgp.NewPlainMessage(opened), ownKey)
+		sealed, err := pgphelper.EncryptBinary(ownKey, ownKey, opened)
 		if err != nil {
 			return err
 		}
 		sealedKeys = append(sealedKeys, map[string]any{
-			"Key":         base64.StdEncoding.EncodeToString(sealed.GetBinary()),
+			"Key":         base64.StdEncoding.EncodeToString(sealed.Bytes()),
 			"KeyRotation": k.KeyRotation,
 		})
 	}

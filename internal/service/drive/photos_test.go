@@ -14,7 +14,8 @@ import (
 	"sync"
 	"testing"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/proton"
 )
 
@@ -226,7 +227,7 @@ func TestPhotosUnfavoriteRemovesFavoriteTag(t *testing.T) {
 // under.
 func photoLibrary(t *testing.T) (*Context, []byte) {
 	t.Helper()
-	shareKey, err := pgp.GenerateKey("Photos", "", "x25519", 0)
+	shareKey, err := pgphelper.GenerateKey("Photos", "")
 	if err != nil {
 		t.Fatalf("generate a share key: %v", err)
 	}

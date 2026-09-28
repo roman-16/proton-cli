@@ -14,6 +14,14 @@ func TestByName(t *testing.T) {
 		// No general table carries the camera formats.
 		{"DSC01234.arw", "image/x-sony-arw"},
 		{"IMG_0001.CR3", "image/x-canon-cr3"},
+		// The table is carried rather than asked of the machine, whose own
+		// table may not know these.
+		{"vienna-parking.md", "text/markdown"},
+		{"config.yaml", "text/yaml"},
+		{"app.js", "application/javascript"},
+		// The web client asks the general table before the camera formats, and
+		// the general table has its own answer for this one.
+		{"IMG_0001.dcr", "application/x-director"},
 		{"notes", Unknown},
 		{"archive.zzz", Unknown},
 	}

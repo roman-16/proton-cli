@@ -1,5 +1,7 @@
-// Package pgp wraps gopenpgp primitives Proton uses for Calendar events,
-// Contacts, Drive links and Pass key blobs. Nothing here talks to the API.
+// Package pgp is how the CLI makes and opens every key, message and signature:
+// the one gopenpgp handle, the text and binary operations Proton's clients tell
+// apart, and the signed and encrypted cards of Calendar and Contacts. Nothing
+// here talks to the API.
 package pgp
 
 import (
@@ -7,7 +9,7 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	gopenpgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 )
 
 // CalendarKeyPayload is the calendar key-setup data for
@@ -22,18 +24,18 @@ type CalendarKeyPayload struct {
 // GenerateCalendarKey creates a fresh calendar key and the split
 // (encrypted + signed) passphrase bound to the given address key ring, matching
 // Proton's calendar key-setup flow.
-func GenerateCalendarKey(addrKR *pgp.KeyRing) (*CalendarKeyPayload, error) {
+func GenerateCalendarKey(addrKR *gopenpgp.KeyRing) (*CalendarKeyPayload, error) {
 	raw := make([]byte, 32)
 	if _, err := rand.Read(raw); err != nil {
 		return nil, err
 	}
 	passphrase := base64.StdEncoding.EncodeToString(raw)
 
-	key, err := pgp.GenerateKey("Calendar key", "", "x25519", 0)
+	key, err := GenerateKey("Calendar key", "")
 	if err != nil {
 		return nil, err
 	}
-	locked, err := key.Lock([]byte(passphrase))
+	locked, err := PGP.LockKey(key, []byte(passphrase))
 	if err != nil {
 		return nil, err
 	}
@@ -42,24 +44,19 @@ func GenerateCalendarKey(addrKR *pgp.KeyRing) (*CalendarKeyPayload, error) {
 		return nil, err
 	}
 
-	msg := pgp.NewPlainMessageFromString(passphrase)
-	sk, err := pgp.GenerateSessionKey()
+	sk, err := PGP.GenerateSessionKey()
 	if err != nil {
 		return nil, err
 	}
-	dataPacket, err := sk.Encrypt(msg)
+	dataPacket, err := EncryptTextWithSessionKey(sk, nil, passphrase)
 	if err != nil {
 		return nil, err
 	}
-	keyPacket, err := addrKR.EncryptSessionKey(sk)
+	keyPacket, err := EncryptSessionKey(addrKR, sk)
 	if err != nil {
 		return nil, err
 	}
-	sig, err := addrKR.SignDetached(msg)
-	if err != nil {
-		return nil, err
-	}
-	sigArmored, err := sig.GetArmored()
+	sigArmored, err := SignTextArmored(addrKR, passphrase)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +91,7 @@ type Card struct {
 // Alongside the decrypted strings it returns a per-card verdict: type-2/3 cards
 // are signature-checked against verificationKR; clear/encrypted-only cards are
 // reported Unsigned. Callers typically pgp.Aggregate the verdicts.
-func DecryptCards(cards []Card, decryptionKR, verificationKR *pgp.KeyRing, keyPacket []byte) ([]string, []VerifyResult, error) {
+func DecryptCards(cards []Card, decryptionKR, verificationKR *gopenpgp.KeyRing, keyPacket []byte) ([]string, []VerifyResult, error) {
 	out := make([]string, 0, len(cards))
 	verdicts := make([]VerifyResult, 0, len(cards))
 	for _, c := range cards {
@@ -104,7 +101,7 @@ func DecryptCards(cards []Card, decryptionKR, verificationKR *pgp.KeyRing, keyPa
 			verdicts = append(verdicts, Unsigned)
 		case CardSigned:
 			out = append(out, c.Data)
-			verdicts = append(verdicts, VerifyDetachedStatus(verificationKR, pgp.NewPlainMessageFromString(c.Data), c.Signature))
+			verdicts = append(verdicts, VerifyTextStatus(verificationKR, c.Data, c.Signature))
 		case CardEncrypted:
 			plain, err := decryptCardData(c.Data, keyPacket, decryptionKR)
 			if err != nil {
@@ -118,7 +115,7 @@ func DecryptCards(cards []Card, decryptionKR, verificationKR *pgp.KeyRing, keyPa
 				return nil, nil, fmt.Errorf("decrypt card (type %d): %w", c.Type, err)
 			}
 			out = append(out, plain)
-			verdicts = append(verdicts, VerifyDetachedStatus(verificationKR, pgp.NewPlainMessageFromString(plain), c.Signature))
+			verdicts = append(verdicts, VerifyTextStatus(verificationKR, plain, c.Signature))
 		default:
 			out = append(out, c.Data)
 			verdicts = append(verdicts, Unsigned)
@@ -128,7 +125,7 @@ func DecryptCards(cards []Card, decryptionKR, verificationKR *pgp.KeyRing, keyPa
 }
 
 // DecryptCardsRaw accepts the map form returned from json.Unmarshal.
-func DecryptCardsRaw(cards []map[string]any, decryptionKR, verificationKR *pgp.KeyRing, keyPacket []byte) ([]string, []VerifyResult, error) {
+func DecryptCardsRaw(cards []map[string]any, decryptionKR, verificationKR *gopenpgp.KeyRing, keyPacket []byte) ([]string, []VerifyResult, error) {
 	typed := make([]Card, 0, len(cards))
 	for _, m := range cards {
 		c := Card{}
@@ -146,67 +143,40 @@ func DecryptCardsRaw(cards []map[string]any, decryptionKR, verificationKR *pgp.K
 	return DecryptCards(typed, decryptionKR, verificationKR, keyPacket)
 }
 
-func decryptCardData(data string, keyPacket []byte, kr *pgp.KeyRing) (string, error) {
+func decryptCardData(data string, keyPacket []byte, kr *gopenpgp.KeyRing) (string, error) {
+	message, encoding := []byte(data), gopenpgp.Armor
 	if keyPacket != nil {
-		raw, err := base64.StdEncoding.DecodeString(data)
-		if err != nil {
-			msg, err := pgp.NewPGPMessageFromArmored(data)
-			if err != nil {
-				return "", err
-			}
-			dec, err := kr.Decrypt(msg, nil, pgp.GetUnixTime())
-			if err != nil {
-				return "", err
-			}
-			return dec.GetString(), nil
+		if raw, err := base64.StdEncoding.DecodeString(data); err == nil {
+			message, encoding = gopenpgp.NewPGPSplitMessage(keyPacket, raw).Bytes(), gopenpgp.Bytes
 		}
-		split := pgp.NewPGPSplitMessage(keyPacket, raw)
-		dec, err := kr.Decrypt(split.GetPGPMessage(), nil, pgp.GetUnixTime())
-		if err != nil {
-			return "", err
-		}
-		return dec.GetString(), nil
 	}
-	msg, err := pgp.NewPGPMessageFromArmored(data)
+	res, err := DecryptText(kr, nil, message, encoding)
 	if err != nil {
 		return "", err
 	}
-	dec, err := kr.Decrypt(msg, nil, pgp.GetUnixTime())
-	if err != nil {
-		return "", err
-	}
-	return dec.GetString(), nil
+	return res.String(), nil
 }
 
-func SignCard(data string, signingKR *pgp.KeyRing) (*Card, error) {
-	sig, err := signingKR.SignDetached(pgp.NewPlainMessageFromString(data))
+func SignCard(data string, signingKR *gopenpgp.KeyRing) (*Card, error) {
+	armored, err := SignTextArmored(signingKR, data)
 	if err != nil {
 		return nil, fmt.Errorf("sign card: %w", err)
-	}
-	armored, err := sig.GetArmored()
-	if err != nil {
-		return nil, err
 	}
 	return &Card{Type: CardSigned, Data: data, Signature: armored}, nil
 }
 
 // EncryptAndSignCard produces a card of type CardEncryptedSigned where the
 // encrypted payload is armored (no separate key packet). Used by Contacts.
-func EncryptAndSignCard(data string, encryptionKR, signingKR *pgp.KeyRing) (*Card, error) {
-	msg := pgp.NewPlainMessageFromString(data)
-	enc, err := encryptionKR.Encrypt(msg, nil)
+func EncryptAndSignCard(data string, encryptionKR, signingKR *gopenpgp.KeyRing) (*Card, error) {
+	enc, err := EncryptText(encryptionKR, nil, data)
 	if err != nil {
 		return nil, fmt.Errorf("encrypt card: %w", err)
 	}
-	armored, err := enc.GetArmored()
+	armored, err := enc.Armor()
 	if err != nil {
 		return nil, err
 	}
-	sig, err := signingKR.SignDetached(msg)
-	if err != nil {
-		return nil, err
-	}
-	sigArmored, err := sig.GetArmored()
+	sigArmored, err := SignTextArmored(signingKR, data)
 	if err != nil {
 		return nil, err
 	}
@@ -218,49 +188,44 @@ func EncryptAndSignCard(data string, encryptionKR, signingKR *pgp.KeyRing) (*Car
 // the existing session key is reused (update flow) and the returned keyPacket
 // is empty. The returned session key lets callers encrypt sibling parts (e.g.
 // the attendees part) and wrap it to additional recipients.
-func EncryptAndSignCardSplit(signedData, encryptedData string, encryptionKR, signingKR *pgp.KeyRing, existingKeyPacketB64 string) (signed, encrypted *Card, keyPacketB64 string, sessionKey *pgp.SessionKey, err error) {
+func EncryptAndSignCardSplit(signedData, encryptedData string, encryptionKR, signingKR *gopenpgp.KeyRing, existingKeyPacketB64 string) (signed, encrypted *Card, keyPacketB64 string, sessionKey *gopenpgp.SessionKey, err error) {
 	signed, err = SignCard(signedData, signingKR)
 	if err != nil {
 		return nil, nil, "", nil, err
 	}
 
-	encMsg := pgp.NewPlainMessageFromString(encryptedData)
 	var dataPacket []byte
 	if existingKeyPacketB64 != "" {
 		kpBytes, err := base64.StdEncoding.DecodeString(existingKeyPacketB64)
 		if err != nil {
 			return nil, nil, "", nil, fmt.Errorf("decode existing key packet: %w", err)
 		}
-		sessionKey, err = encryptionKR.DecryptSessionKey(kpBytes)
+		sessionKey, err = DecryptSessionKey(encryptionKR, kpBytes)
 		if err != nil {
 			return nil, nil, "", nil, fmt.Errorf("decrypt existing session key: %w", err)
 		}
-		dataPacket, err = sessionKey.Encrypt(encMsg)
+		dataPacket, err = EncryptTextWithSessionKey(sessionKey, nil, encryptedData)
 		if err != nil {
 			return nil, nil, "", nil, err
 		}
 	} else {
-		enc, err := encryptionKR.Encrypt(encMsg, signingKR)
+		sessionKey, err = PGP.GenerateSessionKey()
 		if err != nil {
 			return nil, nil, "", nil, err
 		}
-		split, err := enc.SplitMessage()
+		enc, err := PGP.Encryption().Recipients(encryptionKR).SigningKeys(signingKR).SessionKey(sessionKey).Utf8().New()
 		if err != nil {
 			return nil, nil, "", nil, err
 		}
-		keyPacketB64 = base64.StdEncoding.EncodeToString(split.GetBinaryKeyPacket())
-		dataPacket = split.GetBinaryDataPacket()
-		sessionKey, err = encryptionKR.DecryptSessionKey(split.GetBinaryKeyPacket())
+		split, err := enc.Encrypt([]byte(encryptedData))
 		if err != nil {
-			return nil, nil, "", nil, fmt.Errorf("recover session key: %w", err)
+			return nil, nil, "", nil, err
 		}
+		keyPacketB64 = base64.StdEncoding.EncodeToString(split.BinaryKeyPacket())
+		dataPacket = split.BinaryDataPacket()
 	}
 
-	sig, err := signingKR.SignDetached(encMsg)
-	if err != nil {
-		return nil, nil, "", nil, err
-	}
-	sigArmored, err := sig.GetArmored()
+	sigArmored, err := SignTextArmored(signingKR, encryptedData)
 	if err != nil {
 		return nil, nil, "", nil, err
 	}
@@ -272,17 +237,12 @@ func EncryptAndSignCardSplit(signedData, encryptedData string, encryptionKR, sig
 // (encrypt-only data packet) and attaches a detached signature, matching
 // Proton's ENCRYPTED_AND_SIGNED card layout for sibling event parts such as the
 // attendees part.
-func EncryptPartWithSessionKey(data string, sessionKey *pgp.SessionKey, signingKR *pgp.KeyRing) (*Card, error) {
-	msg := pgp.NewPlainMessageFromString(data)
-	dataPacket, err := sessionKey.Encrypt(msg)
+func EncryptPartWithSessionKey(data string, sessionKey *gopenpgp.SessionKey, signingKR *gopenpgp.KeyRing) (*Card, error) {
+	dataPacket, err := EncryptTextWithSessionKey(sessionKey, nil, data)
 	if err != nil {
 		return nil, err
 	}
-	sig, err := signingKR.SignDetached(msg)
-	if err != nil {
-		return nil, err
-	}
-	sigArmored, err := sig.GetArmored()
+	sigArmored, err := SignTextArmored(signingKR, data)
 	if err != nil {
 		return nil, err
 	}

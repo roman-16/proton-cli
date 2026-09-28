@@ -3,8 +3,8 @@ package mail
 import (
 	"encoding/base64"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
-	"github.com/ProtonMail/gopenpgp/v2/helper"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/proton"
 )
 
@@ -12,16 +12,16 @@ import (
 // and attachment keys are wrapped with the password, and a random token plus an
 // SRP verifier let the recipient authenticate to Proton's EO viewer.
 func eoAddress(sessionKey *pgp.SessionKey, password, hint string, atts []*draftAttachment, modulus proton.Modulus) (map[string]any, error) {
-	bodyKP, err := pgp.EncryptSessionKeyWithPassword(sessionKey, []byte(password))
+	bodyKP, err := pgphelper.EncryptSessionKeyWithPassword([]byte(password), sessionKey)
 	if err != nil {
 		return nil, err
 	}
-	tokenSK, err := pgp.GenerateSessionKey()
+	tokenSK, err := pgphelper.PGP.GenerateSessionKey()
 	if err != nil {
 		return nil, err
 	}
 	token := base64.StdEncoding.EncodeToString(tokenSK.Key)
-	encToken, err := helper.EncryptMessageWithPassword([]byte(password), token)
+	encToken, err := pgphelper.EncryptTextWithPassword([]byte(password), token)
 	if err != nil {
 		return nil, err
 	}

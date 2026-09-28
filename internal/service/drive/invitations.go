@@ -7,8 +7,9 @@ import (
 	"log/slog"
 	"strings"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	"github.com/roman-16/proton-cli/internal/account/keys"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/fetch"
 	"github.com/roman-16/proton-cli/internal/proton"
 	"github.com/roman-16/proton-cli/internal/skip"
@@ -179,7 +180,7 @@ func invitationKey(u *keys.Unlocked, r invitationDetail) (keys.Rings, *pgp.Sessi
 	if err != nil {
 		return keys.Rings{}, nil, fmt.Errorf("decode key packet: %w", err)
 	}
-	sessionKey, err := addr.Read.DecryptSessionKey(keyPacket)
+	sessionKey, err := pgphelper.DecryptSessionKey(addr.Read, keyPacket)
 	if err != nil {
 		return keys.Rings{}, nil, fmt.Errorf("decrypt session key: %w", err)
 	}
@@ -193,15 +194,11 @@ func invitationPassphrase(sessionKey *pgp.SessionKey, r invitationDetail) ([]byt
 	if err != nil {
 		return nil, err
 	}
-	split, err := enc.SplitMessage()
-	if err != nil {
-		return nil, err
-	}
-	passphrase, err := sessionKey.Decrypt(split.GetBinaryDataPacket())
+	passphrase, err := pgphelper.DecryptWithSessionKey(sessionKey, enc.BinaryDataPacket())
 	if err != nil {
 		return nil, fmt.Errorf("decrypt share passphrase: %w", err)
 	}
-	return passphrase.GetBinary(), nil
+	return passphrase, nil
 }
 
 func (s *Service) AcceptInvitation(ctx context.Context, invitationID string) error {
@@ -213,13 +210,13 @@ func (s *Service) AcceptInvitation(ctx context.Context, invitationID string) err
 	if err != nil {
 		return err
 	}
-	sig, err := addr.Write.SignDetachedWithContext(pgp.NewPlainMessage(sessionKey.Key), pgp.NewSigningContext(sigContextMember, true))
+	sig, err := pgphelper.SignBinaryInContext(addr.Write, sessionKey.Key, pgp.NewSigningContext(sigContextMember, true), pgp.Bytes)
 	if err != nil {
 		return fmt.Errorf("sign session key: %w", err)
 	}
 	return s.C.Decode(ctx, proton.Request{
 		Method: "POST", Path: "/drive/v2/shares/invitations/" + invitationID + "/accept",
-		Body: map[string]any{"SessionKeySignature": base64.StdEncoding.EncodeToString(sig.GetBinary())},
+		Body: map[string]any{"SessionKeySignature": base64.StdEncoding.EncodeToString(sig)},
 	}, nil)
 }
 

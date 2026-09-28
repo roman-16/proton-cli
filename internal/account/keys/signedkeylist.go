@@ -9,10 +9,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/ProtonMail/go-crypto/openpgp/packet"
-	"github.com/ProtonMail/gopenpgp/v2/constants"
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	openpgp "github.com/ProtonMail/go-crypto/openpgp/v2"
+	"github.com/ProtonMail/gopenpgp/v3/armor"
+	"github.com/ProtonMail/gopenpgp/v3/constants"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 )
 
 // The account's own statement of which keys an address holds.
@@ -284,11 +285,12 @@ func signKeyList(data string, signers []*pgp.Key, at func() time.Time) (string, 
 	}
 	var packets bytes.Buffer
 	for _, key := range signers {
-		if err := openpgp.DetachSignText(&packets, key.GetEntity(), strings.NewReader(data), config); err != nil {
+		if err := openpgp.DetachSignWithParams(&packets, []*openpgp.Entity{key.GetEntity()}, strings.NewReader(data),
+			&openpgp.SignParams{TextSig: true, Config: config}); err != nil {
 			return "", fmt.Errorf("sign the address's key list: %w", err)
 		}
 	}
-	return pgp.NewPGPSignature(packets.Bytes()).GetArmored()
+	return armor.ArmorPGPSignature(packets.Bytes())
 }
 
 // addressKey is one of an address's active key records, read far enough to be

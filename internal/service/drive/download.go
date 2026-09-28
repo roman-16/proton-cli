@@ -10,7 +10,7 @@ import (
 	"log/slog"
 	"strconv"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/progress"
@@ -193,7 +193,7 @@ func (s *Service) downloadFile(ctx context.Context, dc *Context, link *Link, nod
 	if err != nil {
 		return err
 	}
-	sk, err := nodeKR.DecryptSessionKey(kp)
+	sk, err := pgphelper.DecryptSessionKey(nodeKR, kp)
 	if err != nil {
 		return fmt.Errorf("get file session key: %w", err)
 	}
@@ -223,16 +223,15 @@ func (s *Service) downloadFile(ctx context.Context, dc *Context, link *Link, nod
 		if actual := sha256.Sum256(encData); !bytes.Equal(actual[:], hashes[i]) {
 			return fmt.Errorf("block %d does not match the hash the revision was signed with", b.Index)
 		}
-		dec, err := sk.Decrypt(encData)
+		bin, err := pgphelper.DecryptWithSessionKey(sk, encData)
 		if err != nil {
 			return fmt.Errorf("decrypt block %d: %w", b.Index, err)
 		}
 		if opts.OnSignatureIssue != nil {
-			if verdict := wrote.verify(ctx, dec, b.EncSignature); verdict != "" {
+			if verdict := wrote.verify(ctx, bin, b.EncSignature); verdict != "" {
 				opts.OnSignatureIssue(b.Index, verdict)
 			}
 		}
-		bin := dec.GetBinary()
 		if _, err := w.Write(bin); err != nil {
 			return err
 		}
@@ -269,7 +268,7 @@ func newBlockAuthor(s *Service, dc *Context, email string, nodeKR *pgp.KeyRing) 
 //
 // A block whose author is not named is nobody's to judge, which is every block
 // of an upload nobody was signed in for.
-func (a *blockAuthor) verify(ctx context.Context, plain *pgp.PlainMessage, encSignature string) string {
+func (a *blockAuthor) verify(ctx context.Context, plain []byte, encSignature string) string {
 	if encSignature == "" || a.email == "" {
 		return ""
 	}
@@ -286,11 +285,11 @@ func (a *blockAuthor) verify(ctx context.Context, plain *pgp.PlainMessage, encSi
 	if err != nil {
 		return string(pgphelper.Invalid)
 	}
-	sig, err := a.nodeKR.Decrypt(msg, nil, pgp.GetUnixTime())
+	sig, err := pgphelper.Decrypt(a.nodeKR, nil, msg.Bytes(), pgp.Bytes)
 	if err != nil {
 		return string(pgphelper.Invalid)
 	}
-	if err := a.kr.VerifyDetached(plain, pgp.NewPGPSignature(sig.GetBinary()), pgp.GetUnixTime()); err != nil {
+	if err := pgphelper.VerifyBinary(a.kr, plain, sig.Bytes(), pgp.Bytes); err != nil {
 		return string(pgphelper.Classify(err))
 	}
 	return ""
@@ -419,7 +418,7 @@ func (s *Service) verifyManifest(ctx context.Context, dc *Context, nodeKR *pgp.K
 		}
 		verificationKR = kr
 	}
-	if verdict := pgphelper.VerifyDetachedStatus(verificationKR, pgp.NewPlainMessage(manifest), signature); verdict != pgphelper.Verified {
+	if verdict := pgphelper.VerifyBinaryStatus(verificationKR, manifest, signature); verdict != pgphelper.Verified {
 		return fmt.Errorf("the revision's manifest signature is %s, so its content cannot be trusted", verdict)
 	}
 	return nil

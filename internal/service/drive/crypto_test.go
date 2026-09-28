@@ -5,13 +5,14 @@ import (
 	"testing"
 	"time"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 )
 
 // A file's record of itself is sealed to its own node key, so what a client
 // writes there is what every other client - and a later download - reads back.
 func TestAFilesRecordOfItselfRoundTrips(t *testing.T) {
-	key, err := pgp.GenerateKey("Node", "", "x25519", 0)
+	key, err := pgphelper.GenerateKey("Node", "")
 	if err != nil {
 		t.Fatalf("generate a node key: %v", err)
 	}

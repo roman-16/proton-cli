@@ -10,7 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/progress"
 	"github.com/roman-16/proton-cli/internal/proton"
 	"github.com/roman-16/proton-cli/internal/search"
@@ -175,13 +176,9 @@ func (d *indexedTree) addFile(t *testing.T, parent *cannedFolder, id, name, mime
 		t.Fatalf("encrypt the block: %v", err)
 	}
 	hash := sha256.Sum256(block)
-	sig, err := child.kr.SignDetached(pgp.NewPlainMessage(hash[:]))
+	manifest, err := pgphelper.SignBinaryArmored(child.kr, hash[:])
 	if err != nil {
 		t.Fatalf("sign the manifest: %v", err)
-	}
-	manifest, err := sig.GetArmored()
-	if err != nil {
-		t.Fatalf("armor the manifest signature: %v", err)
 	}
 
 	const revision = "rev-1"

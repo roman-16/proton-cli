@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/ProtonMail/gopenpgp/v2/constants"
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	"github.com/ProtonMail/gopenpgp/v3/constants"
+	gopenpgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 )
 
 func TestClassify(t *testing.T) {
@@ -15,13 +15,13 @@ func TestClassify(t *testing.T) {
 		want VerifyResult
 	}{
 		{"nil error is verified", nil, Verified},
-		{"status OK", pgp.SignatureVerificationError{Status: constants.SIGNATURE_OK}, Verified},
-		{"not signed", pgp.SignatureVerificationError{Status: constants.SIGNATURE_NOT_SIGNED}, Unsigned},
-		{"no verifier", pgp.SignatureVerificationError{Status: constants.SIGNATURE_NO_VERIFIER}, Unverified},
-		{"failed", pgp.SignatureVerificationError{Status: constants.SIGNATURE_FAILED}, Invalid},
-		{"bad context", pgp.SignatureVerificationError{Status: constants.SIGNATURE_BAD_CONTEXT}, Invalid},
+		{"status OK", gopenpgp.SignatureVerificationError{Status: constants.SIGNATURE_OK}, Verified},
+		{"not signed", gopenpgp.SignatureVerificationError{Status: constants.SIGNATURE_NOT_SIGNED}, Unsigned},
+		{"no verifier", gopenpgp.SignatureVerificationError{Status: constants.SIGNATURE_NO_VERIFIER}, Unverified},
+		{"failed", gopenpgp.SignatureVerificationError{Status: constants.SIGNATURE_FAILED}, Invalid},
+		{"bad context", gopenpgp.SignatureVerificationError{Status: constants.SIGNATURE_BAD_CONTEXT}, Invalid},
 		{"non-signature error is unverified", errors.New("network down"), Unverified},
-		{"wrapped signature error", errWrap{pgp.SignatureVerificationError{Status: constants.SIGNATURE_FAILED}}, Invalid},
+		{"wrapped signature error", errWrap{gopenpgp.SignatureVerificationError{Status: constants.SIGNATURE_FAILED}}, Invalid},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

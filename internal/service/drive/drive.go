@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"strings"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	"github.com/roman-16/proton-cli/internal/account/keys"
 	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
@@ -224,19 +224,18 @@ func (s *Service) unlockShare(ctx context.Context, shareID, rootLinkID, volumeID
 	if err != nil {
 		return nil, err
 	}
-	dec, err := addrRings.Read.Decrypt(enc, nil, pgp.GetUnixTime())
+	dec, err := pgphelper.Decrypt(addrRings.Read, nil, enc.Bytes(), pgp.Bytes)
 	if err != nil {
 		return nil, u.Explain(fmt.Errorf("decrypt share passphrase: %w", err), "share", enc)
 	}
-	norm := pgp.NewPlainMessageFromString(string(dec.GetBinary()))
-	if v := pgphelper.VerifyDetachedStatus(addrRings.Read, norm, sh.PassphraseSignature); v != pgphelper.Verified {
+	if v := pgphelper.VerifyTextStatus(addrRings.Read, string(dec.Bytes()), sh.PassphraseSignature); v != pgphelper.Verified {
 		slog.Debug("drive: share passphrase signature not verified", "share", shareID, "result", string(v))
 	}
 	locked, err := pgp.NewKeyFromArmored(sh.Key)
 	if err != nil {
 		return nil, err
 	}
-	unlocked, err := locked.Unlock(dec.GetBinary())
+	unlocked, err := locked.Unlock(dec.Bytes())
 	if err != nil {
 		return nil, fmt.Errorf("unlock share key: %w", err)
 	}
@@ -250,7 +249,7 @@ func (s *Service) unlockShare(ctx context.Context, shareID, rootLinkID, volumeID
 		VolumeID: volumeID, RootLinkID: rootLinkID, rootLink: rootLink,
 		Type: sh.Type, RootName: rootName(ctx, shareID, sh.Type, rootLink, shareKR),
 		Creator: sh.Creator, Created: sh.CreateTime,
-		sharePassphrase: dec.GetBinary(),
+		sharePassphrase: dec.Bytes(),
 	}
 	if len(sh.Memberships) > 0 {
 		dc.Permissions = sh.Memberships[0].Permissions

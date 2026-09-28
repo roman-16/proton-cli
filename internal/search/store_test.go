@@ -9,7 +9,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 )
 
 // A store for a test: a temporary directory, one account, and a key of its own.
@@ -19,7 +20,7 @@ import (
 // leave the one thing worth checking unchecked.
 func testStore(t *testing.T) *Store {
 	t.Helper()
-	key, err := pgp.GenerateKey("Test", "test@proton.me", "x25519", 0)
+	key, err := pgphelper.GenerateKey("Test", "test@proton.me")
 	if err != nil {
 		t.Fatalf("generate key: %v", err)
 	}

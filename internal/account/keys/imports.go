@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"time"
 
-	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/ProtonMail/go-crypto/openpgp/armor"
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	openpgp "github.com/ProtonMail/go-crypto/openpgp/v2"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
 )
@@ -70,7 +71,7 @@ func ReadKeys(data []byte, source string, ask func() (string, error)) ([]Offered
 		if sound, err := key.Check(); err != nil || !sound {
 			return nil, errs.Problemf("The key in %s is damaged: its public and private halves do not match.", source)
 		}
-		if !key.CanEncrypt() {
+		if !key.CanEncrypt(time.Now().Unix()) {
 			return nil, errs.Problemf("The key in %s cannot encrypt, which a key of an address has to.", source)
 		}
 		out = append(out, Offered{Key: key, Source: source})

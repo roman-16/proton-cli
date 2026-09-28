@@ -11,8 +11,9 @@ import (
 	"time"
 
 	"github.com/ProtonMail/go-srp"
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	"github.com/roman-16/proton-cli/internal/account/localkey"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/fetch"
 	"github.com/roman-16/proton-cli/internal/proton"
@@ -125,7 +126,7 @@ func (u *Unlocked) SealedToLocked(msg *pgp.PGPMessage) bool {
 	if msg == nil || len(u.lockedID) == 0 {
 		return false
 	}
-	ids, _ := msg.GetEncryptionKeyIDs()
+	ids, _ := msg.EncryptionKeyIDs()
 	for _, id := range ids {
 		if u.lockedID[id] {
 			return true
@@ -909,22 +910,22 @@ func unlockKeyRing(ctx context.Context, keys []Key, passphrase []byte, userKR *p
 }
 
 func decryptToken(tokenArm, sigArm string, kr *pgp.KeyRing) ([]byte, error) {
-	msg, err := pgp.NewPGPMessageFromArmored(tokenArm)
+	dec, err := pgphelper.Decrypt(kr, nil, []byte(tokenArm), pgp.Armor)
 	if err != nil {
 		return nil, err
 	}
-	sig, err := pgp.NewPGPSignatureFromArmored(sigArm)
+	verifier, err := pgphelper.PGP.Verify().VerificationKeys(kr).DisableVerifyTimeCheck().New()
 	if err != nil {
 		return nil, err
 	}
-	dec, err := kr.Decrypt(msg, nil, 0)
+	verified, err := verifier.VerifyDetached(dec.Bytes(), []byte(sigArm), pgp.Armor)
 	if err != nil {
 		return nil, err
 	}
-	if err := kr.VerifyDetached(dec, sig, 0); err != nil {
+	if err := verified.SignatureError(); err != nil {
 		return nil, err
 	}
-	return dec.GetBinary(), nil
+	return dec.Bytes(), nil
 }
 
 // Unreadable is what a Proton address whose published key will not parse

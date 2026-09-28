@@ -9,10 +9,11 @@ import (
 	"sync"
 	"testing"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 
 	"github.com/roman-16/proton-cli/internal/account/keys"
 	"github.com/roman-16/proton-cli/internal/crypto/aead"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
 	pb "github.com/roman-16/proton-cli/internal/service/pass/proto"
@@ -164,7 +165,7 @@ func TestVaultCreateSealsTheKeyToThePrimaryUserKeyAlone(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, name := range []string{"primary", "retired"} {
-		key, err := pgp.GenerateKey(name, name+"@example.invalid", "x25519", 0)
+		key, err := pgphelper.GenerateKey(name, name+"@example.invalid")
 		if err != nil {
 			t.Fatalf("GenerateKey: %v", err)
 		}
@@ -186,7 +187,7 @@ func TestVaultCreateSealsTheKeyToThePrimaryUserKeyAlone(t *testing.T) {
 		t.Fatal(err)
 	}
 	msg := pgp.NewPGPMessage(raw)
-	if ids, ok := msg.GetHexEncryptionKeyIDs(); !ok || len(ids) != 1 {
+	if ids, ok := msg.HexEncryptionKeyIDs(); !ok || len(ids) != 1 {
 		t.Fatalf("the vault key is sealed to %v, want exactly one key", ids)
 	}
 	one := func(i int) *pgp.KeyRing {
@@ -196,10 +197,10 @@ func TestVaultCreateSealsTheKeyToThePrimaryUserKeyAlone(t *testing.T) {
 		}
 		return kr
 	}
-	if _, err := one(0).Decrypt(msg, nil, pgp.GetUnixTime()); err != nil {
+	if _, err := pgphelper.Decrypt(one(0), nil, msg.Bytes(), pgp.Bytes); err != nil {
 		t.Errorf("the primary user key cannot open the vault key it should have sealed: %v", err)
 	}
-	if _, err := one(1).Decrypt(msg, nil, pgp.GetUnixTime()); err == nil {
+	if _, err := pgphelper.Decrypt(one(1), nil, msg.Bytes(), pgp.Bytes); err == nil {
 		t.Error("the vault key was sealed to a key that is no longer primary")
 	}
 }

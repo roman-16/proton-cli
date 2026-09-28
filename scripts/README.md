@@ -8,6 +8,7 @@ Everything the maintainer or CI runs, in whatever language suits it: shell insta
 | `gen-completions.sh` | Emits the shell completions shipped in releases (a goreleaser `before` hook) |
 | `changelog/` | Reads `CHANGELOG.md`: the version to release and the notes to publish (`just notes`) |
 | `gendocs/` | Generates the command reference from the command tree (`just docs`) |
+| `mimetypes/` | Writes the table `internal/mimetype` types a file by its name with, from the mime-types release WebClients' Drive pins (`just mimetypes`) |
 | `openapi-generator/` | Generates `openapi.yaml` from the WebClients and Drive SDK TypeScript source (`just openapi`) |
 | `openapi-guard/` | Checks a regenerated `openapi.yaml` before the weekly sync commits it |
 | `stats/` | Records the public counters the Stats page charts (`just stats`) |

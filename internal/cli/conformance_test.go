@@ -1536,10 +1536,14 @@ var layers = map[string][]string{
 	// instead would disagree with that one, and did.
 	"redact": {"ref"},
 	// search is the index on disk and the rules for matching against it. It seals
-	// records with the symmetric primitive Pass items are sealed with, and reports
-	// a build through the same sink a transfer reports through; the keys it seals
-	// to are handed in, so it reaches for nothing that knows about an account.
-	"search": {"crypto/aead", "progress"},
+	// records with the symmetric primitive Pass items are sealed with, seals its
+	// own key through the handle every other key goes through, and reports a build
+	// through the same sink a transfer reports through; the keys it seals to are
+	// handed in, so it reaches for nothing that knows about an account.
+	"search": {"crypto/aead", "crypto/pgp", "progress"},
+	// crypto/pgp is the one handle every key, message and signature is made
+	// through, so it reaches for nothing of ours.
+	"crypto/pgp": {},
 	// skip logs through the package-level logger and counts on the context, so it
 	// needs nothing of ours. That is what lets every service reach it.
 	"skip":   {},

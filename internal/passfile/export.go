@@ -10,10 +10,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ProtonMail/gopenpgp/v2/helper"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
 	pb "github.com/roman-16/proton-cli/internal/service/pass/proto"
 )
@@ -468,11 +468,11 @@ func sortedShares(doc *ExportDocument) []string {
 // Proton Pass encrypts an export to a passphrase rather than to a key, so a
 // backup can be opened on a machine that has never held the account's keys.
 func encryptExport(plain []byte, passphrase string) (string, error) {
-	return helper.EncryptMessageWithPassword([]byte(passphrase), string(plain))
+	return pgphelper.EncryptTextWithPassword([]byte(passphrase), string(plain))
 }
 
 func decryptExport(armored, passphrase string) ([]byte, error) {
-	out, err := helper.DecryptMessageWithPassword([]byte(passphrase), armored)
+	out, err := pgphelper.DecryptTextWithPassword([]byte(passphrase), armored)
 	if err != nil {
 		return nil, err
 	}

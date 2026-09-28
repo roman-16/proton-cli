@@ -7,8 +7,9 @@ import (
 	"fmt"
 	"strings"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	"github.com/roman-16/proton-cli/internal/account/keys"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
 	"github.com/roman-16/proton-cli/internal/skip"
@@ -209,11 +210,11 @@ func (s *Service) InviteMember(ctx context.Context, t Target, email string, canE
 // this one, so the person is invited once rather than twice.
 func (s *Service) inviteProton(ctx context.Context, dc *Context, shareID, email, name string,
 	canEdit bool, message string, sk *pgp.SessionKey, inviteeKR *pgp.KeyRing, held string) error {
-	keyPacket, err := inviteeKR.EncryptSessionKey(sk)
+	keyPacket, err := pgphelper.EncryptSessionKey(inviteeKR, sk)
 	if err != nil {
 		return fmt.Errorf("encrypt session key for invitee: %w", err)
 	}
-	sig, err := dc.Addr.Write.SignDetachedWithContext(pgp.NewPlainMessage(keyPacket), pgp.NewSigningContext(sigContextInviter, true))
+	sig, err := pgphelper.SignBinaryInContext(dc.Addr.Write, keyPacket, pgp.NewSigningContext(sigContextInviter, true), pgp.Bytes)
 	if err != nil {
 		return fmt.Errorf("sign key packet: %w", err)
 	}
@@ -222,7 +223,7 @@ func (s *Service) inviteProton(ctx context.Context, dc *Context, shareID, email,
 		"InviterEmail":       dc.AddrEmail,
 		"Permissions":        permFor(canEdit),
 		"KeyPacket":          base64.StdEncoding.EncodeToString(keyPacket),
-		"KeyPacketSignature": base64.StdEncoding.EncodeToString(sig.GetBinary()),
+		"KeyPacketSignature": base64.StdEncoding.EncodeToString(sig),
 	}
 	if held != "" {
 		invitation["ExternalInvitationID"] = held
@@ -243,8 +244,8 @@ func (s *Service) inviteProton(ctx context.Context, dc *Context, shareID, email,
 // sends is an email inviting them to make an account.
 func (s *Service) inviteOutside(ctx context.Context, dc *Context, shareID, email, name string,
 	canEdit bool, message string, sk *pgp.SessionKey, t Target) error {
-	sig, err := dc.Addr.Write.SignDetachedWithContext(
-		outsideSigned(email, sk), pgp.NewSigningContext(sigContextOutside, true))
+	sig, err := pgphelper.SignTextInContext(dc.Addr.Write,
+		outsideSigned(email, sk), pgp.NewSigningContext(sigContextOutside, true), pgp.Bytes)
 	if err != nil {
 		return fmt.Errorf("sign the invitation: %w", err)
 	}
@@ -252,7 +253,7 @@ func (s *Service) inviteOutside(ctx context.Context, dc *Context, shareID, email
 		"InviterAddressID":            dc.AddrID,
 		"InviteeEmail":                email,
 		"Permissions":                 permFor(canEdit),
-		"ExternalInvitationSignature": base64.StdEncoding.EncodeToString(sig.GetBinary()),
+		"ExternalInvitationSignature": base64.StdEncoding.EncodeToString(sig),
 	}}
 	if details := emailDetails(message, name); details != nil {
 		body["EmailDetails"] = details
@@ -299,8 +300,8 @@ func (s *Service) resendInvite(ctx context.Context, shareID string, p PendingInv
 // outsideSigned is what an offer to an address outside Proton commits to: the
 // address and the session key, together, so neither can be changed under the
 // other between the invitation and the key.
-func outsideSigned(email string, sk *pgp.SessionKey) *pgp.PlainMessage {
-	return pgp.NewPlainMessageFromString(email + "|" + base64.StdEncoding.EncodeToString(sk.Key))
+func outsideSigned(email string, sk *pgp.SessionKey) string {
+	return email + "|" + base64.StdEncoding.EncodeToString(sk.Key)
 }
 
 // outsideRefused phrases the killswitch Proton keeps over this feature, which
@@ -375,8 +376,8 @@ func (s *Service) confirm(ctx context.Context, shareID string, t Target, held ou
 	if err != nil {
 		return fmt.Errorf("the invitation's signature is not base64: %w", err)
 	}
-	if err := dc.Addr.Write.VerifyDetachedWithContext(
-		outsideSigned(held.InviteeEmail, sk), pgp.NewPGPSignature(raw), pgp.GetUnixTime(),
+	if err := pgphelper.VerifyTextInContext(dc.Addr.Write,
+		outsideSigned(held.InviteeEmail, sk), raw, pgp.Bytes,
 		pgp.NewVerificationContext(sigContextOutside, true, 0)); err != nil {
 		return errs.Problemf(
 			"The invitation to %s is not the one this account signed, so the key will not be handed over.",

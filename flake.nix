@@ -17,14 +17,14 @@
     in
     {
       packages = forAllSystems (pkgs: {
-        default = pkgs.buildGoModule {
+        default = pkgs.buildGoLatestModule {
           pname = "proton-cli";
           inherit version;
 
           __structuredAttrs = true;
 
           src = self;
-          vendorHash = "sha256-iEuPuIt4kQZb+xIR0OcWcQ5/yYM1REZBabXxax+nq9c=";
+          vendorHash = "sha256-qfgiqfDDlUxHM6XLoCrhDoFLbYZBj/4GihVoEP+CAIw=";
 
           subPackages = [ "cmd/proton" ];
 

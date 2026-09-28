@@ -7,9 +7,10 @@ import (
 	"sort"
 	"strings"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 
 	"github.com/roman-16/proton-cli/internal/account/keys"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
 )
@@ -118,21 +119,16 @@ func (s *Service) CalendarShare(ctx context.Context, calendarID, email string, c
 	}
 	// The key packet is the session key encrypted to them; the signature is over
 	// the session key itself, so they can tell who handed it over.
-	keyPacket, err := inviteeKR.EncryptSessionKey(ck.passphraseKey)
+	keyPacket, err := pgphelper.EncryptSessionKey(inviteeKR, ck.passphraseKey)
 	if err != nil {
 		return fmt.Errorf("encrypt the passphrase key for %s: %w", email, err)
 	}
-	signature, err := ck.addr.Write.SignDetachedWithContext(
-		pgp.NewPlainMessage(ck.passphraseKey.Key),
-		pgp.NewSigningContext(shareInviteContext, true),
-	)
+	signature, err := pgphelper.SignBinaryInContext(ck.addr.Write, ck.passphraseKey.Key,
+		pgp.NewSigningContext(shareInviteContext, true), pgp.Armor)
 	if err != nil {
 		return fmt.Errorf("sign the invitation: %w", err)
 	}
-	armored, err := signature.GetArmored()
-	if err != nil {
-		return err
-	}
+	armored := string(signature)
 
 	permissions := permViewer
 	if canEdit {
@@ -339,15 +335,11 @@ func (s *Service) CalendarInvitationAccept(ctx context.Context, invitationID str
 	if err != nil {
 		return err
 	}
-	passphrase, err := addr.Read.Decrypt(msg, nil, pgp.GetUnixTime())
+	passphrase, err := pgphelper.DecryptText(addr.Read, nil, msg.Bytes(), pgp.Bytes)
 	if err != nil {
 		return fmt.Errorf("open the calendar's passphrase: %w", err)
 	}
-	signature, err := addr.Write.SignDetached(pgp.NewPlainMessageFromString(passphrase.GetString()))
-	if err != nil {
-		return err
-	}
-	armored, err := signature.GetArmored()
+	armored, err := pgphelper.SignTextArmored(addr.Write, passphrase.String())
 	if err != nil {
 		return err
 	}

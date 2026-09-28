@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 )
 
 func TestNewContentID(t *testing.T) {
@@ -145,7 +145,7 @@ func TestReadLocalAttachmentUnknownExtensionFallsBack(t *testing.T) {
 // decrypts back to the original session key with the password.
 func TestAttachmentPasswordKeyPacketsRoundTrip(t *testing.T) {
 	const pw = "correct horse battery staple"
-	sk, err := pgp.GenerateSessionKey()
+	sk, err := pgphelper.PGP.GenerateSessionKey()
 	if err != nil {
 		t.Fatalf("GenerateSessionKey: %v", err)
 	}
@@ -163,7 +163,7 @@ func TestAttachmentPasswordKeyPacketsRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("packet is not base64: %v", err)
 	}
-	got, err := pgp.DecryptSessionKeyWithPassword(packet, []byte(pw))
+	got, err := pgphelper.DecryptSessionKeyWithPassword([]byte(pw), packet)
 	if err != nil {
 		t.Fatalf("DecryptSessionKeyWithPassword: %v", err)
 	}
@@ -175,7 +175,7 @@ func TestAttachmentPasswordKeyPacketsRoundTrip(t *testing.T) {
 	// integrity check, so a wrong password yields bytes that now and then parse as
 	// a valid session key. What the packet promises is that they are not this one,
 	// and the data they would go on to decrypt is what carries the tag that fails.
-	if wrong, err := pgp.DecryptSessionKeyWithPassword(packet, []byte("wrong")); err == nil && reflect.DeepEqual(wrong.Key, sk.Key) {
+	if wrong, err := pgphelper.DecryptSessionKeyWithPassword([]byte("wrong"), packet); err == nil && reflect.DeepEqual(wrong.Key, sk.Key) {
 		t.Error("the wrong password recovered the session key")
 	}
 }

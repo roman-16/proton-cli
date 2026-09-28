@@ -7,8 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	"github.com/roman-16/proton-cli/internal/account/keys"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/proton"
 )
 
@@ -16,7 +17,7 @@ import (
 // public key.
 func testKeyRing(t *testing.T, name, email string) (*pgp.KeyRing, string) {
 	t.Helper()
-	key, err := pgp.GenerateKey(name, email, "x25519", 0)
+	key, err := pgphelper.GenerateKey(name, email)
 	if err != nil {
 		t.Fatalf("GenerateKey %s: %v", name, err)
 	}
@@ -40,7 +41,7 @@ func openBody(t *testing.T, pkg map[string]any, email string, kr *pgp.KeyRing) s
 	if err != nil {
 		t.Fatalf("decode BodyKeyPacket: %v", err)
 	}
-	sk, err := kr.DecryptSessionKey(kp)
+	sk, err := pgphelper.DecryptSessionKey(kr, kp)
 	if err != nil {
 		t.Fatalf("DecryptSessionKey: %v", err)
 	}
@@ -48,11 +49,11 @@ func openBody(t *testing.T, pkg map[string]any, email string, kr *pgp.KeyRing) s
 	if err != nil {
 		t.Fatalf("decode Body: %v", err)
 	}
-	dec, err := sk.Decrypt(body)
+	dec, err := pgphelper.DecryptTextWithSessionKey(sk, body)
 	if err != nil {
 		t.Fatalf("decrypt body: %v", err)
 	}
-	return dec.GetString()
+	return dec
 }
 
 func packagesByFormat(pkgs []map[string]any) map[string]map[string]any {
@@ -142,7 +143,7 @@ func TestBuildPackagesGivesEachRecipientTheBodyTheyNeed(t *testing.T) {
 func TestBuildPackagesWrapsAttachmentKeysForReferencedAttachments(t *testing.T) {
 	recKR, recPub := testKeyRing(t, "rec", "rec@ext.com")
 	sndKR, _ := testKeyRing(t, "snd", "snd@proton.me")
-	attSK, err := pgp.GenerateSessionKey()
+	attSK, err := pgphelper.PGP.GenerateSessionKey()
 	if err != nil {
 		t.Fatalf("attachment session key: %v", err)
 	}
@@ -169,7 +170,7 @@ func TestBuildPackagesWrapsAttachmentKeysForReferencedAttachments(t *testing.T) 
 	if err != nil {
 		t.Fatalf("decode attachment key packet: %v", err)
 	}
-	gotAttSK, err := recKR.DecryptSessionKey(attKP)
+	gotAttSK, err := pgphelper.DecryptSessionKey(recKR, attKP)
 	if err != nil {
 		t.Fatalf("decrypt attachment session key: %v", err)
 	}

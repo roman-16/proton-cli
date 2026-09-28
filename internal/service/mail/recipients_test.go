@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
 	"github.com/roman-16/proton-cli/internal/vcard"
@@ -53,7 +53,7 @@ func resp(addressKeys, unverifiedKeys []apiPublicKey) keysAllResponse {
 
 func genArmoredPubKey(t *testing.T) (armored, fingerprint string) {
 	t.Helper()
-	key, err := pgp.GenerateKey("pin", "pin@example.invalid", "x25519", 0)
+	key, err := pgphelper.GenerateKey("pin", "pin@example.invalid")
 	if err != nil {
 		t.Fatalf("GenerateKey: %v", err)
 	}

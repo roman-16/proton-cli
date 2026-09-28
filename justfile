@@ -115,6 +115,10 @@ sources: (_checkout "Drive SDK" "https://github.com/ProtonDriveApps/sdk.git" dri
 tidyurl: sources
     cd scripts && bun install --frozen-lockfile && bun tidyurl/index.ts {{ webClients }}
 
+[doc("Rewrite the table files are typed by name with, from the mime-types release WebClients' Drive pins")]
+mimetypes: sources
+    cd scripts && bun install --frozen-lockfile && bun mimetypes/index.ts {{ webClients }}
+
 [doc("Rewrite the list of domains that offer a two-factor code, from 2fa.directory")]
 twofa:
     go run ./scripts/twofa
@@ -219,10 +223,22 @@ coverage:
 
 [doc("Move every dependency and tool to the latest version")]
 update:
+    #!/usr/bin/env bash
+    set -euo pipefail
     go get -u ./...
+    # Proton's builds of gopenpgp and go-crypto carry what the plain releases do
+    # not, and a pre-release suffix sorts them below those releases - so `go get
+    # -u` trades them away. They go back to the newest Proton build of gopenpgp,
+    # with the go-crypto that build was made against.
+    pgp=$(go list -m -versions github.com/ProtonMail/gopenpgp/v3 | tr ' ' '\n' | grep -- '-proton$' | tail -1)
+    crypto=$(grep --only-matching 'github.com/ProtonMail/go-crypto v[^ ]*' \
+        "$(go mod download -json "github.com/ProtonMail/gopenpgp/v3@$pgp" | jq --raw-output .GoMod)" | cut -d' ' -f2)
+    go get "github.com/ProtonMail/gopenpgp/v3@$pgp" "github.com/ProtonMail/go-crypto@$crypto"
     go mod tidy
+    nix flake update
     just vendor-hash
-    cd scripts && bun update
+    (cd scripts && bun update)
+    (cd web && bun update)
     devbox update
     just lint
     just test-fast

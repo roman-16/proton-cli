@@ -9,8 +9,8 @@ import (
 	"net/url"
 	"strings"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
-	"github.com/ProtonMail/gopenpgp/v2/helper"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/mailtext"
 	"github.com/roman-16/proton-cli/internal/proton"
@@ -127,7 +127,7 @@ func (s *Service) OpenEO(ctx context.Context, ref, password string) (*EOMessage,
 	if sealed.Token == "" {
 		return nil, errs.Problemf("Proton named no token for that message, so there is nothing to open it with.")
 	}
-	token, err := helper.DecryptMessageWithPassword([]byte(password), sealed.Token)
+	token, err := pgphelper.DecryptTextWithPassword([]byte(password), sealed.Token)
 	if err != nil {
 		// Recorded and not counted: nothing is missing from an answer, because the
 		// caller is told outright that the password was wrong. What the log adds is
@@ -158,7 +158,7 @@ func (s *Service) OpenEO(ctx context.Context, ref, password string) (*EOMessage,
 	if err := s.C.Decode(ctx, proton.EOMessageRequest(id, token), &answer); err != nil {
 		return nil, eoRefused(ctx, err)
 	}
-	body, err := helper.DecryptMessageWithPassword([]byte(password), answer.Message.Body)
+	body, err := pgphelper.DecryptTextWithPassword([]byte(password), answer.Message.Body)
 	if err != nil {
 		return nil, fmt.Errorf("decrypt the body of a password-protected message: %w", err)
 	}
@@ -201,7 +201,7 @@ func (s *Service) EOAttachment(ctx context.Context, m *EOMessage, reference stri
 	if err != nil {
 		return nil, "", fmt.Errorf("decode attachment key packets: %w", err)
 	}
-	sk, err := pgp.DecryptSessionKeyWithPassword(kp, []byte(m.password))
+	sk, err := pgphelper.DecryptSessionKeyWithPassword([]byte(m.password), kp)
 	if err != nil {
 		return nil, "", errs.Naming(wanted.Name,
 			fmt.Errorf("open the key of an attachment on a password-protected message: %w", err))
@@ -210,12 +210,12 @@ func (s *Service) EOAttachment(ctx context.Context, m *EOMessage, reference stri
 	if err != nil {
 		return nil, "", eoRefused(ctx, err)
 	}
-	dec, err := sk.Decrypt(resp.Body)
+	dec, err := pgphelper.DecryptWithSessionKey(sk, resp.Body)
 	if err != nil {
 		return nil, "", errs.Naming(wanted.Name,
 			fmt.Errorf("decrypt an attachment on a password-protected message: %w", err))
 	}
-	return dec.GetBinary(), wanted.Name, nil
+	return dec, wanted.Name, nil
 }
 
 // EOReply answers such a message, which goes to whoever sent it and nobody
@@ -243,17 +243,17 @@ func (s *Service) EOReply(ctx context.Context, m *EOMessage, spec EOReplySpec) e
 		html = *spec.HTML
 	}
 	text := eoReplyBody(m, spec, html)
-	sealedToSender, err := senderKR.Encrypt(pgp.NewPlainMessageFromString(text), nil)
+	sealedToSender, err := pgphelper.EncryptText(senderKR, nil, text)
 	if err != nil {
 		return fmt.Errorf("encrypt the answer to the sender: %w", err)
 	}
-	armoured, err := sealedToSender.GetArmored()
+	armoured, err := sealedToSender.Armor()
 	if err != nil {
 		return fmt.Errorf("encrypt the answer to the sender: %w", err)
 	}
 	// The second copy is what stays behind the link, where the password is the
 	// only key there is.
-	sealedToPassword, err := helper.EncryptMessageWithPassword([]byte(m.password), text)
+	sealedToPassword, err := pgphelper.EncryptTextWithPassword([]byte(m.password), text)
 	if err != nil {
 		return fmt.Errorf("encrypt the answer to the password: %w", err)
 	}
@@ -261,7 +261,7 @@ func (s *Service) EOReply(ctx context.Context, m *EOMessage, spec EOReplySpec) e
 	fields := []formField{{Name: "Body", Value: armoured}, {Name: "ReplyBody", Value: sealedToPassword}}
 	var files []formFile
 	for _, a := range spec.Attach {
-		packet, err := senderKR.EncryptAttachment(pgp.NewPlainMessage(a.Data), a.Filename)
+		packet, err := pgphelper.EncryptBinary(senderKR, nil, a.Data)
 		if err != nil {
 			return errs.Naming(a.Filename, fmt.Errorf("encrypt an attachment to the sender: %w", err))
 		}

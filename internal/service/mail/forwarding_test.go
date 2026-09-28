@@ -10,10 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/ProtonMail/go-crypto/openpgp/packet"
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	openpgp "github.com/ProtonMail/go-crypto/openpgp/v2"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	"github.com/roman-16/proton-cli/internal/account/keys"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/proton"
 )
 
@@ -103,7 +104,7 @@ func freshKeyAt(t *testing.T, name string, now func() time.Time) *pgp.Key {
 
 func armoredLocked(t *testing.T, key *pgp.Key, passphrase string) string {
 	t.Helper()
-	shut, err := key.Lock([]byte(passphrase))
+	shut, err := pgphelper.PGP.LockKey(key, []byte(passphrase))
 	if err != nil {
 		t.Fatalf("lock: %v", err)
 	}
@@ -116,20 +117,15 @@ func armoredLocked(t *testing.T, key *pgp.Key, passphrase string) string {
 
 func sealedToken(t *testing.T, userKR *pgp.KeyRing, token string) (sealed, signature string) {
 	t.Helper()
-	message := pgp.NewPlainMessageFromString(token)
-	encrypted, err := userKR.Encrypt(message, nil)
+	encrypted, err := pgphelper.EncryptText(userKR, nil, token)
 	if err != nil {
 		t.Fatalf("seal the token: %v", err)
 	}
-	if sealed, err = encrypted.GetArmored(); err != nil {
+	if sealed, err = encrypted.Armor(); err != nil {
 		t.Fatalf("armor the token: %v", err)
 	}
-	sig, err := userKR.SignDetached(message)
-	if err != nil {
+	if signature, err = pgphelper.SignTextArmored(userKR, token); err != nil {
 		t.Fatalf("sign the token: %v", err)
-	}
-	if signature, err = sig.GetArmored(); err != nil {
-		t.Fatalf("armor the token's signature: %v", err)
 	}
 	return sealed, signature
 }
@@ -360,7 +356,8 @@ func TestForwardingAcceptNamesThePublishedKeyAfterTheAddress(t *testing.T) {
 	if len(identities) != 1 {
 		t.Fatalf("the published key carries %d user IDs, want 1", len(identities))
 	}
-	if got := key.GetEntity().PrimaryIdentity().UserId.Email; got != forwardeeEmail {
+	if _, identity := key.GetEntity().PrimaryIdentity(time.Now(), nil); identity.UserId.Email != forwardeeEmail {
+		got := identity.UserId.Email
 		t.Errorf("the published key is addressed to %q, want %q", got, forwardeeEmail)
 	}
 }
@@ -640,15 +637,18 @@ func TestDerivedForwardingKeySaysOnlyThatItForwards(t *testing.T) {
 	}
 	var forwarding int
 	for _, sub := range key.GetEntity().Subkeys {
-		if sub.Sig == nil || !sub.Sig.FlagForward {
-			continue
-		}
-		forwarding++
-		if sub.Sig.FlagSplitKey {
-			t.Error("the derived key says its private half was split, which no other client writes")
-		}
-		if sub.Sig.FlagEncryptCommunications || sub.Sig.FlagEncryptStorage || sub.Sig.FlagSign {
-			t.Errorf("the derived key claims more than forwarding: %+v", sub.Sig)
+		for _, binding := range sub.Bindings {
+			sig := binding.Packet
+			if sig == nil || !sig.FlagForward {
+				continue
+			}
+			forwarding++
+			if sig.FlagSplitKey {
+				t.Error("the derived key says its private half was split, which no other client writes")
+			}
+			if sig.FlagEncryptCommunications || sig.FlagEncryptStorage || sig.FlagSign {
+				t.Errorf("the derived key claims more than forwarding: %+v", sig)
+			}
 		}
 	}
 	if forwarding == 0 {
@@ -669,22 +669,22 @@ func TestDerivedForwardingKeyIsShapedLikeAProtonKey(t *testing.T) {
 	if got := entity.PrimaryKey.CreationTime; !got.Equal(dated) {
 		t.Errorf("the derived key is dated %s, want Proton's clock at %s", got, dated)
 	}
-	identity := entity.PrimaryIdentity()
-	if identity == nil || identity.SelfSignature == nil {
+	selfSignature, _ := entity.PrimaryIdentity(dated, nil)
+	if selfSignature == nil {
 		t.Fatal("the derived key carries no self-signature to read")
 	}
 	for what, sig := range map[string]*packet.Signature{
-		"the key's own signature": identity.SelfSignature,
+		"the key's own signature": selfSignature,
 		"the subkey binding":      forwardingBinding(t, entity),
 	} {
 		if sig.Hash != crypto.SHA512 {
 			t.Errorf("%s is hashed with %v, want SHA-512 as Proton's clients write", what, sig.Hash)
 		}
 	}
-	if got := identity.SelfSignature.PreferredHash; !slices.Equal(got, []uint8{10, 8}) {
+	if got := selfSignature.PreferredHash; !slices.Equal(got, []uint8{10, 8}) {
 		t.Errorf("the derived key prefers hashes %v, want SHA-512 then SHA-256", got)
 	}
-	if got := identity.SelfSignature.PreferredSymmetric; !slices.Equal(got, []uint8{9, 7}) {
+	if got := selfSignature.PreferredSymmetric; !slices.Equal(got, []uint8{9, 7}) {
 		t.Errorf("the derived key prefers ciphers %v, want AES-256 then AES-128", got)
 	}
 	if strings.Contains(armoredKeyOf(t, forwarder, forwardeeEmail), "Comment:") {
@@ -749,8 +749,10 @@ func armoredKeyOf(t *testing.T, forwarder *party, forwardee string) string {
 func forwardingBinding(t *testing.T, entity *openpgp.Entity) *packet.Signature {
 	t.Helper()
 	for _, sub := range entity.Subkeys {
-		if sub.Sig != nil && sub.Sig.FlagForward {
-			return sub.Sig
+		for _, binding := range sub.Bindings {
+			if binding.Packet != nil && binding.Packet.FlagForward {
+				return binding.Packet
+			}
 		}
 	}
 	t.Fatal("the derived key carries no subkey for forwarded communications")

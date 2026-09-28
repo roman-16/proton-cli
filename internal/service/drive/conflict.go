@@ -7,7 +7,8 @@ import (
 	"fmt"
 	"strings"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
 )
@@ -411,7 +412,7 @@ func (s *Service) startRevision(ctx context.Context, dc *Context, plan *UploadPl
 		if err != nil {
 			return "", "", nil, nil, err
 		}
-		sessionKey, err := link.NodeKR.DecryptSessionKey(kp)
+		sessionKey, err := pgphelper.DecryptSessionKey(link.NodeKR, kp)
 		if err != nil {
 			return "", "", nil, nil, fmt.Errorf("get file session key: %w", err)
 		}

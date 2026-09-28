@@ -3,8 +3,8 @@ package pgp
 import (
 	"errors"
 
-	"github.com/ProtonMail/gopenpgp/v2/constants"
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	"github.com/ProtonMail/gopenpgp/v3/constants"
+	gopenpgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 )
 
 // VerifyResult is the outcome of checking a PGP signature. It mirrors the
@@ -34,7 +34,7 @@ func Classify(err error) VerifyResult {
 	if err == nil {
 		return Verified
 	}
-	var sigErr pgp.SignatureVerificationError
+	var sigErr gopenpgp.SignatureVerificationError
 	if errors.As(err, &sigErr) {
 		switch sigErr.Status {
 		case constants.SIGNATURE_OK:
@@ -50,26 +50,37 @@ func Classify(err error) VerifyResult {
 	return Unverified
 }
 
-// VerifyDetachedStatus verifies an armored detached signature over msg with kr.
+// VerifyTextStatus verifies an armored detached signature over text with kr.
 //
 // Detached verification cannot distinguish a cryptographically bad signature
 // from one made by a key the verifier does not hold (rotated, inactive, or
-// another party): gopenpgp reports both as a failure. To avoid crying "invalid"
-// over what may simply be a key we lack, this never returns Invalid - both map
-// to Unverified. Reserve Invalid for embedded-signature decryption (via
-// Classify), where gopenpgp does distinguish "no verifier" from "bad signature".
-func VerifyDetachedStatus(kr *pgp.KeyRing, msg *pgp.PlainMessage, sigArmored string) VerifyResult {
+// another party): both report as a failure. To avoid crying "invalid" over
+// what may simply be a key we lack, this never returns Invalid - both map to
+// Unverified. Reserve Invalid for embedded-signature decryption (via
+// Classify), where "no verifier" and "bad signature" are told apart.
+func VerifyTextStatus(kr *gopenpgp.KeyRing, text, sigArmored string) VerifyResult {
 	if sigArmored == "" {
 		return Unsigned
 	}
 	if kr == nil {
 		return Unverified
 	}
-	sig, err := pgp.NewPGPSignatureFromArmored(sigArmored)
-	if err != nil {
+	return detachedStatus(VerifyText(kr, text, []byte(sigArmored), gopenpgp.Armor))
+}
+
+// VerifyBinaryStatus is VerifyTextStatus over bytes.
+func VerifyBinaryStatus(kr *gopenpgp.KeyRing, data []byte, sigArmored string) VerifyResult {
+	if sigArmored == "" {
+		return Unsigned
+	}
+	if kr == nil {
 		return Unverified
 	}
-	if r := Classify(kr.VerifyDetached(msg, sig, pgp.GetUnixTime())); r != Invalid {
+	return detachedStatus(VerifyBinary(kr, data, []byte(sigArmored), gopenpgp.Armor))
+}
+
+func detachedStatus(err error) VerifyResult {
+	if r := Classify(err); r != Invalid {
 		return r
 	}
 	return Unverified

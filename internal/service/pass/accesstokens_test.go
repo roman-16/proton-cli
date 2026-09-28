@@ -8,11 +8,12 @@ import (
 	"testing"
 	"time"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/roman-16/proton-cli/internal/account/keys"
 	"github.com/roman-16/proton-cli/internal/crypto/aead"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/proton"
 	pb "github.com/roman-16/proton-cli/internal/service/pass/proto"
 )
@@ -101,7 +102,7 @@ func holder(t *testing.T) (*keys.Unlocked, *pgp.KeyRing, string) {
 		t.Fatal(err)
 	}
 	for _, name := range []string{"primary", "retired"} {
-		key, err := pgp.GenerateKey(name, name+"@example.invalid", "x25519", 0)
+		key, err := pgphelper.GenerateKey(name, name+"@example.invalid")
 		if err != nil {
 			t.Fatalf("GenerateKey: %v", err)
 		}
@@ -113,12 +114,12 @@ func holder(t *testing.T) (*keys.Unlocked, *pgp.KeyRing, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sealed, err := primary.Encrypt(pgp.NewPlainMessage(vaultKey()), primary)
+	sealed, err := pgphelper.EncryptBinary(primary, primary, vaultKey())
 	if err != nil {
 		t.Fatal(err)
 	}
 	u := &keys.Unlocked{UserKR: users, AddrKRs: map[string]keys.Rings{}}
-	return u, primary, base64.StdEncoding.EncodeToString(sealed.GetBinary())
+	return u, primary, base64.StdEncoding.EncodeToString(sealed.Bytes())
 }
 
 func TestAccessTokenCreateSealsItsKeyToTheAccountAndTheVaultKeyToTheToken(t *testing.T) {
@@ -139,15 +140,18 @@ func TestAccessTokenCreateSealsItsKeyToTheAccountAndTheVaultKeyToTheToken(t *tes
 		t.Fatal(err)
 	}
 	msg := pgp.NewPGPMessage(sealed)
-	opened, err := primary.Decrypt(msg, primary, pgp.GetUnixTime())
+	opened, err := pgphelper.Decrypt(primary, primary, msg.Bytes(), pgp.Bytes)
+	if err == nil {
+		err = pgphelper.SignatureError(opened, primary)
+	}
 	if err != nil {
 		t.Fatalf("the primary user key cannot open and vouch for the token key: %v", err)
 	}
-	raw := opened.GetBinary()
+	raw := opened.Bytes()
 	if len(raw) != aead.KeyLen {
 		t.Fatalf("the token key is %d bytes, want %d", len(raw), aead.KeyLen)
 	}
-	if ids, ok := msg.GetHexEncryptionKeyIDs(); !ok || len(ids) != 1 {
+	if ids, ok := msg.HexEncryptionKeyIDs(); !ok || len(ids) != 1 {
 		t.Errorf("the token key is sealed to %v, want the primary key alone", ids)
 	}
 	if products, _ := d.made["Products"].([]string); len(products) != 1 || products[0] != "pass" {
@@ -213,11 +217,11 @@ func TestOpenTokenKeyRefusesAKeyTheAccountDidNotSign(t *testing.T) {
 	u, primary, shareKey := holder(t)
 	mallory := ring(t, "mallory")
 	raw := vaultKey()
-	forged, err := publicRing(t, primary).Encrypt(pgp.NewPlainMessage(raw), mallory)
+	forged, err := pgphelper.EncryptBinary(publicRing(t, primary), mallory, raw)
 	if err != nil {
 		t.Fatal(err)
 	}
-	d := &tokenDoer{shareKey: shareKey, tokenKey: base64.StdEncoding.EncodeToString(forged.GetBinary())}
+	d := &tokenDoer{shareKey: shareKey, tokenKey: base64.StdEncoding.EncodeToString(forged.Bytes())}
 	s := New(d, testKeys(u))
 	tokens, err := s.AccessTokens(context.Background())
 	if err != nil || len(tokens) != 1 {
@@ -239,11 +243,11 @@ func TestOpenTokenKeyRefusesAKeyTheAccountDidNotSign(t *testing.T) {
 func TestAccessTokenSetVaultsGrantsWhatIsMissingAndRevokesTheRest(t *testing.T) {
 	u, primary, shareKey := holder(t)
 	raw := vaultKey()
-	sealed, err := primary.Encrypt(pgp.NewPlainMessage(raw), primary)
+	sealed, err := pgphelper.EncryptBinary(primary, primary, raw)
 	if err != nil {
 		t.Fatal(err)
 	}
-	d := &tokenDoer{shareKey: shareKey, tokenKey: base64.StdEncoding.EncodeToString(sealed.GetBinary())}
+	d := &tokenDoer{shareKey: shareKey, tokenKey: base64.StdEncoding.EncodeToString(sealed.Bytes())}
 	s := New(d, testKeys(u))
 	tokens, err := s.AccessTokens(context.Background())
 	if err != nil {
@@ -268,7 +272,7 @@ func TestAccessTokenSetVaultsGrantsWhatIsMissingAndRevokesTheRest(t *testing.T) 
 func TestAccessTokenActivityOpensEachNoteAndMarksOneThatWillNot(t *testing.T) {
 	u, primary, shareKey := holder(t)
 	raw := vaultKey()
-	sealed, err := primary.Encrypt(pgp.NewPlainMessage(raw), primary)
+	sealed, err := pgphelper.EncryptBinary(primary, primary, raw)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -288,7 +292,7 @@ func TestAccessTokenActivityOpensEachNoteAndMarksOneThatWillNot(t *testing.T) {
 		t.Fatal(err)
 	}
 	d := &tokenDoer{
-		shareKey: shareKey, tokenKey: base64.StdEncoding.EncodeToString(sealed.GetBinary()),
+		shareKey: shareKey, tokenKey: base64.StdEncoding.EncodeToString(sealed.Bytes()),
 		records: []map[string]any{
 			{"PatMonitorRecordID": "r1", "VaultID": "vault", "ObjectID": "item", "Action": 31,
 				"Payload": base64.StdEncoding.EncodeToString(wrapped), "ActionTime": 10},

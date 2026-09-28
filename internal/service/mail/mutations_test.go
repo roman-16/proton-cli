@@ -9,8 +9,9 @@ import (
 	"sync"
 	"testing"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	"github.com/roman-16/proton-cli/internal/account/keys"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/proton"
 )
 
@@ -166,11 +167,11 @@ func (a *recordingAPI) body(path string) map[string]any {
 // encryptedMessage is a stored message as Proton hands one back.
 func encryptedMessage(t *testing.T, kr *pgp.KeyRing, body, mimeType string) map[string]any {
 	t.Helper()
-	enc, err := kr.Encrypt(pgp.NewPlainMessageFromString(body), nil)
+	enc, err := pgphelper.EncryptText(kr, nil, body)
 	if err != nil {
 		t.Fatalf("Encrypt: %v", err)
 	}
-	armored, err := enc.GetArmored()
+	armored, err := enc.Armor()
 	if err != nil {
 		t.Fatalf("GetArmored: %v", err)
 	}

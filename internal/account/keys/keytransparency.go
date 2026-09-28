@@ -4,17 +4,17 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"log/slog"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/ProtonMail/go-crypto/openpgp"
-	pgperrors "github.com/ProtonMail/go-crypto/openpgp/errors"
 	"github.com/ProtonMail/go-crypto/openpgp/packet"
-	"github.com/ProtonMail/gopenpgp/v2/constants"
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	openpgp "github.com/ProtonMail/go-crypto/openpgp/v2"
+	"github.com/ProtonMail/gopenpgp/v3/armor"
+	"github.com/ProtonMail/gopenpgp/v3/constants"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/proton"
 	"github.com/roman-16/proton-cli/internal/skip"
 )
@@ -107,11 +107,8 @@ func (u *Unlocked) verifiedRevision(ctx context.Context, c proton.Doer, addr Add
 			"kind", string(skip.KindAddress), "reason", string(skip.Unreadable), "ref", addr.ID, "error", err.Error())
 		return 0
 	}
-	signature, err := pgp.NewPGPSignatureFromArmored(r.Signature)
-	if err == nil {
-		err = u.UserKR.VerifyDetachedWithContext(pgp.NewPlainMessageFromString(r.Data), signature,
-			pgp.GetUnixTime(), pgp.NewVerificationContext(verifiedEpochContext, true, 0))
-	}
+	err := pgphelper.VerifyTextInContext(u.UserKR, r.Data, []byte(r.Signature), pgp.Armor,
+		pgp.NewVerificationContext(verifiedEpochContext, true, 0))
 	var epoch struct{ Revision int }
 	if err == nil {
 		err = json.Unmarshal([]byte(r.Data), &epoch)
@@ -132,20 +129,16 @@ func (u *Unlocked) verifiedRevision(ctx context.Context, c proton.Doer, addr Add
 // The check is of the signature and not of when it was made: a list from years
 // ago was signed by a key valid then, which is all that is being asked.
 func signedAt(signers openpgp.EntityList, list pastList) (time.Time, bool) {
-	signature, err := pgp.NewPGPSignatureFromArmored(list.Signature)
+	signature, err := armor.Unarmor(list.Signature)
 	if err != nil {
 		return time.Time{}, false
 	}
 	config := &packet.Config{
-		Time:           func() time.Time { return time.Unix(0, 0) },
+		Time:           func() time.Time { return time.Time{} },
 		KnownNotations: map[string]bool{constants.SignatureContextName: true},
 	}
-	sig, signer, err := openpgp.VerifyDetachedSignature(signers,
-		strings.NewReader(list.Data), bytes.NewReader(signature.GetBinary()), config)
-	if sig != nil && signer != nil &&
-		(errors.Is(err, pgperrors.ErrSignatureExpired) || errors.Is(err, pgperrors.ErrKeyExpired)) {
-		err = nil
-	}
+	sig, _, err := openpgp.VerifyDetachedSignature(signers,
+		strings.NewReader(list.Data), bytes.NewReader(signature), config)
 	if err != nil || sig == nil {
 		return time.Time{}, false
 	}

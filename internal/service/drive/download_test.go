@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
 	"github.com/roman-16/proton-cli/internal/account/keys"
 	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 )
@@ -131,7 +130,7 @@ func TestVerifyManifestAcceptsAPublicLinkWithNoSignature(t *testing.T) {
 // spend a request to learn nothing, and warn about a guarantee that was never on
 // offer.
 func TestABlockNobodyCanJudgeIsNotJudged(t *testing.T) {
-	block := pgp.NewPlainMessageFromString("block")
+	block := []byte("block")
 	doer := &stubDoer{}
 	s := New(doer, testKeys(nil))
 	own := &Context{}

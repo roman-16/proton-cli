@@ -8,12 +8,14 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/ProtonMail/go-crypto/openpgp/packet"
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	openpgp "github.com/ProtonMail/go-crypto/openpgp/v2"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	"github.com/roman-16/proton-cli/internal/account/keys"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
+	"time"
 )
 
 // Forwarding hands every message arriving at one of your addresses to somebody
@@ -393,7 +395,10 @@ func openForwardingKey(
 		return nil, errs.Problemf("What %s sent is not readable, so the forwarding cannot be accepted.", forwarder).
 			Hint("ask them to set it up again")
 	}
-	passphrase, err := addrKR.Decrypt(token, forwarderKR, pgp.GetUnixTime())
+	passphrase, err := pgphelper.Decrypt(addrKR, forwarderKR, token.Bytes(), pgp.Bytes)
+	if err == nil {
+		err = pgphelper.SignatureError(passphrase, forwarderKR)
+	}
 	if err != nil {
 		return nil, errs.Problemf(
 			"The key %s sent could not be opened as theirs, so the forwarding cannot be accepted.", forwarder).
@@ -404,7 +409,7 @@ func openForwardingKey(
 	if err != nil {
 		return nil, errs.Problemf("What %s sent is not a readable key.", forwarder)
 	}
-	key, err := locked.Unlock(passphrase.GetBinary())
+	key, err := locked.Unlock(passphrase.Bytes())
 	if err != nil {
 		return nil, errs.Problemf("The key %s sent does not open with the passphrase they sealed for it.", forwarder)
 	}
@@ -423,7 +428,7 @@ func openForwardingKey(
 // afterwards compares against.
 func addressedTo(key *pgp.Key, email string) (*pgp.Key, error) {
 	entity := key.GetEntity()
-	if id := entity.PrimaryIdentity(); id != nil && id.UserId != nil && id.UserId.Email == email {
+	if _, id := entity.PrimaryIdentity(time.Now(), nil); id != nil && id.UserId != nil && id.UserId.Email == email {
 		return key, nil
 	}
 	for name := range entity.Identities {
@@ -552,7 +557,7 @@ func keyEmail(kr *pgp.KeyRing) string {
 		if entity == nil {
 			continue
 		}
-		if id := entity.PrimaryIdentity(); id != nil && id.UserId != nil && id.UserId.Email != "" {
+		if _, id := entity.PrimaryIdentity(time.Now(), nil); id != nil && id.UserId != nil && id.UserId.Email != "" {
 			return id.UserId.Email
 		}
 	}
@@ -621,14 +626,16 @@ func deriveForwarding(
 // about itself than theirs do is a key they did not make.
 func forwardOnly(derived *openpgp.Entity, config *packet.Config) error {
 	for _, sub := range derived.Subkeys {
-		if sub.Sig == nil || !sub.Sig.FlagForward {
-			continue
-		}
-		sub.Sig.FlagSplitKey = false
-		// The flags live in what binds the subkey to the key, so changing them
-		// means signing that again.
-		if err := sub.Sig.SignKey(sub.PublicKey, derived.PrivateKey, config); err != nil {
-			return fmt.Errorf("sign the forwarding key's encryption subkey: %w", err)
+		for _, binding := range sub.Bindings {
+			if binding.Packet == nil || !binding.Packet.FlagForward {
+				continue
+			}
+			binding.Packet.FlagSplitKey = false
+			// The flags live in what binds the subkey to the key, so changing them
+			// means signing that again.
+			if err := binding.Packet.SignKey(sub.PublicKey, derived.PrivateKey, config); err != nil {
+				return fmt.Errorf("sign the forwarding key's encryption subkey: %w", err)
+			}
 		}
 	}
 	return nil
@@ -646,13 +653,11 @@ func proxyInstance(i packet.ForwardingInstance) map[string]any {
 // sealPassphrase encrypts the forwardee key's passphrase to the forwardee and
 // signs it as the forwarder, which is how they prove where it came from.
 func sealPassphrase(passphrase string, forwarderKR, forwardeeKR *pgp.KeyRing) (string, error) {
-	msg, err := forwardeeKR.Encrypt(pgp.NewPlainMessageFromString(passphrase), forwarderKR)
+	msg, err := pgphelper.EncryptText(forwardeeKR, forwarderKR, passphrase)
 	if err != nil {
 		return "", err
 	}
-	// No armour headers, for the reason a key carries none: what Proton's clients
-	// send carries none.
-	return msg.GetArmoredWithCustomHeaders("", "")
+	return msg.Armor()
 }
 
 // ForwardingDelete removes an arrangement in either direction.

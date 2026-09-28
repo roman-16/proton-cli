@@ -7,9 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 
 	"github.com/roman-16/proton-cli/internal/account/keys"
+	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/proton"
 	pb "github.com/roman-16/proton-cli/internal/service/pass/proto"
 )
@@ -21,7 +22,7 @@ import (
 
 func ring(t *testing.T, name string) *pgp.KeyRing {
 	t.Helper()
-	key, err := pgp.GenerateKey(name, name+"@example.invalid", "x25519", 0)
+	key, err := pgphelper.GenerateKey(name, name+"@example.invalid")
 	if err != nil {
 		t.Fatalf("GenerateKey: %v", err)
 	}
@@ -56,14 +57,19 @@ func offer(t *testing.T, invited, signer *pgp.KeyRing, context string) string {
 	var sealed *pgp.PGPMessage
 	var err error
 	if context == "" {
-		sealed, err = publicRing(t, invited).Encrypt(pgp.NewPlainMessage(vaultKey()), signer)
+		sealed, err = pgphelper.EncryptBinary(publicRing(t, invited), signer, vaultKey())
 	} else {
-		sealed, err = publicRing(t, invited).EncryptWithContext(pgp.NewPlainMessage(vaultKey()), signer, pgp.NewSigningContext(context, true))
+		var enc pgp.PGPEncryption
+		enc, err = pgphelper.PGP.Encryption().Recipients(publicRing(t, invited)).SigningKeys(signer).
+			SigningContext(pgp.NewSigningContext(context, true)).New()
+		if err == nil {
+			sealed, err = enc.Encrypt(vaultKey())
+		}
 	}
 	if err != nil {
 		t.Fatalf("seal the offer: %v", err)
 	}
-	return base64.StdEncoding.EncodeToString(sealed.GetBinary())
+	return base64.StdEncoding.EncodeToString(sealed.Bytes())
 }
 
 // inviteDoer serves one received invitation and the inviter's published keys,
@@ -116,7 +122,7 @@ func invited(t *testing.T) (*keys.Unlocked, *pgp.KeyRing) {
 		t.Fatal(err)
 	}
 	for _, name := range []string{"primary", "retired"} {
-		key, err := pgp.GenerateKey(name, name+"@example.invalid", "x25519", 0)
+		key, err := pgphelper.GenerateKey(name, name+"@example.invalid")
 		if err != nil {
 			t.Fatalf("GenerateKey: %v", err)
 		}
@@ -170,18 +176,18 @@ func TestAcceptTakesTheInvitersKeyAndSealsItToOneKey(t *testing.T) {
 		t.Fatal(err)
 	}
 	msg := pgp.NewPGPMessage(raw)
-	if ids, ok := msg.GetHexEncryptionKeyIDs(); !ok || len(ids) != 1 {
+	if ids, ok := msg.HexEncryptionKeyIDs(); !ok || len(ids) != 1 {
 		t.Fatalf("the vault key is sealed to %v, want exactly one key", ids)
 	}
 	primary, err := u.PrimaryUserKey()
 	if err != nil {
 		t.Fatal(err)
 	}
-	opened, err := primary.Decrypt(msg, nil, pgp.GetUnixTime())
+	opened, err := pgphelper.Decrypt(primary, nil, msg.Bytes(), pgp.Bytes)
 	if err != nil {
 		t.Fatalf("the primary user key cannot open the vault key it should have sealed: %v", err)
 	}
-	if string(opened.GetBinary()) != string(vaultKey()) {
+	if string(opened.Bytes()) != string(vaultKey()) {
 		t.Error("what was re-sealed is not the vault key that was offered")
 	}
 }

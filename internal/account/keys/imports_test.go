@@ -5,10 +5,11 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
-	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/ProtonMail/go-crypto/openpgp/packet"
-	pgp "github.com/ProtonMail/gopenpgp/v2/crypto"
+	openpgp "github.com/ProtonMail/go-crypto/openpgp/v2"
+	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	"github.com/roman-16/proton-cli/internal/errs"
 )
 
@@ -198,7 +199,8 @@ func TestImportBringsBackALockedKeyAsItself(t *testing.T) {
 	if _, err := returned.Unlock(token); err != nil {
 		t.Errorf("the key does not open with the token sent beside it: %v", err)
 	}
-	if got := returned.GetEntity().PrimaryIdentity().UserId.Email; got != "old@example.invalid" {
+	if _, identity := returned.GetEntity().PrimaryIdentity(time.Now(), nil); identity.UserId.Email != "old@example.invalid" {
+		got := identity.UserId.Email
 		t.Errorf("the key came back addressed to %q, want its record's own", got)
 	}
 	entries, _, _ := listOf(t, body)
@@ -229,7 +231,8 @@ func TestImportAddressesAKeyWhoseRecordHasOnlyAPlaceholder(t *testing.T) {
 	if err != nil {
 		t.Fatalf("withUserIDsOf: %v", err)
 	}
-	if got := restored.GetEntity().PrimaryIdentity().UserId.Email; got != "me@proton.me" {
+	if _, identity := restored.GetEntity().PrimaryIdentity(time.Now(), nil); identity.UserId.Email != "me@proton.me" {
+		got := identity.UserId.Email
 		t.Errorf("the key came back addressed to %q, want the address", got)
 	}
 }
