@@ -116,7 +116,7 @@ components:
   # ConfirmationCodeVersion: 1=V1, 2=V2
   # CONTACT_CARD_TYPE: 3=ENCRYPTED_AND_SIGNED, 2=SIGNED, 1=ENCRYPTED, 0=CLEAR_TEXT
   # CookieSameSiteAttribute: lax=Lax, strict=Strict, none=None
-  # COUPON_CODES: PORKBUN=PORKBUN, BF25PROMO=BLACK_FRIDAY_2025, BF25PROMO1M=BLACK_FRIDAY_2025_MONTH, BF25BUNDLEPROMO=BLACK_FRIDAY_2025_BUNDLE, BF25LIGHTNING=BLACK_FRIDAY_2025_LIGHTNING, BF25LUMOADDON=BLACK_FRIDAY_2025_LUMOADDON, BF25LUMOADDONPROMO=BLACK_FRIDAY_2025_LUMOADDON_OMNI, BF25DEALPD=BLACK_FRIDAY_2025_DEALPD, BF25DEALVM=BLACK_FRIDAY_2025_DEALVM, BF25PROMO24=BLACK_FRIDAY_2025_TWOYEAR, BF25PROMOCS=BLACK_FRIDAY_2025_CS, BF25PROMO24CS=BLACK_FRIDAY_2025_TWOYEAR_CS, BF25PROMO1MCS=BLACK_FRIDAY_2025_MONTH_CS, BF25BUNDLEPROMOCS=BLACK_FRIDAY_2025_BUNDLE_CS, BF25LUMOADDONCS=BLACK_FRIDAY_2025_LUMOADDON_CS, BF25LIGHTNINGCS=BLACK_FRIDAY_2025_LIGHTNING_CS, BF25LUMOADDONPROMOCS=BLACK_FRIDAY_2025_LUMOADDON_PROMO_CS, ANNUALOFFER25=ANNUALOFFER25, RENEWANDSAVE1M26=RENEWANDSAVE1M26, RENEWANDSAVE12M26=RENEWANDSAVE12M26, LIFETIME=LIFETIME, VIVALDIVPN=VPN_VIVALDI, MAILPLUSINTRO=MAILPLUSINTRO, DRIVEPLUSINTRO2024=TRYDRIVEPLUS2024, PASSPLUSINTRO2024=PASSPLUSINTRO2024, VPNINTROPRICE2025=VPN_INTRO_2025, VPNPLUSFREE2024=VPN_PLUS_FREE_2024, TRYVPNPLUS2024=TRYVPNPLUS2024, VPNMATCHDAYDEALS=VPNMATCHDAYDEALS, TECHRADARVPNPASS=TECHRADARVPNPASS, CNETVPNPASS=CNETVPNPASS, COMPARITECHVPNPASS=COMPARITECHVPNPASS, PCMAGVPNPASS=PCMAGVPNPASS, VPNPASSINTRO2026=VPNPASSINTRO2026, TRYMAILPLUS0724=TRYMAILPLUS0724, TRYMAILPLUSMOBILE2026=TRYMAILPLUSMOBILE2026, TRYMAILPLUS0926=TRYMAILPLUS0926, PASSEARLYSUPPORTER=PASSEARLYSUPPORTER, PASSFAMILYLAUNCH=PASSFAMILYLAUNCH, MAR26SALECS=MAR26SALECS, MAR26BUNDLESALECS=MAR26BUNDLESALECS, MAR26OFFERCS=MAR26OFFERCS, JUNE26SALE=JUNE26SALE, JUNE26BUNDLESALE=JUNE26BUNDLESALE, SEP26BUNDLESALE=SEP26BUNDLESALE, SEP26BUNDLEDEAL=SEP26BUNDLEDEAL, SEP26BUNDLESALECS=SEP26BUNDLESALECS, SEP26BUNDLEDEALCS=SEP26BUNDLEDEALCS, VPNSAVEOFFER=VPNSAVEOFFER
+  # COUPON_CODES: PORKBUN=PORKBUN, BF25PROMO=BLACK_FRIDAY_2025, BF25PROMO1M=BLACK_FRIDAY_2025_MONTH, BF25BUNDLEPROMO=BLACK_FRIDAY_2025_BUNDLE, BF25LIGHTNING=BLACK_FRIDAY_2025_LIGHTNING, BF25LUMOADDON=BLACK_FRIDAY_2025_LUMOADDON, BF25LUMOADDONPROMO=BLACK_FRIDAY_2025_LUMOADDON_OMNI, BF25DEALPD=BLACK_FRIDAY_2025_DEALPD, BF25DEALVM=BLACK_FRIDAY_2025_DEALVM, BF25PROMO24=BLACK_FRIDAY_2025_TWOYEAR, BF25PROMOCS=BLACK_FRIDAY_2025_CS, BF25PROMO24CS=BLACK_FRIDAY_2025_TWOYEAR_CS, BF25PROMO1MCS=BLACK_FRIDAY_2025_MONTH_CS, BF25BUNDLEPROMOCS=BLACK_FRIDAY_2025_BUNDLE_CS, BF25LUMOADDONCS=BLACK_FRIDAY_2025_LUMOADDON_CS, BF25LIGHTNINGCS=BLACK_FRIDAY_2025_LIGHTNING_CS, BF25LUMOADDONPROMOCS=BLACK_FRIDAY_2025_LUMOADDON_PROMO_CS, ANNUALOFFER25=ANNUALOFFER25, RENEWANDSAVE1M26=RENEWANDSAVE1M26, RENEWANDSAVE12M26=RENEWANDSAVE12M26, LIFETIME=LIFETIME, VIVALDIVPN=VPN_VIVALDI, MAILPLUSINTRO=MAILPLUSINTRO, DRIVEPLUSINTRO2024=TRYDRIVEPLUS2024, PASSPLUSINTRO2024=PASSPLUSINTRO2024, VPNINTROPRICE2025=VPN_INTRO_2025, VPNPLUSFREE2024=VPN_PLUS_FREE_2024, TRYVPNPLUS2024=TRYVPNPLUS2024, VPNMATCHDAYDEALS=VPNMATCHDAYDEALS, TECHRADARVPNPASS=TECHRADARVPNPASS, CNETVPNPASS=CNETVPNPASS, COMPARITECHVPNPASS=COMPARITECHVPNPASS, PCMAGVPNPASS=PCMAGVPNPASS, VPNPASSINTRO2026=VPNPASSINTRO2026, TRYMAILPLUS0724=TRYMAILPLUS0724, TRYMAILPLUSMOBILE2026=TRYMAILPLUSMOBILE2026, TRYMAILPLUS0926=TRYMAILPLUS0926, PASSEARLYSUPPORTER=PASSEARLYSUPPORTER, PASSFAMILYLAUNCH=PASSFAMILYLAUNCH, MAR26SALECS=MAR26SALECS, MAR26BUNDLESALECS=MAR26BUNDLESALECS, MAR26OFFERCS=MAR26OFFERCS, JUNE26SALE=JUNE26SALE, JUNE26BUNDLESALE=JUNE26BUNDLESALE, SEP26BUNDLESALE=SEP26BUNDLESALE, SEP26BUNDLEDEAL=SEP26BUNDLEDEAL, SEP26BUNDLESALECS=SEP26BUNDLESALECS, SEP26BUNDLEDEALCS=SEP26BUNDLEDEALCS, VPNSAVEOFFER=VPNSAVEOFFER, TRYDUO2026=TRYDUO2026
   # CREATE_DRAFT_MESSAGE_ACTION: 0=REPLY, 1=REPLY_ALL, 2=FORWARD
   # CreateMemberMode: 0=Password, 1=Invitation, 2=LoginLink
   # CRYPTO_PROCESSING_TYPES: 0=SUCCESS, 1=SIGNATURE_NOT_VERIFIED, 2=FAIL_TO_READ, 3=FAIL_TO_LOAD, 4=FAIL_TO_DECRYPT
@@ -217,7 +217,7 @@ components:
   # INVITATION_ERROR_TYPE: INVITATION_INVALID=INVITATION_INVALID, INVITATION_UNSUPPORTED=INVITATION_UNSUPPORTED, INVALID_METHOD=INVALID_METHOD, NO_COMPONENT=NO_COMPONENT, NO_VEVENT=NO_VEVENT, PARSING_ERROR=PARSING_ERROR, DECRYPTION_ERROR=DECRYPTION_ERROR, FETCHING_ERROR=FETCHING_ERROR, UPDATING_ERROR=UPDATING_ERROR, EVENT_CREATION_ERROR=EVENT_CREATION_ERROR, EVENT_UPDATE_ERROR=EVENT_UPDATE_ERROR, CANCELLATION_ERROR=CANCELLATION_ERROR, UNEXPECTED_ERROR=UNEXPECTED_ERROR, EXTERNAL_ERROR=EXTERNAL_ERROR
   # INVOICE_EMAIL_STATE: 0=DISABLED, 1=ENABLED, 2=BOUNCED
   # InvoiceOwner: 0=User, 1=Organization
-  # InvoiceState: 0=Unpaid, 1=Paid, 2=Void, 3=Billed, 4=Writeoff
+  # InvoiceState: 0=Unpaid, 1=Paid, 2=Void, 3=Billed, 4=Writeoff, 5=Posted
   # InvoiceType: 0=Other, 1=Subscription, 2=Cancellation, 3=Credit, 4=Donation, 5=Chargeback, 6=Renewal, 7=Refund, 8=Modification, 9=Addition, 10=CurrencyConversion, 12=Product, 13=Manual
   # IsCustomCalendarMapping: 1=TRUE, 0=FALSE
   # KEY_FLAG: 8=FLAG_EMAIL_NO_SIGN, 4=FLAG_EMAIL_NO_ENCRYPT, 2=FLAG_NOT_OBSOLETE, 1=FLAG_NOT_COMPROMISED
@@ -232,10 +232,10 @@ components:
   # LinkState: 0=DRAFT, 1=ACTIVE, 2=TRASHED
   # LinkType: 1=FOLDER, 2=FILE, 3=ALBUM
   # LinkURLType: folder=FOLDER, file=FILE
-  # LUMO_UPSELL_PATHS: top-navigation-bar=TOP_NAVIGATION_BAR, chat-history=CHAT_HISTORY, sidebar=SIDEBAR, sidebar-button=SIDEBAR_BUTTON, settings-modal=SETTINGS_MODAL, settings-modal-plan=SETTINGS_MODAL_PLAN, api-keys=API_KEYS, limit-questions=LIMIT_QUESTIONS, free-user-question-limit=QUESTION_LIMIT_FREE, paid-user-question-limit=QUESTION_LIMIT_B2B_B2C, lumo-plus-upgrade-modal=LUMO_PLUS_UPGRADE_MODAL, lumo-plus-upgrade-toggle=LUMO_PLUS_UPGRADE_TOGGLE, composer-model-selector=COMPOSER_MODEL_SELECTOR, composer-image-selector=COMPOSER_IMAGE_SELECTOR, gallery-image-limit=GALLERY_IMAGE_LIMIT, custom-agents=CUSTOM_AGENTS
+  # LUMO_UPSELL_PATHS: chat-history=CHAT_HISTORY, sidebar-button=SIDEBAR_BUTTON, settings-modal=SETTINGS_MODAL, settings-modal-plan=SETTINGS_MODAL_PLAN, free-user-question-limit=QUESTION_LIMIT_FREE, composer-model-selector=COMPOSER_MODEL_SELECTOR, composer-image-selector=COMPOSER_IMAGE_SELECTOR, gallery-image-limit=GALLERY_IMAGE_LIMIT, custom-agents=CUSTOM_AGENTS
   # MAIL_PAGE_SIZE: 50=FIFTY, 100=ONE_HUNDRED, 200=TWO_HUNDRED
   # MAIL_UPSELL_BANNER_LINK_ID_REF_PATH: 3=SEND_FROM_PM_ADDRESS, 4=GET_MORE_FOLDERS_FILTERS_AND_ADDRESSES, 5=AUTO_REPLY, 7=THIRD_PARTY_CLIENTS, 9=GET_MORE_FEATURES, 15=HOST_EMAILS_FROM_YOUR_DOMAINS, 16=PROTECT_YOUR_BUSINESS, 17=ADD_MORE_ADDRESSES, 18=CONTACT_GROUPS, 19=PRIVACY_FIRST_INTERNET, 20=PRIVACY_FOR_ALL, 23=PREMIUM_FEATURES, 24=LVL_UP_PRIVACY, 25=PROTON_SENTINEL
-  # MAIL_UPSELL_PATHS: auto-reply=AUTO_REPLY, domain-names=DOMAIN_NAMES, catch-all=CATCH_ALL, bridge=BRIDGE, pm-me=PM_ME, short-address=SHORT_ADDRESS, auto-delete=AUTO_DELETE, schedule-send=SCHEDULE_SEND, storage-full=STORAGE_FULL, get-started-checklist=GET_STARTED_CHECKLIST, mail-footer=MAIL_FOOTER, unlimited-folders=UNLIMITED_FOLDERS, unlimited-labels=UNLIMITED_LABELS, unlimited-filters=UNLIMITED_FILTERS, unlimited-filters-newsletter-subscription=UNLIMITED_FILTERS_NEWSLETTER_SUBSCRIPTION, unlimited-folders-newsletter-subscription=UNLIMITED_FOLDERS_NEWSLETTER_SUBSCRIPTION, unlimited-addresses=UNLIMITED_ADDRESSES, forward-emails=FORWARD_EMAILS, smtp-submission=SMTP_SUBMISSION, snooze-message=SNOOZE_MESSAGE, proton-sentinel=PROTON_SENTINEL, pass-aliases=PASS_ALIASES, trial-welcome=TRIAL_WELCOME, trial-banner=TRIAL_BANNER, trial-end=TRIAL_END, assistant-toggle=ASSISTANT_TOGGLE, assistant-toggle-downgrade=ASSISTANT_TOGGLE_DOWNGRADE, assistant-composer=ASSISTANT_COMPOSER, zoom-meeting=ZOOM_MEETING, account-locked-state=ACCOUNT_LOCKED, dark-web-monitoring=DARK_WEB_MONITORING, subscription-reminder-privacy=SUBSCRIPTION_REMINDER_PRIVACY, subscription-reminder-productivity=SUBSCRIPTION_REMINDER_PRODUCTIVITY, one-dollar-initial-reminder=ONE_DOLLAR_INITIAL_REMINDER, one-dollar-second-reminder=ONE_DOLLAR_SECOND_REMINDER, one-dollar-last-reminder=ONE_DOLLAR_LAST_REMINDER, zero-ninety-nine-initial-reminder=ZERO_NINETY_NINE_INITIAL_REMINDER, zero-ninety-nine-second-reminder=ZERO_NINETY_NINE_SECOND_REMINDER, zero-ninety-nine-last-reminder=ZERO_NINETY_NINE_LAST_REMINDER, go-unlimited-2025=GO_UNLIMITED_2025, unlimited-to-duo=UNLIMITED_TO_DUO, plus_monthly-subscriber-nudge-variant-money=PLUS_MONTHLY_SUBSCRIBER_NUDGE_VARIANT_MONEY, bundle_monthly-subscriber-nudge-variant-money=BUNDLE_MONTHLY_SUBSCRIBER_NUDGE_VARIANT_MONEY
+  # MAIL_UPSELL_PATHS: auto-reply=AUTO_REPLY, domain-names=DOMAIN_NAMES, catch-all=CATCH_ALL, bridge=BRIDGE, pm-me=PM_ME, short-address=SHORT_ADDRESS, auto-delete=AUTO_DELETE, schedule-send=SCHEDULE_SEND, storage-full=STORAGE_FULL, get-started-checklist=GET_STARTED_CHECKLIST, mail-footer=MAIL_FOOTER, unlimited-folders=UNLIMITED_FOLDERS, unlimited-labels=UNLIMITED_LABELS, unlimited-filters=UNLIMITED_FILTERS, unlimited-filters-newsletter-subscription=UNLIMITED_FILTERS_NEWSLETTER_SUBSCRIPTION, unlimited-folders-newsletter-subscription=UNLIMITED_FOLDERS_NEWSLETTER_SUBSCRIPTION, unlimited-addresses=UNLIMITED_ADDRESSES, forward-emails=FORWARD_EMAILS, smtp-submission=SMTP_SUBMISSION, snooze-message=SNOOZE_MESSAGE, proton-sentinel=PROTON_SENTINEL, pass-aliases=PASS_ALIASES, trial-welcome=TRIAL_WELCOME, trial-banner=TRIAL_BANNER, trial-end=TRIAL_END, assistant-toggle=ASSISTANT_TOGGLE, assistant-toggle-downgrade=ASSISTANT_TOGGLE_DOWNGRADE, assistant-composer=ASSISTANT_COMPOSER, zoom-meeting=ZOOM_MEETING, account-locked-state=ACCOUNT_LOCKED, dark-web-monitoring=DARK_WEB_MONITORING, subscription-reminder-privacy=SUBSCRIPTION_REMINDER_PRIVACY, subscription-reminder-productivity=SUBSCRIPTION_REMINDER_PRODUCTIVITY, one-dollar-initial-reminder=ONE_DOLLAR_INITIAL_REMINDER, one-dollar-second-reminder=ONE_DOLLAR_SECOND_REMINDER, one-dollar-last-reminder=ONE_DOLLAR_LAST_REMINDER, zero-ninety-nine-initial-reminder=ZERO_NINETY_NINE_INITIAL_REMINDER, zero-ninety-nine-second-reminder=ZERO_NINETY_NINE_SECOND_REMINDER, zero-ninety-nine-last-reminder=ZERO_NINETY_NINE_LAST_REMINDER, go-unlimited-2025=GO_UNLIMITED_2025, unlimited-to-duo=UNLIMITED_TO_DUO, unlimited-to-duo-discounted=UNLIMITED_TO_DUO_DISCOUNTED, plus_monthly-subscriber-nudge-variant-money=PLUS_MONTHLY_SUBSCRIBER_NUDGE_VARIANT_MONEY, bundle_monthly-subscriber-nudge-variant-money=BUNDLE_MONTHLY_SUBSCRIBER_NUDGE_VARIANT_MONEY
   # MAIL_VERIFICATION_STATUS: -1=NOT_VERIFIED, 0=NOT_SIGNED, 1=SIGNED_AND_VALID, 2=SIGNED_AND_INVALID
   # MAILBOX_LABEL_IDS: 0=INBOX, 1=ALL_DRAFTS, 2=ALL_SENT, 3=TRASH, 4=SPAM, 5=ALL_MAIL, 10=STARRED, 6=ARCHIVE, 7=SENT, 8=DRAFTS, 9=OUTBOX, 12=SCHEDULED, 15=ALMOST_ALL_MAIL, 16=SNOOZED, 20=CATEGORY_SOCIAL, 21=CATEGORY_PROMOTIONS, 22=CATEGORY_UPDATES, 24=CATEGORY_DEFAULT, 25=CATEGORY_NEWSLETTERS, 26=CATEGORY_TRANSACTIONS, 40=SOFT_DELETED
   # MailImportDestinationFolder: Inbox=INBOX, All Drafts=ALL_DRAFTS, All Sent=ALL_SENT, Trash=TRASH, Spam=SPAM, All Mail=ALL_MAIL, Almost All Mail=ALMOST_ALL_MAIL, Starred=STARRED, Archive=ARCHIVE, Sent=SENT, Drafts=DRAFTS
@@ -292,7 +292,7 @@ components:
   # PhotoTag: -1=All, 0=Favorites, 1=Screenshots, 2=Videos, 3=LivePhotos, 4=MotionPhotos, 5=Selfies, 6=Portraits, 7=Bursts, 8=Panoramas, 9=Raw
   # PLAN_SERVICES: 1=MAIL, 2=DRIVE, 4=VPN, 8=PASS
   # PLAN_TYPES: 0=ADDON, 1=PLAN, 2=PRODUCT
-  # PLANS: free=FREE, drive2022=DRIVE, drive1tb2025=DRIVE_1TB, drivepro2022=DRIVE_PRO, drivebiz2024=DRIVE_BUSINESS, drivelite2024=DRIVE_LITE, pass2023=PASS, mail2022=MAIL, mailpro2022=MAIL_PRO, mailbiz2024=MAIL_BUSINESS, vpn2022=VPN, vpn2024=VPN2024, bundle2022=BUNDLE, bundlepro2022=BUNDLE_PRO, bundlepro2024=BUNDLE_PRO_2024, bundlebiz2025=BUNDLE_BIZ_2025, family2022=FAMILY, duo2024=DUO, visionary2022=VISIONARY, vpnpro2023=VPN_PRO, vpnbiz2023=VPN_BUSINESS, vpnpass2023=VPN_PASS_BUNDLE, passpro2024=PASS_PRO, passbiz2024=PASS_BUSINESS, passfamily2024=PASS_FAMILY, passlifetime2024=PASS_LIFETIME, lumo2024=LUMO, lumobiz2025=LUMO_BUSINESS, meet2026=MEET, meetbiz2025=MEET_BUSINESS, vpnpassbiz2025=VPN_PASS_BUNDLE_BUSINESS
+  # PLANS: free=FREE, drive2022=DRIVE, drive1tb2025=DRIVE_1TB, drivepro2022=DRIVE_PRO, drivebiz2024=DRIVE_BUSINESS, drivelite2024=DRIVE_LITE, pass2023=PASS, mail2022=MAIL, mailpro2022=MAIL_PRO, mailbiz2024=MAIL_BUSINESS, vpn2022=VPN, vpn2024=VPN2024, bundle2022=BUNDLE, bundlepro2022=BUNDLE_PRO, bundlepro2024=BUNDLE_PRO_2024, bundlebiz2025=BUNDLE_BIZ_2025, family2022=FAMILY, duo2024=DUO, visionary2022=VISIONARY, vpnpro2023=VPN_PRO, vpnbiz2023=VPN_BUSINESS, vpnpass2023=VPN_PASS_BUNDLE, passpro2024=PASS_PRO, passbiz2024=PASS_BUSINESS, passfamily2024=PASS_FAMILY, passlifetime2024=PASS_LIFETIME, passbasic2026=PASS_BASIC, lumo2024=LUMO, lumobiz2025=LUMO_BUSINESS, meet2026=MEET, meetbiz2025=MEET_BUSINESS, vpnpassbiz2025=VPN_PASS_BUNDLE_BUSINESS
   # PlanState: 0=Unavailable, 1=Available
   # PM_SIGNATURE: 0=DISABLED, 1=ENABLED, 2=LOCKED
   # PM_SIGNATURE_REFERRAL: 0=DISABLED, 1=ENABLED
@@ -407,7 +407,7 @@ components:
   # TelemetryMailPostSignupZeroNinetyNineEvents: automatic_modal_open=automaticModalOpen, click_top_navbar=clickTopNavbar, click_upsell_button=clickUpsellButton, close_offer=closeOffer, click_hide_offer=clickHideOffer, user_subscribed=userSubscribed
   # TelemetryMailSelectAllEvents: button_move_to_archive=button_move_to_archive, button_move_to_trash=button_move_to_trash, banner_move_to=banner_move_to, banner_label_as=banner_label_as, banner_mark_as_read=banner_mark_as_read, banner_mark_as_unread=banner_mark_as_unread, banner_permanent_delete=banner_permanent_delete
   # TelemetryMailTrial2024UpsellModal: no_thanks=noThanks, close_modal=closeModal, upsell=upsell
-  # TelemetryMeasurementGroups: account.any.signup=accountSignup, account.web.org_logo_upload=accountOrgLogoUpload, account.web.security_checkup=accountSecurityCheckup, account.web.safety_review_ctr=accountSafetyReviewCtr, account.web.safety_review_score_diff=accountSafetyReviewScoreDiff, account.web.recovery_settings=accountRecoverySettings, account.web.password_reminder=accountPasswordReminder, account.web.reset_password=accountResetPassword, account.web.unauth_lost_2fa=accountUnauthLost2FA, account.web.dashboard=accountDashboard, account.web.upgrade_page=accountUpgradePage, any.web.referral_discover=referralDiscover, any.web.always_on_upsell=alwaysOnUpsell, calendar.web.ics_surgery=calendarIcsSurgery, calendar.web.timezone_selector=calendarTimeZoneSelector, calendar.web.video_conferencing=calendarVideoConferencing, meet.web.meet_funnel_telemetry=meetFunnelTelemetry, account.web.cancellation=accountCancellation, account.web.cancellation_feedback_first=accountCancellationFeedbackFirst, any.web.settings_heart_beat=settingsHeartBeat, any.web.calendar_settings_heart_beat=calendarSettingsHeartBeat, any.web.calendar_invite=calendarInvite, any.web.key_transparency=keyTransparency, any.web.subscription_modal=subscriptionModal, mail.web.onboarding=mailOnboarding, any.web.paid_users_nudge=paidUsersNudge, mail.web.privacy_dropdown=mailPrivacyDropdown, mail.web.select_all=mailSelectAll, mail.web.snooze=mailSnooze, mail.web.signup=mailSignup, mail.web.composer_assistant=mailComposerAssistant, mail.web.lumo=mailLumo, mail.web.proton_tips=mailProtonTips, any.web.post_subscription_tour_events=postSubscriptionTourEvents, mail.desktop.default_mailto=mailDesktopDefaultMailto, mail.desktop.daily_stats=mailDesktopDailyStats, mail.web.clicks_mail_actions=mailActions, mail.web.list_settings=mailListSettings, mail.web.post_signup_one_dollar=mailPostSignupOneDollar, mail.web.post_signup_zero_ninety_nine=mailPostSignupZeroNinetyNine, mail.web.paging_controls=mailPagingControls, mail.web.expand_blockquotes=mailExpandBlockquotes, mail.any.categories_view=categoriesView, mail.web.pass_nudge=passNudge, mail.any.search=contentSearch, mail.any.search_index=contentSearchIndex, mail.web.newsletter_subscriptions=mailNewsletterSubscriptions, any.web.unlimited_offer_2025=unlimitedOffer2025, any.web.unlimited_to_duo_offer=unlimitedToDuoOffer, mail.es_migration_tool=esMigrationTool, any.web.security_center=securityCenter, any.web.vpn_drawer=vpnDrawer, payments.flow=paymentsFlow, drive.web.feature_performance_unauth=driveWebFeaturePerformance, drive.web.actions_unauth=driveWebActions, drive.web.post_signup_one_dollar=drivePostSignupOneDollar, any.web.collapsible_left_sidebar=collapsibleLeftSidebar, any.web.smart_banner=smartBanner, common.any.client_installs=clientInstalls, any.web.client_search=clientSearch, any.web.b2b_onboarding=b2bOnboarding, any.web.bring_your_own_email=bringYourOwnEmail, any.web.app_switcher=appSwitcher, account.web.explore_apps=accountExploreApps, any.web.prevent_wasm_loading=preventWasmLoading, common.web.suggestions=docsSuggestions, drive.docs.homepage=docsHomepage, drive.docs.editor=docsEditor, vpn.any.tv_signin=vpnTv, vpn.web.always_on_policy=vpnAlwaysOnPolicy, vpn.web.b2b_user_activity=vpnB2bUserActivity, mail.common.foreground_activity=mailForegroundActivity
+  # TelemetryMeasurementGroups: account.any.signup=accountSignup, account.web.org_logo_upload=accountOrgLogoUpload, account.web.security_checkup=accountSecurityCheckup, account.web.safety_review_ctr=accountSafetyReviewCtr, account.web.safety_review_score_diff=accountSafetyReviewScoreDiff, account.web.recovery_settings=accountRecoverySettings, account.web.password_reminder=accountPasswordReminder, account.web.reset_password=accountResetPassword, account.web.unauth_lost_2fa=accountUnauthLost2FA, account.web.dashboard=accountDashboard, account.web.upgrade_page=accountUpgradePage, any.web.referral_discover=referralDiscover, any.web.always_on_upsell=alwaysOnUpsell, calendar.web.ics_surgery=calendarIcsSurgery, calendar.web.timezone_selector=calendarTimeZoneSelector, calendar.web.video_conferencing=calendarVideoConferencing, meet.web.meet_funnel_telemetry=meetFunnelTelemetry, account.web.cancellation=accountCancellation, account.web.cancellation_feedback_first=accountCancellationFeedbackFirst, any.web.settings_heart_beat=settingsHeartBeat, any.web.calendar_settings_heart_beat=calendarSettingsHeartBeat, any.web.calendar_invite=calendarInvite, any.web.key_transparency=keyTransparency, any.web.subscription_modal=subscriptionModal, mail.web.onboarding=mailOnboarding, any.web.paid_users_nudge=paidUsersNudge, mail.web.privacy_dropdown=mailPrivacyDropdown, mail.web.select_all=mailSelectAll, mail.web.snooze=mailSnooze, mail.web.signup=mailSignup, mail.web.composer_assistant=mailComposerAssistant, mail.web.lumo=mailLumo, mail.web.proton_tips=mailProtonTips, any.web.post_subscription_tour_events=postSubscriptionTourEvents, mail.desktop.default_mailto=mailDesktopDefaultMailto, mail.desktop.daily_stats=mailDesktopDailyStats, mail.web.clicks_mail_actions=mailActions, mail.web.list_settings=mailListSettings, mail.web.post_signup_one_dollar=mailPostSignupOneDollar, mail.web.post_signup_zero_ninety_nine=mailPostSignupZeroNinetyNine, mail.web.paging_controls=mailPagingControls, mail.web.expand_blockquotes=mailExpandBlockquotes, mail.any.categories_view=categoriesView, mail.web.pass_nudge=passNudge, mail.any.search=contentSearch, mail.any.search_index=contentSearchIndex, mail.web.newsletter_subscriptions=mailNewsletterSubscriptions, any.web.unlimited_offer_2025=unlimitedOffer2025, any.web.unlimited_to_duo_offer=unlimitedToDuoOffer, any.web.unlimited_to_duo_discounted_offer=unlimitedToDuoDiscountedOffer, mail.es_migration_tool=esMigrationTool, any.web.security_center=securityCenter, any.web.vpn_drawer=vpnDrawer, payments.flow=paymentsFlow, drive.web.feature_performance_unauth=driveWebFeaturePerformance, drive.web.actions_unauth=driveWebActions, drive.web.post_signup_one_dollar=drivePostSignupOneDollar, any.web.collapsible_left_sidebar=collapsibleLeftSidebar, any.web.smart_banner=smartBanner, common.any.client_installs=clientInstalls, any.web.client_search=clientSearch, any.web.b2b_onboarding=b2bOnboarding, any.web.bring_your_own_email=bringYourOwnEmail, any.web.app_switcher=appSwitcher, account.web.explore_apps=accountExploreApps, any.web.prevent_wasm_loading=preventWasmLoading, common.web.suggestions=docsSuggestions, drive.docs.homepage=docsHomepage, drive.docs.editor=docsEditor, vpn.any.tv_signin=vpnTv, vpn.web.always_on_policy=vpnAlwaysOnPolicy, vpn.web.b2b_user_activity=vpnB2bUserActivity, mail.common.foreground_activity=mailForegroundActivity
   # TelemetryMeetFunnelTelemetry: spotlight_displayed=spotlight_displayed, explore_meet_clicked=explore_meet_clicked, meeting_created=meeting_created, meet_opened=meet_opened
   # TelemetryPaidUsersNudge: click_upsell_button=clickUpsellButton, click_top_navbar=clickTopNavbar, close_offer=closeOffer, user_subscribed=userSubscribed, click_hide_offer=clickHideOffer
   # TelemetryPassExtensionEvents: fe.pass_extension_installed=pass_extension_installed
@@ -427,6 +427,7 @@ components:
   # TelemetrySubscriptionModalEvents: initialization=initialization, payment=payment, cancelled_on_same_day=cancelledOnSameDay, add_lumo=addLumo
   # TelemetryUnauthLost2FAEvents: step_load=step_load, flow_outcome=flow_outcome
   # TelemetryUnlimitedOffer2025: click_top_navbar=clickTopNavbar, click_upsell_button=clickUpsellButton, close_offer=closeOffer, user_subscribed=userSubscribed, click_hide_offer=clickHideOffer
+  # TelemetryUnlimitedToDuoDiscountedOffer: click_upsell_button=clickUpsellButton, click_top_navbar=clickTopNavbar, user_subscribed=userSubscribed, close_offer=closeOffer, click_hide_offer=clickHideOffer
   # TelemetryUnlimitedToDuoOffer: click_upsell_button=clickUpsellButton, click_top_navbar=clickTopNavbar, user_subscribed=userSubscribed, close_offer=closeOffer, click_hide_offer=clickHideOffer
   # TelemetryUpgradePageEvents: page_load=page_load, cta_click=cta_click, subscription_success=subscription_success
   # TelemetryVpnAlwaysOnPolicyEvents: configure_opened=configureOpened, generate_start=generateStart, generate_success=generateSuccess, generate_failure=generateFailure, instructions_viewed=instructionsViewed, learn_more_clicked=learnMoreClicked, remove_modal_opened=removeModalOpened, download_latest_clicked=downloadLatestClicked, client_download_clicked=clientDownloadClicked
@@ -1155,6 +1156,8 @@ paths:
                 Prompt:
                   type: string
                 ModelOutput:
+                  type: string
+                Conversation:
                   type: string
       responses:
         "200":
@@ -11541,7 +11544,6 @@ paths:
                       Code:
                         type: integer
                         description: ProtonResponseCode
-      x-timeout: 60000
   /drive/shares/{shareID}/files:
     post:
       tags: [Drive]
@@ -11616,8 +11618,6 @@ paths:
                       Code:
                         type: integer
                         description: ProtonResponseCode
-      x-timeout: 90000
-      x-expected-errors: [all]
   /drive/shares/{shareID}/files/{linkID}/revisions:
     get:
       tags: [Drive]
@@ -11699,8 +11699,6 @@ paths:
                       Code:
                         type: integer
                         description: ProtonResponseCode
-      x-timeout: 90000
-      x-expected-errors: [all]
   /drive/shares/{shareID}/files/{linkID}/revisions/{revisionID}:
     delete:
       tags: [Drive]
@@ -11862,7 +11860,6 @@ paths:
                       Code:
                         type: integer
                         description: ProtonResponseCode
-      x-timeout: 90000
   /drive/shares/{shareID}/files/{linkID}/revisions/{revisionID}/restore:
     post:
       tags: [Drive]
@@ -12470,7 +12467,6 @@ paths:
                       Code:
                         type: integer
                         description: ProtonResponseCode
-      x-expected-errors: [all]
   /drive/shares/{shareID}/map:
     get:
       tags: [Drive]
@@ -12913,7 +12909,6 @@ paths:
                         type: integer
                       ShareURL:
                         type: object
-      x-expected-errors: [API_CUSTOM_ERROR_CODES.MAX_PUBLIC_EDIT_MODE_FOR_FREE_USER]
   /drive/unauth/blocks:
     post:
       tags: [Drive]
@@ -18259,6 +18254,10 @@ paths:
           in: query
           schema:
             type: string
+        - name: Provider
+          in: query
+          schema:
+            type: integer
       responses:
         "200":
           description: Success
@@ -27900,6 +27899,23 @@ paths:
       tags: [Permissions]
       summary: Get User Permissions
       operationId: getUserPermissions
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+  /permissions/v1/members/roles:
+    post:
+      tags: [Permissions]
+      summary: Get Members Organization Roles
+      operationId: getMembersOrganizationRoles
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
       responses:
         "200":
           description: Success
