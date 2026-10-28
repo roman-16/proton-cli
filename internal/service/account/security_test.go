@@ -48,9 +48,6 @@ func serving(settings, user string) *answers {
 	}}
 }
 
-// The reading is what every `get` in this tree answers with, and what each
-// write checks itself against, so the whole of it is read from one pair of
-// requests rather than one pair per question.
 func TestSecurityReadsWhatTheAccountIsProtectedWith(t *testing.T) {
 	a := serving(`{
 		"Email": {"Value": "jane.roe@example.com", "Status": 1, "Reset": 1},
@@ -123,9 +120,6 @@ func TestDarkWebMonitoringIsOffWithoutThePlanForIt(t *testing.T) {
 	}
 }
 
-// A security key registered without the authenticator app is its own state, and
-// reporting either as "two-factor is on" would hide which of them the account
-// would be asked for.
 func TestSecurityTellsTheTwoSecondFactorsApart(t *testing.T) {
 	for _, tc := range []struct {
 		enabled int
@@ -143,9 +137,6 @@ func TestSecurityTellsTheTwoSecondFactorsApart(t *testing.T) {
 	}
 }
 
-// The four words a phrase's state is reported in. The one distinction that
-// changes what a person does is `outdated`: those words still open the data
-// they were made for and will not get the account back.
 func TestTheRecoveryPhraseStatesAreNamed(t *testing.T) {
 	for _, tc := range []struct {
 		status int
@@ -165,7 +156,6 @@ func TestTheRecoveryPhraseStatesAreNamed(t *testing.T) {
 		if got.Set() != tc.set {
 			t.Errorf("status %d: set = %v, want %v", tc.status, got.Set(), tc.set)
 		}
-		// A time only means something where there is a phrase to have been set.
 		if wantTime := int64(0); !tc.set && got.Changed != wantTime {
 			t.Errorf("status %d: changed = %d, want %d", tc.status, got.Changed, wantTime)
 		}
@@ -180,18 +170,16 @@ func TestTakingACredentialAwayProvesThePasswordInTheRequest(t *testing.T) {
 		name string
 		call func(*Service) error
 		path string
-		// accountHost is where the endpoint answers: the recovery phrase is the
-		// account app's and is Path not found at the host Mail is served from.
-		accountHost bool
+		door proton.Door
 	}{{
 		name: "the authenticator app",
 		call: func(s *Service) error { return s.TOTPDisable(context.Background()) },
 		path: "/core/v4/settings/2fa/totp",
 	}, {
-		name:        "the recovery phrase",
-		call:        func(s *Service) error { return s.DisableRecoveryPhrase(context.Background()) },
-		path:        "/core/v4/settings/mnemonic/disable",
-		accountHost: true,
+		name: "the recovery phrase",
+		call: func(s *Service) error { return s.DisableRecoveryPhrase(context.Background()) },
+		path: "/core/v4/settings/mnemonic/disable",
+		door: proton.AccountDoor,
 	}} {
 		t.Run(tc.name, func(t *testing.T) {
 			a := &answers{body: map[string]json.RawMessage{
@@ -207,15 +195,13 @@ func TestTakingACredentialAwayProvesThePasswordInTheRequest(t *testing.T) {
 			if !a.sent[0].Proves {
 				t.Error("the request does not carry the proof of the password")
 			}
-			if a.sent[0].AccountHost != tc.accountHost {
-				t.Errorf("account host = %v, want %v", a.sent[0].AccountHost, tc.accountHost)
+			if a.sent[0].Door != tc.door {
+				t.Errorf("door = %d, want %d", a.sent[0].Door, tc.door)
 			}
 		})
 	}
 }
 
-// A recovery address or number is removed by writing an empty one, which is
-// what the CLI's `none` means here.
 func TestRemovingARecoveryAddressWritesAnEmptyOne(t *testing.T) {
 	a := &answers{body: map[string]json.RawMessage{
 		"PUT /core/v4/settings/email": json.RawMessage(`{}`),
@@ -236,8 +222,6 @@ func TestRemovingARecoveryAddressWritesAnEmptyOne(t *testing.T) {
 	}
 }
 
-// The code and the number travel together in the header a human verification
-// travels in, with the spacing a person types stripped out.
 func TestVerifyingAPhoneCarriesTheNumberAndTheCode(t *testing.T) {
 	a := &answers{body: map[string]json.RawMessage{
 		"POST /core/v4/verify/phone": json.RawMessage(`{}`),

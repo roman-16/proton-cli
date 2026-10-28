@@ -25,9 +25,6 @@ import (
 // what Proton means by an outdated phrase and why setting a new one replaces
 // rather than adds.
 
-// mnemonicEntropyBytes is how much randomness a phrase carries, and what makes
-// it twelve words (generateMnemonicBase64RandomBytes,
-// packages/shared/lib/mnemonic/bip39Wrapper.ts).
 const mnemonicEntropyBytes = 16
 
 // NewRecoveryPhrase makes a phrase, locks every open user key under it, and
@@ -70,7 +67,7 @@ func (u *Unlocked) NewRecoveryPhrase(ctx context.Context, c proton.Doer) (string
 		return "", err
 	}
 	if err := c.Decode(ctx, proton.Request{
-		Method: "PUT", Path: "/core/v4/settings/mnemonic", AccountHost: true,
+		Method: "PUT", Path: "/core/v4/settings/mnemonic", Door: proton.AccountDoor,
 		Body: map[string]any{
 			"MnemonicUserKeys": locked,
 			"MnemonicSalt":     encodedSalt,

@@ -16,6 +16,7 @@ import (
 	"github.com/roman-16/proton-cli/internal/ical"
 	"github.com/roman-16/proton-cli/internal/proton"
 	"github.com/roman-16/proton-cli/internal/search"
+	"github.com/roman-16/proton-cli/internal/service/meet"
 	"github.com/roman-16/proton-cli/internal/skip"
 )
 
@@ -37,11 +38,10 @@ func (s *Service) PrimaryZone(ctx context.Context) string {
 	return settings.PrimaryTimezone
 }
 
-// userSettings are the account-wide calendar settings two answers depend on: the
-// zone the grid is drawn in, and the calendar a new event goes into.
 type userSettings struct {
-	PrimaryTimezone   string
-	DefaultCalendarID string
+	PrimaryTimezone       string
+	DefaultCalendarID     string
+	AutoAddConferenceLink autoAddLink
 }
 
 func (s *Service) userSettings(ctx context.Context) (userSettings, error) {
@@ -66,10 +66,19 @@ type Service struct {
 	settings   fetch.Memo[userSettings]
 	directory  fetch.Memo[[]directoryEntry]
 
-	// index is this machine's copy of the events, which is what can answer a
-	// question about what one says rather than about when it is.
 	index *search.Store
+
+	meetings Meetings
 }
+
+type Meetings interface {
+	Create(context.Context, meet.NewMeeting) (*meet.Meeting, error)
+	Delete(context.Context, *meet.Meeting) error
+	ByLink(ctx context.Context, name, password string) (*meet.Meeting, error)
+	Allowed(context.Context) bool
+}
+
+func (s *Service) SetMeetings(m Meetings) { s.meetings = m }
 
 func New(c proton.Doer, k keys.Get) *Service { return &Service{C: c, keys: k} }
 
@@ -101,8 +110,6 @@ type bootstrap struct {
 		Flags      int
 	}
 	Passphrase struct {
-		// ID names the passphrase the calendar's keys are locked with. Handing
-		// that passphrase to a link means saying which one it is.
 		ID                string
 		MemberPassphrases []struct {
 			MemberID, Passphrase, Signature string
@@ -117,9 +124,6 @@ func (s *Service) calendarBootstrap(ctx context.Context, calendarID string) (*bo
 		if err := s.C.Decode(ctx, proton.Request{
 			Method: "GET", Path: "/calendar/v2/" + calendarID + "/bootstrap",
 		}, &b); err != nil {
-			// The only thing the request named was the calendar, so a server that
-			// does not recognise it is answering about the reference, and the answer
-			// reads the same whether the reference was a name or an ID.
 			if proton.DoesNotExist(err) {
 				return nil, &errs.NotFound{Kind: "calendar", Ref: calendarID}
 			}
@@ -144,9 +148,6 @@ func ourMember(members []member, u *keys.Unlocked) (member, keys.Rings, bool) {
 	return member{}, keys.Rings{}, false
 }
 
-// addressKeyRing is the key ring for one of our own addresses, when we hold it.
-// An event invited to an address whose keys will not open is left encrypted
-// rather than refused, which is what the caller's readErr already says.
 func (s *Service) addressKeyRing(ctx context.Context, addressID string) (keys.Rings, bool) {
 	u, err := s.keys(ctx)
 	if err != nil {
@@ -162,11 +163,7 @@ type calKeys struct {
 	email    string
 	// addressID is the address this membership belongs to. Sharing names it, so
 	// Proton knows which of your addresses is doing the sharing.
-	addressID string
-	// passphraseKey is the session key of the passphrase that opens this
-	// calendar. Giving somebody else access means handing them this key,
-	// encrypted to theirs - so it is kept rather than discarded once the
-	// passphrase itself is in hand.
+	addressID     string
 	passphraseKey *pgp.SessionKey
 	// passphrase is what the calendar's keys are locked with, and passphraseID
 	// names it. Publishing the calendar as a link hands both over: the
@@ -179,7 +176,6 @@ type calKeys struct {
 
 const calendarKeyPrimary = 2
 
-// unlockCalendar opens a calendar's keys.
 func (s *Service) unlockCalendar(ctx context.Context, calendarID string) (*calKeys, error) {
 	return s.unlocked.Do(calendarID, func() (*calKeys, error) {
 		var b *bootstrap
@@ -265,33 +261,46 @@ func (s *Service) unlockCalendar(ctx context.Context, calendarID string) (*calKe
 	})
 }
 
-// decryptEvent decrypts an event's cards and parses them into one model.
-//
-// The session key is wrapped to decryptionKR - the calendar key for an event you
-// own, the invited address key for an invitation you received - via keyPacket;
-// signatures are checked against verificationKR.
-//
-// A failure to decrypt is returned rather than folded into empty fields. Reading
-// an event that cannot be read should say so, and writing one back must be
-// impossible: an update built from blanks would sign those blanks over the real
-// title, location, description, rule and exclusions.
 func decryptEvent(cards []map[string]any, keyPacket string, decryptionKR, verificationKR *pgp.KeyRing) (ical.VEvent, pgphelper.VerifyResult, error) {
-	kp, err := base64.StdEncoding.DecodeString(keyPacket)
-	if err != nil {
-		return ical.VEvent{}, pgphelper.Unverified, fmt.Errorf("decode event key packet: %w", err)
+	return readCards(verificationKR, cardSet{cards, keyPacket, decryptionKR})
+}
+
+type cardSet struct {
+	cards     []map[string]any
+	keyPacket string
+	key       *pgp.KeyRing
+}
+
+// readCards reads one event out of several sets of cards, each opened with its
+// own key, in the order Proton's web client merges them.
+func readCards(verificationKR *pgp.KeyRing, sets ...cardSet) (ical.VEvent, pgphelper.VerifyResult, error) {
+	var texts []string
+	var verdicts []pgphelper.VerifyResult
+	for _, cs := range sets {
+		if len(cs.cards) == 0 {
+			continue
+		}
+		var kp []byte
+		if cs.keyPacket != "" {
+			var err error
+			if kp, err = base64.StdEncoding.DecodeString(cs.keyPacket); err != nil {
+				return ical.VEvent{}, pgphelper.Unverified, fmt.Errorf("decode event key packet: %w", err)
+			}
+		}
+		decrypted, vs, err := pgphelper.DecryptCardsRaw(cs.cards, cs.key, verificationKR, kp)
+		if err != nil {
+			return ical.VEvent{}, pgphelper.Unverified, fmt.Errorf("decrypt event content: %w", err)
+		}
+		texts = append(texts, decrypted...)
+		verdicts = append(verdicts, vs...)
 	}
-	decrypted, verdicts, err := pgphelper.DecryptCardsRaw(cards, decryptionKR, verificationKR, kp)
-	if err != nil {
-		return ical.VEvent{}, pgphelper.Unverified, fmt.Errorf("decrypt event content: %w", err)
-	}
-	v, err := ical.Parse(strings.Join(decrypted, "\r\n"))
+	v, err := ical.Parse(strings.Join(texts, "\r\n"))
 	if err != nil {
 		return ical.VEvent{}, pgphelper.Unverified, fmt.Errorf("read event content: %w", err)
 	}
 	return v, pgphelper.Aggregate(verdicts...), nil
 }
 
-// defaultDays is how many days a listing covers when it is not told which.
 const defaultDays = 30
 
 // busyDays is how many days a listing of busy times covers when it is not told
@@ -299,15 +308,10 @@ const defaultDays = 30
 // a week costs is four requests for each person asked about.
 const busyDays = 7
 
-// DefaultDays are the first and last day a listing covers when it is not told
-// which: today, and the rest of the month ahead.
 func DefaultDays() (first, last time.Time) { return fromToday(defaultDays) }
 
-// BusyDays are the first and last day a listing of busy times covers when it is
-// not told which: today, and the rest of the week ahead.
 func BusyDays() (first, last time.Time) { return fromToday(busyDays) }
 
-// fromToday are the first and last of n days, starting today.
 func fromToday(n int) (first, last time.Time) {
 	now := time.Now()
 	first = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())

@@ -4,11 +4,6 @@ before:
   hooks:
     - bash scripts/gen-completions.sh
 
-# The program is `proton`; the project, and so every artifact name, is
-# proton-cli. An install answers to both names: `proton` is the file,
-# `proton-cli` is a link beside it that each channel below creates.
-#
-# Unix and Windows build separately only so their archives can differ.
 # An archive cannot carry a link, and winget shims exactly the
 # executables the release declares, so the Windows zip carries the
 # second name as a small launcher instead. Nothing on Unix needs it:
@@ -60,9 +55,6 @@ archives:
     ids: [unix, windows]
     formats: [binary]
     name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
-  # Per-platform archives bundling the binary, license, and completions.
-  # Consumed by the AUR, Homebrew, and winget packages, and offered as a
-  # direct download next to the raw binaries above.
   - id: archive
     ids: [unix]
     formats: [tar.gz]
@@ -84,7 +76,7 @@ nfpms:
     formats: [apk, deb, rpm]
     maintainer: "Roman <roman@lerchster.dev>"
     homepage: "https://github.com/roman-16/proton-cli"
-    description: "Unofficial, end-to-end encrypted CLI for Proton Mail, Drive, Calendar, Pass and Contacts."
+    description: "Unofficial, end-to-end encrypted CLI for Proton Mail, Drive, Calendar, Pass, Meet and Contacts."
     license: MIT
     bindir: /usr/bin
     contents:
@@ -115,7 +107,7 @@ aurs:
   - name: proton-cli-bin
     ids: [archive]
     homepage: "https://github.com/roman-16/proton-cli"
-    description: "Unofficial, end-to-end encrypted CLI for Proton Mail, Drive, Calendar, Pass and Contacts."
+    description: "Unofficial, end-to-end encrypted CLI for Proton Mail, Drive, Calendar, Pass, Meet and Contacts."
     maintainers:
       - "Roman <roman@lerchster.dev>"
     license: MIT
@@ -148,7 +140,7 @@ homebrew_casks:
       name: Roman
       email: roman@lerchster.dev
     homepage: "https://github.com/roman-16/proton-cli"
-    description: "Unofficial, end-to-end encrypted CLI for Proton Mail, Drive, Calendar, Pass and Contacts."
+    description: "Unofficial, end-to-end encrypted CLI for Proton Mail, Drive, Calendar, Pass, Meet and Contacts."
     license: MIT
     binaries:
       - proton
@@ -156,7 +148,6 @@ homebrew_casks:
       bash: completions/proton.bash
       fish: completions/proton.fish
       zsh: completions/proton.zsh
-    # The second name, and the fish script that autoloads under it.
     custom_block: |
       binary "proton", target: "proton-cli"
       fish_completion "completions/proton-cli.fish"
@@ -171,8 +162,8 @@ winget:
       email: roman@lerchster.dev
     ids: [archive-windows]
     homepage: "https://github.com/roman-16/proton-cli"
-    short_description: "Unofficial CLI for Proton Mail, Drive, Calendar, Pass and Contacts"
-    description: "Unofficial, end-to-end encrypted CLI for Proton Mail, Drive, Calendar, Pass and Contacts."
+    short_description: "Unofficial CLI for Proton Mail, Drive, Calendar, Pass, Meet and Contacts"
+    description: "Unofficial, end-to-end encrypted CLI for Proton Mail, Drive, Calendar, Pass, Meet and Contacts."
     license: MIT
     publisher_url: "https://github.com/roman-16"
     publisher_support_url: "https://github.com/roman-16/proton-cli/issues"

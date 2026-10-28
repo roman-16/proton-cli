@@ -1,13 +1,13 @@
 ---
 name: proton-cli
-description: Work with a Proton account through the proton command-line tool - read, search, send and organize Proton Mail; upload, download and share Drive files; read and create Calendar events; read Pass logins, TOTP codes and aliases; look up Contacts. Use when the user asks about their Proton mail, files, calendar, passwords or contacts, or mentions proton-cli or the proton command. Not for Proton VPN, Wallet, Docs, Meet or Lumo, which it does not cover.
+description: Work with a Proton account through the proton command-line tool - read, search, send and organize Proton Mail; upload, download and share Drive files; read and create Calendar events and give them Proton Meet links; read Pass logins, TOTP codes and aliases; manage Proton Meet meetings and rooms; look up Contacts. Use when the user asks about their Proton mail, files, calendar, passwords, meetings or contacts, or mentions proton-cli or the proton command. Not for Proton VPN, Wallet, Docs or Lumo, which it does not cover.
 compatibility: Requires the proton binary on PATH and an account signed in with `proton account login`.
 license: MIT
 ---
 
 # proton
 
-`proton` is one command for a Proton account: mail, files in Drive, calendar events, Pass logins and secrets, and contacts. Content is encrypted and decrypted here, with the user's own keys.
+`proton` is one command for a Proton account: mail, files in Drive, calendar events, Pass logins and secrets, Proton Meet meetings and rooms, and contacts. Content is encrypted and decrypted here, with the user's own keys.
 
 This file is what to know before running it, not a reference. `proton <command> --help` is the reference: it lists every flag a command takes, the values each accepts, and examples, and it is right for whatever build is installed. Read it before using a command for the first time instead of guessing a flag.
 
@@ -77,6 +77,8 @@ These are the listings that can be narrowed, and what narrows them. The same fla
 - `proton mail settings labels list --limit int --page int`
 - `proton mail settings senders list --desc --limit int --page int --sort string`
 - `proton mail settings smtp-tokens list --desc --limit int --page int --sort string`
+- `proton meet meetings list --desc --limit int --page int --sort string`
+- `proton meet rooms list --desc --limit int --page int --sort string`
 - `proton pass aliases contacts list REF --desc --limit int --page int --sort string`
 - `proton pass aliases list --desc --limit int --page int --sort string --vault string`
 - `proton pass breaches list --desc --limit int --page int --sort string --type string`
@@ -155,6 +157,8 @@ A bulk verb acts on at most `--limit` things, 150 by default; `--limit 0` lifts 
 ## Secrets
 
 `proton pass items get` and `proton pass items totp` print secrets in full. So do `proton account settings two-factor generate`, `proton account settings recovery-phrase set`, `proton pass settings access-tokens create` and `proton mail settings smtp-tokens create`, which print a two-factor secret, twelve recovery words, an access token and an SMTP token that are shown once and kept nowhere.
+
+A Proton Meet link lets anyone holding it join. `proton meet meetings get`, `proton meet rooms get` and `proton calendar events get` print one; no listing does. Hand one on only where the user asked.
 
 Secrets go in the same way they come out. `pass items create` and `pass items update` read them from `--secret-file NAME=FILE`, never from a flag value, because a flag value is in the shell history; `-` as the file reads standard input. The commands that change a credential read it from `--password-file` and `--new-password-file` the same way.
 
@@ -246,6 +250,11 @@ One line per group, with the verbs under it. Arguments, flags and examples are i
 - `proton mail settings labels` - Labels, which a message carries: create, delete, list, reorder, update
 - `proton mail settings senders` - Who always reaches the inbox, and who never does: allow, block, list, remove, spam
 - `proton mail settings smtp-tokens` - Tokens that let a device send from your address: create, delete, get, list
+
+### meet - Meetings and rooms people join by a link
+
+- `proton meet meetings` - Meetings at a set time, once or repeating: create, delete, get, list, update
+- `proton meet rooms` - Rooms that stay open, your personal room first: create, delete, get, list, rotate, update
 
 ### pass - Vaults, logins and secrets
 

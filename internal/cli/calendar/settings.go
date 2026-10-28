@@ -11,6 +11,7 @@ import (
 	"github.com/roman-16/proton-cli/internal/app"
 	"github.com/roman-16/proton-cli/internal/cli/kit"
 	"github.com/roman-16/proton-cli/internal/errs"
+	"github.com/roman-16/proton-cli/internal/ical"
 	"github.com/roman-16/proton-cli/internal/proton"
 	calsvc "github.com/roman-16/proton-cli/internal/service/calendar"
 	"github.com/roman-16/proton-cli/internal/ui"
@@ -20,9 +21,12 @@ import (
 
 const settingsPath = "/settings/calendar"
 
-// Calendar's General page takes a partial object, so every key writes to the same
-// endpoint.
 var specs = map[string]kit.Setting{
+	"auto-add-meet-links": {
+		Path: settingsPath, Field: "AutoAddConferenceLink",
+		Page: "General", Desc: "Add a Proton Meet link to new events with guests",
+		Enum: []kit.Choice{{Name: "off", Value: 0}, {Name: "on", Value: ical.ProviderMeet}},
+	},
 	"auto-detect-timezone": {
 		Path: settingsPath, Field: "AutoDetectPrimaryTimezone",
 		Page: "General", Desc: "Follow the system time zone", Enum: kit.OnOffNumbers(),
@@ -67,6 +71,7 @@ type settingsView struct {
 	SecondaryTimezone  string `json:"secondary_timezone,omitempty"`
 	ShowSecondary      string `json:"show_secondary_timezone"`
 	AutoImportInvite   string `json:"auto_import_invite"`
+	AutoAddMeetLinks   string `json:"auto_add_meet_links"`
 	InviteLocale       string `json:"invite_locale,omitempty"`
 	DefaultCalendar    string `json:"default_calendar,omitempty"`
 }
@@ -86,6 +91,7 @@ func settingsCmd() *cobra.Command {
 				SecondaryTimezone         string
 				DisplaySecondaryTimezone  any
 				AutoImportInvite          any
+				AutoAddConferenceLink     any
 				InviteLocale              string
 				DefaultCalendarID         string
 			}
@@ -102,6 +108,7 @@ func settingsCmd() *cobra.Command {
 			SecondaryTimezone:  s.SecondaryTimezone,
 			ShowSecondary:      kit.OnOffText(kit.IntOf(s.DisplaySecondaryTimezone)),
 			AutoImportInvite:   kit.OnOffText(kit.IntOf(s.AutoImportInvite)),
+			AutoAddMeetLinks:   specs["auto-add-meet-links"].Name(provider(s.AutoAddConferenceLink)),
 			InviteLocale:       s.InviteLocale,
 			DefaultCalendar:    s.DefaultCalendarID,
 		}
@@ -115,6 +122,7 @@ func settingsCmd() *cobra.Command {
 				{Label: "Secondary Time Zone", Value: view.SecondaryTimezone},
 				{Label: "Show Secondary", Value: view.ShowSecondary, Always: true},
 				{Label: "Auto-import Invitations", Value: view.AutoImportInvite, Always: true},
+				{Label: "Auto-add Meet Links", Value: view.AutoAddMeetLinks, Always: true},
 				{Label: "Invitation Language", Value: view.InviteLocale},
 				{Label: "Default Calendar", Value: view.DefaultCalendar, Ref: "calendar settings calendars"},
 			},
@@ -124,7 +132,18 @@ func settingsCmd() *cobra.Command {
 	return c
 }
 
-// ── calendar settings calendars ──
+// provider reads AutoAddConferenceLink, which Proton answers as an object naming
+// a provider and takes back as the bare number. Any provider but Meet is off,
+// as the web's toggle shows it.
+func provider(v any) int {
+	if m, ok := v.(map[string]any); ok {
+		v = m["Provider"]
+	}
+	if kit.IntOf(v) == ical.ProviderMeet {
+		return ical.ProviderMeet
+	}
+	return 0
+}
 
 func calendarsCmd() *cobra.Command {
 	c := &cobra.Command{Use: "calendars", Short: "The calendars you keep events in"}
@@ -216,8 +235,6 @@ func calendarsCreateCmd() *cobra.Command {
 	return c
 }
 
-// calendarsGetCmd shows one calendar in full, including the defaults it applies
-// to events made in it - which nothing else reports.
 func calendarsGetCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "get REF",
@@ -373,8 +390,6 @@ func fitsKind(c *kit.Invocation, cal calsvc.Calendar) error {
 	return nil
 }
 
-// defaultsPatch reads the per-calendar flags, judging what it can before the
-// network: a duration that does not parse is wrong whoever is signed in.
 func defaultsPatch(c *kit.Invocation, duration string, reminders, allDay []string,
 	noRemind bool, busy string) (calsvc.DefaultsPatch, error) {
 	var p calsvc.DefaultsPatch
@@ -450,9 +465,6 @@ func calendarsDeleteCmd() *cobra.Command {
 				}
 			}
 			return kit.Mutate(c, spec, func() error {
-				// Nothing here arranges the elevation: the client does it when the
-				// server asks, and drops the scope again afterwards. All this owes
-				// the user is a reason for the prompt.
 				ctx := app.WithScopeReason(c.Ctx, "delete a calendar")
 				for _, cal := range sel.Rows {
 					if err := c.App.Calendar.CalendarDelete(ctx, cal); err != nil {
@@ -509,8 +521,6 @@ func calendarsLeaveCmd() *cobra.Command {
 
 var plainArg = regexp.MustCompile(`^[A-Za-z0-9._@/-]+$`)
 
-// shellArg writes a calendar's name so that a command line pasted from a hint
-// reads it back as one argument.
 func shellArg(s string) string {
 	if plainArg.MatchString(s) {
 		return s

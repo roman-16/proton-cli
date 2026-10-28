@@ -88,8 +88,6 @@ func read(path string) ([]invocation, error) {
 	return out, scanner.Err()
 }
 
-// ── timings ──
-
 type tally struct {
 	name     string
 	count    int
@@ -188,8 +186,6 @@ func byKey(runs []invocation, key func(invocation) string) []tally {
 	return out
 }
 
-// overlapOf is how many requests were in flight on average while any were: the
-// time spent on requests divided by the time they spanned. A chain is 1.0.
 func overlapOf(requests []apiRequest) float64 {
 	if len(requests) == 0 {
 		return 0
@@ -213,9 +209,6 @@ func overlapOf(requests []apiRequest) float64 {
 	return float64(spent) / span
 }
 
-// field names an invocation by its first n words that name the command rather
-// than what it acts on: flags, the values they take, paths and identifiers all
-// belong to one call and would make every call its own row.
 func field(r invocation, n int) string {
 	var words []string
 	for _, a := range r.Args {
@@ -271,16 +264,11 @@ func secs(ms int64) string { return fmt.Sprintf("%.0fs", float64(ms)/1000) }
 
 func section(title string) { fmt.Printf("\n── %s ──\n", title) }
 
-// ── coverage ──
-
 // opaque matches a path segment that is a Proton identifier rather than a name:
 // base64url of some length, or a number. Templating them is what makes two runs
 // comparable.
 var opaque = regexp.MustCompile(`^[A-Za-z0-9_=-]{20,}$`)
 
-// words are path segments that are as long as an ID but are part of the endpoint.
-// Guessing from the characters cannot work: an invitation ID is twenty-two of
-// them and about one in a hundred is all letters, so the words are named instead.
 var words = map[string]bool{
 	"block-sender-confirmation":           true,
 	"checkAvailableHashes":                true,
@@ -295,20 +283,16 @@ var words = map[string]bool{
 // holders are the segments whose next segment names a thing rather than
 // continuing the endpoint.
 //
-// A public link's token is ten characters of letters and digits, which nothing
-// can tell apart from a word, so it is recognised by where it sits instead. A
-// token left as itself would put one run's links in a file every run has to
-// agree with.
-var holders = map[string]bool{"urls": true}
+// A public link's token and a Proton Meet link's name are ten characters of
+// letters and digits, which nothing can tell apart from a word, so they are
+// recognised by where they sit instead.
+var holders = map[string]bool{"by-link": true, "urls": true}
 
 var numeric = regexp.MustCompile(`^[0-9]+$`)
 
 func printCoverage(runs []invocation) {
 	seen := map[string]bool{}
 	for _, r := range runs {
-		// What the raw `api` command sent is what a test asked for by hand. Its
-		// whole purpose is to reach something no command models, so it proves
-		// nothing about the surface the CLI itself covers.
 		if field(r, 1) == "api" {
 			continue
 		}

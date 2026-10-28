@@ -371,6 +371,7 @@ proton calendar settings set KEY VALUE
 ```bash
 proton calendar settings set view week
 proton calendar settings set primary-timezone Europe/Vienna
+proton calendar settings set auto-add-meet-links off
 ```
 
 ---

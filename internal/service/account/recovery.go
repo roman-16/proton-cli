@@ -15,15 +15,11 @@ import (
 // two are contact details Proton also uses for security notices, which is why
 // having one and allowing recovery with it are two separate things.
 
-// Written out rather than built from settingsPath: what the CLI can send is
-// read off these literals by the coverage test, which reads one file at a time.
 const (
 	recoveryEmailPath = "/core/v4/settings/email"
 	recoveryPhonePath = "/core/v4/settings/phone"
 )
 
-// SetRecoveryEmail writes the recovery address. An empty address removes the
-// one there is.
 func (s *Service) SetRecoveryEmail(ctx context.Context, address string) error {
 	return s.C.Decode(ctx, proton.Request{
 		Method: "PUT", Path: recoveryEmailPath,
@@ -31,8 +27,6 @@ func (s *Service) SetRecoveryEmail(ctx context.Context, address string) error {
 	}, nil)
 }
 
-// SetRecoveryPhone writes the recovery number. An empty number removes the one
-// there is.
 func (s *Service) SetRecoveryPhone(ctx context.Context, number string) error {
 	return s.C.Decode(ctx, proton.Request{
 		Method: "PUT", Path: recoveryPhonePath,
@@ -50,8 +44,6 @@ func (s *Service) AllowRecoveryByEmail(ctx context.Context, allow bool) error {
 	}, nil)
 }
 
-// AllowRecoveryByPhone says whether the recovery number may be used to reset
-// the password.
 func (s *Service) AllowRecoveryByPhone(ctx context.Context, allow bool) error {
 	return s.C.Decode(ctx, proton.Request{
 		Method: "PUT", Path: recoveryPhonePath + "/reset",
@@ -94,13 +86,10 @@ func (s *Service) VerifyPhone(ctx context.Context, number, code string) error {
 	}, nil)
 }
 
-// DisableRecoveryPhrase takes the phrase away, which deletes the copy of the
-// keys it opened. The password is proved inside the request, as it is for
-// taking a second factor away.
 func (s *Service) DisableRecoveryPhrase(ctx context.Context) error {
 	return s.C.Decode(ctx, proton.Request{
 		Method: "POST", Path: "/core/v4/settings/mnemonic/disable",
-		AccountHost: true, Proves: true,
+		Door: proton.AccountDoor, Proves: true,
 	}, nil)
 }
 

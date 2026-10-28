@@ -24,6 +24,7 @@ import (
 	indexcmd "github.com/roman-16/proton-cli/internal/cli/index"
 	"github.com/roman-16/proton-cli/internal/cli/kit"
 	mailcmd "github.com/roman-16/proton-cli/internal/cli/mail"
+	meetcmd "github.com/roman-16/proton-cli/internal/cli/meet"
 	passcmd "github.com/roman-16/proton-cli/internal/cli/pass"
 	selfcmd "github.com/roman-16/proton-cli/internal/cli/self"
 	"github.com/roman-16/proton-cli/internal/config"
@@ -35,7 +36,6 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// version is overridden at release time via -ldflags -X.
 var version = "dev"
 
 type globalFlags struct {
@@ -57,12 +57,6 @@ type globalFlags struct {
 	zone       string
 }
 
-// settings is what the command line said, with a boolean left alone told apart
-// from one set to false.
-//
-// The difference is what makes a preference in the file overridable for one run:
-// `--quiet=false` is a thing somebody said, while no --quiet at all leaves the
-// file to answer.
 func (g *globalFlags) settings(pf *pflag.FlagSet) config.Flags {
 	said := func(name string, value bool) *bool {
 		if !pf.Changed(name) {
@@ -86,34 +80,19 @@ func (g *globalFlags) settings(pf *pflag.FlagSet) config.Flags {
 	}
 }
 
-// newRoot assembles the whole command tree and returns it.
-//
-// Building the tree rather than mutating a package variable is what lets the
-// conformance test walk a complete, freshly constructed tree and check the rules
-// the interface is meant to obey.
 func newRoot() *cobra.Command {
 	var g globalFlags
 
 	root := &cobra.Command{
 		Use:   kit.Program,
-		Short: "Unofficial CLI for Proton Mail, Drive, Calendar, Pass and Contacts",
+		Short: "Unofficial CLI for Proton Mail, Drive, Calendar, Pass, Meet and Contacts",
 		Long: "Proton, in your terminal.\n\n" +
-			"Unofficial, end-to-end encrypted CLI for Proton Mail, Drive, Calendar, Pass and Contacts.",
+			"Unofficial, end-to-end encrypted CLI for Proton Mail, Drive, Calendar, Pass, Meet and Contacts.",
 		Version:       version,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
 
-	// A shorthand is a second name for a flag, which cuts against the rule that a
-	// name means one thing. Each one here earns that by being typed constantly and
-	// by being the letter every other tool already uses for the idea, so it is
-	// guessed rather than learned. The rest of the global flags have no shorthand:
-	// nobody types --no-input twice a day, and a letter chosen for a flag that
-	// does not need one is a letter spent.
-	//
-	// The whole shorthand namespace belongs to this command. No leaf may take a
-	// letter, which is what stops -p meaning `--profile` here and `--page` two
-	// words later; the conformance test enforces it.
 	pf := root.PersistentFlags()
 	pf.StringVar(&g.configPath, "config", "",
 		"Settings file to read (env: "+config.PathVar+"; default: "+config.Name+" in the config directory)")
@@ -156,11 +135,6 @@ func newRoot() *cobra.Command {
 	root.TraverseChildren = true
 
 	root.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
-		// A shell asking what may come next is not an invocation of this CLI. It
-		// reads one file and answers, so it needs no client, no session and no
-		// settings but which profile is being typed about - and building the rest
-		// would put a line in the diagnostic log for every press of the tab key,
-		// crowding out the runs somebody would report a bug about.
 		if completing(cmd) {
 			return nil
 		}
@@ -171,15 +145,6 @@ func newRoot() *cobra.Command {
 		if cmd.Name() == helpName {
 			return nil
 		}
-		// Everything the configuration decides is settled here, before any command
-		// body runs and so before anything reaches the network: a file that does not
-		// parse, a format that is not one, a policy naming a command that is not
-		// there - none of them should first cost a sign-in to discover.
-		//
-		// Except for the command whose whole job is a machine that is not working.
-		// A configuration too broken to run on is exactly what somebody reports, and
-		// a report that refuses to run over it leaves them with nothing to send. It
-		// runs on the defaults instead and says what was wrong with theirs.
 		settings, err := resolveSettings(root, g.settings(pf))
 		if err != nil && cmd.Name() != selfcmd.ReportName {
 			return err
@@ -204,9 +169,6 @@ func newRoot() *cobra.Command {
 		return kit.Judge(cmd)
 	}
 
-	// The groups make `--help` read as a map of the product rather than as an
-	// alphabetical list, and they decide which page of the reference a command is
-	// published on, which is why they are named in kit.
 	root.AddGroup(
 		&cobra.Group{ID: kit.GroupApps, Title: "Apps:"},
 		&cobra.Group{ID: kit.GroupAccount, Title: "Account:"},
@@ -219,7 +181,7 @@ func newRoot() *cobra.Command {
 			root.AddCommand(c)
 		}
 	}
-	add(kit.GroupApps, mailcmd.New(), drivecmd.New(), calendarcmd.New(), contactscmd.New(), passcmd.New())
+	add(kit.GroupApps, mailcmd.New(), drivecmd.New(), calendarcmd.New(), contactscmd.New(), meetcmd.New(), passcmd.New())
 	add(kit.GroupAccount, accountcmd.New(), apicmd.New(), indexcmd.New())
 	add(kit.GroupSelf, selfcmd.ChangelogCmd(), selfcmd.ReportCmd(version), selfcmd.UpdateCmd(version),
 		selfcmd.UninstallCmd(), selfcmd.VersionCmd(version), completionCmd(root), skillCmd(root, version))
@@ -231,9 +193,6 @@ func newRoot() *cobra.Command {
 	return root
 }
 
-// completing reports whether this run is a shell asking what may come next.
-// Asking without descriptions is an alias of the same command, so both arrive
-// under the one name.
 func completing(cmd *cobra.Command) bool {
 	return cmd.Name() == cobra.ShellCompRequestCmd
 }
@@ -241,14 +200,6 @@ func completing(cmd *cobra.Command) bool {
 func Execute() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	// The first interrupt is the user changing their mind, and the run is given
-	// the chance to put things down: finish the line it is on, say what it
-	// managed. The second is the user saying they are done waiting for that, and
-	// it ends the run where it stands.
-	//
-	// Handing the signal back is not what does this. A Go program keeps the
-	// runtime's handler for an interrupt whether or not anything is listening, so
-	// a second one after signal.Stop is delivered to nobody and changes nothing.
 	context.AfterFunc(ctx, func() {
 		impatient := make(chan os.Signal, 1)
 		signal.Notify(impatient, os.Interrupt, syscall.SIGTERM)
@@ -258,18 +209,12 @@ func Execute() {
 
 	os.Args = preprocessArgs(os.Args)
 
-	// Probed on a tree of its own, because Find and ParseFlags leave state
-	// behind and the tree that answers the command has to start clean.
 	if err := unknownSubcommand(newRoot(), os.Args[1:]); err != nil {
 		ui.WriteError(os.Stderr, err, ui.StyleFor(os.Stderr, config.EnvColor()), false)
 		os.Exit(exitCode(err))
 	}
 
 	root := newRoot()
-	// A crash is the failure a report is most needed for and the one the person
-	// who hit it can say least about, so it is caught here: the stack goes to the
-	// run's log, where a report will find it, and the screen gets a sentence
-	// instead of forty lines of goroutine.
 	defer func() {
 		if value := recover(); value != nil {
 			os.Exit(crashed(os.Stderr, root, value, debug.Stack()))
@@ -281,16 +226,10 @@ func Execute() {
 		finish(root, cmd, 0, nil)
 		return
 	}
-	// A signal is the user changing their mind. A deadline is the request running
-	// out of time, which is a network failure and reports as one - saying
-	// "Cancelled." there would blame the user for a stalled connection.
 	if ctx.Err() != nil || errors.Is(err, context.Canceled) {
 		fmt.Fprintln(os.Stderr, "\nCancelled.")
 		os.Exit(finish(root, cmd, exitCancelled, err))
 	}
-	// A human verification that reaches here was never answered, and what to do
-	// about it depends on why. It becomes an ordinary refusal so that it is
-	// written by the one thing that writes refusals.
 	var hvErr *proton.HumanVerificationError
 	if errors.As(err, &hvErr) {
 		err = hvFinalError(hvErr, app.FromOrNil(root.Context()))
@@ -300,11 +239,6 @@ func Execute() {
 	os.Exit(finish(root, cmd, exitCode(err), err))
 }
 
-// finish records how the run came out and returns its exit code.
-//
-// It is called on the way out rather than deferred, because os.Exit runs no
-// deferred function and the whole point of the record is that it survives the
-// run that needed it.
 func finish(root *cobra.Command, cmd *cobra.Command, code int, err error) int {
 	announce(cmd)
 	if a := app.FromOrNil(root.Context()); a != nil {
@@ -313,11 +247,6 @@ func finish(root *cobra.Command, cmd *cobra.Command, code int, err error) int {
 	return code
 }
 
-// crashed reports a panic as the bug it is.
-//
-// The stack is not printed. It says nothing to the person who hit it, and the
-// one reader it does help is reached by `report` - which is the only thing this
-// screen has to say.
 func crashed(w io.Writer, root *cobra.Command, value any, stack []byte) int {
 	a := app.FromOrNil(root.Context())
 	if a != nil {
@@ -331,11 +260,6 @@ func crashed(w io.Writer, root *cobra.Command, value any, stack []byte) int {
 	return errs.ExitBug
 }
 
-// invite asks for a report, for the failures that are worth one.
-//
-// Only for those: a line saying "this might be a bug" under every mistyped flag
-// is a line nobody reads by the second week, and the whole value of this one is
-// that it appears when something really did go wrong here rather than there.
 func invite(w io.Writer, root *cobra.Command, err error) {
 	if !ourFault(err) {
 		return
@@ -344,15 +268,6 @@ func invite(w io.Writer, root *cobra.Command, err error) {
 		kit.Program+" report  (this looks like a bug in "+kit.Program+", not something you did)"))
 }
 
-// announce mentions a new release below whatever the command produced.
-//
-// Below, because it is the least important thing on the screen; and after a
-// failure as much as after a success, because running a version from before the
-// fix is one of the reasons a command fails.
-//
-// The two commands that manage the install are left out - they would be saying
-// it twice - and so is the completion script, which a shell reads at startup
-// where a remark on stderr is noise in a file nobody is watching.
 func announce(cmd *cobra.Command) {
 	switch cmd.Name() {
 	case "update", "uninstall", "completion":
@@ -412,10 +327,6 @@ func unknownSubcommand(root *cobra.Command, args []string) error {
 	return problem.Hint(cmd.CommandPath() + " --help")
 }
 
-// errorStyle is how the final error is painted. The app owns one, but a failure
-// during flag parsing happens before there is an app, so fall back to asking the
-// stream and the environment - which is all a run whose flags never parsed has
-// to go on.
 func errorStyle(root *cobra.Command) ui.Style {
 	if a := app.FromOrNil(root.Context()); a != nil {
 		return a.UI.ErrStyle()
@@ -423,9 +334,6 @@ func errorStyle(root *cobra.Command) ui.Style {
 	return ui.StyleFor(os.Stderr, config.EnvColor())
 }
 
-// shortIDs answers the way every other screen answers it, from the app the
-// command ran under. A failure with no app behind it - a flag that did not parse
-// - had no listing either, so it names things whole.
 func shortIDs(root *cobra.Command) bool {
 	if a := app.FromOrNil(root.Context()); a != nil {
 		return a.UI.ShortIDs()
@@ -433,17 +341,6 @@ func shortIDs(root *cobra.Command) bool {
 	return false
 }
 
-// hvFinalError is the refusal a human verification becomes when it reaches the
-// top level unanswered.
-//
-// There are three ways to get here and they want different words. A verification
-// that was presented and refused is over: the challenge is spent and a fresh one
-// is what the next run will be given, and what to do about it depends on what
-// was offered - a CAPTCHA is solved on a page, a code is typed. A challenge nobody could be asked about
-// carries the two halves an unattended caller needs - the page, and the token to
-// repeat the command with - because the proof outlives the run that asked for it
-// even though the challenge does not. And a challenge offering no CAPTCHA cannot
-// be finished by any client, so it says so rather than pointing at a page.
 func hvFinalError(hv *proton.HumanVerificationError, a *app.App) error {
 	if hv.Refused {
 		return errs.Problemf("Proton did not accept the verification.").
@@ -459,10 +356,6 @@ func hvFinalError(hv *proton.HumanVerificationError, a *app.App) error {
 		Hint("solve "+page, "then run the same command again with --verified "+hv.Token).Exit(2)
 }
 
-// retryVerification says how to answer a challenge again. A CAPTCHA is the only
-// one this CLI carries through itself, so a challenge naming one is answered on
-// the page; anything else is a code somebody was sent and handed back, and
-// telling them to solve a CAPTCHA sends them to a page they never saw.
 func retryVerification(methods []string) string {
 	if len(methods) == 0 || slices.Contains(methods, proton.MethodCaptcha) {
 		return "solve the CAPTCHA fully, then run the command again"
@@ -470,9 +363,6 @@ func retryVerification(methods []string) string {
 	return "check the code Proton sent, then run the command again"
 }
 
-// verificationPage is the address to send somebody to, from whichever client is
-// at hand. A failure before the app exists has no API to ask, and the address
-// depends on the host that raised the challenge.
 func verificationPage(hv *proton.HumanVerificationError, a *app.App) (string, error) {
 	if a == nil {
 		return "", fmt.Errorf("no client to build a verification address with")
@@ -480,6 +370,4 @@ func verificationPage(hv *proton.HumanVerificationError, a *app.App) (string, er
 	return a.API.VerifyURL(hv)
 }
 
-// Root returns the assembled command tree, for the documentation generator and
-// for anything else that needs to walk it.
 func Root() *cobra.Command { return newRoot() }

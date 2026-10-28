@@ -19,24 +19,23 @@ import (
 
 func TestARequestGoesThroughTheDoorItNames(t *testing.T) {
 	for _, tc := range []struct {
-		base        string
-		accountHost bool
-		want        string
+		base string
+		door Door
+		want string
 	}{
 		{base: "https://mail.proton.me/api", want: "https://mail.proton.me/api"},
-		{base: "https://mail.proton.me/api", accountHost: true, want: "https://account.proton.me/api"},
-		{base: "https://mail-api.proton.me/api", accountHost: true, want: "https://account.proton.me/api"},
-		// A host with no siblings keeps whatever the CLI was pointed at: a
-		// local API, an address rather than a name, Proton's DoH front.
-		{base: "http://localhost:8080", accountHost: true, want: "http://localhost:8080"},
-		{base: "https://192.0.2.10/api", accountHost: true, want: "https://192.0.2.10/api"},
-		{base: "https://ec2-1-2-3-4.compute.amazonaws.com/api", accountHost: true,
+		{base: "https://mail.proton.me/api", door: AccountDoor, want: "https://account.proton.me/api"},
+		{base: "https://mail-api.proton.me/api", door: AccountDoor, want: "https://account.proton.me/api"},
+		{base: "https://mail.proton.me/api", door: MeetDoor, want: "https://meet.proton.me/api"},
+		{base: "https://calendar.proton.me/api", door: MeetDoor, want: "https://meet.proton.me/api"},
+		{base: "http://localhost:8080", door: AccountDoor, want: "http://localhost:8080"},
+		{base: "https://192.0.2.10/api", door: MeetDoor, want: "https://192.0.2.10/api"},
+		{base: "https://ec2-1-2-3-4.compute.amazonaws.com/api", door: AccountDoor,
 			want: "https://ec2-1-2-3-4.compute.amazonaws.com/api"},
 	} {
 		c := New(Options{BaseURL: tc.base, Logger: slog.New(slog.DiscardHandler)})
-		if got := c.doorFor(Request{AccountHost: tc.accountHost}); got != tc.want {
-			t.Errorf("%s (account host %v) goes to %s, want %s",
-				tc.base, tc.accountHost, got, tc.want)
+		if got := c.doorFor(Request{Door: tc.door}); got != tc.want {
+			t.Errorf("%s (door %d) goes to %s, want %s", tc.base, tc.door, got, tc.want)
 		}
 	}
 }
@@ -65,7 +64,7 @@ func TestARequestReachesTheHostItNamed(t *testing.T) {
 		t.Fatalf("an ordinary request: %v", err)
 	}
 	if err := c.Decode(t.Context(), Request{
-		Method: "PUT", Path: "/core/v4/settings/2fa/totp", AccountHost: true, Proves: true,
+		Method: "PUT", Path: "/core/v4/settings/2fa/totp", Door: AccountDoor, Proves: true,
 	}, nil); err != nil {
 		t.Fatalf("a proving request: %v", err)
 	}

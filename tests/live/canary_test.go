@@ -15,38 +15,18 @@ import (
 	"github.com/roman-16/proton-cli/tests/paid"
 )
 
-// The paid account is photographed before the run and compared after it.
-//
-// The restrictions in tests/paid are promises - a command refused, a fixture
-// never made, a test acting only on what it made. This is what checks them, and
-// it is the one that catches a mistake nobody predicted. Anything left behind or
-// missing fails the run and is named.
-
-// before is the account as it was when the run started.
 var before paid.Photograph
 
-// runStarted is when the run began, so the sweep can tell mail this run caused
-// from mail that was already there.
 var runStarted int64
 
 // noticesCaused counts the notices a run told Proton to send, so the sweep knows
 // how many to wait for. runAs increments it.
 var noticesCaused atomic.Int64
 
-// collections are what the photograph counts, each read with a command that only
-// reads. Between them they cover everything a test here could plausibly leave
-// behind.
-//
-// A collection nobody can list is not covered, which is the honest limit of
-// this: it says what it saw, and a test that changes something invisible to
-// every listing has to be argued for on its own.
 var collections = []struct {
-	name string
-	args []string
-	id   string
-	// fields are what a row is read by in the report, so what turned up is
-	// readable rather than an identifier nobody can place - and, where a row
-	// carries a state a run could change, what says the state came back too.
+	name   string
+	args   []string
+	id     string
 	fields []string
 }{
 	// The newest of the inbox, because a run can leave mail behind: sharing
@@ -56,6 +36,8 @@ var collections = []struct {
 	{"inbox", []string{"mail", "messages", "list", "--folder", "inbox", "--limit", "25"}, "id", []string{"subject"}},
 	{"calendars", []string{"calendar", "settings", "calendars", "list"}, "id", []string{"name"}},
 	{"booking pages", []string{"calendar", "booking-pages", "list"}, "id", []string{"title"}},
+	{"meetings", []string{"meet", "meetings", "list"}, "id", []string{"title"}},
+	{"meeting rooms", []string{"meet", "rooms", "list"}, "id", []string{"title"}},
 	{"vaults", []string{"pass", "vaults", "list"}, "share_id", []string{"name"}},
 	{"pass items", []string{"pass", "items", "list"}, "item_id", []string{"name"}},
 	// The one listing whose rows carry a state a test can change, so the state is
@@ -68,19 +50,12 @@ var collections = []struct {
 	{"folders", []string{"mail", "settings", "folders", "list"}, "id", []string{"name"}},
 	{"filters", []string{"mail", "settings", "filters", "list"}, "id", []string{"name"}},
 	{"addresses", []string{"mail", "settings", "addresses", "list"}, "id", []string{"name"}},
-	// The catch-all is compared beside the domain for the reason a watched
-	// address's state is: a run that left stray mail arriving somewhere else has
-	// changed where somebody's real mail goes, and the domain is still there.
 	{"domains", []string{"mail", "settings", "domains", "list"}, "id", []string{"domain", "catch_all"}},
 	{"forwardings", []string{"mail", "settings", "forwarding", "list"}, "id", []string{"to"}},
 	{"smtp tokens", []string{"mail", "settings", "smtp-tokens", "list"}, "id", []string{"name"}},
 	{"contacts", []string{"contacts", "list"}, "id", []string{"name"}},
 	{"contact groups", []string{"contacts", "groups", "list"}, "id", []string{"name"}},
 	{"alias mailboxes", []string{"pass", "settings", "mailboxes", "list"}, "id", []string{"email"}},
-	// Which domain is the default is compared beside the domain for the reason a
-	// watched address's state is: a run that left new aliases being made on
-	// another domain has changed something real, and the domains are all still
-	// there.
 	{"alias domains", []string{"pass", "settings", "domains", "list"}, "domain", []string{"default", "status"}},
 	{"alias contacts", []string{"pass", "aliases", "contacts", "list", fixture.PaidAlias}, "id", []string{"email"}},
 	{"access tokens", []string{"pass", "settings", "access-tokens", "list"}, "id", []string{"name"}},
@@ -88,9 +63,6 @@ var collections = []struct {
 	{"drive root", []string{"drive", "items", "list", "/"}, "id", []string{"name"}},
 }
 
-// settingsPages are the values a run must leave exactly as it found them,
-// compared whole so a single key changed anywhere shows up. The auto-reply is
-// among them: a test may arm one, and this is what proves it was disarmed.
 var settingsPages = [][]string{
 	{"account", "settings", "get"},
 	{"account", "settings", "sentinel", "get"},
@@ -101,7 +73,6 @@ var settingsPages = [][]string{
 	{"pass", "settings", "extra-password", "get"},
 }
 
-// photographPaid records the account before any test runs.
 func photographPaid() {
 	runStarted = time.Now().Unix()
 	before = takePhotograph()
@@ -112,7 +83,6 @@ func photographPaid() {
 	}
 }
 
-// paidCameBack photographs it again and reports whether nothing moved.
 func paidCameBack() bool {
 	sweepNotices()
 	after := takePhotograph()
@@ -135,8 +105,6 @@ func paidCameBack() bool {
 	return false
 }
 
-// takePhotograph reads every collection and settings page, or nil if it could
-// not read one: a partial photograph would report a change that never happened.
 func takePhotograph() paid.Photograph {
 	out := paid.Photograph{}
 	for _, c := range collections {
@@ -226,7 +194,6 @@ func sweepNotices() {
 	}
 }
 
-// sweepOnce trashes the notices that have arrived so far, and says how many.
 func sweepOnce() int {
 	var cleared int
 	for _, sender := range paid.NoticeSenders() {
@@ -277,11 +244,6 @@ func sweepFrom(sender string) int {
 	return cleared
 }
 
-// The canary has to have actually photographed something.
-//
-// A photograph that came back empty would compare equal to another empty one
-// and pass every run while checking nothing, which is the failure mode of every
-// guard that reads the world rather than the code.
 func TestThePaidAccountWasPhotographed(t *testing.T) {
 	if len(before) == 0 {
 		t.Fatal("nothing was photographed before the run")

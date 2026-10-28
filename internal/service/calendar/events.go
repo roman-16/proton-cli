@@ -19,17 +19,11 @@ import (
 	"github.com/roman-16/proton-cli/internal/ical"
 	"github.com/roman-16/proton-cli/internal/proton"
 	"github.com/roman-16/proton-cli/internal/ref"
+	"github.com/roman-16/proton-cli/internal/service/meet"
 	"github.com/roman-16/proton-cli/internal/skip"
 	"github.com/roman-16/proton-cli/internal/units"
 )
 
-// Event is one thing on a calendar: a one-off event, or one occurrence of a
-// recurring series.
-//
-// A series is stored once and shown many times, so ID names the event a
-// reference addresses - the series itself for every occurrence of it - while
-// StoredID names the record actually holding this row's content. They differ
-// exactly when an occurrence has been edited on its own.
 type Event struct {
 	ID          string    `json:"id"`
 	StoredID    string    `json:"stored_id,omitempty"`
@@ -43,55 +37,25 @@ type Event struct {
 	Zone        string    `json:"zone,omitempty"`
 	UID         string    `json:"uid,omitempty"`
 	RRule       string    `json:"rrule,omitempty"`
-	// Occurrence is this instance's original start in the series' own frame, and
-	// the half of a reference that names it. It is empty for a one-off event and
-	// for a series addressed as a whole.
-	Occurrence string `json:"occurrence,omitempty"`
-	// Number is this instance's position in the series.
-	Number int `json:"occurrence_number,omitempty"`
-	// Count is how many occurrences a series has, set only when the series itself
-	// is being reported rather than one of its instances. It is null for a series
-	// that never ends, because such a series has no number of occurrences to
-	// report rather than a very large one.
-	Count *int `json:"occurrence_count,omitempty"`
-	// Reminders are the triggers before the start, e.g. "-PT15M". Absent means the
-	// event takes the calendar's defaults.
-	Reminders []string `json:"reminders"`
-	// Attendees are the participants, spelled the way --attendee accepts them, so
-	// an event that has been read can be described back.
-	Attendees []string `json:"attendees"`
-	// Status is whether the event is going ahead. It is always reported, since
-	// an event nobody said anything about is confirmed and that is worth stating.
-	Status string `json:"status"`
-	// Organizer is whoever called the meeting. It is empty for an event with no
-	// participants, which has nobody to organise.
-	Organizer string `json:"organizer,omitempty"`
+	Occurrence  string    `json:"occurrence,omitempty"`
+	Number      int       `json:"occurrence_number,omitempty"`
+	Count       *int      `json:"occurrence_count,omitempty"`
+	Reminders   []string  `json:"reminders"`
+	Attendees   []string  `json:"attendees"`
+	Status      string    `json:"status"`
+	Organizer   string    `json:"organizer,omitempty"`
 	// Color is the event's own accent colour, as the hex Proton stores. Empty
 	// means it has none of its own and is drawn in its calendar's.
 	Color     string                 `json:"color,omitempty"`
 	Signature pgphelper.VerifyResult `json:"signature,omitempty"`
 }
 
-// Recurring reports whether this row belongs to a series.
 func (e Event) Recurring() bool { return e.RRule != "" || e.Occurrence != "" }
 
-// ── reading ──
-
-// eventsPageSize is the largest page the events endpoint serves.
 const eventsPageSize = 100
 
-// queryTypes are the four windows the events endpoint can be asked for, and the
-// busy-times endpoint the same four.
-//
-// Type is not a kind of event, it is a two-by-two selector: part-day or full-day,
-// crossed with starting inside the window or having started before it and
-// reaching in. Asking only for the first hides every all-day event, and hides
-// every recurring series whose first occurrence is in the past - which is how a
-// series reaches a later window at all.
 var queryTypes = []string{"0", "1", "2", "3"}
 
-// fullDay reports whether a query type is one of the two that answer with
-// full-day events, whose times are the dates they name held as UTC midnights.
 func fullDay(typ string) bool { return typ == "2" || typ == "3" }
 
 type rawNotification struct {
@@ -121,22 +85,20 @@ type rawEvent struct {
 		Attendees     []rawAttendee
 		MoreAttendees int
 	}
-	SharedKeyPacket  string
-	AddressKeyPacket string
-	SharedEvents     []map[string]any
-	AttendeesEvents  []map[string]any
+	SharedKeyPacket   string
+	AddressKeyPacket  string
+	CalendarKeyPacket string
+	SharedEvents      []map[string]any
+	CalendarEvents    []map[string]any
+	AttendeesEvents   []map[string]any
 }
 
-// rawAttendee is the cleartext per-attendee record from AttendeesInfo: it maps
-// the deterministic X-PM token to the server attendee ID and current status.
 type rawAttendee struct {
 	ID     string
 	Token  string
 	Status int
 }
 
-// notifications re-renders the reminder list for a write, preserving the
-// difference between "none" and "the calendar's defaults".
 func (e rawEvent) notifications() []map[string]any {
 	if e.Notifications == nil {
 		return nil
@@ -148,8 +110,6 @@ func (e rawEvent) notifications() []map[string]any {
 	return out
 }
 
-// ownColor is the colour the event carries itself, empty for one that has none
-// and is drawn in its calendar's.
 func (e rawEvent) ownColor() string {
 	if e.Color == nil {
 		return ""
@@ -157,8 +117,6 @@ func (e rawEvent) ownColor() string {
 	return *e.Color
 }
 
-// triggers renders an event's reminders the way --remind spells them, so what a
-// listing shows is what would recreate it.
 func (e rawEvent) triggers() []string {
 	out := make([]string, 0, len(e.Notifications))
 	for _, n := range e.Notifications {
@@ -169,31 +127,22 @@ func (e rawEvent) triggers() []string {
 
 // stored is an event as Proton holds it, together with what its cards said.
 type stored struct {
-	raw   rawEvent
-	model ical.VEvent
-	sig   pgphelper.VerifyResult
-	// readErr records that the content could not be read. Such an event is still
-	// reported, from its cleartext times, because a row you cannot read is worth
-	// seeing; it is never expanded or written back.
+	raw     rawEvent
+	model   ical.VEvent
+	sig     pgphelper.VerifyResult
 	readErr error
 }
 
-// decrypt resolves which key the event's content is wrapped to and reads it.
-//
-// The attendee list is read separately and best-effort. It lives in its own card,
-// it is not part of what the event says, and an event that arrived without one this
-// key can open is still an event: folding it into the same read would make a
-// missing participant list look like an unreadable event.
 func (s *Service) decrypt(ctx context.Context, ck *calKeys, raw rawEvent) stored {
-	// An invitation you received wraps its content to the invited address rather
-	// than to the calendar key.
 	packet, decKR := raw.SharedKeyPacket, ck.calKR
 	if packet == "" && raw.AddressKeyPacket != "" {
 		if rings, ok := s.addressKeyRing(ctx, raw.AddressID); ok {
 			packet, decKR = raw.AddressKeyPacket, rings.Read
 		}
 	}
-	model, sig, err := decryptEvent(raw.SharedEvents, packet, decKR, ck.addr.Read)
+	model, sig, err := readCards(ck.addr.Read,
+		cardSet{raw.SharedEvents, packet, decKR},
+		cardSet{raw.CalendarEvents, raw.CalendarKeyPacket, ck.calKR})
 	if err == nil && len(raw.AttendeesEvents) > 0 {
 		if attendees, _, aerr := decryptEvent(raw.AttendeesEvents, packet, decKR, ck.addr.Read); aerr == nil {
 			model.Attendees = attendees.Attendees
@@ -202,32 +151,14 @@ func (s *Service) decrypt(ctx context.Context, ck *calKeys, raw rawEvent) stored
 	return stored{raw: raw, model: model, sig: sig, readErr: err}
 }
 
-// eventFetch is how one calendar's events are asked for: the ones a window
-// covers, or every one it holds where the question is about words rather than
-// days.
 type eventFetch func(ctx context.Context, calendarID string) ([]rawEvent, error)
 
-// inWindow fetches what a window covers, which is what a listing and an export
-// each want of every calendar they name.
 func (s *Service) inWindow(w ical.Window) eventFetch {
 	return func(ctx context.Context, calendarID string) ([]rawEvent, error) {
 		return s.rawEventsBetween(ctx, calendarID, w)
 	}
 }
 
-// readCalendars opens the named calendars at the same time and reads what each
-// one holds, keeping every calendar's events their own group.
-//
-// Groups rather than one list, because a series is expanded by UID and the same
-// UID lives in two calendars whenever somebody holds both an invitation and the
-// organiser's shared copy: flattening first would leave one of them out.
-//
-// A calendar that cannot be read is left out rather than allowed to empty the
-// answer: the list of calendars is eventually consistent, so one that was deleted
-// a moment ago can still be named, and "what is on my calendars" is worth
-// answering from the ones that are there. Only when nothing could be read at all
-// is that reported - which is also what makes a single named calendar strict,
-// since then the one failure is the only one.
 func (s *Service) readCalendars(ctx context.Context, calendarIDs []string, events eventFetch) ([][]stored, error) {
 	answers := make([][]stored, len(calendarIDs))
 	failures := make([]error, len(calendarIDs))
@@ -245,7 +176,6 @@ func (s *Service) readCalendars(ctx context.Context, calendarIDs []string, event
 	var first error
 	for i := range calendarIDs {
 		if failures[i] != nil {
-			// Recorded by readCalendar, where which half failed is still known.
 			if first == nil {
 				first = failures[i]
 			}
@@ -259,12 +189,6 @@ func (s *Service) readCalendars(ctx context.Context, calendarIDs []string, event
 	return out, nil
 }
 
-// readCalendar opens one calendar and reads the events it holds.
-//
-// The keys and the events are asked for at the same time: the calendar ID names
-// both, so neither request needs the other's answer - only the decryption between
-// them does. Which of the two failed is what the record says, so a report tells a
-// calendar nobody can open from one the server would not hand over.
 func (s *Service) readCalendar(ctx context.Context, calendarID string, events eventFetch) ([]stored, error) {
 	var (
 		ck      *calKeys
@@ -296,8 +220,6 @@ func (s *Service) readCalendar(ctx context.Context, calendarID string, events ev
 	return out, nil
 }
 
-// EventsList returns everything the window covers on the given calendars,
-// expanding each series into the occurrences that fall in it.
 func (s *Service) EventsList(ctx context.Context, calendarIDs []string, w ical.Window) ([]Event, error) {
 	groups, err := s.readCalendars(ctx, calendarIDs, s.inWindow(w))
 	if err != nil {
@@ -316,14 +238,6 @@ func (s *Service) EventsList(ctx context.Context, calendarIDs []string, w ical.W
 	return out, nil
 }
 
-// rawEventsBetween asks for all four windows over every span of the range, and
-// pages each one.
-//
-// The queries are independent asks over the same calendar, so they run together:
-// serialising them would multiply the wall-clock of a call that is already waiting
-// on the network. An event can legitimately answer more than one of them - a
-// series both starts in the range and reaches into it, and an event on the seam
-// between two spans touches both - so the union is deduplicated.
 func (s *Service) rawEventsBetween(ctx context.Context, calendarID string, w ical.Window) ([]rawEvent, error) {
 	spans := fetchSpans(w)
 	answers := make([][]rawEvent, len(spans)*len(queryTypes))
@@ -370,9 +284,6 @@ func fetchBounds(w ical.Window) (from, to time.Time) {
 	return sinceEpoch(first.AddDate(0, 0, -1), until.AddDate(0, 0, 1))
 }
 
-// sinceEpoch is a range cut where the calendar's endpoints begin. They refuse a
-// negative timestamp, and nothing is stored before the epoch, so the part of a
-// range before it is not asked for.
 func sinceEpoch(from, to time.Time) (time.Time, time.Time) {
 	if from.Unix() < 0 {
 		from = time.Unix(0, 0)
@@ -391,18 +302,13 @@ func sinceEpoch(from, to time.Time) (time.Time, time.Time) {
 // answering.
 const fetchSpan = 42 * 24 * time.Hour
 
-// span is one stretch of instants an endpoint is asked for.
 type span struct{ from, to time.Time }
 
-// fetchSpans cuts the instants the events endpoint is asked for into ranges it
-// accepts.
 func fetchSpans(w ical.Window) []span {
 	from, to := fetchBounds(w)
 	return cutSpans(from, to, fetchSpan)
 }
 
-// cutSpans cuts a range into stretches no wider than an endpoint accepts.
-// Consecutive stretches meet, so nothing between the ends goes unasked.
 func cutSpans(from, to time.Time, width time.Duration) []span {
 	var out []span
 	for start := from; start.Before(to); start = start.Add(width) {
@@ -420,8 +326,6 @@ func (s *Service) rawEventsOfType(ctx context.Context, calendarID string, from, 
 		q := url.Values{}
 		q.Set("Start", fmt.Sprintf("%d", from.Unix()))
 		q.Set("End", fmt.Sprintf("%d", to.Unix()))
-		// UTC, because that is the frame in which a full-day event's cleartext times
-		// are the dates it names.
 		q.Set("Timezone", "UTC")
 		q.Set("Type", typ)
 		q.Set("Page", fmt.Sprintf("%d", page))
@@ -440,14 +344,6 @@ func (s *Service) rawEventsOfType(ctx context.Context, calendarID string, from, 
 	})
 }
 
-// expand turns stored events into the rows a person sees: a one-off is itself, a
-// series becomes its occurrences in the window, and an occurrence that has been
-// edited on its own replaces the one the rule would have generated.
-//
-// Every row is put to the window by the same rule, whether it came from a stored
-// event or from a rule this CLI expanded. The endpoint is asked for more than the
-// window holds, so the window is what makes the answer the one that was asked for
-// rather than the one the server happened to return.
 func expand(events []stored, w ical.Window) []Event {
 	masters := map[string]stored{}
 	overrides := map[string][]stored{}
@@ -479,8 +375,6 @@ func expand(events []stored, w ical.Window) []Event {
 		}
 		occurrences, err := master.model.Occurrences(w)
 		if err != nil {
-			// A rule this build cannot read still describes a real event, so the
-			// series is reported at its own start rather than dropped.
 			out = append(out, master.row())
 			continue
 		}
@@ -500,9 +394,6 @@ func expand(events []stored, w ical.Window) []Event {
 			}
 			row := o.row()
 			if hasMaster {
-				// An occurrence is addressed by where it sits in its series, not by
-				// which record happens to hold it, so that the reference does not
-				// change the first time somebody edits it.
 				row.ID = master.raw.ID
 				row.StoredID = o.raw.ID
 				row.Occurrence = master.model.Start.At(o.model.RecurrenceID.Time).String()
@@ -535,11 +426,6 @@ func (e stored) when() (start, end ical.DateTime) {
 		ical.Timed(time.Unix(e.raw.EndTime, 0), e.raw.EndTimezone))
 }
 
-// row reports the stored event as itself.
-//
-// The times are read in the zone the reader is in, which for an all-day event is
-// the only way to name the day it is on: it carries a date and no instant, so
-// placing it anywhere else moves it to the day before or after.
 func (e stored) row() Event {
 	start, end := e.when()
 	ev := Event{
@@ -559,7 +445,7 @@ func (e stored) row() Event {
 	}
 	ev.Title = e.model.Summary
 	ev.Location = e.model.Location
-	ev.Description = e.model.Description
+	ev.Description = e.model.ShownDescription()
 	ev.RRule = e.model.RRule
 	ev.Organizer = e.model.Organizer
 	ev.Status = StatusText(e.model.Status)
@@ -569,7 +455,6 @@ func (e stored) row() Event {
 	return ev
 }
 
-// occurrenceRow reports one instance of a series.
 func (e stored) occurrenceRow(occ ical.Occurrence) Event {
 	ev := e.row()
 	ev.Start = occ.Start.In(time.Local)
@@ -579,13 +464,35 @@ func (e stored) occurrenceRow(occ ical.Occurrence) Event {
 	return ev
 }
 
-// EventGet reports one event. An empty occurrence names the stored event, which
-// for a series is the series itself; otherwise it names one instance.
-//
-// The event and the keys that read it are asked for at the same time. The
-// reference names the event, so neither request needs the other's answer - only
-// the decryption between them does.
-func (s *Service) EventGet(ctx context.Context, calendarID, eventID, occurrence string) (*Event, error) {
+type EventDetail struct {
+	Event
+	VideoCall *VideoCall `json:"video_call,omitempty"`
+}
+
+type VideoCall struct {
+	Provider string `json:"provider"`
+	URL      string `json:"url"`
+}
+
+func videoCall(v ical.VEvent) *VideoCall {
+	call, ok := v.Call()
+	if !ok {
+		return nil
+	}
+	return &VideoCall{Provider: ProviderName(call.Provider), URL: call.URL}
+}
+
+func ProviderName(provider int) string {
+	switch provider {
+	case ical.ProviderMeet:
+		return "proton-meet"
+	case ical.ProviderZoom:
+		return "zoom"
+	}
+	return "other"
+}
+
+func (s *Service) EventGet(ctx context.Context, calendarID, eventID, occurrence string) (*EventDetail, error) {
 	var (
 		ck  *calKeys
 		raw rawEvent
@@ -606,9 +513,12 @@ func (s *Service) EventGet(ctx context.Context, calendarID, eventID, occurrence 
 	}
 	e := s.decrypt(ctx, ck, raw)
 	if occurrence == "" {
-		ev := e.row()
-		if e.readErr == nil && e.model.Recurring() {
-			ev.Count, _ = e.model.CountOccurrences()
+		ev := EventDetail{Event: e.row()}
+		if e.readErr == nil {
+			ev.VideoCall = videoCall(e.model)
+			if e.model.Recurring() {
+				ev.Count, _ = e.model.CountOccurrences()
+			}
 		}
 		return &ev, nil
 	}
@@ -619,26 +529,14 @@ func (s *Service) EventGet(ctx context.Context, calendarID, eventID, occurrence 
 	if err != nil {
 		return nil, err
 	}
-	ev := occ.row()
-	return &ev, nil
+	return &EventDetail{Event: occ.row(), VideoCall: videoCall(occ.currentVEvent())}, nil
 }
 
-// Reach is what a change to a stored event actually touches.
-//
-// A series is one event to address and many meetings to lose, so the two counts
-// are kept apart: Rows is the sample a person reads to recognise what they are
-// about to change, and Total is how many there are - nil when the series never
-// ends, which is a thing to be told rather than a number to be given.
 type Reach struct {
 	Rows  []Event
 	Total *int
 }
 
-// Series reports what a stored event reaches, drawing at most sample of its
-// occurrences.
-//
-// It is what a preview and a confirmation both rest on: a count alone cannot be
-// checked, and the occurrences are the things that would change.
 func (s *Service) Series(ctx context.Context, calendarID, eventID string, sample int) (*Reach, error) {
 	ck, err := s.unlockCalendar(ctx, calendarID)
 	if err != nil {
@@ -698,30 +596,20 @@ func (s *Service) storedEvent(ctx context.Context, ck *calKeys, calendarID, even
 	return s.decrypt(ctx, ck, raw), nil
 }
 
-// ── creating ──
-
-// EventInput is the full set of fields for a new event.
 type EventInput struct {
 	Title       string
 	Location    string
 	Description string
-	// Start is when it begins: a day for an event with no time of day, otherwise a
-	// moment anchored to a zone, so a recurring series keeps its wall-clock time
-	// across a daylight-saving change instead of drifting by an hour.
-	Start ical.DateTime
-	// Duration is how long it lasts, measured in whole days for an event with no
-	// time of day.
-	Duration  time.Duration
-	RRule     string
-	Reminders []string
-	Attendees []string
-	// Status is whether the event is going ahead: CONFIRMED, TENTATIVE or
-	// CANCELLED. Empty means it never said, which every client reads as
-	// confirmed.
-	Status string
+	Start       ical.DateTime
+	Duration    time.Duration
+	RRule       string
+	Reminders   []string
+	Attendees   []string
+	Status      string
 	// Color is the event's own accent colour, as the hex Proton stores. Empty
 	// gives it none, which is how an event comes to be drawn in its calendar's.
 	Color string
+	Meet  bool
 }
 
 // EventResult is the outcome of a write. Mail is non-nil when participants have
@@ -731,6 +619,17 @@ type EventResult struct {
 	ID   string
 	Ref  string
 	Mail *Mail
+	// Call is the Proton Meet call this write gave the event.
+	Call          *ical.Call
+	MeetUnchanged bool
+}
+
+func gaveCall(v ical.VEvent, made *meet.Meeting) *ical.Call {
+	if made == nil {
+		return nil
+	}
+	call, _ := v.Call()
+	return &call
 }
 
 // Mail is a ready-to-send iCalendar message.
@@ -742,7 +641,7 @@ type Mail struct {
 	Method     string
 }
 
-func (s *Service) EventCreate(ctx context.Context, calendarID string, in EventInput) (*EventResult, error) {
+func (s *Service) EventCreate(ctx context.Context, calendarID string, in EventInput) (res *EventResult, err error) {
 	ck, err := s.unlockCalendar(ctx, calendarID)
 	if err != nil {
 		return nil, err
@@ -771,6 +670,20 @@ func (s *Service) EventCreate(ctx context.Context, calendarID string, in EventIn
 	if err != nil {
 		return nil, err
 	}
+	res = &EventResult{}
+	if in.Meet {
+		made, conference, err := s.meetingFor(ctx, ck, in.Title)
+		if err != nil {
+			return nil, err
+		}
+		body.model = body.model.WithConference(conference)
+		res.Call = gaveCall(body.model, made)
+		defer func() {
+			if res == nil {
+				s.giveBack(ctx, made)
+			}
+		}()
+	}
 	op, _, err := ck.createOp(body)
 	if err != nil {
 		return nil, err
@@ -779,7 +692,6 @@ func (s *Service) EventCreate(ctx context.Context, calendarID string, in EventIn
 	if err != nil {
 		return nil, err
 	}
-	res := &EventResult{}
 	if len(created) > 0 {
 		res.ID = created[0]
 	}
@@ -884,10 +796,6 @@ func (s *Service) attendeeKeyRing(ctx context.Context, email string) (*pgp.KeyRi
 	return keys.Published(ctx, s.C, email)
 }
 
-// ── resolving ──
-
-// ResolveEvent finds an event by title across every calendar over the days the
-// default window covers.
 func (s *Service) ResolveEvent(ctx context.Context, needle string) (calendarID, eventID, occurrence string, err error) {
 	cals, err := s.CalendarsList(ctx)
 	if err != nil {
@@ -918,8 +826,6 @@ func (s *Service) ResolveEvent(ctx context.Context, needle string) (calendarID, 
 	return m.CalendarID, m.ID, m.Occurrence, nil
 }
 
-// ── reminders ──
-
 // Proton's two kinds of reminder. The web client offers both wherever it offers
 // one, so a reminder here says which it is by suffixing the duration - "1d:email"
 // - and a bare duration is the notification, which is what the composer defaults
@@ -949,8 +855,6 @@ func buildReminders(reminders []string) ([]map[string]any, error) {
 	return out, nil
 }
 
-// reminderKind splits "15m" or "1d:email" into the duration and how to deliver
-// it.
 func reminderKind(r string) (spec string, kind int, err error) {
 	spec, suffix, found := strings.Cut(r, ":")
 	if !found {
@@ -974,16 +878,6 @@ const (
 	roleOptional = "OPT-PARTICIPANT"
 )
 
-// ParseAttendee splits "jane@example.com" or "jane@example.com:optional" into the
-// address and how much their presence matters.
-//
-// The address is split on the last colon, not the first, so that a scheme or a
-// port somebody pasted in does not eat the address.
-//
-// It is exported for the command that takes --attendee to judge each value with
-// before anything is sent, so the refusal here is one no command line reaches.
-// The address comes back even with a role that is neither of the two, for that
-// command to show the value spelled the way it would be taken.
 func ParseAttendee(raw string) (email, role string, err error) {
 	email = strings.TrimSpace(raw)
 	i := strings.LastIndex(email, ":")
@@ -1001,8 +895,6 @@ func ParseAttendee(raw string) (email, role string, err error) {
 	return email, "", fmt.Errorf("attendee %q: after the colon write required or optional", raw)
 }
 
-// AttendeeText renders a participant the way --attendee spells them, so a
-// listing can be read back into a command.
 func AttendeeText(email, role string) string {
 	if role == roleOptional {
 		return email + ":optional"
@@ -1015,14 +907,13 @@ var eventStatuses = map[string]string{
 	"confirmed": "CONFIRMED", "tentative": "TENTATIVE", "cancelled": "CANCELLED",
 }
 
-// EventStatuses lists the words --status accepts, for the flag's declared domain.
-func EventStatuses() []string { return []string{"confirmed", "tentative", "cancelled"} }
+// EventStatuses are what Proton stores an event's status as: it refuses
+// TENTATIVE, which only an invitation from another service carries.
+func EventStatuses() []string { return []string{"confirmed", "cancelled"} }
 
 // ICalStatus turns the word a person writes into the one iCalendar stores.
 func ICalStatus(word string) string { return eventStatuses[strings.ToLower(word)] }
 
-// StatusText is the inverse, and answers "confirmed" for an event that never
-// said: an absent STATUS is what every client reads as going ahead.
 func StatusText(status string) string {
 	for word, ical := range eventStatuses {
 		if ical == strings.ToUpper(status) {
@@ -1032,8 +923,6 @@ func StatusText(status string) string {
 	return "confirmed"
 }
 
-// ReminderText renders a stored reminder the way it is written on the command
-// line, so what a listing shows can be passed straight back to --remind.
 func ReminderText(kind int, trigger string) string {
 	spec := units.Duration(triggerDuration(trigger))
 	if kind == remindByEmail {
@@ -1042,8 +931,6 @@ func ReminderText(kind int, trigger string) string {
 	return spec
 }
 
-// icalTrigger converts a duration-before-start ("15m", "1h", "1d") into an iCal
-// negative trigger ("-PT15M", "-PT60M", "-P1D").
 func icalTrigger(dur string) (string, error) {
 	d, err := units.ParseDuration(dur)
 	if err != nil {
@@ -1086,8 +973,6 @@ func triggerDuration(trigger string) time.Duration {
 	}
 	return total
 }
-
-// ── exporting ──
 
 // EventsExport returns what a calendar holds as iCalendar models, ready to be
 // written as a file.
@@ -1138,24 +1023,17 @@ func alarmsOf(raw rawEvent) []ical.Alarm {
 	return alarms
 }
 
-// ── importing ──
-
-// ImportResult says what an import did, per event, so a partial success reports
-// which events landed rather than one number that hides the rest.
 type ImportResult struct {
 	Imported []string       `json:"imported"`
 	Skipped  []SkippedEvent `json:"skipped"`
 }
 
-// SkippedEvent is one event an import could not take, and why.
 type SkippedEvent struct {
 	Summary string `json:"summary,omitempty"`
 	UID     string `json:"uid,omitempty"`
 	Reason  string `json:"reason"`
 }
 
-// String names the event, falling back to the UID for one with no summary, since
-// an untitled event still has to be findable in the file.
 func (s SkippedEvent) String() string {
 	switch {
 	case s.Summary != "":
@@ -1236,13 +1114,12 @@ func (s *Service) EventsImport(ctx context.Context, calendarID string, events []
 	return res, nil
 }
 
-// importable strips what an imported event must not carry: the participants and
-// the organiser, since this account did not call the meeting, and a stamp, since
-// the event is being written now.
 func importable(v ical.VEvent) ical.VEvent {
 	v.Attendees = nil
 	v.Organizer = ""
 	v.Alarms = nil
+	v.Conference = nil
+	v.Rest = nil
 	v.DTStamp = time.Now().UTC()
 	if v.UID == "" {
 		v.UID = ical.EventUID()

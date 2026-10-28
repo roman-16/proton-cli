@@ -17,6 +17,6 @@ export const stats = `https://raw.githubusercontent.com/roman-16/proton-cli/data
 
 export const social = `${origin}/og.png`;
 
-export const tagline = "Your CLI for Proton Mail, Drive, Calendar, Pass and Contacts.";
+export const tagline = "Your CLI for Proton Mail, Drive, Calendar, Pass, Meet and Contacts.";
 
 export const description = `${tagline} One binary, end-to-end encrypted.`;

@@ -1,6 +1,6 @@
 Proton, in your terminal.
 
-Unofficial, end-to-end encrypted CLI for Proton Mail, Drive, Calendar, Pass and Contacts.
+Unofficial, end-to-end encrypted CLI for Proton Mail, Drive, Calendar, Pass, Meet and Contacts.
 
 Usage:
   proton <app> <collection> <verb> [TARGET...] [--flags]
@@ -10,6 +10,7 @@ Apps:
   contacts    Contacts, their groups, email settings and keys
   drive       Files and folders in Drive
   mail        Read, write and organize mail
+  meet        Meetings and rooms people join by a link
   pass        Vaults, logins and secrets
 
 Account:

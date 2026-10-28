@@ -17,24 +17,15 @@ import (
 // different combination of those records, and the combinations are Proton's, not
 // this CLI's invention: they are what its own clients do.
 
-// EventPatch is what an update changes. A nil field is a field the caller did not
-// mention, which is left exactly as it was - including the reminder list and the
-// colour, which are not in the event's content but are just as much part of it.
 type EventPatch struct {
 	Title       *string
 	Location    *string
 	Description *string
-	// Start is where the event is put: a day, or a moment anchored to the zone the
-	// change is written against.
-	Start *ical.DateTime
-	// Duration is how long it lasts. Absent keeps the length it had, which is what
-	// makes moving an event a move rather than a rewrite.
-	Duration *time.Duration
-	// AllDay takes an event's time of day away. Giving one back is a Start that
-	// names one, since a time of day is a time somebody has to choose.
-	AllDay    *bool
-	RRule     *string
-	Reminders *[]string
+	Start       *ical.DateTime
+	Duration    *time.Duration
+	AllDay      *bool
+	RRule       *string
+	Reminders   *[]string
 	// Status is whether the event is going ahead: CONFIRMED, TENTATIVE or
 	// CANCELLED. Cancelling this way keeps the event and its history, which is
 	// what the web client does and what `delete` does not.
@@ -45,30 +36,15 @@ type EventPatch struct {
 	// meaning "none", so an event that has been given one can only be given
 	// another. Its own clients cannot do it either.
 	Color *string
+	Meet  *bool
 }
 
-// TouchesTimes reports whether the patch puts the event somewhere else or gives
-// it another length, which is what decides both what a result says about it and
-// whether the exclusions and the separately edited occurrences still mean
-// anything.
 func (p EventPatch) TouchesTimes() bool {
 	return p.Start != nil || p.Duration != nil || p.AllDay != nil
 }
 
-// breaks reports whether the patch changes something participants have to be told
-// about, and something that invalidates instants recorded against the series.
 func (p EventPatch) breaks() bool { return p.TouchesTimes() || p.RRule != nil }
 
-// Lands is where the patch puts an event that begins at start, in the form it
-// then has: a day for one with no time of day, a moment for one with.
-//
-// A start that names a time of day gives an all-day event one, because naming a
-// time is what asking for a time of day looks like. A start that names only a
-// day moves an event and leaves the time of day it had, because that is what
-// moving a meeting to Monday means.
-//
-// A result and a dry run say where a change lands before it is made, so the rule
-// is here rather than beside either of them.
 func (p EventPatch) Lands(start ical.DateTime) ical.DateTime {
 	allDay := start.AllDay
 	if p.Start != nil {
@@ -91,8 +67,6 @@ func (p EventPatch) Lands(start ical.DateTime) ical.DateTime {
 	}
 }
 
-// onDay is an event's own time of day, on another day, in the zone it is
-// anchored to.
 func onDay(current, day ical.DateTime) ical.DateTime {
 	wall := current.Wall()
 	y, m, d := day.Time.Date()
@@ -100,7 +74,6 @@ func onDay(current, day ical.DateTime) ical.DateTime {
 	return ical.Timed(moved, current.TZID)
 }
 
-// apply merges the patch into an event.
 func (p EventPatch) apply(v ical.VEvent) ical.VEvent {
 	if p.Title != nil {
 		v.Summary = *p.Title
@@ -112,7 +85,7 @@ func (p EventPatch) apply(v ical.VEvent) ical.VEvent {
 		v.Status = *p.Status
 	}
 	if p.Description != nil {
-		v.Description = *p.Description
+		v = v.WithDescription(*p.Description)
 	}
 	if p.RRule != nil {
 		v.RRule = *p.RRule
@@ -146,9 +119,6 @@ func withTimes(v ical.VEvent, start ical.DateTime, dur time.Duration) ical.VEven
 	return v
 }
 
-// reminders resolves the notification list a write sends: the patched one, or the
-// one the event already had, preserving the difference between having none and
-// taking the calendar's defaults.
 func (p EventPatch) reminders(raw rawEvent) ([]map[string]any, error) {
 	if p.Reminders == nil {
 		return raw.notifications(), nil
@@ -156,8 +126,6 @@ func (p EventPatch) reminders(raw rawEvent) ([]map[string]any, error) {
 	return buildReminders(*p.Reminders)
 }
 
-// color resolves the colour a write sends: the patched one, or the one the event
-// already had.
 func (p EventPatch) color(raw rawEvent) *string {
 	if p.Color == nil {
 		return raw.Color
@@ -165,15 +133,11 @@ func (p EventPatch) color(raw rawEvent) *string {
 	return optionalColor(*p.Color)
 }
 
-// ── the chain ──
-
-// series is every record that makes up one recurring event.
 type series struct {
 	master    stored
 	overrides []stored
 }
 
-// overrideAt returns the record that replaces one occurrence, or nil.
 func (c series) overrideAt(at ical.DateTime) *stored {
 	for i := range c.overrides {
 		if c.overrides[i].model.RecurrenceID.Equal(at) {
@@ -183,8 +147,6 @@ func (c series) overrideAt(at ical.DateTime) *stored {
 	return nil
 }
 
-// idsFrom lists the overrides at or after an instant, which is the set a change
-// to "this one and the rest" invalidates.
 func (c series) idsFrom(at ical.DateTime) []string {
 	var out []string
 	for _, o := range c.overrides {
@@ -238,15 +200,10 @@ func (s *Service) loadSeries(ctx context.Context, ck *calKeys, calendarID string
 	return out, nil
 }
 
-// ── resolving an occurrence ──
-
-// occurrenceTarget is one instance of a series, resolved to the records behind it.
 type occurrenceTarget struct {
 	chain    series
 	at       ical.DateTime
 	instance ical.Occurrence
-	// override is the record replacing this instance, nil when the rule still
-	// generates it.
 	override *stored
 }
 
@@ -274,7 +231,6 @@ func (s *Service) resolveOccurrence(ctx context.Context, ck *calKeys, calendarID
 	return occurrenceTarget{chain: chain, at: at, instance: instance, override: override}, nil
 }
 
-// row reports the instance as a person sees it.
 func (t occurrenceTarget) row() Event {
 	master := t.chain.master
 	if t.override != nil {
@@ -289,8 +245,6 @@ func (t occurrenceTarget) row() Event {
 	return master.occurrenceRow(t.instance)
 }
 
-// currentVEvent is what the series says this instance looks like today: the
-// series' own content, placed at the instance, with nothing recurring left on it.
 func (t occurrenceTarget) currentVEvent() ical.VEvent {
 	if t.override != nil {
 		return t.override.model
@@ -304,15 +258,6 @@ func (t occurrenceTarget) currentVEvent() ical.VEvent {
 	return v
 }
 
-// ── writing ──
-
-// EventUpdate changes a stored event, which for a recurring event is the whole
-// series.
-//
-// Everything the caller did not mention is carried over: not only the title and
-// the times but the recurrence rule, the exclusions, the reminders, the colour and
-// whether the account is the organizer. An update that rebuilt those from
-// defaults would quietly resurrect deleted occurrences and reset reminders.
 func (s *Service) EventUpdate(ctx context.Context, calendarID, eventID string, p EventPatch) (*EventResult, error) {
 	ck, err := s.unlockCalendar(ctx, calendarID)
 	if err != nil {
@@ -325,19 +270,38 @@ func (s *Service) EventUpdate(ctx context.Context, calendarID, eventID string, p
 	if old.readErr != nil {
 		return nil, fmt.Errorf("read the event before updating it: %w", old.readErr)
 	}
-	updated := p.apply(old.model)
+	updated, made, unchanged, err := s.withMeet(ctx, ck, p, p.apply(old.model), old.raw.IsOrganizer)
+	if err != nil {
+		return nil, err
+	}
+	saved := false
+	defer func() {
+		if !saved {
+			s.giveBack(ctx, made)
+		}
+	}()
 
 	var ops []syncOp
-	if old.model.Recurring() && p.breaks() {
-		// The exclusions and the separately edited occurrences name instants this
-		// series no longer has, so they go with the pattern that created them.
-		updated.ExDates = nil
+	if old.model.Recurring() && (p.breaks() || (p.Meet != nil && !unchanged)) {
 		chain, err := s.loadSeries(ctx, ck, calendarID, old)
 		if err != nil {
 			return nil, err
 		}
-		for _, id := range chain.allOverrideIDs() {
-			ops = append(ops, deleteOp(id))
+		if p.breaks() {
+			updated.ExDates = nil
+			for _, id := range chain.allOverrideIDs() {
+				ops = append(ops, deleteOp(id))
+			}
+		} else {
+			for _, o := range chain.overrides {
+				if carried, changed := carryCall(o.model, updated); changed {
+					op, err := ck.updateOp(o.raw.ID, o.rewrite(carried))
+					if err != nil {
+						return nil, err
+					}
+					ops = append(ops, op)
+				}
+			}
 		}
 	}
 	updated.Sequence = ical.NextSequence(old.model, updated)
@@ -346,29 +310,30 @@ func (s *Service) EventUpdate(ctx context.Context, calendarID, eventID string, p
 	if err != nil {
 		return nil, err
 	}
-	op, err := ck.updateOp(eventID, eventBody{
-		model:         updated,
-		notifications: notifs,
-		color:         p.color(old.raw),
-		isOrganizer:   old.raw.IsOrganizer,
-		keyPacket:     old.raw.SharedKeyPacket,
-		attendeeList:  attendeeList(old.raw),
-	})
+	body := old.rewrite(updated)
+	body.notifications = notifs
+	body.color = p.color(old.raw)
+	if made == nil && p.Title != nil && *p.Title != old.model.Summary {
+		body.meetTitle = s.retitle(ctx, ck, updated)
+	}
+	op, err := ck.updateOp(eventID, body)
 	if err != nil {
 		return nil, err
 	}
 	if _, err := s.sync(ctx, calendarID, ck.memberID, append(ops, op)); err != nil {
 		return nil, err
 	}
-	mail, err := s.changeMail(ctx, updated, old.model, p, nil)
-	if err != nil {
+	saved = true
+	if p.Meet != nil && !*p.Meet && !unchanged {
+		s.endMeeting(ctx, ck, old.model)
+	}
+	res := &EventResult{ID: eventID, Call: gaveCall(updated, made), MeetUnchanged: unchanged}
+	if res.Mail, err = s.changeMail(ctx, updated, old.model, p, nil); err != nil {
 		return nil, err
 	}
-	return &EventResult{ID: eventID, Mail: mail}, nil
+	return res, nil
 }
 
-// OccurrenceUpdate changes one instance of a series, writing the extra record
-// that replaces it. The series itself keeps its rule and its other occurrences.
 func (s *Service) OccurrenceUpdate(ctx context.Context, calendarID, eventID, occurrence string, p EventPatch) (*EventResult, error) {
 	ck, err := s.unlockCalendar(ctx, calendarID)
 	if err != nil {
@@ -384,7 +349,17 @@ func (s *Service) OccurrenceUpdate(ctx context.Context, calendarID, eventID, occ
 	}
 
 	current := target.currentVEvent()
-	updated := p.apply(current).AsOverride(master.model, target.at)
+	updated, made, unchanged, err := s.withMeet(ctx, ck, p, p.apply(current), master.raw.IsOrganizer)
+	if err != nil {
+		return nil, err
+	}
+	saved := false
+	defer func() {
+		if !saved {
+			s.giveBack(ctx, made)
+		}
+	}()
+	updated = updated.AsOverride(master.model, target.at)
 	// A replacement may never claim to be older than the series it belongs to, and
 	// Proton refuses a sequence that goes backwards.
 	updated.Sequence = max(ical.NextSequence(current, updated), master.model.Sequence)
@@ -404,6 +379,7 @@ func (s *Service) OccurrenceUpdate(ctx context.Context, calendarID, eventID, occ
 	var external []string
 	if target.override != nil {
 		body.keyPacket = target.override.raw.SharedKeyPacket
+		body.calendarKeyPacket = target.override.raw.CalendarKeyPacket
 		body.attendeeList = attendeeList(target.override.raw)
 		op, err := ck.updateOp(target.override.raw.ID, body)
 		if err != nil {
@@ -414,14 +390,7 @@ func (s *Service) OccurrenceUpdate(ctx context.Context, calendarID, eventID, occ
 		// Proton refuses a replacement whose series carries no sequence at all, so
 		// the series is written back alongside it. This CLI always writes one, but
 		// an event another client created may not have.
-		parent, err := ck.updateOp(master.raw.ID, eventBody{
-			model:         master.model,
-			notifications: master.raw.notifications(),
-			color:         master.raw.Color,
-			isOrganizer:   master.raw.IsOrganizer,
-			keyPacket:     master.raw.SharedKeyPacket,
-			attendeeList:  attendeeList(master.raw),
-		})
+		parent, err := ck.updateOp(master.raw.ID, master.rewrite(master.model))
 		if err != nil {
 			return nil, err
 		}
@@ -438,15 +407,14 @@ func (s *Service) OccurrenceUpdate(ctx context.Context, calendarID, eventID, occ
 	if _, err := s.sync(ctx, calendarID, ck.memberID, ops); err != nil {
 		return nil, err
 	}
-	mail, err := s.changeMail(ctx, updated, current, p, external)
-	if err != nil {
+	saved = true
+	res := &EventResult{ID: eventID, Call: gaveCall(updated, made), MeetUnchanged: unchanged}
+	if res.Mail, err = s.changeMail(ctx, updated, current, p, external); err != nil {
 		return nil, err
 	}
-	return &EventResult{ID: eventID, Mail: mail}, nil
+	return res, nil
 }
 
-// SeriesSplit changes one instance and every later one: the series is ended just
-// before it, and a new series takes over from there.
 func (s *Service) SeriesSplit(ctx context.Context, calendarID, eventID, occurrence string, p EventPatch) (*EventResult, error) {
 	ck, err := s.unlockCalendar(ctx, calendarID)
 	if err != nil {
@@ -468,7 +436,16 @@ func (s *Service) SeriesSplit(ctx context.Context, calendarID, eventID, occurren
 	truncated.Sequence = master.model.Sequence + 1
 
 	current := target.currentVEvent()
-	remainder := p.apply(current)
+	remainder, made, unchanged, err := s.withMeet(ctx, ck, p, p.apply(current), master.raw.IsOrganizer)
+	if err != nil {
+		return nil, err
+	}
+	saved := false
+	defer func() {
+		if !saved {
+			s.giveBack(ctx, made)
+		}
+	}()
 	remainder.RRule = master.model.RRule
 	if p.RRule != nil {
 		remainder.RRule = *p.RRule
@@ -479,14 +456,7 @@ func (s *Service) SeriesSplit(ctx context.Context, calendarID, eventID, occurren
 	if err != nil {
 		return nil, err
 	}
-	head, err := ck.updateOp(master.raw.ID, eventBody{
-		model:         truncated,
-		notifications: master.raw.notifications(),
-		color:         master.raw.Color,
-		isOrganizer:   master.raw.IsOrganizer,
-		keyPacket:     master.raw.SharedKeyPacket,
-		attendeeList:  attendeeList(master.raw),
-	})
+	head, err := ck.updateOp(master.raw.ID, master.rewrite(truncated))
 	if err != nil {
 		return nil, err
 	}
@@ -506,8 +476,6 @@ func (s *Service) SeriesSplit(ctx context.Context, calendarID, eventID, occurren
 	}
 
 	ops := make([]syncOp, 0, len(target.chain.overrides)+2)
-	// The remainder is a new series with a new identity, so occurrences edited on
-	// their own past the split no longer belong to anything.
 	for _, id := range target.chain.idsFrom(target.at) {
 		ops = append(ops, deleteOp(id))
 	}
@@ -517,19 +485,17 @@ func (s *Service) SeriesSplit(ctx context.Context, calendarID, eventID, occurren
 	if err != nil {
 		return nil, err
 	}
-	mail, err := s.changeMail(ctx, remainder, current, p, external)
-	if err != nil {
+	saved = true
+	res := &EventResult{ID: eventID, Call: gaveCall(remainder, made), MeetUnchanged: unchanged}
+	if res.Mail, err = s.changeMail(ctx, remainder, current, p, external); err != nil {
 		return nil, err
 	}
-	res := &EventResult{ID: eventID, Mail: mail}
 	if len(created) > 0 {
 		res.ID = created[len(created)-1]
 	}
 	return res, nil
 }
 
-// EventDelete removes a stored event, and with it every occurrence of a series
-// that was edited on its own.
 func (s *Service) EventDelete(ctx context.Context, calendarID, eventID string) error {
 	ck, err := s.unlockCalendar(ctx, calendarID)
 	if err != nil {
@@ -549,8 +515,6 @@ func (s *Service) EventDelete(ctx context.Context, calendarID, eventID string) e
 	return err
 }
 
-// OccurrenceDelete cancels one instance of a series, leaving the rule and every
-// other occurrence intact.
 func (s *Service) OccurrenceDelete(ctx context.Context, calendarID, eventID, occurrence string) error {
 	ck, err := s.unlockCalendar(ctx, calendarID)
 	if err != nil {
@@ -566,20 +530,11 @@ func (s *Service) OccurrenceDelete(ctx context.Context, calendarID, eventID, occ
 	}
 
 	var ops []syncOp
-	// An instance edited on its own has a record of its own, which the exclusion
-	// does not remove: without this the "deleted" occurrence keeps rendering.
 	if target.override != nil {
 		ops = append(ops, deleteOp(target.override.raw.ID))
 	}
 	if excluded, changed := master.model.ExcludeOccurrence(target.at); changed {
-		op, err := ck.updateOp(master.raw.ID, eventBody{
-			model:         excluded,
-			notifications: master.raw.notifications(),
-			color:         master.raw.Color,
-			isOrganizer:   master.raw.IsOrganizer,
-			keyPacket:     master.raw.SharedKeyPacket,
-			attendeeList:  attendeeList(master.raw),
-		})
+		op, err := ck.updateOp(master.raw.ID, master.rewrite(excluded))
 		if err != nil {
 			return err
 		}
@@ -589,8 +544,6 @@ func (s *Service) OccurrenceDelete(ctx context.Context, calendarID, eventID, occ
 	return err
 }
 
-// SeriesTruncate removes one instance and every later one by ending the series
-// just before it.
 func (s *Service) SeriesTruncate(ctx context.Context, calendarID, eventID, occurrence string) error {
 	ck, err := s.unlockCalendar(ctx, calendarID)
 	if err != nil {
@@ -614,14 +567,7 @@ func (s *Service) SeriesTruncate(ctx context.Context, calendarID, eventID, occur
 	for _, id := range target.chain.idsFrom(target.at) {
 		ops = append(ops, deleteOp(id))
 	}
-	op, err := ck.updateOp(master.raw.ID, eventBody{
-		model:         truncated,
-		notifications: master.raw.notifications(),
-		color:         master.raw.Color,
-		isOrganizer:   master.raw.IsOrganizer,
-		keyPacket:     master.raw.SharedKeyPacket,
-		attendeeList:  attendeeList(master.raw),
-	})
+	op, err := ck.updateOp(master.raw.ID, master.rewrite(truncated))
 	if err != nil {
 		return err
 	}
@@ -629,10 +575,6 @@ func (s *Service) SeriesTruncate(ctx context.Context, calendarID, eventID, occur
 	return err
 }
 
-// ── helpers ──
-
-// readMaster fetches the event a reference addresses and insists it can be read,
-// which every scoped change needs before it can decide what to write.
 func (s *Service) readMaster(ctx context.Context, ck *calKeys, calendarID, eventID string) (stored, error) {
 	e, err := s.storedEvent(ctx, ck, calendarID, eventID)
 	if err != nil {
@@ -644,8 +586,6 @@ func (s *Service) readMaster(ctx context.Context, ck *calKeys, calendarID, event
 	return e, nil
 }
 
-// overrideRaw is the record whose non-content fields a replacement inherits: its
-// own if it exists, otherwise the series'.
 func overrideRaw(t occurrenceTarget, master stored) rawEvent {
 	if t.override != nil {
 		return t.override.raw
@@ -653,8 +593,20 @@ func overrideRaw(t occurrenceTarget, master stored) rawEvent {
 	return master.raw
 }
 
-// attendeeList re-sends the cleartext per-attendee record, so an update does not
-// drop the participants' server-side status.
+// rewrite is what writing model in place of the stored event sends: everything
+// Proton keeps beside the cards carried over as it is.
+func (e stored) rewrite(model ical.VEvent) eventBody {
+	return eventBody{
+		model:             model,
+		notifications:     e.raw.notifications(),
+		color:             e.raw.Color,
+		isOrganizer:       e.raw.IsOrganizer,
+		keyPacket:         e.raw.SharedKeyPacket,
+		calendarKeyPacket: e.raw.CalendarKeyPacket,
+		attendeeList:      attendeeList(e.raw),
+	}
+}
+
 func attendeeList(raw rawEvent) []map[string]any {
 	if len(raw.AttendeesInfo.Attendees) == 0 {
 		return nil
@@ -680,7 +632,8 @@ func emailsOf(v ical.VEvent) []string {
 // Only attendees outside Proton are emailed: Proton writes a change straight into
 // a Proton attendee's own calendar, so mailing them as well would tell them twice.
 func (s *Service) changeMail(ctx context.Context, updated, old ical.VEvent, p EventPatch, external []string) (*Mail, error) {
-	if !p.breaks() || len(updated.Attendees) == 0 || updated.Sequence <= old.Sequence {
+	rescheduled := p.breaks() && updated.Sequence > old.Sequence
+	if len(updated.Attendees) == 0 || (!rescheduled && callOf(updated) == callOf(old)) {
 		return nil, nil
 	}
 	if external == nil {
@@ -714,4 +667,9 @@ func (s *Service) externalAttendees(ctx context.Context, emails []string) ([]str
 		}
 	}
 	return out, nil
+}
+
+func callOf(v ical.VEvent) ical.Call {
+	call, _ := v.Call()
+	return call
 }

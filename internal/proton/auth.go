@@ -21,9 +21,7 @@ type authInfo struct {
 	Salt            string
 	SRPSession      string
 	Username        string
-	// TwoFA is answered only when the session asking is already signed in, which
-	// is how proving a session again learns what it may prove itself with.
-	TwoFA twoFA `json:"2FA"`
+	TwoFA           twoFA `json:"2FA"`
 }
 
 type authResp struct {
@@ -40,9 +38,6 @@ type authResp struct {
 type twoFA struct {
 	Enabled int
 	FIDO2   struct {
-		// AuthenticationOptions is a WebAuthn challenge, carried as it arrived: it
-		// goes back with the answer, and re-encoding what the server wrote is a way
-		// of disagreeing with it about what it said.
 		AuthenticationOptions json.RawMessage
 		RegisteredKeys        []struct {
 			Name string
@@ -87,20 +82,16 @@ type SecondFactorOffer struct {
 	SecurityKey *SecurityKeyRequest
 }
 
-// SecurityKeyRequest is a WebAuthn challenge and the host that sent it. Both
-// halves matter: what a key is asked to sign, and who is entitled to ask.
 type SecurityKeyRequest struct {
 	Options json.RawMessage
 	Host    string
 }
 
-// SecondFactorAnswer is what came back. Exactly one of the two is filled in.
 type SecondFactorAnswer struct {
 	TOTP        string
 	SecurityKey *SecurityKeyAssertion
 }
 
-// SecurityKeyAssertion is what a key answered a challenge with.
 type SecurityKeyAssertion struct {
 	ClientData        []byte
 	AuthenticatorData []byte
@@ -108,8 +99,6 @@ type SecurityKeyAssertion struct {
 	CredentialID      []byte
 }
 
-// SetSecondFactorResolver installs what answers a second-factor challenge, for
-// signing in and for proving a session again later.
 func (c *Client) SetSecondFactorResolver(r SecondFactorFunc) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -122,9 +111,6 @@ func (c *Client) getSecondFactorResolver() SecondFactorFunc {
 	return c.secondFactor
 }
 
-// answer puts a second factor where the request that carries it wants it. Every
-// endpoint that asks for one takes both kinds under the same two names, so this
-// is written once.
 func (offer SecondFactorOffer) answer(a SecondFactorAnswer) (map[string]any, error) {
 	switch {
 	case a.SecurityKey != nil:
@@ -181,7 +167,6 @@ func (c *Client) Login(ctx context.Context, username string, password []byte) er
 					refused.Refused = true
 				}
 			case errors.Is(rerr, ErrHVUnavailable):
-				// keep err = hvErr, surfaced below
 			case rerr != nil:
 				return fmt.Errorf("login: hv resolver: %w", rerr)
 			}
@@ -222,8 +207,6 @@ func (c *Client) Login(ctx context.Context, username string, password []byte) er
 	return nil
 }
 
-// Host is the machine the API answers on, which is the only relying party a
-// security key may be asked about.
 func (c *Client) Host() string {
 	u, err := url.Parse(c.base)
 	if err != nil {
@@ -245,7 +228,6 @@ type srpExchange struct {
 
 	password []byte
 
-	// extra is what the endpoint wants alongside the proof.
 	extra map[string]any
 	// secondFactor answers the challenge the parameters come back with, for the
 	// exchanges that carry one in the same request as the proof. It is consulted
@@ -255,9 +237,7 @@ type srpExchange struct {
 	hvToken string
 	hvType  string
 
-	// accountHost sends the proof through Proton's account host. See
-	// Request.AccountHost.
-	accountHost bool
+	door Door
 
 	// opensLink marks the exchange that proves a public link, which Proton answers
 	// whether or not anybody is behind it. See Request.opensLink.
@@ -293,13 +273,6 @@ func (c *Client) exchange(ctx context.Context, x srpExchange) (*Response, error)
 	return resp, refusedSecondFactor(err)
 }
 
-// refusedSecondFactor phrases the one thing an exchange can be refused for that
-// the person can put right themselves.
-//
-// The code was asked for by this package, through its own resolver, so the
-// answer to it is this package's to explain. Left bare it reaches the screen as
-// a number under an invitation to file a bug, for a thirty-second code that had
-// simply turned over.
 func refusedSecondFactor(err error) error {
 	if !WrongTwoFactorCode(err) {
 		return err
@@ -349,8 +322,8 @@ func (c *Client) srpCall(ctx context.Context, x srpExchange, info *authInfo) (*R
 
 	resp, err := c.authCall(ctx, Request{
 		Method: x.method, Path: x.path, Body: payload,
-		AccountHost: x.accountHost,
-		HVToken:     x.hvToken, HVType: x.hvType, opensLink: x.opensLink,
+		Door:    x.door,
+		HVToken: x.hvToken, HVType: x.hvType, opensLink: x.opensLink,
 	})
 	if err != nil {
 		return nil, err
@@ -391,12 +364,12 @@ func (c *Client) createSession(ctx context.Context) (*authResp, error) {
 // accountParameters asks Proton what an account password is proved against, for
 // the scope the exchange is for.
 //
-// accountHost sends the question through the same door as the proof that
+// door sends the question through the same door as the proof that
 // follows. They are two halves of one conversation - the second spends the
 // SRPSession the first issued - so they are never split across hosts.
-func (c *Client) accountParameters(username string, scope Scope, accountHost bool) func(context.Context) (*authInfo, error) {
+func (c *Client) accountParameters(username string, scope Scope, door Door) func(context.Context) (*authInfo, error) {
 	return func(ctx context.Context) (*authInfo, error) {
-		return c.getAuthInfo(ctx, username, scope, accountHost)
+		return c.getAuthInfo(ctx, username, scope, door)
 	}
 }
 
@@ -411,7 +384,7 @@ func (c *Client) accountParameters(username string, scope Scope, accountHost boo
 // It is not marked repeatable, though asking twice spends nothing: it is only
 // ever one half of an exchange, and the exchange is what gets another go. Two
 // budgets over the same failure would multiply into minutes of waiting.
-func (c *Client) getAuthInfo(ctx context.Context, username string, reauthScope Scope, accountHost bool) (*authInfo, error) {
+func (c *Client) getAuthInfo(ctx context.Context, username string, reauthScope Scope, door Door) (*authInfo, error) {
 	payload := map[string]any{"Intent": "Proton"}
 	if username != "" {
 		payload["Username"] = username
@@ -420,7 +393,7 @@ func (c *Client) getAuthInfo(ctx context.Context, username string, reauthScope S
 		payload["ReauthScope"] = string(reauthScope)
 	}
 	resp, err := c.authCall(ctx, Request{
-		Method: "POST", Path: "/core/v4/auth/info", Body: payload, AccountHost: accountHost,
+		Method: "POST", Path: "/core/v4/auth/info", Body: payload, Door: door,
 	})
 	if err != nil {
 		return nil, err
@@ -432,11 +405,9 @@ func (c *Client) getAuthInfo(ctx context.Context, username string, reauthScope S
 	return &r, nil
 }
 
-// loginSRP proves the password to the endpoint that hands out a session.
-// When hvToken/hvType are non-empty they're attached as HV headers on the proof.
 func (c *Client) loginSRP(ctx context.Context, username string, password []byte, hvToken, hvType string) (*authResp, error) {
 	resp, err := c.exchange(ctx, srpExchange{
-		parameters: c.accountParameters(username, "", false),
+		parameters: c.accountParameters(username, "", SessionDoor),
 		method:     "POST", path: "/core/v4/auth",
 		password: password,
 		extra:    map[string]any{"Username": username},
@@ -476,18 +447,14 @@ func (c *Client) prove(ctx context.Context, req Request) (*Response, error) {
 		return nil, err
 	}
 	return c.exchange(ctx, srpExchange{
-		parameters: c.accountParameters("", "", req.AccountHost),
-		method:     req.Method, path: req.Path, accountHost: req.AccountHost,
+		parameters: c.accountParameters("", "", req.Door),
+		method:     req.Method, path: req.Path, door: req.Door,
 		password:     cr.Password,
 		extra:        extra,
 		secondFactor: c.answerSecondFactor(ctx),
 	})
 }
 
-// provenBody is what a proving request wants sent alongside its proof. The
-// proof is a JSON object, so anything the endpoint wants with it has to be one
-// too - which is a fact about the request rather than about this run, so it is
-// a programming error rather than something to phrase for a person.
 func provenBody(body any) (map[string]any, error) {
 	switch b := body.(type) {
 	case nil:
@@ -514,13 +481,6 @@ func (c *Client) auth2FA(ctx context.Context, offer SecondFactorOffer, answer Se
 	return refusedSecondFactor(err)
 }
 
-// authCall sends one request of the auth flow and returns the answer to it.
-//
-// The flow stands here rather than on Do, one layer up: refreshing a session,
-// elevating a scope and refusing a dry run are all answers about a session, and
-// during a sign-in there is not one yet. What it does share with every other
-// request is the part that matters - the status is read before the body, and a
-// bad moment upstream is waited out rather than parsed.
 func (c *Client) authCall(ctx context.Context, req Request) (*Response, error) {
 	resp, err := c.attempt(ctx, req)
 	if err != nil {

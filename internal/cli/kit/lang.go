@@ -1,30 +1,12 @@
-// Package kit is the vocabulary every command is built from: the verbs it may
-// use, the argument names it may take, the way it selects what to act on, and
-// the shared flag groups.
-//
-// It exists so that the language is declared in one place instead of emerging
-// from whatever the neighbouring command happened to do. A new command that
-// wants a word not listed here is a command that is inventing one, and the
-// conformance test says so.
 package kit
 
 import "github.com/roman-16/proton-cli/internal/errs"
 
-// Program is the command, and Alias is its second name: the same binary under
-// the project's name, so a line written either way runs.
-//
-// Every screen speaks Program, whichever name was typed to get there. A help
-// screen that renamed itself to match the invocation would teach two languages
-// and pin nothing - the examples, the generated reference and the golden files
-// all rest on the program being nameable.
 const (
 	Program = "proton"
 	Alias   = "proton-cli"
 )
 
-// Docs is where the pages this repository carries are published, rendered and
-// searchable. The site is named for the project, so it is spelled from Alias
-// rather than written out again.
 const Docs = "https://" + Alias + ".lerchster.dev"
 
 // Verbs is every word that may end a command path.
@@ -35,18 +17,15 @@ const Docs = "https://" + Alias + ".lerchster.dev"
 // is the one Proton's own interface uses; where Proton has no word, the winner is
 // the one that reads as ordinary English.
 var Verbs = map[string]string{
-	// Reading
 	"list":  "enumerate a collection",
 	"get":   "show one thing in full",
 	"count": "say how many there are in each place, and how many are unread",
 	"watch": "stay attached and report each thing as it happens",
 
-	// Writing
 	"create": "make a new thing",
 	"update": "change fields of an existing thing",
 	"set":    "write one setting",
 
-	// Removing
 	"delete":  "remove permanently",
 	"trash":   "remove reversibly",
 	"restore": "undo a removal",
@@ -57,18 +36,15 @@ var Verbs = map[string]string{
 	"cancel": "stop work that is under way",
 	"resume": "set stopped work going again",
 
-	// Moving
 	"move": "put into another container",
 	"copy": "duplicate into another container",
 
-	// Bytes
 	"upload":   "send a local file",
 	"download": "write a remote file to disk",
 	"export":   "write documents to disk",
 	"import":   "read documents in from disk",
 	"merge":    "fold duplicates into one",
 
-	// Mail
 	"send":       "deliver a message",
 	"reply":      "answer a message",
 	"forward":    "pass a message on",
@@ -83,11 +59,9 @@ var Verbs = map[string]string{
 	"star":       "attach the starred label",
 	"unstar":     "detach the starred label",
 
-	// Toggles
 	"enable":  "turn on",
 	"disable": "turn off",
 
-	// Sharing
 	"abuse":       "report something shared with you to Proton as abuse",
 	"transfer":    "hand ownership to somebody else",
 	"add":         "put a member into a container",
@@ -107,15 +81,12 @@ var Verbs = map[string]string{
 	"unsnooze":    "bring something back to the inbox early",
 	"decline":     "refuse an invitation",
 
-	// Breaches
 	"resolve": "mark a breach as dealt with",
 	"reopen":  "mark a resolved breach as open again",
 
-	// Photos
 	"favorite":   "mark as a favourite",
 	"unfavorite": "unmark as a favourite",
 
-	// What a listing offers
 	"pin":     "keep at the top of a list",
 	"unpin":   "stop keeping at the top of a list",
 	"hide":    "leave out of every listing that does not name it",
@@ -123,29 +94,24 @@ var Verbs = map[string]string{
 	"exclude": "leave out of the checks Pass Monitor runs",
 	"include": "bring back into the checks Pass Monitor runs",
 
-	// Secrets
 	"totp":     "print the code a stored secret currently stands for",
 	"generate": "make a new secret",
 
-	// Keys
 	"trust":      "encrypt to a public key and verify with it, for a contact",
 	"untrust":    "stop relying on a contact's trusted keys",
 	"reactivate": "bring keys a password reset locked back into use",
 
-	// Trusted contacts
 	"request": "start the wait to use emergency access somebody granted you",
 	"access":  "sign in to an account whose emergency access is now open",
 	"grant":   "let a pending emergency request in now, without the wait",
 
-	// Calendar
 	"respond": "reply to an invitation",
 
-	// Session
 	"login":  "authenticate and save a session",
 	"logout": "discard a saved session",
 	"revoke": "stop something handed out working: a session, a public link",
+	"rotate": "replace a link with a new one, which stops the old one working",
 
-	// The tool itself
 	"changelog":  "print what each release changed",
 	"report":     "collect what a bug report needs",
 	"skill":      "emit the instructions an AI agent reads before using " + Program,
@@ -175,41 +141,10 @@ var Irreversible = map[string]bool{
 	"undo": true,
 }
 
-// Opaque marks a command whose effect the CLI models nothing of, and so the one
-// kind of mutation that is settled before the work rather than during it.
-//
-// A mutation normally waits: by the time it reports what it will do, the filter
-// has run and the question can name the eight messages rather than guess. A raw
-// request has nothing to resolve and nothing better to say afterwards than it
-// can say now - the method and the path are the whole of what will happen - so
-// it is put to the person at the gate, where a command that changes nothing is.
 var Opaque = map[string]bool{"api": true}
 
-// SignedOut marks a command that does its work with nobody signed in, and is the
-// third thing declared about a mutation, beside whether it can be taken back and
-// whether it changes state at all.
-//
-// It exists for one rule. A preview has to be as true as the change would be, so
-// a dry run asserts that an account exists - otherwise it is the one path that
-// answers as though it had one, since it sends no request to find out. That is
-// right for every mutation that needs a session and wrong for the ones that do
-// not: replacing this binary, deleting it, dropping what this machine has
-// indexed, and signing in, which is the command that makes the session the
-// others assume. Asking any of them for an account would refuse a preview of
-// work that would have succeeded.
-//
-// It is declared per command because nothing else separates them. `update` is a
-// verb eight collections use, and `Updated` is the action a draft reports too;
-// only the command knows what it needs.
 const SignedOut = "signed-out"
 
-// Mutating lists the verbs that change state. Every command whose verb is in
-// here has to honour --dry-run, which kit.Mutate guarantees structurally.
-//
-// `api` is the one entry that is not obvious from its own name, and it is here
-// for the reason the others are not: a raw request is whatever the caller made
-// it, so the CLI cannot promise it changes nothing. A guard that has to read an
-// argument before it knows whether it applies is a guard with a gap in it.
 var Mutating = map[string]bool{
 	"api":    true,
 	"create": true, "update": true, "set": true, "delete": true, "trash": true,
@@ -227,7 +162,7 @@ var Mutating = map[string]bool{
 	"snooze": true, "unsnooze": true, "apply": true, "reorder": true, "favorite": true, "unfavorite": true, "pin": true,
 	"unpin": true, "hide": true, "unhide": true, "exclude": true, "include": true,
 	"trust": true, "untrust": true, "reactivate": true, "respond": true, "login": true, "logout": true,
-	"revoke": true, "uninstall": true, "transfer": true, "abuse": true,
+	"revoke": true, "rotate": true, "uninstall": true, "transfer": true, "abuse": true,
 	"grant": true, "request": true, "access": true,
 	"resolve": true, "reopen": true,
 }
@@ -281,55 +216,21 @@ var SettingsPages = map[string]string{
 	"pass settings mailboxes":            "Aliases",
 }
 
-// Placeholder is one argument name: what it stands for, where the things it may
-// name are found, and what a value typed for it has to look like.
 type Placeholder struct {
-	// Means is the sentence that explains the name.
 	Means string
-	// Picks is the collection whose things the argument names, for the arguments
-	// that name one. It is a command line, or one of the two answers that depend
-	// on the command asking. It is empty for an argument naming something this
-	// CLI does not hold - a local file, an address, a setting key - and such an
-	// argument is left to the shell, which knows about files and does not need
-	// telling not to.
 	Picks string
-	// Check refuses a value that cannot be what the name stands for, saying what
-	// is wrong with it. Every command whose usage line names the placeholder is
-	// held to it before anything else runs, so a mistyped address costs no
-	// sign-in to find out about. It is nil for a name only a lookup can judge - a
-	// reference, a path, a setting key - and for free text.
 	Check func(value string) *errs.Problem
 }
 
-// TakesNone is how a command declares that a checked argument also takes None,
-// the word that takes the value away: `recovery-email set none` removes the
-// address. The annotation's value is the placeholder it applies to.
 const TakesNone = "takes-none"
 
-// The two collections an argument can name that are not the same wherever the
-// argument appears. Neither reads as a command line, so neither can be mistaken
-// for one.
 const (
-	// PicksAddressed is what a command's REF names: the nearest collection above
-	// it that can be listed without naming something first, unless the command
-	// says otherwise with Addresses.
 	PicksAddressed = "the collection this command acts on"
-	// PicksHolding is the collection the command is part of, which is what a
-	// second reference names - the attachments of the message it addresses, the
-	// revisions of the file.
-	PicksHolding = "the collection this command is part of"
+	PicksHolding   = "the collection this command is part of"
 )
 
-// Addresses is how a command declares the collection its REF comes from, for
-// the one whose REF is not what the tree above it would say: `pass links create`
-// sits under links and names an item.
 const Addresses = "addresses"
 
-// Placeholders is every argument name a usage string may contain.
-//
-// One name per idea, so `REF` means the same thing in every command that takes
-// one: a full ID, an eight-character short ID, or a human handle such as a
-// subject, a name, a path or an email address.
 var Placeholders = map[string]Placeholder{
 	"ALIAS_CONTACT_REF": {Means: "an address the addressed alias may write to", Picks: PicksHolding},
 	"ATTACHMENT_REF":    {Means: "an attachment on the addressed message or item", Picks: PicksHolding},

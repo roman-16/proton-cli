@@ -1,45 +1,12 @@
 package kit
 
-// The flag vocabulary.
-//
-// Verbs are declared, argument names are declared, and for a long time flags
-// were not - so a name got in by being spelled, and a second meaning got in by
-// being spelled the same. That is how --color came to take an accent name on ten
-// commands and a bare integer on one, and how --start came to mean both an
-// event's own beginning and the first day of a query.
-//
-// So a flag used by more than one command is declared here, exactly as a verb
-// is: one entry, one meaning, and - where its value names something this CLI
-// holds - the collection it names, which is what shell completion answers from.
-//
-// The conformance test reads this in both directions. A shared name missing here
-// fails, and an entry nothing uses fails too, because a vocabulary that keeps
-// words after they stop being spoken stops describing the CLI.
-
-// None is what a flag takes to mean "nothing", where the values it otherwise
-// accepts have a shape the word cannot be mistaken for.
-//
-// An address is such a value: no address is spelled `none`, so the flag that
-// sets one can say it, and a --clear-x beside it would be a second way to say
-// the same thing. Free text and a secret read from a file are the cases that
-// cannot, and those keep their --clear-x.
 const None = "none"
 
-// Flag is one flag name: what it means, and what its value names.
 type Flag struct {
-	// Means is the sentence that explains the name. It is the meaning, not the
-	// wording: "Set the postal address" on a create and "Replace the postal
-	// address" on the update beside it are one meaning.
 	Means string
-	// Picks is every collection whose things the value names, for the flags whose
-	// value is a reference. Each is a command line, so completion asks the same
-	// cache an argument asks. It is empty for a value that names something this
-	// CLI does not hold - a local path, an address, a duration, a free word - and
-	// such a value is left to the shell or to the flag's own declared domain.
 	Picks []string
 }
 
-// Flags is every flag name used by more than one command.
 var Flags = map[string]Flag{
 	"access":                 {Means: "what somebody may do with a shared thing"},
 	"address":                {Means: "a postal or street address"},
@@ -140,6 +107,7 @@ var Flags = map[string]Flag{
 	"manager":                {Means: "the password manager that wrote a file being read in"},
 	"mark-read":              {Means: "mark matching mail as read"},
 	"match":                  {Means: "whether every condition must hold or any one of them"},
+	"meet":                   {Means: "a Proton Meet link: on an event, or on a booking page's appointments"},
 	"message":                {Means: "an accompanying note"},
 	"middle-name":            {Means: "a middle name"},
 	"name":                   {Means: "the name to set"},
@@ -148,6 +116,7 @@ var Flags = map[string]Flag{
 	"nickname":               {Means: "a familiar name"},
 	"no-attachments":         {Means: "leave attachments out"},
 	"no-digits":              {Means: "leave the digits out of a generated password"},
+	"no-meet":                {Means: "leave an event without a Proton Meet link"},
 	"no-quote":               {Means: "do not quote the message being answered"},
 	"no-remind":              {Means: "leave an event with no reminder"},
 	"no-signature":           {Means: "leave the signature out"},
@@ -209,7 +178,7 @@ var Flags = map[string]Flag{
 	"summary":                {Means: "one line per item instead of the whole thing"},
 	"tag":                    {Means: "the photo tag to select"},
 	"timezone":               {Means: "an IANA time zone"},
-	"title":                  {Means: "a title: an event's or a booking page's, or a person's job title"},
+	"title":                  {Means: "a title: an event's, a booking page's, a meeting's or a room's, or a person's job title"},
 	"to":                     {Means: "an address mail goes to: compose sets one, a filter matches one, an import lands on one"},
 	"totp":                   {Means: "a two-factor code"},
 	"type":                   {Means: "the kind of thing to create or select"},

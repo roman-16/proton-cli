@@ -19,7 +19,7 @@ body:
     id: web
     attributes:
       label: Where this lives in Proton's own clients
-      description: The page or menu in Proton Mail, Drive, Calendar, Pass or Contacts that does this today.
+      description: The page or menu in Proton Mail, Drive, Calendar, Pass, Meet or Contacts that does this today.
     validations:
       required: false
 

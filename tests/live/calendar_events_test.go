@@ -12,17 +12,9 @@ import (
 	"time"
 )
 
-// Events: making, reading, editing and deleting one, and everything that only a
-// recurring event has.
-//
-// A series is stored once and happens many times, so almost everything about it
-// is observable only through a window. These tests work the way a person does -
-// list a range, act on a row, list again - because that is the only place the
-// difference is visible.
-
 func TestCalendarEventsList(t *testing.T) {
 	stdout := runOK(t, "calendar", "events", "list", "--calendar", "Default")
-	_ = stdout // may be empty; only assert the command runs
+	_ = stdout
 }
 
 func TestCalendarEventsCRUDByIDs(t *testing.T) {
@@ -34,19 +26,14 @@ func TestCalendarEventsCRUDByIDs(t *testing.T) {
 		"--title", title,
 		"--start", start,
 		"--duration", "1h")
-	// An event lives in a calendar, so creating one answers with both halves as
-	// the single reference every event verb takes.
 	eventID := assertBarePairRef(t, idOut, "events create")
 	cleanupRun(t, fmt.Sprintf("Delete event: proton calendar events delete -- %s", eventID),
 		"calendar", "events", "delete", "--", eventID)
 
-	// Get by IDs
 	got := runOK(t, "calendar", "events", "get", "--", eventID)
 	assertContains(t, got, title)
-	// Signature: an event we just created is signed with our own address key.
 	assertField(t, got, "Signature:", "verified")
 
-	// Update title + location
 	runOK(t, "calendar", "events", "update", "--title", title+"-updated", "--location", "Vienna",
 		"--", eventID)
 	got2 := runOK(t, "calendar", "events", "get", "--", eventID)
@@ -66,7 +53,6 @@ func TestCalendarEventsGetByTitleRef(t *testing.T) {
 	cleanupRun(t, fmt.Sprintf("Delete event: proton calendar events delete -- %s", eventID),
 		"calendar", "events", "delete", "--", eventID)
 
-	// REF = title substring
 	stdout := runOK(t, "calendar", "events", "get", title)
 	assertContains(t, stdout, title)
 }
@@ -95,11 +81,6 @@ func TestCalendarEventsNotFound(t *testing.T) {
 	}
 }
 
-// eventPath is the raw API path for an event. The CLI hands an event's two
-// halves back as one reference, but the endpoint wants them apart.
-// eventIfStillThere reads one event of a shared calendar, and answers nil when it
-// is not there any more: the listing this walks is of a calendar other tests are
-// making and deleting events in, so one going missing mid-walk is ordinary.
 func eventIfStillThere(t *testing.T, calendarID, eventID string) map[string]interface{} {
 	t.Helper()
 	stdout, _, code := run(t, "--output", "json", "api", "GET", "/calendar/v1/"+calendarID+"/events/"+eventID)
@@ -122,9 +103,6 @@ func eventPath(t *testing.T, ref string) string {
 	return "/calendar/v1/" + cal + "/events/" + ev
 }
 
-// firstCalendarID is which calendar a test writes to when it does not care. It is
-// looked up once: the account's calendars do not change under the suite, so asking
-// again for every test that needs one is a listing paid for six times over.
 var defaultCalendarID = sync.OnceValues(func() (string, error) {
 	stdout, stderr, code, err := runArgs(nil, "--output", "json", "calendar", "settings", "calendars", "list")
 	if err != nil || code != 0 {
@@ -210,7 +188,6 @@ func TestCalendarEventWithProtonAttendee(t *testing.T) {
 	if !looksLikeID(eventID) {
 		t.Errorf("expected an event ID on stdout, got %q", eventID)
 	}
-	// The server accepted the encrypted attendee parts; the event must read back.
 	runOK(t, "calendar", "events", "get", eventID)
 }
 
@@ -223,7 +200,6 @@ func TestCalendarEventWithProtonAttendee(t *testing.T) {
 // Nothing else in the suite invites one. Reading a refusal as a failure breaks
 // every invitation to a work address, and the free accounts would go on passing.
 func TestCalendarEventWithAttendeeOutsideProton(t *testing.T) {
-	// Creating this event emails the attendee, and no two sends overlap.
 	guest := externalRecipient(t)
 	calID := firstCalendarID(t)
 
@@ -241,11 +217,8 @@ func TestCalendarEventWithAttendeeOutsideProton(t *testing.T) {
 	assertContains(t, runOK(t, "calendar", "events", "get", eventID), guest)
 }
 
-// seriesAnchor is a fixed far-future date, so a run cannot collide with real
-// events on the account or with a previous run's leftovers.
 const seriesAnchor = "2027-03-01"
 
-// occurrencesOf lists a window and returns the rows whose title matches.
 func occurrencesOf(t *testing.T, title, from, to string) []map[string]interface{} {
 	t.Helper()
 	rows := runJSONArray(t, "calendar", "events", "list",
@@ -263,8 +236,6 @@ func occurrencesOf(t *testing.T, title, from, to string) []map[string]interface{
 	return out
 }
 
-// occurrenceRefs is the reference each matching row is addressed by, which is what
-// a person would copy out of the table.
 func occurrenceRefs(t *testing.T, title, from, to string) []string {
 	t.Helper()
 	var out []string
@@ -296,10 +267,6 @@ func createSeries(t *testing.T, title, start, rule string, extra ...string) stri
 	return ref
 }
 
-// A weekly event is one stored record. Asking about a week three weeks out has to
-// answer with that week's occurrence, which is only true if the rule is expanded
-// and if the record is asked for in the window it reaches into rather than the one
-// it starts in.
 func TestCalendarRecurringSeriesAppearsOnEveryOccurrence(t *testing.T) {
 	title := testID() + "-weekly"
 	createSeries(t, title, seriesAnchor+"T09:00", "FREQ=WEEKLY;COUNT=5")
@@ -318,8 +285,6 @@ func TestCalendarRecurringSeriesAppearsOnEveryOccurrence(t *testing.T) {
 		}
 	}
 
-	// A window that contains only the fourth occurrence answers with it alone,
-	// even though the record itself is dated three weeks earlier.
 	later := occurrencesOf(t, title, "2027-03-22", "2027-03-22")
 	if len(later) != 1 {
 		t.Fatalf("a window three weeks out listed %d rows, want 1", len(later))
@@ -329,8 +294,6 @@ func TestCalendarRecurringSeriesAppearsOnEveryOccurrence(t *testing.T) {
 	}
 }
 
-// An all-day event is asked for through a different window than a timed one, so
-// asking for only one window makes every all-day event invisible.
 func TestCalendarAllDayEventAppearsInAList(t *testing.T) {
 	title := testID() + "-allday"
 	ref := strings.TrimSpace(runOK(t, "calendar", "events", "create",
@@ -385,10 +348,6 @@ func TestCalendarAllDayEventLastsAWholeDay(t *testing.T) {
 	assertField(t, runOK(t, "calendar", "events", "get", "--", ref), "Duration:", "1d")
 }
 
-// An all-day event is the one state a calendar cannot be talked out of by
-// accident: every way of giving it a time of day back has to work, or the event
-// is stuck. Writing a time is that way, and taking the time of day away again is
-// how it goes back.
 func TestCalendarAllDayEventGainsAndLosesItsTimeOfDay(t *testing.T) {
 	title := testID() + "-allday-toggle"
 	ref := strings.TrimSpace(runOK(t, "calendar", "events", "create",
@@ -461,10 +420,6 @@ func TestCalendarEventWithNoLengthTakesTheCalendarsDefault(t *testing.T) {
 	assertField(t, runOK(t, "calendar", "events", "get", "--", ref), "Duration:", "45m")
 }
 
-// The day after the last one named is not reported, by either route into a listing:
-// an all-day event begins at the instant that day begins, and an all-day row carries
-// no time of day to give it away. Recurring and one-off events are filtered by the
-// same rule, so both are checked here.
 func TestCalendarListStopsAtTheLastDayNamed(t *testing.T) {
 	series := testID() + "-leak-series"
 	seriesRef := strings.TrimSpace(runOK(t, "calendar", "events", "create",
@@ -489,7 +444,6 @@ func TestCalendarListStopsAtTheLastDayNamed(t *testing.T) {
 	}
 }
 
-// The last day named is a whole day, not the instant it begins.
 func TestCalendarListIncludesTheLastDayNamed(t *testing.T) {
 	title := testID() + "-lastday"
 	ref := strings.TrimSpace(runOK(t, "calendar", "events", "create",
@@ -564,9 +518,6 @@ func TestCalendarUpdatingAnEventKeepsItsReminders(t *testing.T) {
 	}
 }
 
-// An event may carry an accent colour of its own. It lives beside the encrypted
-// cards, so it survives an edit that says nothing about it, and an event given
-// none has none rather than an empty one.
 func TestCalendarAnEventKeepsTheColourItWasGiven(t *testing.T) {
 	title := testID() + "-colour"
 	ref := strings.TrimSpace(runOK(t, "calendar", "events", "create",
@@ -578,7 +529,6 @@ func TestCalendarAnEventKeepsTheColourItWasGiven(t *testing.T) {
 	if got := colourOf(t, ref); got != "#179FD9" {
 		t.Fatalf("the event was created with colour %q, want pacific", got)
 	}
-	// The name is what a person reads, and the hex is what a machine gets.
 	assertContains(t, runOK(t, "calendar", "events", "get", "--", ref), "pacific")
 	if got := runJSON(t, "calendar", "events", "get", "--", ref)["color"]; got != "#179FD9" {
 		t.Errorf("machine output reports the colour as %v, want #179FD9", got)
@@ -594,8 +544,6 @@ func TestCalendarAnEventKeepsTheColourItWasGiven(t *testing.T) {
 		t.Errorf("--color left the event with %q, want strawberry", got)
 	}
 
-	// An event given no colour has none of its own, which is how it comes to be
-	// drawn in its calendar's.
 	plain := strings.TrimSpace(runOK(t, "calendar", "events", "create",
 		"--calendar", "Default", "--title", title+"-plain",
 		"--start", "2027-07-02T11:00", "--duration", "30m"))
@@ -606,8 +554,6 @@ func TestCalendarAnEventKeepsTheColourItWasGiven(t *testing.T) {
 	}
 }
 
-// A colour follows the scope its reference names: one occurrence takes its own
-// and leaves the series alone, and --onwards colours the remainder only.
 func TestCalendarAColourReachesWhatTheReferenceNames(t *testing.T) {
 	const pacific, strawberry, carrot = "#179FD9", "#EC3E7C", "#F78400"
 	last := "2027-03-29"
@@ -633,8 +579,6 @@ func TestCalendarAColourReachesWhatTheReferenceNames(t *testing.T) {
 	}
 }
 
-// colours is the colour each occurrence of a series is drawn in, in the order a
-// listing prints them.
 func colours(t *testing.T, title, from, to string) []string {
 	t.Helper()
 	var out []string
@@ -645,8 +589,6 @@ func colours(t *testing.T, title, from, to string) []string {
 	return out
 }
 
-// cleanupSplitRemainder registers the second series a split produced, which has
-// an identity of its own and so outlives the one the test created.
 func cleanupSplitRemainder(t *testing.T, title, from, to, colour string) {
 	t.Helper()
 	for _, row := range occurrencesOf(t, title, from, to) {
@@ -661,8 +603,6 @@ func cleanupSplitRemainder(t *testing.T, title, from, to, colour string) {
 	}
 }
 
-// colourOf reads an event's own colour straight from the API. It is empty for an
-// event that has none, which the API spells as a null.
 func colourOf(t *testing.T, ref string) string {
 	t.Helper()
 	data := runJSON(t, "api", "GET", eventPath(t, ref))
@@ -671,8 +611,6 @@ func colourOf(t *testing.T, ref string) string {
 	return colour
 }
 
-// triggersOf reads an event's reminder triggers straight from the API, so the
-// assertion does not depend on how the CLI renders them.
 func triggersOf(t *testing.T, ref string) []string {
 	t.Helper()
 	data := runJSON(t, "api", "GET", eventPath(t, ref))
@@ -689,9 +627,6 @@ func triggersOf(t *testing.T, ref string) []string {
 	return out
 }
 
-// Editing one occurrence writes a second record that replaces it. The rest of the
-// series has to be untouched, and the edited occurrence keeps the reference it had
-// before it was edited.
 func TestCalendarOccurrenceUpdateLeavesTheSeriesAlone(t *testing.T) {
 	title := testID() + "-single"
 	createSeries(t, title, seriesAnchor+"T09:00", "FREQ=WEEKLY;COUNT=4")
@@ -723,13 +658,9 @@ func TestCalendarOccurrenceUpdateLeavesTheSeriesAlone(t *testing.T) {
 	if stored, _ := edited["stored_id"].(string); stored == "" {
 		t.Error("the edited occurrence does not report the record backing it")
 	}
-	// Re-addressing it by the same reference finds the edit rather than the rule's
-	// version of that day.
 	assertContains(t, runOK(t, "calendar", "events", "get", "--", second), title+"-moved")
 }
 
-// Cancelling one occurrence has to leave the rule alone, and has to stick: an
-// exclusion written in the wrong frame does not cancel anything.
 func TestCalendarOccurrenceDeleteLeavesTheSeriesAloneAndSticks(t *testing.T) {
 	title := testID() + "-cancel"
 	createSeries(t, title, seriesAnchor+"T09:00", "FREQ=WEEKLY;COUNT=4")
@@ -748,15 +679,12 @@ func TestCalendarOccurrenceDeleteLeavesTheSeriesAloneAndSticks(t *testing.T) {
 		t.Error("the cancelled occurrence is still listed")
 	}
 
-	// Deleting it again changes nothing rather than accumulating exclusions.
 	runOK(t, "calendar", "events", "delete", "--yes", "--", refs[2])
 	if again := occurrenceRefs(t, title, seriesAnchor, "2027-03-29"); len(again) != 3 {
 		t.Errorf("cancelling the same occurrence twice left %d occurrences, want 3", len(again))
 	}
 }
 
-// Renaming a series must not resurrect the occurrences somebody cancelled, which
-// is what happens when an update rebuilds the event instead of merging into it.
 func TestCalendarSeriesUpdateKeepsItsExclusions(t *testing.T) {
 	title := testID() + "-exdate"
 	ref := createSeries(t, title, seriesAnchor+"T09:00", "FREQ=WEEKLY;COUNT=4")
@@ -779,8 +707,6 @@ func TestCalendarSeriesUpdateKeepsItsExclusions(t *testing.T) {
 	}
 }
 
-// Ending a series at one occurrence keeps everything before it and removes
-// everything from it on.
 func TestCalendarOnwardsEndsTheSeriesAtAnOccurrence(t *testing.T) {
 	title := testID() + "-onwards"
 	createSeries(t, title, seriesAnchor+"T09:00", "FREQ=WEEKLY;COUNT=5")
@@ -802,8 +728,6 @@ func TestCalendarOnwardsEndsTheSeriesAtAnOccurrence(t *testing.T) {
 	}
 }
 
-// Changing one occurrence and every later one keeps the earlier ones as they were
-// and starts a second series from the split.
 func TestCalendarOnwardsUpdateSplitsTheSeries(t *testing.T) {
 	title := testID() + "-split"
 	createSeries(t, title, seriesAnchor+"T09:00", "FREQ=WEEKLY;COUNT=5")
@@ -831,7 +755,6 @@ func TestCalendarOnwardsUpdateSplitsTheSeries(t *testing.T) {
 	if early != 2 || late != 3 {
 		t.Errorf("the split left %d occurrences before and %d after, want 2 and 3", early, late)
 	}
-	// The remainder has its own identity, so the two halves are separate series.
 	var uids []string
 	for _, row := range after {
 		if uid, _ := row["uid"].(string); uid != "" && !contains(uids, uid) {
@@ -842,7 +765,6 @@ func TestCalendarOnwardsUpdateSplitsTheSeries(t *testing.T) {
 		t.Errorf("the split produced %d identities, want 2", len(uids))
 	}
 
-	// Any occurrence created by the split has to be deletable on its own.
 	for _, row := range after {
 		if got, _ := row["title"].(string); strings.Contains(got, "-later") {
 			cal, _ := row["calendar_id"].(string)
@@ -854,8 +776,6 @@ func TestCalendarOnwardsUpdateSplitsTheSeries(t *testing.T) {
 	}
 }
 
-// Ending a series at its own first occurrence would leave nothing, so it is
-// refused rather than quietly removing everything.
 func TestCalendarOnwardsRefusesTheFirstOccurrence(t *testing.T) {
 	title := testID() + "-firstocc"
 	createSeries(t, title, seriesAnchor+"T09:00", "FREQ=WEEKLY;COUNT=3")
@@ -871,7 +791,6 @@ func TestCalendarOnwardsRefusesTheFirstOccurrence(t *testing.T) {
 	assertContains(t, stderr, "first occurrence")
 }
 
-// Deleting the series removes every occurrence, and says how many before it does.
 func TestCalendarDeletingASeriesRemovesEveryOccurrence(t *testing.T) {
 	title := testID() + "-whole"
 	ref := createSeries(t, title, seriesAnchor+"T09:00", "FREQ=WEEKLY;COUNT=4")
@@ -885,9 +804,6 @@ func TestCalendarDeletingASeriesRemovesEveryOccurrence(t *testing.T) {
 	}
 }
 
-// A series anchored to a zone keeps its wall-clock time when the clocks change.
-// Stored as a plain UTC instant it slides by an hour, which is the whole reason an
-// event carries a zone. European summer time ends on 31 October 2027.
 func TestCalendarRecurringSeriesKeepsItsWallClockAcrossADaylightSavingChange(t *testing.T) {
 	title := testID() + "-dst"
 	createSeries(t, title, "2027-10-28T09:00", "FREQ=DAILY;COUNT=6", "--zone", "Europe/Vienna")
@@ -907,7 +823,6 @@ func TestCalendarRecurringSeriesKeepsItsWallClockAcrossADaylightSavingChange(t *
 	}
 }
 
-// Changing the rule is a change to the event like any other.
 func TestCalendarSeriesRuleCanBeChanged(t *testing.T) {
 	title := testID() + "-rerule"
 	ref := createSeries(t, title, seriesAnchor+"T09:00", "FREQ=WEEKLY;COUNT=3")
@@ -940,8 +855,6 @@ func TestCalendarEventEndIsTheSameAsADuration(t *testing.T) {
 	}
 }
 
-// A reminder says how it is delivered, and what a listing prints has to be what
-// --remind would accept: an event you can read is an event you can recreate.
 func TestCalendarEventEmailReminderRoundTrips(t *testing.T) {
 	title := testID() + "-remind-email"
 	ref := strings.TrimSpace(runOK(t, "calendar", "events", "create",
@@ -971,7 +884,6 @@ func TestCalendarEventEmailReminderRoundTrips(t *testing.T) {
 		t.Errorf("a bare 17m stored as Type %v, want 1 (device)", kinds["-PT17M"])
 	}
 
-	// And it comes back spelled the way it was written.
 	got := runJSON(t, "calendar", "events", "get", "--", ref)
 	reminders, _ := got["reminders"].([]interface{})
 	var printed []string
@@ -985,8 +897,6 @@ func TestCalendarEventEmailReminderRoundTrips(t *testing.T) {
 	}
 }
 
-// An export has to be a file another client can open: one VCALENDAR, no METHOD,
-// and a series written once with its rule rather than expanded.
 func TestCalendarEventsExportWritesAnICSFile(t *testing.T) {
 	title := testID() + "-export"
 	ref := strings.TrimSpace(runOK(t, "calendar", "events", "create",
@@ -1018,28 +928,24 @@ func TestCalendarEventsExportWritesAnICSFile(t *testing.T) {
 	}
 }
 
-// An event's own status is not an attendee's answer, so cancelling one keeps it
-// and its history rather than removing it.
 func TestCalendarEventStatusIsStoredAndRead(t *testing.T) {
 	title := testID() + "-status"
 	ref := strings.TrimSpace(runOK(t, "calendar", "events", "create",
 		"--calendar", "Default", "--title", title,
-		"--start", "2027-09-20T09:00", "--duration", "30m", "--status", "tentative"))
+		"--start", "2027-09-20T09:00", "--duration", "30m", "--status", "cancelled"))
 	cleanupRun(t, fmt.Sprintf("Delete event: proton calendar events delete -- %s", ref),
 		"calendar", "events", "delete", "--", ref)
 
-	if got := runJSON(t, "calendar", "events", "get", "--", ref)["status"]; got != "tentative" {
-		t.Errorf("status came back as %v, want tentative", got)
+	if got := runJSON(t, "calendar", "events", "get", "--", ref)["status"]; got != "cancelled" {
+		t.Errorf("status came back as %v, want cancelled", got)
 	}
 
-	runOK(t, "calendar", "events", "update", "--status", "cancelled", "--", ref)
-	if got := runJSON(t, "calendar", "events", "get", "--", ref)["status"]; got != "cancelled" {
-		t.Errorf("after cancelling, status is %v, want cancelled", got)
+	runOK(t, "calendar", "events", "update", "--status", "confirmed", "--", ref)
+	if got := runJSON(t, "calendar", "events", "get", "--", ref)["status"]; got != "confirmed" {
+		t.Errorf("after confirming, status is %v, want confirmed", got)
 	}
 }
 
-// An event with no status is confirmed - that is what every client reads an
-// absent STATUS as, so the CLI says so rather than leaving it blank.
 func TestCalendarEventWithoutAStatusIsConfirmed(t *testing.T) {
 	title := testID() + "-nostatus"
 	ref := strings.TrimSpace(runOK(t, "calendar", "events", "create",
@@ -1053,8 +959,6 @@ func TestCalendarEventWithoutAStatusIsConfirmed(t *testing.T) {
 	}
 }
 
-// editEventNamed adds a line to the VEVENT whose SUMMARY is title, leaving every
-// other event in the file alone.
 func editEventNamed(t *testing.T, ics, title, line string) string {
 	t.Helper()
 	const begin = "BEGIN:VEVENT"
@@ -1081,8 +985,6 @@ func TestCalendarEventsImportRoundTripsAnExport(t *testing.T) {
 		"--calendar", "Default", "--title", title,
 		"--start", day+"T09:00", "--duration", "45m", "--remind", "20m",
 		"--color", "pacific")
-	// Overwriting by UID replaces the event, and the replacement has an ID of its
-	// own, so cleanup goes looking by name rather than holding the first one.
 	cleanup(t, "Delete event: proton calendar events list, then delete the one called "+title, func() error {
 		for _, ref := range eventsTitled(t, day, title) {
 			if _, stderr, code, err := runArgs(nil, "--yes", "calendar", "events", "delete", "--", ref); err != nil {
@@ -1098,9 +1000,6 @@ func TestCalendarEventsImportRoundTripsAnExport(t *testing.T) {
 	runOK(t, "calendar", "events", "export",
 		"--after", "2027-10-01", "--before", "2027-10-31", "--dest", file)
 
-	// And back in. An event carries the UID of the event it is, so reading the
-	// file back changes that event rather than making a second one - which is the
-	// difference between a backup and a way to fill a calendar with duplicates.
 	written, err := os.ReadFile(file)
 	if err != nil {
 		t.Fatalf("read the export: %v", err)
@@ -1108,8 +1007,6 @@ func TestCalendarEventsImportRoundTripsAnExport(t *testing.T) {
 	if !strings.Contains(string(written), "COLOR:#179FD9") {
 		t.Error("the export does not carry the event's colour, so a round trip loses it")
 	}
-	// The file may hold other events from the same window, so the edits go on the
-	// one this test made rather than on whichever came first.
 	edited := editEventNamed(t, string(written), title, "LOCATION:Room 12")
 	edited = strings.Replace(edited, "COLOR:#179FD9", "COLOR:tomato", 1)
 	if err := os.WriteFile(file, []byte(edited), 0o600); err != nil {
@@ -1128,7 +1025,6 @@ func TestCalendarEventsImportRoundTripsAnExport(t *testing.T) {
 	}
 }
 
-// eventsTitled returns the references of every event on one day with that title.
 func eventsTitled(t *testing.T, day, title string) []string {
 	t.Helper()
 	var refs []string
@@ -1185,5 +1081,81 @@ func TestCalendarNewEventsGoToTheDefaultCalendar(t *testing.T) {
 	assertContains(t, stderr, "as your new default calendar")
 	if got, _ := runJSON(t, "calendar", "settings", "get")["default_calendar"].(string); got == "" || got == id {
 		t.Errorf("after deleting the default calendar the default is %q, want the next calendar of your own", got)
+	}
+}
+
+func meetLinkOf(t *testing.T, ref string) string {
+	t.Helper()
+	call, _ := runJSON(t, "calendar", "events", "get", ref)["video_call"].(map[string]interface{})
+	url, _ := call["url"].(string)
+	return url
+}
+
+func TestCalendarEventsMeetLink(t *testing.T) {
+	calID := firstCalendarID(t)
+	title := testID() + "-meet"
+	stdout, stderr := runOKStderr(t, "calendar", "events", "create",
+		"--calendar", calID, "--title", title, "--start", "2027-04-06T10:00", "--duration", "30m",
+		"--description", "Bring the numbers", "--meet")
+	ref := assertBarePairRef(t, stdout, "events create --meet")
+	cleanupRun(t, "Delete event: proton calendar events delete "+ref, "calendar", "events", "delete", ref)
+	assertContains(t, stderr, "with a Proton Meet link")
+	assertContains(t, stderr, "Join with Proton Meet: https://meet.proton.me/join/id-")
+
+	url := meetLinkOf(t, ref)
+	if url == "" {
+		t.Fatal("the event has no video call")
+	}
+	name := strings.TrimPrefix(strings.SplitN(url, "#", 2)[0], "https://meet.proton.me/join/id-")
+	cleanupRun(t, "Delete meeting: proton meet meetings delete "+name, "meet", "meetings", "delete", name)
+	got := runJSON(t, "calendar", "events", "get", ref)
+	if got["description"] != "Bring the numbers" {
+		t.Errorf("the description shows the join instructions: %q", got["description"])
+	}
+	assertNotContains(t, runOK(t, "--output", "json", "calendar", "events", "list",
+		"--calendar", calID, "--after", "2027-04-06", "--before", "2027-04-06"), "meet.proton.me")
+
+	runOK(t, "calendar", "events", "update", "--location", "Room 3", "--title", title+"-renamed", ref)
+	if meetLinkOf(t, ref) != url {
+		t.Error("changing the event lost its Proton Meet link")
+	}
+	if meeting := runJSON(t, "meet", "meetings", "get", url); meeting["title"] != title+"-renamed" {
+		t.Errorf("the meeting kept the title %q", meeting["title"])
+	}
+
+	_, stderr = runOKStderr(t, "calendar", "events", "update", "--meet", ref)
+	assertContains(t, stderr, "already has a Proton Meet link")
+
+	runOK(t, "calendar", "events", "update", "--no-meet", ref)
+	if meetLinkOf(t, ref) != "" {
+		t.Error("--no-meet left the link on the event")
+	}
+	if _, _, code := run(t, "meet", "meetings", "get", url); code != 3 {
+		t.Errorf("the meeting outlived the link: get answers exit %d, want 3", code)
+	}
+}
+
+func TestCalendarEventsAutoAddMeetLinks(t *testing.T) {
+	before, _ := runJSON(t, "calendar", "settings", "get")["auto_add_meet_links"].(string)
+	runOK(t, "calendar", "settings", "set", "auto-add-meet-links", "on")
+	cleanupRun(t, "Restore: proton calendar settings set auto-add-meet-links "+before,
+		"calendar", "settings", "set", "auto-add-meet-links", before)
+
+	calID := firstCalendarID(t)
+	title := testID() + "-auto-meet"
+	with := assertBarePairRef(t, runOK(t, "calendar", "events", "create",
+		"--calendar", calID, "--title", title, "--start", "2027-04-07T10:00", "--duration", "30m",
+		"--attendee", selfEmail()), "events create with a guest")
+	cleanupRun(t, "Delete event: proton calendar events delete "+with, "calendar", "events", "delete", with)
+	if meetLinkOf(t, with) == "" {
+		t.Error("an event with a guest got no Proton Meet link while auto-add-meet-links is on")
+	}
+
+	without := assertBarePairRef(t, runOK(t, "calendar", "events", "create",
+		"--calendar", calID, "--title", title+"-none", "--start", "2027-04-07T11:00", "--duration", "30m",
+		"--attendee", selfEmail(), "--no-meet"), "events create --no-meet")
+	cleanupRun(t, "Delete event: proton calendar events delete "+without, "calendar", "events", "delete", without)
+	if meetLinkOf(t, without) != "" {
+		t.Error("--no-meet left a Proton Meet link on the event")
 	}
 }

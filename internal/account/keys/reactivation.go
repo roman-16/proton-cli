@@ -32,17 +32,10 @@ import (
 // locked user key: the password from before the reset, the recovery phrase, or
 // a recovery file.
 type Secret interface {
-	// open tries every locked user key and hands back the ones that opened, by
-	// record ID. A key that stays shut is written to the log by name and is not
-	// an error: the secret may be from between two resets.
 	open(ctx context.Context, c proton.Doer, u *Unlocked, locked []LockedKey) (map[string]*pgp.Key, error)
-	// nothingOpened is the refusal when not one key opened, phrased for the
-	// secret that was tried.
 	nothingOpened() error
 }
 
-// PreviousPassword is the account password from before the reset - the second
-// password, for an account that kept two - stretched with each key's own salt.
 type PreviousPassword string
 
 // RecoveryPhrase is the twelve words Proton's Recovery page hands out.
@@ -52,13 +45,8 @@ type RecoveryPhrase string
 // account's user keys, encrypted under a secret Proton keeps beside the keys.
 type RecoveryFile []byte
 
-// ErrNoRecoveryPhrase reports that the account has no recovery phrase for a
-// phrase to be checked against.
 var ErrNoRecoveryPhrase = errors.New("the account has no recovery phrase")
 
-// ErrNoAccountKeyLocked reports that what is locked is address keys alone. An
-// address key comes back with the account key whose token opens it, so there is
-// nothing for a secret to open here.
 var ErrNoAccountKeyLocked = errors.New("no account key is locked")
 
 // Phrase judges a recovery phrase before anything is asked of Proton: the wrong
@@ -79,17 +67,9 @@ func Phrase(phrase string) (RecoveryPhrase, error) {
 	return RecoveryPhrase(phrase), nil
 }
 
-// Outcome is what a reactivation did, key by key.
 type Outcome struct {
-	// Reactivated is every key brought back, each user key followed by the
-	// address keys it opened.
 	Reactivated []LockedKey
-	// StillLocked is every user key the secret did not open, which stays as it
-	// was: a key from between two resets is opened by the secret of its own time.
 	StillLocked []LockedKey
-	// Unsupported is every address key no secret of the account's opens, with
-	// the address it belongs to: it comes back only from a copy of itself,
-	// through Import.
 	Unsupported []LockedKey
 }
 
@@ -197,8 +177,6 @@ func (u *Unlocked) reactivateUserKey(
 	return following, nil
 }
 
-// reactivated is one address key coming back: its record, and the key itself
-// for the fingerprints the list names it by.
 type reactivated struct {
 	locked LockedKey
 	record Key
@@ -262,8 +240,6 @@ func (u *Unlocked) listWithReactivated(_ context.Context, addr Address, keys []r
 		func(data string) (string, error) { return withReactivated(data, addr, keys) }, signers)
 }
 
-// ── the secrets ──
-
 func (p PreviousPassword) open(ctx context.Context, c proton.Doer, _ *Unlocked, locked []LockedKey) (map[string]*pgp.Key, error) {
 	salts, err := getKeySalts(ctx, c)
 	if err != nil {
@@ -309,7 +285,7 @@ func (p RecoveryPhrase) open(ctx context.Context, c proton.Doer, u *Unlocked, lo
 	}
 	var r struct{ MnemonicUserKeys []mnemonicKey }
 	if err := c.Decode(ctx, proton.Request{
-		Method: "GET", Path: "/core/v4/settings/mnemonic", AccountHost: true,
+		Method: "GET", Path: "/core/v4/settings/mnemonic", Door: proton.AccountDoor,
 	}, &r); err != nil {
 		return nil, fmt.Errorf("get the keys the recovery phrase holds: %w", err)
 	}
@@ -405,8 +381,6 @@ func (RecoveryFile) nothingOpened() error {
 		Hint("a recovery file made before the reset opens the keys from before it")
 }
 
-// openLocked unlocks one locked key record with a passphrase. It answers with
-// the key or with why not, never both.
 func openLocked(_ context.Context, k LockedKey, passphrase []byte) (*pgp.Key, error) {
 	shut, err := pgp.NewKeyFromArmored(k.Key.PrivateKey)
 	if err != nil {

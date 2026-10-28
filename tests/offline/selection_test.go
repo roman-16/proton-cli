@@ -7,12 +7,6 @@ import (
 	"testing"
 )
 
-// A command line that names nothing to act on, asks for something impossible, or
-// contradicts itself is wrong before anybody is signed in. None of these needs an
-// account to be judged, so none of them costs one.
-
-// "Everything" is too consequential to be the default reading of an empty command
-// line, and which filters a command has is part of the refusal.
 func TestASelectionThatNamesNothingIsRefused(t *testing.T) {
 	for _, args := range [][]string{
 		{"mail", "messages", "trash"},
@@ -27,9 +21,6 @@ func TestASelectionThatNamesNothingIsRefused(t *testing.T) {
 	}
 }
 
-// A command that will decrypt still judges its own arguments first. Keys are one
-// more thing to fetch rather than a state to be in, so needing them no longer
-// makes "not signed in" the answer to a command line that was wrong anyway.
 func TestACommandThatDecryptsStillJudgesItsArgumentsFirst(t *testing.T) {
 	for _, tt := range []struct {
 		args   []string
@@ -44,8 +35,6 @@ func TestACommandThatDecryptsStillJudgesItsArgumentsFirst(t *testing.T) {
 	}
 }
 
-// An address is a local part and a domain, which is a judgement about the
-// command line and nothing else.
 func TestAnAddressToAddHasToBeAnAddress(t *testing.T) {
 	for _, bad := range []string{"work", "work@", "@example.com", "work@a@b"} {
 		refuses(t, 1, []string{"mail", "settings", "addresses", "create", bad},
@@ -53,8 +42,6 @@ func TestAnAddressToAddHasToBeAnAddress(t *testing.T) {
 	}
 }
 
-// A domain to add is a bare name, so an address, a URL and a path are all wrong
-// before anybody is signed in - whichever app is being handed the domain.
 func TestADomainToAddHasToBeADomain(t *testing.T) {
 	for _, bad := range []string{"example", "me@example.com", "https://example.com", "example.com/mail"} {
 		refuses(t, 1, []string{"mail", "settings", "domains", "create", bad},
@@ -64,8 +51,6 @@ func TestADomainToAddHasToBeADomain(t *testing.T) {
 	}
 }
 
-// The one field a domain has is the one the command exists to write, so naming
-// neither is a command line with nothing in it.
 func TestUpdatingADomainWithNothingToChangeIsRefused(t *testing.T) {
 	refuses(t, 1, []string{"mail", "settings", "domains", "update", "example.com"},
 		"Nothing to change", "--catch-all none")
@@ -73,9 +58,6 @@ func TestUpdatingADomainWithNothingToChangeIsRefused(t *testing.T) {
 		"Nothing to change", "--catch-all", "--default")
 }
 
-// A domain's display name is text, so taking it off has a flag of its own, and
-// saying both at once is a command line that means something its author did not
-// check.
 func TestADomainsDisplayNameIsSetOrClearedButNotBoth(t *testing.T) {
 	refuses(t, 1, []string{"pass", "settings", "domains", "update", "example.com", "--display-name", ""},
 		"--display-name needs a name", "--clear-display-name")
@@ -83,8 +65,6 @@ func TestADomainsDisplayNameIsSetOrClearedButNotBoth(t *testing.T) {
 		"--display-name", "Jane", "--clear-display-name"}, "contradict")
 }
 
-// A token is described whole on the command line: what to call it, how long it
-// works, and what it reads. Each is judged before anybody is signed in.
 func TestAnAccessTokenIsDescribedWholeBeforeItIsMade(t *testing.T) {
 	create := func(rest ...string) []string {
 		return append([]string{"pass", "settings", "access-tokens", "create"}, rest...)
@@ -111,8 +91,6 @@ func TestSendingNeedsSomethingToSend(t *testing.T) {
 		"At least one recipient is required", "--to, --cc or --bcc")
 }
 
-// One stream cannot carry several files, and one path cannot name several. Both
-// are decided by the flags alone.
 func TestOneDestinationForSeveralItemsIsRefused(t *testing.T) {
 	for _, args := range [][]string{
 		{"mail", "messages", "attachments", "download", "--dest", "-", "some-message"},
@@ -122,7 +100,6 @@ func TestOneDestinationForSeveralItemsIsRefused(t *testing.T) {
 	}
 }
 
-// Two flags that mean different selections cannot both be honoured.
 func TestContradictoryFlagsAreRefused(t *testing.T) {
 	refuses(t, 1, []string{"account", "sessions", "revoke", "--others", "some-uid"}, "--others")
 }
@@ -142,6 +119,8 @@ func TestFlagsThatContradictAreRefusedInOneSentence(t *testing.T) {
 			"--signature", "Best, Jane", "--clear-signature"}, "--signature and --clear-signature"},
 		{[]string{"calendar", "events", "update", "some-event", "--remind", "15m", "--no-remind"},
 			"--remind and --no-remind"},
+		{[]string{"calendar", "events", "update", "--meet", "--no-meet", "some-event"},
+			"--meet and --no-meet"},
 		{[]string{"calendar", "settings", "calendars", "update", "Work", "--remind", "15m", "--no-remind"},
 			"--remind and --no-remind"},
 		{[]string{"calendar", "settings", "calendars", "update", "Work", "--remind-all-day", "1d", "--no-remind"},
@@ -151,8 +130,6 @@ func TestFlagsThatContradictAreRefusedInOneSentence(t *testing.T) {
 	}
 }
 
-// An order is named or it is alphabetical, and a command line that asks for
-// both, or for neither, says nothing about what the order should be.
 func TestAReorderAsksForOneOrderOrTheOther(t *testing.T) {
 	for _, noun := range []string{"folders", "labels"} {
 		refuses(t, 1, []string{"mail", "settings", noun, "reorder", "--alphabetical", "Work"},
@@ -162,9 +139,6 @@ func TestAReorderAsksForOneOrderOrTheOther(t *testing.T) {
 	}
 }
 
-// A page nobody could serve is wrong wherever it is typed, and every listing
-// judges it the same way - the flags are one declaration rather than a habit
-// each command picked up.
 func TestAPageThatCannotExistIsRefused(t *testing.T) {
 	for _, listing := range [][]string{
 		{"contacts", "list"},
@@ -176,21 +150,16 @@ func TestAPageThatCannotExistIsRefused(t *testing.T) {
 	} {
 		refuses(t, 1, append(listing, "--page", "-1"), "--page counts from zero")
 		refuses(t, 1, append(listing, "--limit", "-5"), "--limit is a count")
-		// Zero is the whole collection, so there is no second page of it, and an
-		// empty answer would read as the end rather than as a wrong question.
 		refuses(t, 1, append(listing, "--page", "2", "--limit", "0"),
 			"--page 2 asks for a page of a listing --limit 0 does not cut into")
 	}
 }
 
-// A cap is a page under the name a bulk verb gives it, and it is judged the same
-// way - before anything is selected, let alone acted on.
 func TestACapThatCannotExistIsRefused(t *testing.T) {
 	refuses(t, 1, []string{"mail", "messages", "trash", "--unread", "--limit", "-1"},
 		"--limit is a count; 0 lifts the cap")
 }
 
-// The raw escape hatch judges what it was handed before it sends it.
 func TestTheRawAPICommandJudgesItsOwnArguments(t *testing.T) {
 	refuses(t, 1, []string{"api", "POST", "/core/v4/labels", "--body", "{not json}"},
 		"not valid JSON")
@@ -198,8 +167,6 @@ func TestTheRawAPICommandJudgesItsOwnArguments(t *testing.T) {
 		"key=value")
 }
 
-// An auto-reply schedule that does not describe a schedule is refused before it is
-// sent, and the refusal says which shape the chosen repeat takes.
 func TestAnAutoReplyScheduleThatContradictsItselfIsRefused(t *testing.T) {
 	for _, tt := range []struct {
 		args    []string
@@ -217,14 +184,10 @@ func TestAnAutoReplyScheduleThatContradictsItselfIsRefused(t *testing.T) {
 	}
 }
 
-// Which folder to clear is on the command line or it is nowhere, so the question
-// is settled before the sign-in - not after a round trip that was never needed.
 func TestEmptyingAFolderNeedsToKnowWhichOne(t *testing.T) {
 	refuses(t, 1, []string{"mail", "messages", "empty"}, "Which folder", "--folder trash")
 }
 
-// The one field a message has to change is the one this command exists to write,
-// so naming none is a command line with nothing in it.
 func TestUpdatingAMessageNeedsAnInstruction(t *testing.T) {
 	refuses(t, 1, []string{"mail", "messages", "update", "any-ref"},
 		"Nothing to change", "--expires 7d")
@@ -232,8 +195,6 @@ func TestUpdatingAMessageNeedsAnInstruction(t *testing.T) {
 		"Nothing to change", "--expires 7d")
 }
 
-// Only the types whose Pass editor offers headings can carry a section, and
-// which those are is known from --type alone.
 func TestASectionNeedsAnItemTypeThatHasOne(t *testing.T) {
 	refuses(t, 1, []string{"pass", "items", "create", "--name", "x", "--field", "Recovery/Code=1"},
 		"has no sections", "--type custom")
@@ -243,8 +204,6 @@ func TestASectionNeedsAnItemTypeThatHasOne(t *testing.T) {
 		"has no name")
 }
 
-// A link with no end is the way a secure link goes wrong, so how long it lasts
-// is required - and that is a question no account needs to be asked.
 func TestASecureLinkNeedsAnExpiry(t *testing.T) {
 	refuses(t, 1, []string{"pass", "links", "create", "anything"}, "How long", "--expires 7d")
 	refuses(t, 1, []string{"pass", "links", "create", "anything", "--expires", "next tuesday"},
@@ -266,11 +225,6 @@ func TestALinkThatIsNotADriveLinkIsRefused(t *testing.T) {
 	}
 }
 
-// A public link is for people who do not have an account, so a run that opens
-// one is not stopped at the door. Every other command with no session answers
-// "you are not signed in" before it does anything; this one reaches for the
-// link, and here that means asking a port nothing listens on until it is
-// stopped.
 func TestOpeningALinkIsNotRefusedForWantOfAnAccount(t *testing.T) {
 	args := []string{"drive", "items", "list", "/",
 		"--link", "https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL"}
@@ -283,9 +237,6 @@ func TestOpeningALinkIsNotRefusedForWantOfAnAccount(t *testing.T) {
 	}
 }
 
-// Uploading into a link is the other thing a link is for, so it is not stopped
-// at the door either: the link's own session is what authorises it, and a run
-// with no account reaches for the link rather than being told to sign in.
 func TestUploadingIntoALinkIsNotRefusedForWantOfAnAccount(t *testing.T) {
 	src := filepath.Join(t.TempDir(), "photo.jpg")
 	if err := os.WriteFile(src, []byte("the bytes"), 0o600); err != nil {
@@ -302,8 +253,6 @@ func TestUploadingIntoALinkIsNotRefusedForWantOfAnAccount(t *testing.T) {
 	}
 }
 
-// A link takes new files and not new versions of the ones already in it, and
-// which was asked for is on the command line.
 func TestANewRevisionInALinkIsRefused(t *testing.T) {
 	src := filepath.Join(t.TempDir(), "photo.jpg")
 	if err := os.WriteFile(src, []byte("the bytes"), 0o600); err != nil {
@@ -314,32 +263,24 @@ func TestANewRevisionInALinkIsRefused(t *testing.T) {
 		"cannot take a new revision", "--if-exists rename")
 }
 
-// The two ways of naming a tree name different trees, so asking for both is a
-// contradiction rather than a preference.
 func TestNamingTwoDriveTreesAtOnceIsRefused(t *testing.T) {
 	refuses(t, 1, []string{"drive", "items", "list", "/", "--shared", "Project",
 		"--link", "https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL"},
 		"--shared and --link contradict each other.")
 }
 
-// A link's password is a secret like every other one here, so it is read from a
-// file or from stdin and never from a flag value.
 func TestALinkPasswordIsNotAFlagValue(t *testing.T) {
 	refuses(t, 1, []string{"drive", "items", "list", "/", "--link",
 		"https://drive.proton.me/urls/7X2K9M3N1P#kQ81mDx4T9wL", "--link-password", "hunter2"},
 		"Unknown flag: --link-password")
 }
 
-// Emptying clears a folder whole, so only the folders a person can clear in the
-// web are taken, and which those are is known from the name alone.
 func TestAFolderTheWebNeverEmptiesIsRefused(t *testing.T) {
 	for _, folder := range []string{"inbox", "drafts", "sent", "starred", "archive", "all", "scheduled", "social"} {
 		refuses(t, 1, []string{"mail", "messages", "empty", "--folder", folder}, "cannot be emptied")
 	}
 }
 
-// A built-in folder that mail cannot be moved into is refused by its name, and
-// starred is the label it is.
 func TestAMoveIntoAFolderThatTakesNoneIsRefused(t *testing.T) {
 	for _, folder := range []string{"drafts", "sent", "all", "scheduled", "snoozed"} {
 		refuses(t, 1, []string{"mail", "messages", "move", "--into", folder, "--unread"}, "cannot be moved into")
@@ -347,10 +288,6 @@ func TestAMoveIntoAFolderThatTakesNoneIsRefused(t *testing.T) {
 	refuses(t, 3, []string{"mail", "messages", "move", "--into", "starred", "--unread"}, "is a label, not a folder")
 }
 
-// A photo is read and fitted on this machine, and a contact's email settings are
-// words from a fixed set, so a file that is not an image, a web address that is
-// not one and a setting that does not exist are all wrong before anybody is
-// signed in.
 func TestAContactsDetailsAreJudgedBeforeSigningIn(t *testing.T) {
 	notes := filepath.Join(t.TempDir(), "notes.txt")
 	if err := os.WriteFile(notes, []byte("not an image"), 0o600); err != nil {
@@ -370,8 +307,6 @@ func TestAContactsDetailsAreJudgedBeforeSigningIn(t *testing.T) {
 	}
 }
 
-// A folder's name and a URL's rule are judged from the command line, and so is
-// a filter that descends from no folder.
 func TestPassFoldersAndURLRulesAreJudgedFirst(t *testing.T) {
 	for _, tt := range []struct {
 		args   []string

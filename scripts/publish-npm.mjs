@@ -1,12 +1,4 @@
 #!/usr/bin/env node
-// Publishes proton-cli to npm using the optionalDependencies pattern: a
-// scoped root package (@roman-16/proton-cli) whose bin shim spawns the
-// matching @roman-16/proton-cli-<platform> package's native binary. There
-// is no postinstall, so it also works under `npm install --ignore-scripts`.
-//
-// The package is the project, proton-cli. The command it puts on PATH is
-// `proton`, with `proton-cli` as a second bin entry onto the same shim.
-//
 // Env:
 //   VERSION  release tag/version, a leading "v" is stripped   (required)
 //   BIN_DIR  directory holding the release binaries           (default: npm-bin)
@@ -22,7 +14,7 @@ const BIN = "proton";
 const REPO = "https://github.com/roman-16/proton-cli";
 const SITE = "https://proton-cli.lerchster.dev";
 const DESCRIPTION =
-  "Your CLI for Proton Mail, Drive, Calendar, Pass and Contacts. One binary, end-to-end encrypted.";
+  "Your CLI for Proton Mail, Drive, Calendar, Pass, Meet and Contacts. One binary, end-to-end encrypted.";
 const KEYWORDS = [
   "cli",
   "command-line",
@@ -58,7 +50,6 @@ const binDir = process.env.BIN_DIR || "npm-bin";
 const dryRun = process.env.DRY_RUN === "1";
 const prerelease = version.includes("-");
 
-// npm platform key -> { release asset, binary name inside the package }
 const PLATFORMS = {
   "linux-x64": { asset: `${NAME}_linux_amd64`, bin: BIN },
   "linux-arm64": { asset: `${NAME}_linux_arm64`, bin: BIN },

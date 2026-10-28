@@ -22,13 +22,17 @@ A refusal that comes from Proton rather than from proton-cli belongs to [Trouble
 
 **A regular expression rule on a login's URL is set in a Pass app.** `proton pass items get` shows one, and `--url` takes every other rule ([Pass](../pass/README.md#choose-where-a-login-fills-in)).
 
+**A meeting's or a room's waiting room is turned on in Proton Meet.** `proton meet` makes and changes meetings and rooms without one.
+
+**A personal room is made the first time you open Proton Meet.** Until then `proton meet rooms get personal` finds none.
+
 **A Drive filter over a large tree is slow.** Narrow it with `--scope`, or index the tree once with `proton index create drive` ([Local index](../index/README.md)).
 
 ## Out of scope
 
-proton-cli mirrors the Proton web clients for Mail, Drive, Calendar, Pass and Contacts.
+proton-cli mirrors the Proton web clients for Mail, Drive, Calendar, Pass, Meet and Contacts.
 
-Other Proton products are not covered: VPN, Wallet, Docs, Meet, Lumo and Authenticator. Proton VPN has [its own CLI](https://protonvpn.com/support/linux-vpn-tool).
+Other Proton products are not covered: VPN, Wallet, Docs, Lumo and Authenticator. Proton VPN has [its own CLI](https://protonvpn.com/support/linux-vpn-tool).
 
 Endpoints that exist in the API but have no equivalent action in a web client are also out of scope.
 

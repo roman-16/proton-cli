@@ -23,6 +23,7 @@
     --app-calendar: linear-gradient(135deg, #6d4aff, #06b8ff);
     --app-pass: linear-gradient(135deg, #6d4aff, #ffd580);
     --app-contacts: linear-gradient(135deg, #7341ff, #b39ffb);
+    --app-meet: linear-gradient(135deg, #6d4aff, #9494ff);
   }
 
   :root:root {
@@ -130,11 +131,6 @@
     outline-offset: 2px;
   }
 
-  /*
-   * A link is purple, the way it is in every Proton client. The theme keeps
-   * prose monochrome and marks a link with an underline alone, which reads well
-   * on its own but says nothing about whose documentation this is.
-   */
   .sl-markdown-content a:not([class]) {
     color: var(--sl-color-text-accent);
     text-decoration-color: color-mix(in oklab, var(--sl-color-text-accent) 40%, transparent);
@@ -144,7 +140,6 @@
     text-decoration-color: var(--sl-color-text-accent);
   }
 
-  /* The one call to action on the site is the one Proton colour people know. */
   .sl-link-button.primary {
     background: var(--proton-purple);
     border-color: var(--proton-purple);
@@ -156,21 +151,10 @@
     border-color: color-mix(in oklab, var(--proton-purple) 85%, #000000);
   }
 
-  /*
-   * Search is drawn as a field and behaves as one - click it and you type - so
-   * it takes a field's cursor. That it is a button underneath is an
-   * implementation detail, and pointing at it with a hand promises a different
-   * interaction than the one that follows.
-   */
   button[data-open-modal] {
     cursor: text;
   }
 
-  /*
-   * A line too long to fit scrolls, so the bar under it belongs to the block it
-   * scrolls rather than to the operating system: at a terminal's own weight, it
-   * reads as part of the panel instead of sitting on top of it.
-   */
   .expressive-code pre {
     scrollbar-color: var(--sl-color-gray-5) transparent;
     scrollbar-width: thin;

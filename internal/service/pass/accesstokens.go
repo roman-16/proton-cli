@@ -30,7 +30,6 @@ import (
 // the vaults that were handed to it, read-only, and nothing about the account
 // beyond them.
 
-// The words a token's state is reported in. Expiring is within the hour.
 const (
 	TokenActive   = "active"
 	TokenExpiring = "expiring"
@@ -51,7 +50,6 @@ const (
 // door Proton serves its account app from, so every request to it says so.
 const tokenBase = "/account/v4/personal-access-token"
 
-// AccessToken is one token, as the account sees it.
 type AccessToken struct {
 	ID      string `json:"id"`
 	Name    string `json:"name"`
@@ -59,14 +57,10 @@ type AccessToken struct {
 	Agent   bool   `json:"agent"`
 	Created int64  `json:"created"`
 	Expires int64  `json:"expires"`
-	// Secret is the token as a program is handed it, known at the moment it is
-	// made and never again.
-	Secret string `json:"secret,omitempty"`
-	// key is the token's own key, sealed to the account's user key.
-	key string
+	Secret  string `json:"secret,omitempty"`
+	key     string
 }
 
-// tokenStatus is the one word for where a token is in its life.
 func tokenStatus(expires, now int64) string {
 	switch {
 	case expires < now:
@@ -115,7 +109,7 @@ func (s *Service) AccessTokens(ctx context.Context) ([]AccessToken, error) {
 			q.Set("Since", since)
 		}
 		if err := s.C.Decode(ctx, proton.Request{
-			Method: "GET", Path: tokenBase, Query: q, AccountHost: true,
+			Method: "GET", Path: tokenBase, Query: q, Door: proton.AccountDoor,
 		}, &r); err != nil {
 			return nil, err
 		}
@@ -132,15 +126,10 @@ func (s *Service) AccessTokens(ctx context.Context) ([]AccessToken, error) {
 	return out, nil
 }
 
-// NewAccessToken is what a token is made of.
 type NewAccessToken struct {
-	Name string
-	// Life is how long the token works for, within TokenMinLife and TokenMaxLife.
-	Life time.Duration
-	// Agent marks a token for an AI agent, which then has to give a reason for
-	// every action it takes and has each one recorded.
-	Agent bool
-	// ShareIDs are the vaults the token may read.
+	Name     string
+	Life     time.Duration
+	Agent    bool
 	ShareIDs []string
 }
 
@@ -189,7 +178,7 @@ func (s *Service) AccessTokenCreate(ctx context.Context, spec NewAccessToken) (*
 	}
 	var r struct{ PersonalAccessToken rawToken }
 	if err := s.C.Decode(ctx, proton.Request{
-		Method: "POST", Path: tokenBase, Body: body, AccountHost: true,
+		Method: "POST", Path: tokenBase, Body: body, Door: proton.AccountDoor,
 	}, &r); err != nil {
 		return nil, err
 	}
@@ -212,12 +201,6 @@ func tokenSecret(token string, raw []byte) string {
 	return token + "::" + base64.RawURLEncoding.EncodeToString(raw)
 }
 
-// accessTokenGrant opens one vault to a token, read-only.
-//
-// Every rotation of the vault's share key travels, sealed under the token's key,
-// because an item made before the last rotation is still sealed under an older
-// one - a program given only the newest key would see a vault half of which will
-// not open.
 func (s *Service) accessTokenGrant(ctx context.Context, tokenID, shareID string, raw []byte) error {
 	sk, err := s.decryptShareKeys(ctx, shareID)
 	if err != nil {
@@ -247,18 +230,13 @@ func (s *Service) accessTokenGrant(ctx context.Context, tokenID, shareID string,
 	}, nil)
 }
 
-// TokenGrant is one vault a token may read.
 type TokenGrant struct {
-	// ID is the grant's own, which is what taking it back names.
-	ID string `json:"id"`
-	// ShareID is the account's own share of the vault, and Vault its name.
+	ID      string `json:"id"`
 	ShareID string `json:"share_id"`
 	Vault   string `json:"vault,omitempty"`
 	Created int64  `json:"created"`
 }
 
-// AccessTokenGrants lists the vaults a token may read, by name where the vault
-// is one of the account's.
 func (s *Service) AccessTokenGrants(ctx context.Context, tokenID string) ([]TokenGrant, error) {
 	var out []TokenGrant
 	since := ""
@@ -301,9 +279,6 @@ func (s *Service) AccessTokenGrants(ctx context.Context, tokenID string) ([]Toke
 	return out, nil
 }
 
-// AccessTokenSetVaults makes the vaults a token may read exactly the ones named:
-// what is missing is handed to it, and what is no longer named is taken back.
-// It reports how many of each.
 func (s *Service) AccessTokenSetVaults(ctx context.Context, token AccessToken, shareIDs []string) (granted, revoked int, err error) {
 	grants, err := s.AccessTokenGrants(ctx, token.ID)
 	if err != nil {
@@ -346,8 +321,6 @@ func (s *Service) AccessTokenSetVaults(ctx context.Context, token AccessToken, s
 	return granted, revoked, nil
 }
 
-// openTokenKey brings a token's key back into the clear, checking that the
-// account's own key signed it when it was made.
 func (s *Service) openTokenKey(ctx context.Context, token AccessToken) ([]byte, error) {
 	u, err := s.keys(ctx)
 	if err != nil {
@@ -372,15 +345,12 @@ func (s *Service) openTokenKey(ctx context.Context, token AccessToken) ([]byte, 
 	return raw, nil
 }
 
-// AccessTokenDelete stops a token working, for good.
 func (s *Service) AccessTokenDelete(ctx context.Context, id string) error {
 	return s.C.Decode(ctx, proton.Request{
-		Method: "DELETE", Path: tokenBase + "/" + id, AccountHost: true,
+		Method: "DELETE", Path: tokenBase + "/" + id, Door: proton.AccountDoor,
 	}, nil)
 }
 
-// TokenAction is one thing a program did with a token, as the token recorded
-// it: which kind of action, on what, and - for an agent - why.
 type TokenAction struct {
 	ID     string `json:"id"`
 	Time   int64  `json:"time"`
@@ -388,14 +358,11 @@ type TokenAction struct {
 	// VaultID and ItemID are what the action was on, as Proton filed it.
 	VaultID string `json:"vault_id,omitempty"`
 	ItemID  string `json:"item_id,omitempty"`
-	// What the program wrote down about it, which only the token's key reads
-	// back.
-	Vault  string `json:"vault,omitempty"`
-	Item   string `json:"item,omitempty"`
-	Folder string `json:"folder,omitempty"`
-	Reason string `json:"reason,omitempty"`
-	// Sealed says the program wrote something down and it would not open.
-	Sealed bool `json:"sealed,omitempty"`
+	Vault   string `json:"vault,omitempty"`
+	Item    string `json:"item,omitempty"`
+	Folder  string `json:"folder,omitempty"`
+	Reason  string `json:"reason,omitempty"`
+	Sealed  bool   `json:"sealed,omitempty"`
 }
 
 // actionWords name what a token did, from Proton's own event numbers. A number
@@ -495,7 +462,6 @@ func (s *Service) AccessTokenActivity(ctx context.Context, token AccessToken) ([
 	return out, nil
 }
 
-// openActionPayload reads what the program wrote down about one action into it.
 func openActionPayload(payload string, raw []byte, into *TokenAction) error {
 	sealed, err := base64.StdEncoding.DecodeString(payload)
 	if err != nil {

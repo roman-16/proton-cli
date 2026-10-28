@@ -23,7 +23,7 @@ Proton ships a CLI for Drive and one for Pass, and Bridge for mail in a desktop 
 
 Use Proton's own tool when it covers what you need and you want first-party support.
 
-Use this one when you want Mail, Calendar or Contacts from a terminal, or one binary with one grammar and one output shape across all five apps.
+Use this one when you want Mail, Calendar or Contacts from a terminal, or one binary with one grammar and one output shape across all six apps.
 
 They coexist fine. Nothing here changes anything another client relies on.
 
@@ -36,7 +36,7 @@ Bridge is a background service that speaks IMAP and SMTP to a desktop mail clien
 | What it is | A local IMAP/SMTP server | A single binary you invoke |
 | Runs | Continuously, in the background | When you run it, then exits |
 | You use it with | Thunderbird, Outlook, Apple Mail | Your shell, a script, cron |
-| Covers | Mail | Mail, Drive, Calendar, Pass, Contacts |
+| Covers | Mail | Mail, Drive, Calendar, Pass, Meet, Contacts |
 | Needs a paid plan | Yes | No |
 | Headless server | Possible, awkward | Yes |
 
@@ -98,9 +98,9 @@ No, and it is not trying to. proton-cli runs an operation and exits: upload this
 
 For a scheduled one-way copy, `proton drive items upload --recursive` in a cron job or systemd timer is the shape that fits. [Scripting](../using/scripting.md) has working examples.
 
-## What about VPN, Wallet, Docs, Meet, Lumo and Authenticator?
+## What about VPN, Wallet, Docs, Lumo and Authenticator?
 
-Not covered, and not planned. proton-cli mirrors what the Proton **web clients** let you do for Mail, Drive, Calendar, Pass and Contacts.
+Not covered, and not planned. proton-cli mirrors what the Proton **web clients** let you do for Mail, Drive, Calendar, Pass, Meet and Contacts.
 
 Proton VPN has [its own CLI](https://protonvpn.com/support/linux-vpn-tool). See [What it can't do](../help/limits.md).
 

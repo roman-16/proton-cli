@@ -30,27 +30,13 @@ import (
 // it is missing, or it belongs in unreachable below with the reason nobody can
 // reach it.
 
-// coverageGolden is what a live run reached, recorded by `just coverage`.
 const coverageGolden = "../../tests/api-coverage.golden"
 
-// unresolved stands for a part of a path that is not known until the command
-// runs.
 const (
 	unresolved = "\x00"
-	// numeric marks a segment a format string will fill with a number, which
-	// the recording end reduces to {n} rather than {id}.
-	numeric = "\x00n"
+	numeric    = "\x00n"
 )
 
-// unreachable are the requests the suite cannot make, and why. They are the
-// exceptions that have to be argued for, not a list to grow when a test is
-// inconvenient to write.
-//
-// "The accounts do not have the plan for it" is not one of them: the suite signs
-// a paid account in on every run, and its plan reaches everything the CLI asks a
-// subscription for except what needs several people in one organization - a gap
-// argued in untested like any other. What is left here is what no run of
-// anything could do.
 var unreachable = map[string]string{
 	"DELETE /auth/v4/sessions": "revoking every other session would end the run",
 
@@ -58,22 +44,11 @@ var unreachable = map[string]string{
 
 	"POST /core/v4/auth/2fa": "only a sign-in answers a second factor there, and no test signs in from nothing",
 
-	// Everything about registering a security key. Reaching any of the four means
-	// holding the ceremony, and the ceremony is a person touching a key: a run on
-	// a machine with one plugged in would block until somebody did, and if
-	// somebody did it would enrol their key on a test account for good. A key that
-	// is not plugged in fails before the request. So what is tested is the listing,
-	// the preview, and every refusal that comes before the network; the ceremony
-	// itself is covered offline, against a key made of software.
 	"GET /core/v4/settings/2fa/register":     "registering a key is a person touching one, which no run can do or should",
 	"POST /core/v4/settings/2fa/register":    "the same: there is nothing to hand back without a key somebody touched",
 	"PUT /core/v4/settings/2fa/{id}/rename":  "renaming needs a registered key, and no run may register one",
 	"POST /core/v4/settings/2fa/{id}/remove": "removing needs a registered key, and removing somebody's real one is worse",
 
-	// The organization's key, asked about only when an administrator changes a
-	// password - to refuse the change if that key is locked with it. The one test
-	// account with an organization is somebody's own, and it refuses every
-	// command that would change a credential.
 	"GET /core/v4/organizations/keys": "only an administrator's password change asks, and the account with an organization refuses that command",
 
 	// Everything a password reset leaves behind. Only a reset locks a key or a
@@ -108,9 +83,6 @@ var unreachable = map[string]string{
 	"POST /mail/v4/eo/reply":          "the same, and an answer would go to a real mailbox",
 }
 
-// untested are the requests a run could make and does not. Each is a gap somebody
-// chose to leave, so it is named here and reported on every run rather than
-// passing quietly. The list is something to shorten.
 var untested = map[string]string{
 	// The emergency-access crisis flow. All three run on the paid account, because
 	// emergency access is paid-only, and each touches somebody's real account in a
@@ -121,6 +93,9 @@ var untested = map[string]string{
 	"PUT /account/v1/access/{id}/trigger": "requesting emergency access notifies the granting account, which is always the paid one",
 	"PUT /account/v1/access/{id}/reset":   "cancelling acts on a request in flight, and making one notifies the paid account",
 	"POST /account/v1/access/{id}/auth":   "signing in opens a session on the granting account, which is always the paid one",
+
+	"GET /core/v4/organizations/settings":    "Proton answers it only for an account in an organization, and the free accounts are in none",
+	"POST /meet/v1/meetings/personal/rotate": "Proton lets a personal room's link change once every 24 hours, so a run would fail the next one that day",
 
 	// Everything that starts an import and everything that acts on one running.
 	// Proton connects to the other mailbox itself, so reaching any of these needs
@@ -169,8 +144,6 @@ var untested = map[string]string{
 
 	"POST /pass/v1/breach/address/{id}/resolved":            "the only addresses with breaches are somebody's own, and Pass cannot reopen them",
 	"POST /pass/v1/share/{id}/alias/{id}/breaches/resolved": "no test alias is in a breach, and none can be put in one",
-
-	"GET /core/v4/organizations/settings": "only an organization that enforces its policy is asked, and no test account is in one",
 
 	"PUT /account/v4/breaches/state": "Dark Web Monitoring has found no breach for any test account, so there is none to resolve or reopen",
 
@@ -248,11 +221,6 @@ var untested = map[string]string{
 	"PUT /core/v4/addresses/{id}/delete":          "Proton allows one address deletion a year, and no test may spend it",
 	"GET /core/v4/addresses/allowAddressDeletion": "only deleting an address asks whether the year's allowance is still there",
 
-	// Adding one. The forwarding fixture is the only address a run makes, and the
-	// deletion above is why it is minted once and then kept: an address made per
-	// run would spend the year's allowance and leave nothing to spend it on. So
-	// the only run that reaches this is the first one on an account that has not
-	// got the fixture yet, and every test account has had it for a while.
 	"POST /core/v4/addresses": "the fixture address is minted once in an account's life, and every test account is past that moment",
 
 	// Changing a recovery address or number. Proton guards both against somebody
@@ -342,16 +310,10 @@ func TestEveryRequestTheCLICanSendIsOneTheSuiteSends(t *testing.T) {
 			"\twrite a test that reaches it, or say why nobody can in `unreachable`,\n"+
 			"\tor record it in `untested` if it is a gap you are leaving open", req)
 	}
-	// A gap that has closed has to be taken off the list. Both lists are arguments
-	// for why the suite does not reach something, and one the recording contradicts
-	// is an argument nobody should read again - a list of gaps is only worth having
-	// while every line in it is still true.
 	for _, req := range closed {
 		t.Errorf("the live suite reaches %s, so the entry excusing it is stale;\n"+
 			"\tdelete it from `unreachable` or `untested`", req)
 	}
-	// The gaps already known about are said out loud on every run, so the list is
-	// something to shorten rather than somewhere to put things.
 	for _, req := range known {
 		t.Logf("not covered by the live suite: %s (%s)", req, untested[req])
 	}
@@ -375,11 +337,6 @@ func readCoverage(path string) (map[string]bool, error) {
 	return out, scanner.Err()
 }
 
-// emittableRequests reads every proton.Request the CLI builds and renders it as a
-// method and a path template.
-//
-// The raw `api` command is left out on purpose: its whole purpose is to send a
-// request nothing else models, so it can emit anything and covers nothing.
 func emittableRequests(t *testing.T) []string {
 	t.Helper()
 	seen := map[string]bool{}
@@ -438,16 +395,6 @@ func requestsIn(t *testing.T, path string) []string {
 				p = render(kv.Value, consts)
 			}
 		}
-		// A path that is a variable in its entirety names no endpoint that can be
-		// read off the source - the two there are, a cross-table probe and the
-		// settings tables, are built elsewhere and covered by the commands that use
-		// them. Reading source has limits, which is why the other half of this is a
-		// recording of a real run.
-		//
-		// The limit worth knowing: a path chosen into a variable and then handed
-		// over is invisible here. The recording covers that for a path some test
-		// reaches, so only a path that is both built in a variable and never
-		// exercised escapes both halves. Write the path in the request literal.
 		if method == "" || p == "" || p == unresolved || strings.Contains(method, unresolved) {
 			return true
 		}
@@ -467,8 +414,6 @@ func isRequestLit(lit *ast.CompositeLit) bool {
 	return false
 }
 
-// constantsIn collects the file's own string constants, so a path written as a
-// name resolves to what it holds.
 func constantsIn(file *ast.File) map[string]string {
 	out := map[string]string{}
 	for _, decl := range file.Decls {
@@ -503,8 +448,6 @@ func literal(e ast.Expr) (string, bool) {
 	return s, err == nil
 }
 
-// render turns a path expression into a string, with anything that is not known
-// at compile time standing in as a placeholder.
 func render(e ast.Expr, consts map[string]string) string {
 	switch v := e.(type) {
 	case *ast.BasicLit:
@@ -521,7 +464,6 @@ func render(e ast.Expr, consts map[string]string) string {
 			return render(v.X, consts) + render(v.Y, consts)
 		}
 	case *ast.CallExpr:
-		// fmt.Sprintf("/a/%s/b", …) - the format is the shape.
 		if sel, ok := v.Fun.(*ast.SelectorExpr); ok && sel.Sel.Name == "Sprintf" && len(v.Args) > 0 {
 			if s, ok := literal(v.Args[0]); ok {
 				return s
@@ -531,13 +473,6 @@ func render(e ast.Expr, consts map[string]string) string {
 	return unresolved
 }
 
-// template normalises a rendered path: whatever was not a literal, and whatever a
-// format string left a verb for, is the same placeholder an exercised path is
-// reduced to.
-//
-// A number is its own placeholder, because the recording end can tell one from
-// an opaque ID by looking and does. %d is what says a segment is a number here,
-// since nothing else in these paths is formatted with it.
 func pathTemplate(p string) string {
 	p = strings.ReplaceAll(p, "%d", numeric)
 	for _, verb := range []string{"%s", "%v", "%q"} {

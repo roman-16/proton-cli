@@ -354,6 +354,17 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton mail settings smtp-tokens delete`](../mail/settings.md#smtp-tokens-delete) | Stop a token working |
 | [`proton mail settings smtp-tokens get`](../mail/settings.md#smtp-tokens-get) | Show a token and where the device it is for connects |
 | [`proton mail settings smtp-tokens list`](../mail/settings.md#smtp-tokens-list) | List the tokens on the account |
+| [`proton meet meetings create`](../meet/meetings.md#create) | Schedule a meeting and print its link |
+| [`proton meet meetings delete`](../meet/meetings.md#delete) | Delete a meeting |
+| [`proton meet meetings get`](../meet/meetings.md#get) | Show one meeting, link and all |
+| [`proton meet meetings list`](../meet/meetings.md#list) | List your meetings |
+| [`proton meet meetings update`](../meet/meetings.md#update) | Rename a meeting, or move it to another time |
+| [`proton meet rooms create`](../meet/rooms.md#create) | Create a room and print its link |
+| [`proton meet rooms delete`](../meet/rooms.md#delete) | Delete a room |
+| [`proton meet rooms get`](../meet/rooms.md#get) | Show one room, link and all |
+| [`proton meet rooms list`](../meet/rooms.md#list) | List your rooms |
+| [`proton meet rooms rotate`](../meet/rooms.md#rotate) | Give your personal room a new link |
+| [`proton meet rooms update`](../meet/rooms.md#update) | Rename a room |
 | [`proton pass aliases contacts allow`](../pass/aliases.md#contacts-allow) | Let a contact's mail reach you again |
 | [`proton pass aliases contacts block`](../pass/aliases.md#contacts-block) | Stop a contact's mail reaching you |
 | [`proton pass aliases contacts create`](../pass/aliases.md#contacts-create) | Make an address that writes to somebody as the alias |

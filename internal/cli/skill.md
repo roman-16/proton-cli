@@ -1,6 +1,6 @@
 # {{.Program}}
 
-`{{.Program}}` is one command for a Proton account: mail, files in Drive, calendar events, Pass logins and secrets, and contacts. Content is encrypted and decrypted here, with the user's own keys.
+`{{.Program}}` is one command for a Proton account: mail, files in Drive, calendar events, Pass logins and secrets, Proton Meet meetings and rooms, and contacts. Content is encrypted and decrypted here, with the user's own keys.
 
 This file is what to know before running it, not a reference. `{{.Program}} <command> --help` is the reference: it lists every flag a command takes, the values each accepts, and examples, and it is right for whatever build is installed. Read it before using a command for the first time instead of guessing a flag.
 
@@ -86,6 +86,8 @@ A bulk verb acts on at most `--limit` things, 150 by default; `--limit 0` lifts 
 ## Secrets
 
 `{{.Program}} pass items get` and `{{.Program}} pass items totp` print secrets in full. So do `{{.Program}} account settings two-factor generate`, `{{.Program}} account settings recovery-phrase set`, `{{.Program}} pass settings access-tokens create` and `{{.Program}} mail settings smtp-tokens create`, which print a two-factor secret, twelve recovery words, an access token and an SMTP token that are shown once and kept nowhere.
+
+A Proton Meet link lets anyone holding it join. `{{.Program}} meet meetings get`, `{{.Program}} meet rooms get` and `{{.Program}} calendar events get` print one; no listing does. Hand one on only where the user asked.
 
 Secrets go in the same way they come out. `pass items create` and `pass items update` read them from `--secret-file NAME=FILE`, never from a flag value, because a flag value is in the shell history; `-` as the file reads standard input. The commands that change a credential read it from `--password-file` and `--new-password-file` the same way.
 

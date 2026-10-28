@@ -6,25 +6,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Every command, shown being used.
-//
-// The grammar is this CLI's whole premise: one shape, learned once, then guessed
-// correctly everywhere else. `--help` is where that learning happens, and a
-// screen that lists twenty flags without once showing the sentence they belong
-// to leaves the reader to assemble it from parts.
-//
-// They live here rather than beside each command for the same reason the verbs
-// and the placeholders do: the examples are the language being spoken, and a
-// language is easier to keep consistent when you can read it in one sitting. The
-// conformance test parses every line against the real tree, so an example cannot
-// name a command that does not exist, use a flag that was renamed, or illustrate
-// a different command from the one it is filed under.
-//
-// The values are deliberately the same cast throughout - Jane Roe, invoice 2291,
-// /Documents, a Work label - so the examples read as one account being used
-// rather than as a hundred unrelated fragments.
 var examples = map[string][]string{
-	// ── account ──
 	"proton account breaches list": {
 		"proton account breaches list",
 		"proton account breaches list --output json",
@@ -253,7 +235,6 @@ var examples = map[string][]string{
 		"proton api POST /mail/v4/labels --body '{\"Name\":\"Work\",\"Color\":\"#8080FF\",\"Type\":1}'",
 	},
 
-	// ── calendar ──
 	"proton calendar events create": {
 		"proton calendar events create --title Dentist --start 2026-04-16T14:00 --duration 1h",
 		"proton calendar events create --title Standup --start 2026-04-16T09:00 --duration 15m --rrule 'FREQ=WEEKLY;COUNT=10' --remind 15m",
@@ -261,6 +242,8 @@ var examples = map[string][]string{
 		"proton calendar events create --title 'Design review' --start 2026-04-20T10:00 --end 2026-04-20T10:45 --attendee jane@example.com --location 'Room 3'",
 		"proton calendar events create --title Renewal --start 2026-09-01T09:00 --remind 1d:email",
 		"proton calendar events create --title Deadline --start 2026-04-30T17:00 --duration 1h --color strawberry",
+		"proton calendar events create --title 'Design review' --start 2026-11-03T10:00 --duration 30m --meet",
+		"proton calendar events create --title 'Coffee' --start 2026-11-03T15:00 --attendee jane@example.com --no-meet",
 	},
 	"proton calendar events export": {
 		"proton calendar events export --after 2026-01-01 --before 2026-12-31 --dest year.ics",
@@ -303,6 +286,8 @@ var examples = map[string][]string{
 		"proton calendar events update Offsite --all-day",
 		"proton calendar events update Offsite --all-day=false --start 2026-07-01T09:00 --end 2026-07-01T17:00",
 		"proton calendar events update Dentist --color pacific",
+		"proton calendar events update 'Design review' --meet",
+		"proton calendar events update 'Design review' --no-meet",
 	},
 	"proton calendar booking-pages create": {
 		"proton calendar booking-pages create --title 'Intro call'",
@@ -404,9 +389,49 @@ var examples = map[string][]string{
 	"proton calendar settings set": {
 		"proton calendar settings set view week",
 		"proton calendar settings set primary-timezone Europe/Vienna",
+		"proton calendar settings set auto-add-meet-links off",
 	},
 
-	// ── the local index ──
+	"proton meet meetings list": {
+		"proton meet meetings list",
+		"proton meet meetings list --sort title --output json",
+	},
+	"proton meet meetings get": {
+		"proton meet meetings get 'Weekly sync'",
+		"proton meet meetings get https://meet.proton.me/join/id-865JZ8JMHG",
+	},
+	"proton meet meetings create": {
+		"proton meet meetings create --title 'Weekly sync' --start 2026-11-04T09:00 --rrule FREQ=WEEKLY",
+		"proton meet meetings create --title 'Interview' --start 2026-11-05T14:00 --duration 1h",
+	},
+	"proton meet meetings update": {
+		"proton meet meetings update 'Weekly sync' --start 2026-11-04T10:00",
+		"proton meet meetings update 865JZ8JM --title 'Team sync' --rrule ''",
+	},
+	"proton meet meetings delete": {
+		"proton meet meetings delete 'Weekly sync'",
+	},
+	"proton meet rooms list": {
+		"proton meet rooms list",
+	},
+	"proton meet rooms get": {
+		"proton meet rooms get personal",
+		"proton meet rooms get 'Team room'",
+	},
+	"proton meet rooms create": {
+		"proton meet rooms create --title 'Team room'",
+	},
+	"proton meet rooms update": {
+		"proton meet rooms update 'Team room' --title 'Platform room'",
+		"proton meet rooms update personal --title 'Office hours'",
+	},
+	"proton meet rooms delete": {
+		"proton meet rooms delete 'Platform room'",
+	},
+	"proton meet rooms rotate": {
+		"proton meet rooms rotate personal",
+	},
+
 	"proton index list": {
 		"proton index list",
 		"proton index list --output json",
@@ -430,7 +455,6 @@ var examples = map[string][]string{
 		"proton index delete --yes mail",
 	},
 
-	// ── contacts ──
 	"proton contacts list": {
 		"proton contacts list",
 		"proton contacts list --output json",
@@ -498,7 +522,6 @@ var examples = map[string][]string{
 		"proton contacts keys untrust jane@example.com",
 	},
 
-	// ── drive ──
 	"proton drive computers list": {"proton drive computers list"},
 	"proton drive computers update": {
 		"proton drive computers update 'Work laptop' --name 'Office PC'",
@@ -695,7 +718,6 @@ var examples = map[string][]string{
 		"proton drive volumes delete 7Kd91mQx --yes",
 	},
 
-	// ── mail: messages ──
 	"proton mail messages count": {
 		"proton mail messages count",
 		"proton mail messages count --folder Receipts",
@@ -832,7 +854,6 @@ var examples = map[string][]string{
 		"proton mail messages trackers list 9xL4pQrT --output json",
 	},
 
-	// ── mail: conversations ──
 	"proton mail conversations count": {
 		"proton mail conversations count",
 		"proton mail conversations count --folder inbox --output json",
@@ -899,7 +920,6 @@ var examples = map[string][]string{
 		"proton mail conversations attachments download 'Quarterly numbers' --dest-dir .",
 	},
 
-	// ── mail: drafts ──
 	"proton mail drafts list": {
 		"proton mail drafts list",
 		"proton mail drafts list --sort size",
@@ -918,7 +938,6 @@ var examples = map[string][]string{
 	},
 	"proton mail drafts delete": {"proton mail drafts delete 5bH2mQxK"},
 
-	// ── mail: protected ──
 	"proton mail protected get": {
 		"proton mail protected get 9fK2pQ7xNv4mB8 --eo-password-file /run/secrets/jane",
 		"proton mail protected get 'https://mail.proton.me/eo/9fK2pQ7xNv4mB8' --eo-password-file -",
@@ -936,7 +955,6 @@ var examples = map[string][]string{
 		"proton mail protected attachments download 9fK2pQ7xNv4mB8 q3-report.pdf --eo-password-file /run/secrets/jane --dest report.pdf",
 	},
 
-	// ── mail: settings ──
 	"proton mail settings get":  {"proton mail settings get"},
 	"proton mail settings list": {"proton mail settings list"},
 	"proton mail settings set": {
@@ -1090,7 +1108,6 @@ var examples = map[string][]string{
 	"proton mail settings imports undo":   {"proton mail settings imports undo jane@fastmail.com"},
 	"proton mail settings imports delete": {"proton mail settings imports delete jane@fastmail.com"},
 
-	// ── pass ──
 	"proton pass vaults share add": {
 		"proton pass vaults share add Work jane@proton.me",
 		"proton pass vaults share add Work jane@proton.me --access editor",
@@ -1429,7 +1446,6 @@ var examples = map[string][]string{
 	},
 	"proton pass trash empty": {"proton pass trash empty"},
 
-	// ── proton itself ──
 	"proton changelog": {
 		"proton changelog",
 		"proton changelog 2.4.1",
@@ -1470,9 +1486,6 @@ var examples = map[string][]string{
 func attachExamples(root *cobra.Command) {
 	var walk func(*cobra.Command)
 	walk = func(c *cobra.Command) {
-		// Stored as the command lines they are. Whoever shows them decides how
-		// they are laid out: a help screen indents them, a reference page fences
-		// them, and neither wants the other's whitespace baked in.
 		if lines, ok := examples[c.CommandPath()]; ok {
 			c.Example = strings.Join(lines, "\n")
 		}

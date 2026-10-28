@@ -1,5 +1,5 @@
 {
-  description = "Unofficial, end-to-end encrypted CLI for Proton Mail, Drive, Calendar, Pass and Contacts";
+  description = "Unofficial, end-to-end encrypted CLI for Proton Mail, Drive, Calendar, Pass, Meet and Contacts";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
@@ -56,7 +56,7 @@
           '';
 
           meta = {
-            description = "Unofficial, end-to-end encrypted CLI for Proton Mail, Drive, Calendar, Pass and Contacts";
+            description = "Unofficial, end-to-end encrypted CLI for Proton Mail, Drive, Calendar, Pass, Meet and Contacts";
             homepage = "https://github.com/roman-16/proton-cli";
             license = pkgs.lib.licenses.mit;
             mainProgram = "proton";
@@ -69,7 +69,7 @@
         default = {
           type = "app";
           program = "${self.packages.${pkgs.stdenv.hostPlatform.system}.default}/bin/proton";
-          meta.description = "Unofficial CLI for Proton Mail, Drive, Calendar, Pass and Contacts";
+          meta.description = "Unofficial CLI for Proton Mail, Drive, Calendar, Pass, Meet and Contacts";
         };
       });
 

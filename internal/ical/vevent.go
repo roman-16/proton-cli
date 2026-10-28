@@ -1,12 +1,3 @@
-// Package ical models the iCalendar events Proton Calendar stores, and the
-// recurrence arithmetic that turns one stored series into the occurrences a
-// person sees.
-//
-// The model exists because a calendar event is not a bag of strings. A series
-// carries a rule, a zone to advance that rule in, a list of dates removed from
-// it, and possibly a reference to the one occurrence it overrides. Code that
-// reads those with a line search will drop whichever of them it forgot to look
-// for, which is how an edit ends up resurrecting occurrences somebody deleted.
 package ical
 
 import (
@@ -22,9 +13,6 @@ import (
 
 const prodID = "-//proton-cli//EN"
 
-// Attendee is one participant. Token is the deterministic Proton attendee token
-// (hex SHA-1 of UID + canonical email) that addresses the participant in the
-// encrypted attendees card.
 type Attendee struct {
 	Email    string
 	Token    string
@@ -33,12 +21,6 @@ type Attendee struct {
 	RSVP     bool
 }
 
-// VEvent is a Proton calendar event, assembled from every card that makes it up.
-//
-// Proton splits an event across cards by property: some are signed in the clear,
-// some are encrypted to the calendar key, the attendee list is encrypted
-// separately. The split is a storage decision, so it lives in the serializers
-// rather than in the shape of this struct.
 type VEvent struct {
 	UID     string
 	DTStamp time.Time
@@ -46,17 +28,9 @@ type VEvent struct {
 	Start DateTime
 	End   DateTime
 
-	// RecurrenceID is set on an override: the original start of the one
-	// occurrence of UID that this event replaces.
 	RecurrenceID *DateTime
-	// RRule is the recurrence rule value, verbatim as stored ("FREQ=WEEKLY;COUNT=10").
-	//
-	// It is kept as written rather than parsed and re-emitted so that reading and
-	// re-saving an event cannot silently rewrite a rule the user or another client
-	// authored.
-	RRule string
-	// ExDates are the occurrences removed from the series, sorted.
-	ExDates []DateTime
+	RRule        string
+	ExDates      []DateTime
 
 	Sequence  int
 	Organizer string
@@ -65,25 +39,14 @@ type VEvent struct {
 	Summary     string
 	Location    string
 	Description string
-	// Status is the event's own state - CONFIRMED, TENTATIVE or CANCELLED - which
-	// says whether it is going ahead. It is distinct from an attendee's PARTSTAT,
-	// which says whether one person is coming. Empty means the event never said,
-	// which every client reads as confirmed.
-	Status string
-	// Alarms are the reminders. Proton stores them beside the event rather than
-	// inside its cards, so they are only set where they matter: a file somebody
-	// else's client will open.
-	Alarms []Alarm
-	// Color is the event's own colour, for the same reason and in the same place
-	// as the reminders: Proton keeps it beside the cards, and a file is where it
-	// has to be written down for another client to see it.
-	Color string
+	Status      string
+	Alarms      []Alarm
+	Color       string
+
+	Conference *Conference
+	Rest       []contentline.Line
 }
 
-// Alarm is a reminder, as iCalendar writes one.
-//
-// Action is DISPLAY or EMAIL, and Trigger is the offset from the start, negative
-// for a reminder before it ("-PT15M").
 type Alarm struct {
 	Action  string
 	Trigger string
@@ -99,8 +62,7 @@ func (a Alarm) lines() []contentline.Line {
 		{Name: "ACTION", Value: action},
 		{Name: "TRIGGER", Value: a.Trigger},
 	}
-	// An emailed reminder has to say something, and every client requires the
-	// two properties even when it shows neither.
+	// RFC 5545 requires both on an emailed alarm, and clients refuse one without them.
 	if action == "EMAIL" {
 		lines = append(lines,
 			contentline.Line{Name: "SUMMARY", Value: contentline.EscapeText("Reminder")},
@@ -110,22 +72,12 @@ func (a Alarm) lines() []contentline.Line {
 	return append(lines, contentline.Line{Name: "END", Value: "VALARM"})
 }
 
-// Recurring reports whether the event carries a rule, and so stands for more
-// than one occurrence.
 func (v VEvent) Recurring() bool { return v.RRule != "" }
 
-// IsOverride reports whether the event replaces a single occurrence of a series.
 func (v VEvent) IsOverride() bool { return v.RecurrenceID != nil }
 
-// Span is the pair of values an event occupies: its start, and the end that is not
-// part of it.
-//
-// An all-day event's end is exclusive in iCalendar - a single day runs to the next
-// one - and an event may be stored with no end at all, or with one that does not
-// exceed its start. All of those name the same days, so the reading is settled here
-// rather than at each place that measures an event. The stored values are left as
-// they were written, so re-saving an event another client authored cannot rewrite
-// what it said.
+// An all-day DTEND is exclusive in RFC 5545, and other clients store no end or one
+// that does not exceed the start.
 func Span(start, end DateTime) (DateTime, DateTime) {
 	if start.AllDay {
 		if end.IsZero() || !end.Time.After(start.Time) {
@@ -139,29 +91,58 @@ func Span(start, end DateTime) (DateTime, DateTime) {
 	return start, end
 }
 
-// Span is the pair of values the event occupies.
 func (v VEvent) Span() (DateTime, DateTime) { return Span(v.Start, v.End) }
 
-// Duration is how long the event lasts. An all-day event's end is exclusive in
-// iCalendar, which is why a one-day event reads as 24 hours here.
 func (v VEvent) Duration() time.Duration {
 	start, end := v.Span()
 	return end.Time.Sub(start.Time)
 }
 
-// Parse reads an event from the concatenation of its decrypted cards.
-//
-// Merging rather than parsing each card apart is deliberate: every card repeats
-// UID and DTSTAMP and carries a disjoint set of the rest, so the union is the
-// event. Properties that legitimately appear in two cards - EXDATE is in both
-// the shared and the calendar part - are deduplicated.
+var calendarLevel = map[string]bool{"VERSION": true, "PRODID": true, "CALSCALE": true, "METHOD": true}
+
+// Parse reads an event from its cards, joined in the order Proton's web client
+// reads them: a property in a later card replaces the same property in an
+// earlier one.
 func Parse(text string) (VEvent, error) {
 	var v VEvent
-	for _, l := range contentline.ParseAll(text) {
-		if err := v.set(l); err != nil {
+	var card []contentline.Line
+	nested := 0
+	flush := func() {
+		v.Rest = replaced(v.Rest, card)
+		card = nil
+	}
+	for _, raw := range contentline.Unfold(text) {
+		l, ok := contentline.Parse(raw)
+		if !ok {
+			continue
+		}
+		switch {
+		case l.Name == "BEGIN" && (strings.EqualFold(l.Value, "VCALENDAR") || strings.EqualFold(l.Value, "VEVENT")):
+			if nested == 0 {
+				flush()
+			}
+			continue
+		case l.Name == "BEGIN":
+			nested++
+			continue
+		case l.Name == "END" && nested > 0:
+			nested--
+			continue
+		case l.Name == "END":
+			flush()
+			continue
+		case nested > 0 || calendarLevel[l.Name]:
+			continue
+		}
+		known, err := v.set(l)
+		if err != nil {
 			return VEvent{}, err
 		}
+		if !known {
+			card = append(card, l)
+		}
 	}
+	flush()
 	if v.UID == "" {
 		return VEvent{}, fmt.Errorf("event has no UID")
 	}
@@ -169,7 +150,19 @@ func Parse(text string) (VEvent, error) {
 	return v, nil
 }
 
-func (v *VEvent) set(l contentline.Line) error {
+func replaced(rest, card []contentline.Line) []contentline.Line {
+	if len(card) == 0 {
+		return rest
+	}
+	names := map[string]bool{}
+	for _, l := range card {
+		names[l.Name] = true
+	}
+	out := slices.DeleteFunc(slices.Clone(rest), func(l contentline.Line) bool { return names[l.Name] })
+	return append(out, card...)
+}
+
+func (v *VEvent) set(l contentline.Line) (bool, error) {
 	switch l.Name {
 	case "UID":
 		v.UID = l.Value
@@ -180,7 +173,7 @@ func (v *VEvent) set(l contentline.Line) error {
 	case "DTSTART":
 		ds, err := parseValues(l)
 		if err != nil {
-			return err
+			return true, err
 		}
 		if len(ds) > 0 {
 			v.Start = ds[0]
@@ -188,7 +181,7 @@ func (v *VEvent) set(l contentline.Line) error {
 	case "DTEND":
 		ds, err := parseValues(l)
 		if err != nil {
-			return err
+			return true, err
 		}
 		if len(ds) > 0 {
 			v.End = ds[0]
@@ -196,7 +189,7 @@ func (v *VEvent) set(l contentline.Line) error {
 	case "RECURRENCE-ID":
 		ds, err := parseValues(l)
 		if err != nil {
-			return err
+			return true, err
 		}
 		if len(ds) > 0 {
 			id := ds[0]
@@ -207,7 +200,7 @@ func (v *VEvent) set(l contentline.Line) error {
 	case "EXDATE":
 		ds, err := parseValues(l)
 		if err != nil {
-			return err
+			return true, err
 		}
 		for _, d := range ds {
 			if !slices.ContainsFunc(v.ExDates, d.Equal) {
@@ -233,8 +226,14 @@ func (v *VEvent) set(l contentline.Line) error {
 		v.Status = strings.ToUpper(l.Value)
 	case "COLOR":
 		v.Color = strings.TrimSpace(l.Value)
+	case conferenceIDName:
+		v.conference().readID(l)
+	case conferenceURLName:
+		v.conference().readURL(l)
+	default:
+		return false, nil
 	}
-	return nil
+	return true, nil
 }
 
 func mailAddress(l contentline.Line) string {
@@ -258,20 +257,38 @@ func (v *VEvent) sortExDates() {
 	slices.SortStableFunc(v.ExDates, func(a, b DateTime) int { return a.Time.Compare(b.Time) })
 }
 
-// ── serializing ──
+// Where Proton keeps the properties it has no field list for, in its own
+// getVeventParts: everything else goes into the shared encrypted card.
+var restCard = map[string]card{"TRANSP": calendarSigned, "COMMENT": calendarEncrypted}
 
-// SharedSigned renders the card Proton signs but does not encrypt.
-//
-// The property set is Proton's SHARED_SIGNED_FIELDS, in its order. Keeping the
-// membership stated in one place is what stops a property being dropped: the
-// recurrence rule, the exclusions and the override reference all live here, and
-// an event rebuilt without them is an event silently turned back into a one-off.
-func (v VEvent) SharedSigned() string {
-	lines := []contentline.Line{
+type card int
+
+const (
+	sharedEncrypted card = iota
+	calendarSigned
+	calendarEncrypted
+)
+
+func (v VEvent) rest(c card) []contentline.Line {
+	var out []contentline.Line
+	for _, l := range v.Rest {
+		if restCard[l.Name] == c {
+			out = append(out, l)
+		}
+	}
+	return out
+}
+
+func (v VEvent) identity() []contentline.Line {
+	return []contentline.Line{
 		{Name: "UID", Value: v.UID},
 		{Name: "DTSTAMP", Value: stamp(v.DTStamp)},
-		v.Start.line("DTSTART"),
 	}
+}
+
+// SharedSigned is Proton's SHARED_SIGNED_FIELDS.
+func (v VEvent) SharedSigned() string {
+	lines := append(v.identity(), v.Start.line("DTSTART"))
 	if !v.End.IsZero() {
 		lines = append(lines, v.End.line("DTEND"))
 	}
@@ -281,9 +298,7 @@ func (v VEvent) SharedSigned() string {
 	if v.RRule != "" {
 		lines = append(lines, contentline.Line{Name: "RRULE", Value: v.RRule})
 	}
-	for _, d := range v.ExDates {
-		lines = append(lines, d.line("EXDATE"))
-	}
+	lines = append(lines, v.exdateLines()...)
 	if v.Organizer != "" {
 		lines = append(lines, contentline.Line{
 			Name:   "ORGANIZER",
@@ -292,31 +307,60 @@ func (v VEvent) SharedSigned() string {
 		})
 	}
 	lines = append(lines, contentline.Line{Name: "SEQUENCE", Value: strconv.Itoa(v.Sequence)})
+	if v.Conference != nil && v.Conference.ID != "" {
+		lines = append(lines, v.Conference.idLine())
+	}
 	return component(lines)
 }
 
-// SharedEncrypted renders the card Proton encrypts to the calendar key and
-// signs. The property set is Proton's SHARED_ENCRYPTED_FIELDS.
+// SharedEncrypted is Proton's SHARED_ENCRYPTED_FIELDS, and every property no
+// field list names.
 func (v VEvent) SharedEncrypted() string {
-	lines := []contentline.Line{
-		{Name: "UID", Value: v.UID},
-		{Name: "DTSTAMP", Value: stamp(v.DTStamp)},
-		{Name: "SUMMARY", Value: contentline.EscapeText(v.Summary)},
-	}
+	lines := append(v.identity(), contentline.Line{Name: "SUMMARY", Value: contentline.EscapeText(v.Summary)})
 	if v.Location != "" {
 		lines = append(lines, contentline.Line{Name: "LOCATION", Value: contentline.EscapeText(v.Location)})
 	}
 	if v.Description != "" {
 		lines = append(lines, contentline.Line{Name: "DESCRIPTION", Value: contentline.EscapeText(v.Description)})
 	}
-	if v.Status != "" {
-		lines = append(lines, contentline.Line{Name: "STATUS", Value: v.Status})
+	if v.Conference != nil && v.Conference.URL != "" {
+		lines = append(lines, v.Conference.urlLine())
 	}
+	lines = append(lines, v.rest(sharedEncrypted)...)
 	return component(lines)
 }
 
-// AttendeesEncrypted renders the attendee card, whose property set is Proton's
-// ATTENDEES_ENCRYPTED_FIELDS. It is empty when there are no attendees.
+// CalendarSigned is Proton's CALENDAR_SIGNED_FIELDS. Proton sends no card that
+// holds nothing but the event's identity, so neither does this.
+func (v VEvent) CalendarSigned() string {
+	lines := v.exdateLines()
+	if v.Status != "" {
+		lines = append(lines, contentline.Line{Name: "STATUS", Value: v.Status})
+	}
+	lines = append(lines, v.rest(calendarSigned)...)
+	if len(lines) == 0 {
+		return ""
+	}
+	return component(append(v.identity(), lines...))
+}
+
+// CalendarEncrypted is Proton's CALENDAR_ENCRYPTED_FIELDS.
+func (v VEvent) CalendarEncrypted() string {
+	lines := v.rest(calendarEncrypted)
+	if len(lines) == 0 {
+		return ""
+	}
+	return component(append(v.identity(), lines...))
+}
+
+func (v VEvent) exdateLines() []contentline.Line {
+	out := make([]contentline.Line, 0, len(v.ExDates))
+	for _, d := range v.ExDates {
+		out = append(out, d.line("EXDATE"))
+	}
+	return out
+}
+
 func (v VEvent) AttendeesEncrypted() string {
 	if len(v.Attendees) == 0 {
 		return ""
@@ -349,8 +393,6 @@ func attendeeLine(a Attendee) contentline.Line {
 	return contentline.Line{Name: "ATTENDEE", Params: params, Value: "mailto:" + a.Email}
 }
 
-// component wraps property lines in the VCALENDAR and VEVENT envelope every card
-// carries.
 func component(body []contentline.Line) string {
 	lines := make([]contentline.Line, 0, len(body)+6)
 	lines = append(lines,
@@ -367,9 +409,4 @@ func component(body []contentline.Line) string {
 	return contentline.Render(lines)
 }
 
-// EventUID mints an identifier for a new event.
-//
-// It comes from a cryptographic source rather than the clock because two events
-// created in the same moment must not share a UID, and a nanosecond clock can
-// return the same reading twice on a supported system.
 func EventUID() string { return rand.Text() + "@proton-cli" }

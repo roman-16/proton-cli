@@ -27,15 +27,8 @@ const (
 	DefaultAppVersion = "Other"
 	DefaultUserAgent  = "proton-cli/dev"
 
-	// maxRetryAfter caps how long a delay the server names is honoured for before
-	// waiting stops being the civil answer and becomes a hang.
 	maxRetryAfter = 30 * time.Second
 
-	// sessionRenewals is how many times one request may have the session renewed
-	// under it. More than one is needed because several commands can share a
-	// session: by the time this one has taken up the tokens another process wrote,
-	// a third may have replaced them again. The count is what stops that becoming a
-	// loop when the session is genuinely gone.
 	sessionRenewals = 3
 
 	// transientWaits is how many times a request is waited out before what it
@@ -59,18 +52,11 @@ const (
 	maxInFlight = 8
 )
 
-// backoffFloor and backoffCeiling bound the wait when the server names no
-// Retry-After. The wait doubles between them and carries jitter, so several
-// requests refused at the same instant do not all come back at the same instant.
-//
-// They are vars so tests can shrink them; production keeps a real backoff.
 var (
 	backoffFloor   = 500 * time.Millisecond
 	backoffCeiling = 8 * time.Second
 )
 
-// Doer is the seam domain services depend on. *Client satisfies it; tests
-// supply fakes.
 type Doer interface {
 	Do(ctx context.Context, r Request) (*Response, error)
 	Decode(ctx context.Context, r Request, out any) error
@@ -84,15 +70,8 @@ type Client struct {
 	log   *slog.Logger
 	slots chan struct{}
 
-	// renewMu makes one process refresh a session once. Independent requests are
-	// made at the same time, so a session that has just expired is discovered by
-	// several of them at once; a refresh token is single-use, so the second and
-	// third refresh would spend a token the first had already replaced.
 	renewMu sync.Mutex
 
-	// linkMu is the same promise for a public link's session, kept apart because
-	// the two are different sessions: proving a link again is a pair of requests
-	// that may themselves find the account's session expired.
 	linkMu sync.Mutex
 
 	mu            sync.RWMutex
@@ -101,7 +80,7 @@ type Client struct {
 	ref           string
 	offset        time.Duration // this machine's clock against Proton's, from the last response
 	link          *linkSession
-	encKeyBlob    string // persisted (salted key password encrypted with the server-held client key)
+	encKeyBlob    string
 	profile       string
 	dryRun        bool
 	hvResolver    HVResolver
@@ -119,12 +98,9 @@ type Options struct {
 	Profile    string
 	HTTPClient *http.Client
 	Logger     *slog.Logger
-	// DryRun refuses every request that would change the account's data. See
-	// Client.dryRun.
-	DryRun bool
+	DryRun     bool
 }
 
-// New fills empty Options fields with defaults.
 func New(opts Options) *Client {
 	if opts.BaseURL == "" {
 		opts.BaseURL = DefaultBaseURL
@@ -150,20 +126,8 @@ func New(opts Options) *Client {
 	}
 }
 
-// ErrDryRun is returned instead of sending a request that would change something.
 var ErrDryRun = errors.New("refusing to change anything under --dry-run")
 
-// dryRun is why --dry-run is a promise rather than a habit.
-//
-// The CLI states that every command which changes something honours --dry-run.
-// Enforcing that inside each command makes it true of the commands that remember
-// to; enforcing it here, at the one point every request passes through, makes it
-// true of all of them, including the ones not yet written and including `api`,
-// whose whole purpose is to send a request nothing else models.
-//
-// Signing in and refreshing a session do not come through here, so they are
-// unaffected: a dry run on an expired session still works, which is the
-// difference between a useful preview and an error.
 func (c *Client) dryRunRefuses(req Request) error {
 	if !c.dryRun || req.Reads || readOnlyMethod(req.Method) {
 		return nil
@@ -171,7 +135,6 @@ func (c *Client) dryRunRefuses(req Request) error {
 	return fmt.Errorf("%w: %s %s", ErrDryRun, strings.ToUpper(req.Method), req.Path)
 }
 
-// readOnlyMethod reports whether a method is defined to leave the resource alone.
 func readOnlyMethod(method string) bool {
 	switch strings.ToUpper(method) {
 	case http.MethodGet, http.MethodHead, http.MethodOptions:
@@ -200,29 +163,22 @@ func (c *Client) SetEncKeyBlob(blob string) {
 	c.encKeyBlob = blob
 }
 
-// Tokens returns the current session auth tokens.
 func (c *Client) Tokens() (uid, acc, ref string) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.uid, c.acc, c.ref
 }
 
-// AppVersion returns the app-version header value (a fixed connection setting).
 func (c *Client) AppVersion() string { return c.app }
 
-// BaseURL returns the API base URL (a fixed connection setting).
 func (c *Client) BaseURL() string { return c.base }
 
-// SetPersistHook installs a callback invoked whenever the client's persistable
-// state changes (e.g. a token refresh). The higher layer uses it to write the
-// session file, keeping this transport package free of any persistence format.
 func (c *Client) SetPersistHook(fn func()) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.persist = fn
 }
 
-// Persist invokes the persist hook if one is installed (best-effort).
 func (c *Client) Persist() {
 	c.mu.RLock()
 	fn := c.persist
@@ -232,14 +188,6 @@ func (c *Client) Persist() {
 	}
 }
 
-// SetSessionGuard installs the check that stands between a command and the
-// network.
-//
-// It is asked before every request rather than before every command, which is
-// what lets a command judge its own arguments first. A reference shaped like
-// nothing, a value outside a declared domain, a selection that names nothing:
-// none of those needs an account to be wrong, and answering "you are not signed
-// in" to them tells somebody to fix the wrong thing.
 func (c *Client) SetSessionGuard(fn func() error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -260,8 +208,6 @@ func (c *Client) SetReloadHook(fn func() (acc, ref string, ok bool)) {
 	c.reload = fn
 }
 
-// adoptStoredTokens takes up the stored tokens when they are not the ones that
-// just failed, and reports whether it did.
 func (c *Client) adoptStoredTokens() bool {
 	c.mu.RLock()
 	fn, current := c.reload, c.acc
@@ -280,32 +226,21 @@ func (c *Client) adoptStoredTokens() bool {
 	return true
 }
 
-// Request is a typed API request. Body is JSON-encoded when it is not nil and
-// not already a []byte / string / io.Reader.
 type Request struct {
 	Method string
 	Path   string
 	Query  url.Values
 	Body   any
 
-	// ContentType overrides the request Content-Type. Empty means
-	// application/json. Set it (e.g. multipart/form-data with a boundary) when
-	// Body is a pre-encoded []byte/io.Reader.
 	ContentType string
 
-	// Human-verification state (set by retry logic, not by most callers).
 	HVToken string
 	HVType  string
 
-	// AccountHost sends this request to the host Proton serves its account app
-	// from, rather than the one the session was made against.
-	//
-	// The API is one gateway behind several front doors, and not every door
-	// routes every path: the recovery phrase answers only at account.proton.me
-	// and is Path not found everywhere else. Which door an endpoint is behind is
-	// a fact about the endpoint, so the caller that names one says so. The
-	// session is the same either way.
-	AccountHost bool
+	// Proton's API is one gateway behind several hosts, and not every host routes
+	// every path: the recovery phrase answers only at account.proton.me, Meet's
+	// listing only at meet.proton.me, and both are Path not found elsewhere.
+	Door Door
 
 	// Proves says that this endpoint wants the account password proved inside the
 	// request itself, rather than answered for beforehand.
@@ -349,16 +284,10 @@ type Request struct {
 	// caller that knows which one it is naming.
 	Transient []Refusal
 
-	// elevated marks a request already retried after a scope elevation, so a
-	// second refusal cannot restart the cycle.
 	elevated bool
 
-	// headers are the request's own, on top of the ones every request carries.
 	headers map[string]string
 
-	// omitBearer leaves the access token off. The one request that wants this is
-	// the refresh, which authenticates with the refresh token in its body: the
-	// token it is replacing has no business on it.
 	omitBearer bool
 
 	// opensLink marks one of the two requests that open a public link. They name
@@ -403,22 +332,16 @@ type Refusal struct {
 	Reason string
 }
 
-// matches reports whether an answer is this refusal.
 func (r Refusal) matches(resp *Response) bool {
 	return resp != nil && resp.Status == r.Status && (r.Code == 0 || r.Code == errorCode(resp.Body))
 }
 
-// credential is what a request identifies itself with: a session's UID and the
-// token that goes with it.
 type credential struct {
 	uid   string
 	token string
-	// link marks a public link's session, which is renewed by proving the link
-	// again rather than by refreshing anything.
-	link bool
+	link  bool
 }
 
-// nobody reports that a request carrying this identifies no one.
 func (c credential) nobody() bool { return c.uid == "" && c.token == "" }
 
 // credentialFor is what a request goes out as.
@@ -447,8 +370,6 @@ type Response struct {
 	Body   []byte
 }
 
-// retryAfter is the delay the server named, and nothing when it named none or
-// when the attempt never reached an answer to carry one.
 func (r *Response) retryAfter() string {
 	if r == nil {
 		return ""
@@ -456,11 +377,6 @@ func (r *Response) retryAfter() string {
 	return r.Header.Get("Retry-After")
 }
 
-// Do sends a request and returns the response. Non-2xx responses return a
-// typed error. It transparently handles a transient failure (waiting and asking
-// again), 401 (refresh + retry), 429 (Retry-After + retry), a refusal the
-// request declared Transient (waiting until it clears) and 9001 (human
-// verification + retry).
 func (c *Client) Do(ctx context.Context, req Request) (*Response, error) {
 	if err := c.guardRefuses(req); err != nil {
 		return nil, err
@@ -468,8 +384,6 @@ func (c *Client) Do(ctx context.Context, req Request) (*Response, error) {
 	if err := c.dryRunRefuses(req); err != nil {
 		return nil, err
 	}
-	// A proving request carries its answer to the guard with it, so it is sent
-	// through the exchange rather than sent and then reacted to.
 	if req.Proves {
 		return c.prove(ctx, req)
 	}
@@ -482,17 +396,12 @@ func (c *Client) Do(ctx context.Context, req Request) (*Response, error) {
 		return resp, nil
 	}
 
-	// The server can refuse because the session is not elevated. Handling that
-	// here, once, is why no command has to know which operations are guarded.
 	if isMissingScope(resp.Status, resp.Body) {
 		return c.elevateAndRetry(ctx, req, resp)
 	}
 
 	hvErr, apiErr := classifyErrorBody(resp.Status, resp.Body)
 	if hvErr != nil {
-		// A request that already carried a verification is not asked to verify a
-		// second time: the answer was refused, and offering the same page again
-		// would send somebody to solve a challenge that has already been spent.
 		if req.HVToken != "" {
 			hvErr.Refused = true
 			return resp, hvErr
@@ -506,7 +415,6 @@ func (c *Client) Do(ctx context.Context, req Request) (*Response, error) {
 				retry.HVType = kind
 				return c.Do(ctx, retry)
 			case errors.Is(rerr, ErrHVUnavailable):
-				// fall through and return the original HV error
 			case rerr != nil:
 				return resp, rerr
 			}
@@ -516,18 +424,16 @@ func (c *Client) Do(ctx context.Context, req Request) (*Response, error) {
 	return resp, apiErr
 }
 
-// doorFor is the front door a request goes through. A base with no siblings -
-// a local API, an address rather than a name - is the only door there is, and
-// a request that wanted another gets this one and whatever it answers.
 func (c *Client) doorFor(req Request) string {
-	if !req.AccountHost {
+	subdomain, ok := doorSubdomains[req.Door]
+	if !ok {
 		return c.base
 	}
 	u, err := url.Parse(c.base)
 	if err != nil {
 		return c.base
 	}
-	host, ok := siblingHost(u.Hostname(), accountSubdomain)
+	host, ok := siblingHost(u.Hostname(), subdomain)
 	if !ok {
 		return c.base
 	}
@@ -538,8 +444,15 @@ func (c *Client) doorFor(req Request) string {
 	return u.String()
 }
 
-// accountSubdomain is where Proton serves what only its account app reaches.
-const accountSubdomain = "account"
+type Door int
+
+const (
+	SessionDoor Door = iota
+	AccountDoor
+	MeetDoor
+)
+
+var doorSubdomains = map[Door]string{AccountDoor: "account", MeetDoor: "meet"}
 
 // guardRefuses asks the guard about a request that would go out as nobody.
 //
@@ -560,8 +473,6 @@ func (c *Client) guardRefuses(req Request) error {
 	return guard()
 }
 
-// send makes the request, renewing a session the server no longer accepts, and
-// returns the response it settled on.
 func (c *Client) send(ctx context.Context, req Request) (*Response, error) {
 	for renewals := 0; ; {
 		used := c.credentialFor(req)
@@ -582,7 +493,6 @@ func (c *Client) send(ctx context.Context, req Request) (*Response, error) {
 	}
 }
 
-// renew gets whichever session a request was refused under working again.
 func (c *Client) renew(ctx context.Context, used credential) error {
 	if used.link {
 		return c.reproveLink(ctx, used)
@@ -590,7 +500,6 @@ func (c *Client) renew(ctx context.Context, used credential) error {
 	return c.renewSession(ctx, used.token)
 }
 
-// attempt sends one request, waiting out what is worth asking about again.
 func (c *Client) attempt(ctx context.Context, req Request) (*Response, error) {
 	return c.retrying(ctx, req, func() (*Response, error) { return c.doOnce(ctx, req) })
 }
@@ -614,8 +523,6 @@ func (c *Client) retrying(ctx context.Context, req Request, once func() (*Respon
 	started := time.Now()
 	for attempt := 1; ; attempt++ {
 		resp, err := once()
-		// An attempt that reports neither an answer nor a failure has settled,
-		// whatever it did: there is nothing here to weigh and nothing to ask again.
 		if resp == nil && err == nil {
 			return nil, nil
 		}
@@ -624,12 +531,6 @@ func (c *Client) retrying(ctx context.Context, req Request, once func() (*Respon
 			return resp, err
 		}
 		delay := retryDelay(resp.retryAfter(), attempt)
-		// Each wait is said out loud rather than logged at debug: waiting is the right
-		// thing to do and it can run to seconds, so a person watching a command sit
-		// there deserves to know what it is waiting for and not read it as a hang.
-		// What is worth recording beside it differs: a wait with no answer to record
-		// has the failure instead, and a refusal recognised by a code is told apart
-		// from every other refusal of that status by it.
 		switch {
 		case err != nil:
 			c.log.Warn(waiting(pause.reason, delay), "method", req.Method, "path", req.Path,
@@ -650,15 +551,11 @@ func (c *Client) retrying(ctx context.Context, req Request, once func() (*Respon
 	}
 }
 
-// pause is what an answer worth asking about again costs: why the run is about
-// to sit still, and how long sitting there stays worth it.
 type pause struct {
 	reason string
 	// code is the Proton code a declared refusal was recognised by, which is what
 	// tells one refusal of a status apart from another in the log.
-	code int
-	// waits bounds the client's own patience, within a declared refusal's. Exactly
-	// one of them is set.
+	code   int
 	waits  int
 	within time.Duration
 }
@@ -678,8 +575,6 @@ func (p pause) over(attempt int, elapsed time.Duration) bool {
 	return attempt > p.waits
 }
 
-// worthWaiting weighs one attempt's answer: whether asking again could change
-// it, and if it could, why the run is waiting and for how long.
 func worthWaiting(req Request, resp *Response, err error) (pause, bool) {
 	if err != nil {
 		if !repeatable(req) || !worthRepeating(err) {
@@ -687,9 +582,6 @@ func worthWaiting(req Request, resp *Response, err error) (pause, bool) {
 		}
 		return pause{reason: notAnswering, waits: transientWaits}, true
 	}
-	// What the request declared is weighed before what the client knows by itself,
-	// because it is the caller saying what this endpoint means by an answer the
-	// client would otherwise read as a refusal to be passed on.
 	for _, refusal := range req.Transient {
 		if refusal.matches(resp) {
 			return pause{reason: refusal.Reason, code: refusal.Code, within: refusal.Within}, true
@@ -704,18 +596,10 @@ func worthWaiting(req Request, resp *Response, err error) (pause, bool) {
 	return pause{}, false
 }
 
-// waiting is how a wait is put to the person sitting through it: what is wrong,
-// and how long before the run tries again.
-//
-// A wait shorter than a second is still announced as one second. It is the only
-// part of the sentence that could round to nothing, and "trying again in 0s"
-// reads as a run that is not waiting at all.
 func waiting(reason string, d time.Duration) string {
 	return fmt.Sprintf("%s; trying again in %s.", reason, units.Duration(max(d.Round(time.Second), time.Second)))
 }
 
-// repeatable reports whether sending req twice could not change what the account
-// ends up in.
 func repeatable(req Request) bool {
 	return req.Repeatable || readOnlyMethod(req.Method)
 }
@@ -774,8 +658,6 @@ func (c *Client) renewSession(ctx context.Context, failed string) error {
 		return nil
 	}
 	if err := c.refreshAuth(ctx); err != nil {
-		// A refresh token is single-use, so losing this race is not a broken
-		// session - it is somebody else's fresher one, already on disk.
 		if c.adoptStoredTokens() {
 			return nil
 		}
@@ -807,7 +689,6 @@ func sessionRefused(err error) error {
 	return err
 }
 
-// Decode is Do + JSON unmarshal into out (out may be nil for discard).
 func (c *Client) Decode(ctx context.Context, req Request, out any) error {
 	resp, err := c.Do(ctx, req)
 	if err != nil {
@@ -954,16 +835,6 @@ func encodeBody(b any) (io.Reader, error) {
 	}
 }
 
-// retryDelay is how long to wait before asking again.
-//
-// The server's own Retry-After is the answer when it gives one. Without it the
-// wait doubles from a floor to a ceiling, and half of it is random: requests
-// refused together would otherwise return together and be refused together.
-//
-// The doubling stops at the ceiling rather than being computed and then capped,
-// because nothing bounds how many attempts there have been: a refusal a request
-// declared is waited out by the clock, and a delay doubled once per attempt for
-// long enough is not a long wait but a negative one.
 func retryDelay(retryAfter string, attempt int) time.Duration {
 	if d, ok := namedDelay(retryAfter); ok {
 		return d
@@ -978,7 +849,6 @@ func retryDelay(retryAfter string, attempt int) time.Duration {
 	return d/2 + time.Duration(rand.Int64N(int64(d/2)+1))
 }
 
-// namedDelay parses the Retry-After header (seconds form) into a bounded delay.
 func namedDelay(retryAfter string) (time.Duration, bool) {
 	if retryAfter == "" {
 		return 0, false

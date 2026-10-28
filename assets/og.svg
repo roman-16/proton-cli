@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630" role="img" aria-label="proton-cli, your CLI for Proton Mail, Drive, Calendar, Pass and Contacts">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630" role="img" aria-label="proton-cli, your CLI for Proton Mail, Drive, Calendar, Pass, Meet and Contacts">
   <title>proton-cli</title>
 
   <defs>
@@ -21,8 +21,8 @@
   <text x="200" y="145" font-family="monospace" font-size="62" font-weight="700" fill="#FFFFFF"
         textLength="372" lengthAdjust="spacing">proton-cli</text>
 
-  <text x="80" y="264" font-family="monospace" font-size="30" fill="#CFC9DC"
-        textLength="1024" lengthAdjust="spacing">Your CLI for Proton Mail, Drive, Calendar, Pass and Contacts.</text>
+  <text x="80" y="264" font-family="monospace" font-size="28" fill="#CFC9DC"
+        textLength="1040" lengthAdjust="spacing">Your CLI for Proton Mail, Drive, Calendar, Pass, Meet and Contacts.</text>
 
   <rect x="80" y="316" width="1040" height="204" rx="16" fill="#1C1925" stroke="#343140" stroke-width="1"/>
   <circle cx="112" cy="348" r="6" fill="#3E3A4C"/>

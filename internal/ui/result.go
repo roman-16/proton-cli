@@ -7,41 +7,20 @@ import (
 	"github.com/roman-16/proton-cli/internal/inflect"
 )
 
-// Consequence is how much a mutation is worth stopping for.
-//
-// The CLI prompts for exactly one reason: something is about to be removed. The
-// two hazards that makes real are different, so they are named separately - a
-// wrong verb (`delete` typed where `trash` was meant) is dangerous however few
-// things it touches, while a wrong filter is only dangerous because it selected
-// things the user never named.
 type Consequence int
 
 const (
-	// Ordinary changes are made without asking. Almost everything is ordinary:
-	// a move, a label, a star is cheap to look at and cheaper to reverse.
 	Ordinary Consequence = iota
-	// OutOfSight takes things out of the working set but leaves them
-	// recoverable. Worth a question only when a filter chose them, since a
-	// reference typed by hand carries no surprise.
 	OutOfSight
 	// Forever cannot be undone by this CLI or by Proton's own clients, so it is
 	// always asked about and always says so.
 	Forever
 )
 
-// Action names a mutation in the three grammatical forms the CLI needs - the
-// past tense for a confirmation, the infinitive for a preview, and a stable key
-// for machine output - plus how much it is worth stopping for.
-//
-// The set below is the complete vocabulary of things this CLI does. A command
-// that wants a word not in this list is a command that has invented one.
 type Action struct {
-	// Past opens the confirmation, and carries a preposition when the sentence
-	// needs one to reach its subject: "Signed in as you@proton.me", not "Signed
-	// in you@proton.me".
-	Past string // "Moved"  → "✓ Moved 3 messages to trash."
-	Verb string // "move"   → "Dry run - would move 3 messages to trash:"
-	Key  string // "moved"  → {"action": "moved"}
+	Past string
+	Verb string
+	Key  string
 	Cost Consequence
 }
 
@@ -115,21 +94,16 @@ var (
 	Set              = Action{"Set", "set", "set", Ordinary}
 	Invited          = Action{"Invited", "invite", "invited", Ordinary}
 	Revoked          = Action{"Revoked", "revoke", "revoked", Ordinary}
+	Rotated          = Action{"Rotated", "rotate", "rotated", Ordinary}
 	Transferred      = Action{"Transferred", "transfer", "transferred", Ordinary}
 	SignedIn         = Action{"Signed in as", "sign in as", "signed_in", Ordinary}
 	SignedOut        = Action{"Signed out", "sign out", "signed_out", Ordinary}
 )
 
-// Asks reports whether a change with this action stops for a yes.
-//
-// There are two reasons to stop, and no others: the change cannot be taken
-// back, or it removes things a filter chose rather than things the user named.
-// computed says which of those a selection was.
 func (a Action) Asks(computed bool) bool {
 	return a.Cost == Forever || (a.Cost == OutOfSight && computed)
 }
 
-// Actions is the vocabulary, for the conformance test to check against.
 var Actions = []Action{
 	Created, Updated, Deleted, Trashed, Restored, Emptied, Uninstalled, Moved,
 	Copied, Uploaded, Downloaded, Exported, Imported, Cancelled, Resumed, Undone,
@@ -138,58 +112,32 @@ var Actions = []Action{
 	MarkedLegitimate, Reported,
 	Enabled, Disabled, Added, Removed, Confirmed, Left, Accepted, Declined,
 	Favorited, Unfavorited, Pinned, Unpinned, Hidden, Unhidden, Excluded, Included, Trusted, Untrusted,
-	Reactivated, Reopened, Resolved, Responded, Set, Invited, Revoked, Granted,
+	Reactivated, Reopened, Resolved, Responded, Set, Invited, Revoked, Rotated, Granted,
 	Requested, Accessed,
 	Transferred, SignedIn, SignedOut,
 }
 
-// ResultSpec describes what a mutation did.
 type ResultSpec struct {
-	Action Action
-	// Kind is the affected collection's plural noun ("messages"), matching
-	// TableSpec.Noun so both halves of a command speak the same word.
-	Kind  string
-	Count int
-	IDs   []string
-	// Name is the affected thing's own name, used instead of a count when
-	// exactly one thing was touched and naming it is more useful.
-	Name string
-	// Detail is a trailing clause: "to trash", "to /Documents", "as read".
-	Detail string
-	// EmitIDs prints the IDs on Out in text mode, one to a line, so a script can
-	// capture what was just made, or where something now answers, with a plain
-	// assignment.
-	EmitIDs bool
-	// DryRun switches to the preview form. Preview, when set, draws the
-	// selection that would have been affected.
-	DryRun  bool
-	Preview func(*UI) error
-	// Extra adds fields to the machine-format object.
-	Extra map[string]any
-	// AnswerFollows says the command writes a record of its own after this
-	// result. The confirmation still goes to Err in text mode, but a machine
-	// format stays silent here, so the record is the one document the command
-	// produces rather than the second of two. A dry run writes no record, so it
-	// reports as usual.
+	Action        Action
+	Kind          string
+	Count         int
+	IDs           []string
+	Name          string
+	Detail        string
+	EmitIDs       bool
+	DryRun        bool
+	Preview       func(*UI) error
+	Extra         map[string]any
 	AnswerFollows bool
 
-	// Skipped is what the run could not read on the way to this change; see
-	// IncompleteSpec. It is filled in by kit from the invocation's tally rather
-	// than by the command, exactly as TableSpec.Skipped is, so that a change made
-	// on a short reading says so at every moment it is described - the preview,
-	// the question, the confirmation - instead of wherever somebody remembered.
 	Skipped IncompleteSpec
 }
 
-// Result reports a mutation. In text mode the new ID (if any) goes to Out and
-// the confirmation to Err, so a redirect captures the ID alone. In a machine
-// format the whole result goes to Out, so --output json always means JSON.
 func Result(u *UI, spec ResultSpec) error {
 	if u.Format.Machine() {
 		if spec.AnswerFollows && !spec.DryRun {
 			return nil
 		}
-		// The result object carries the count itself, beside what was changed.
 		return u.encode(spec.object(), 0)
 	}
 
@@ -222,12 +170,6 @@ func Result(u *UI, spec ResultSpec) error {
 	return nil
 }
 
-// message composes the confirmation. Three shapes, chosen by what the caller
-// actually knows:
-//
-//	Created label "Work".            one thing, and its name is worth saying
-//	Uploaded report.pdf to /Docs.    one thing named, with no useful kind word
-//	Moved 3 messages to trash.       a count
 func (s ResultSpec) message() string {
 	if s.Count == 0 {
 		return "Nothing to " + s.untouched()
@@ -260,8 +202,6 @@ func (s ResultSpec) dryRunLine() string {
 	return "Dry run - " + s.wouldLine("would", s.hasPreview())
 }
 
-// untouched finishes the sentence for a change that affects nothing, after its
-// "nothing to": the verb, and whatever says why.
 func (s ResultSpec) untouched() string {
 	line := s.Action.Verb
 	if s.Detail != "" {
@@ -270,12 +210,8 @@ func (s ResultSpec) untouched() string {
 	return line + "."
 }
 
-// hasPreview reports whether there is a table of affected things to draw.
 func (s ResultSpec) hasPreview() bool { return s.Preview != nil && s.Count > 0 }
 
-// wouldLine describes the change in the conditional, which is the one sentence
-// a preview and a confirmation both need. It ends in a colon when a table is
-// about to follow and a full stop when nothing is.
 func (s ResultSpec) wouldLine(opening string, withTable bool) string {
 	subject := Quantity(s.Count, s.Kind)
 	if s.Name != "" && s.Count == 1 {
@@ -294,11 +230,7 @@ func (s ResultSpec) wouldLine(opening string, withTable bool) string {
 	return line + "."
 }
 
-// Refusal is what a confirmation becomes when there is nobody to ask: the same
-// account of the change, stated rather than put as a question, so an unattended
-// run's log says what it declined to do.
 func (s ResultSpec) Refusal() string {
-	// There is nobody here to show a table to, so the sentence simply closes.
 	line := s.wouldLine("Would", false)
 	if s.Action.Cost == Forever {
 		line += " This cannot be undone."
@@ -306,21 +238,11 @@ func (s ResultSpec) Refusal() string {
 	return line
 }
 
-// Confirm describes what the change would do, shows the things it would touch,
-// and asks. It is the same account of the change a dry run gives, put as a
-// question instead of a report, so approving one means having read the other.
-//
-// Only Forever says the change cannot be undone, because only Forever is true:
-// a confirmation that overstated the stakes would be one people learn to skip.
 func Confirm(u *UI, spec ResultSpec) (bool, error) {
 	question := "Continue?"
 	if spec.Action.Cost == Forever {
 		question = "This cannot be undone. " + question
 	}
-	// A machine format has no table to offer: a dry run does not render one
-	// either, and a JSON document on stderr in front of a question would be for
-	// nobody. The question is asked all the same - what is worth stopping for is
-	// a property of the change, not of how its answer is printed.
 	withTable := !u.Format.Machine() && spec.hasPreview()
 	line := spec.wouldLine("Would", withTable)
 	if withTable {
@@ -332,9 +254,6 @@ func Confirm(u *UI, spec ResultSpec) (bool, error) {
 	} else {
 		question = line + " " + question
 	}
-	// What the run could not read is said before the question, because it is
-	// part of what is being approved: a selection short of a folder is not the
-	// selection the table shows.
 	if spec.Skipped.Count > 0 {
 		u.Unread(spec.Skipped)
 		_, _ = fmt.Fprintln(u.Err)
@@ -357,8 +276,6 @@ func (s ResultSpec) object() map[string]any {
 	if s.Name != "" {
 		obj["name"] = s.Name
 	}
-	// Omitted when nothing was skipped, for the same reason the table envelope
-	// omits it: a consumer that never sees the key acted on a whole reading.
 	if s.Skipped.Count > 0 {
 		obj["skipped"] = s.Skipped.Count
 	}

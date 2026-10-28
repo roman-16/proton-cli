@@ -83,7 +83,7 @@ func TestEveryHidingKindIsAKind(t *testing.T) {
 	known := map[Kind]bool{}
 	for _, k := range []Kind{
 		KindAddress, KindAlbum, KindBookingPage, KindCalendar, KindContact, KindEvent, KindFolder,
-		KindInvitation, KindItem, KindKey, KindMember, KindProfile, KindReminder,
+		KindInvitation, KindItem, KindKey, KindMeeting, KindMember, KindProfile, KindReminder,
 		KindShare, KindVault, KindVolume,
 	} {
 		known[k] = true

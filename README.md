@@ -4,7 +4,7 @@
 
 # proton-cli
 
-**Your CLI for Proton Mail, Drive, Calendar, Pass and Contacts.**
+**Your CLI for Proton Mail, Drive, Calendar, Pass, Meet and Contacts.**
 
 _One binary, end-to-end encrypted. A community project, not affiliated with Proton AG._
 
@@ -20,10 +20,10 @@ _One binary, end-to-end encrypted. A community project, not affiliated with Prot
 </div>
 <br />
 
-Read your mail, move files in and out of Drive, manage calendars, passwords and contacts, all without opening a browser. proton logs in the way the Proton apps do and does the encryption on your machine, so your keys stay yours.
+Read your mail, move files in and out of Drive, manage calendars, passwords, meetings and contacts, all without opening a browser. proton logs in the way the Proton apps do and does the encryption on your machine, so your keys stay yours.
 
 - **Real end-to-end encryption.** SRP login and the full PGP key hierarchy, handled locally with Proton's own [go-srp](https://github.com/ProtonMail/go-srp) and [gopenpgp](https://github.com/ProtonMail/gopenpgp). No bridge, no proxy, no browser in the middle.
-- **Five apps, one binary.** Mail, Drive, Calendar, Pass and Contacts, in a single static executable on Linux, macOS and Windows.
+- **Six apps, one binary.** Mail, Drive, Calendar, Pass, Meet and Contacts, in a single static executable on Linux, macOS and Windows.
 - **Built for pipes and cron.** JSON and YAML with one envelope shape for every list, streaming stdin and stdout, exit codes that mean something, and `--dry-run` on everything that changes state.
 
 ## Install
@@ -74,7 +74,7 @@ Everything is at **[proton-cli.lerchster.dev](https://proton-cli.lerchster.dev)*
 | If you want to | Read |
 | --- | --- |
 | Get going | [Install](docs/install.md) · [First commands](docs/first-commands.md) |
-| Do something in one app | [Mail](docs/mail/README.md) · [Drive](docs/drive/README.md) · [Calendar](docs/calendar/README.md) · [Pass](docs/pass/README.md) · [Contacts](docs/contacts/README.md) |
+| Do something in one app | [Mail](docs/mail/README.md) · [Drive](docs/drive/README.md) · [Calendar](docs/calendar/README.md) · [Pass](docs/pass/README.md) · [Meet](docs/meet/README.md) · [Contacts](docs/contacts/README.md) |
 | Script it | [Scripting](docs/using/scripting.md) · [Output and exit codes](docs/using/output.md) |
 | Let an AI agent use it | [AI agents](docs/using/agents.md) - `proton skill` prints what it needs to know |
 | Look up a command | [All commands](docs/about/commands.md) |

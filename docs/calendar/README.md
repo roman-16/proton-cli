@@ -68,7 +68,7 @@ proton calendar events update Offsite --all-day
 proton calendar events update Offsite --all-day=false --start 2026-07-01T09:00 --end 2026-07-01T17:00
 ```
 
-`--status` says whether the event is going ahead: `confirmed`, `tentative` or `cancelled`. Cancelling this way keeps the event and its history, which `delete` does not.
+`--status` says whether the event is going ahead: `confirmed` or `cancelled`. Cancelling this way keeps the event and its history, which `delete` does not.
 
 ### Colour
 
@@ -92,6 +92,23 @@ A colour per event is a paid feature. On a free account the colour is stored and
 Proton users are added directly. External addresses get an emailed invitation.
 
 A bare address invites somebody as required, and `--attendee jane@example.com:optional` as optional. A value that is not an address, or a role other than `optional` or `required`, is refused before anything is sent.
+
+### Proton Meet links
+
+`--meet` gives an event a Proton Meet link, printed below the confirmation. `--no-meet` takes it off again.
+
+```bash
+proton calendar events create --title "Design review" --start 2026-11-03T10:00 --duration 30m --meet
+proton calendar events update "Design review" --no-meet
+```
+
+An event with an `--attendee` gets a link without `--meet` while `auto-add-meet-links` is on, as it is unless you turned it off. `--no-meet` leaves the link out of one event, and `proton calendar settings set auto-add-meet-links off` out of all of them.
+
+`events get` shows an event's call as `Video call`, whichever service it is on. A listing never shows one.
+
+Only the organizer adds or removes a link, and an event holds one call. Changing an event keeps its link, and renaming it renames its meeting. Taking the link off a whole event deletes its meeting.
+
+A meeting made for an event is not among the ones `proton meet meetings list` shows. `proton meet meetings get` opens it by its whole link, as [Meet](../meet/README.md) shows.
 
 ### Recurrence
 
@@ -398,6 +415,6 @@ proton calendar settings set primary-timezone Europe/Vienna
 | Key | Values |
 | --- | --- |
 | `view` | `day`, `week`, `month`, `year`, `planning` |
-| `week-numbers` · `auto-detect-timezone` · `show-secondary-timezone` · `auto-import-invite` | `off`, `on` |
+| `week-numbers` · `auto-detect-timezone` · `show-secondary-timezone` · `auto-import-invite` · `auto-add-meet-links` | `off`, `on` |
 | `primary-timezone` · `secondary-timezone` | An IANA zone |
 | `invite-locale` | A language, such as `en_US` |

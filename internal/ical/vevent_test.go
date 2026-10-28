@@ -6,7 +6,6 @@ import (
 	"time"
 )
 
-// A stored event arrives as several cards; the model is their union.
 const storedCards = "BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\n" +
 	"UID:uid-1\r\n" +
 	"DTSTAMP:20260101T000000Z\r\n" +
@@ -64,8 +63,6 @@ func TestParseSortsAndDeduplicatesExclusions(t *testing.T) {
 }
 
 func TestParseRefusesContentWithNoUID(t *testing.T) {
-	// A card that decrypted into something without an identity is not an event,
-	// and writing it back would sign nonsense over a real one.
 	if _, err := Parse("BEGIN:VEVENT\r\nSUMMARY:x\r\nEND:VEVENT"); err == nil {
 		t.Fatal("Parse accepted content with no UID")
 	}
@@ -89,9 +86,6 @@ func TestParseReadsAllDayAndUTCForms(t *testing.T) {
 	}
 }
 
-// Clients write an all-day event's end three ways: the exclusive next day, no end
-// at all, and an end equal to the start. All three mean the same days, so an event
-// measures the same however it arrived.
 func TestSpanReadsEveryShapeOfAllDayEnd(t *testing.T) {
 	day := time.Date(2026, 8, 14, 0, 0, 0, 0, time.UTC)
 	for name, end := range map[string]DateTime{
@@ -121,8 +115,6 @@ func TestSpanOfAThreeDayAllDayEventKeepsItsLength(t *testing.T) {
 	}
 }
 
-// An event written with no end is an instant, and stays one: only a whole day has a
-// length nobody wrote down.
 func TestSpanOfATimedEventWithoutAnEndIsAnInstant(t *testing.T) {
 	loc := vienna(t)
 	at := time.Date(2026, 8, 14, 9, 0, 0, 0, loc)
@@ -136,9 +128,6 @@ func TestSpanOfATimedEventWithoutAnEndIsAnInstant(t *testing.T) {
 	}
 }
 
-// Reading is not rewriting: an event that arrived without an end is stored again
-// without one, because normalising what another client wrote would change what the
-// event says.
 func TestSpanLeavesTheStoredValuesAlone(t *testing.T) {
 	v, err := Parse("UID:u\r\nDTSTART;VALUE=DATE:20260814")
 	if err != nil {
@@ -246,8 +235,6 @@ func TestAttendeesCardCarriesTokensAndIsEmptyWithoutAttendees(t *testing.T) {
 }
 
 func TestEventUIDDoesNotRepeat(t *testing.T) {
-	// Two events created in the same moment must not share an identity, which a
-	// nanosecond clock cannot promise.
 	seen := map[string]bool{}
 	for range 100 {
 		uid := EventUID()
@@ -261,8 +248,6 @@ func TestEventUIDDoesNotRepeat(t *testing.T) {
 	}
 }
 
-// A calendar file is not a message about an event: it carries no METHOD, so a
-// client that opens it files the events rather than acting on them.
 func TestCalendarFileCarriesNoMethod(t *testing.T) {
 	doc := Calendar([]VEvent{{UID: "a", Summary: "One"}, {UID: "b", Summary: "Two"}})
 	if strings.Contains(doc, "METHOD") {
@@ -299,7 +284,6 @@ func TestAlarmsRenderAsValarmComponents(t *testing.T) {
 			t.Errorf("missing %q:\n%s", want, doc)
 		}
 	}
-	// An emailed reminder has to say something, and clients require both.
 	if !strings.Contains(doc, "SUMMARY:Reminder") || !strings.Contains(doc, "DESCRIPTION:Reminder") {
 		t.Errorf("an EMAIL alarm needs a summary and a description:\n%s", doc)
 	}
@@ -336,11 +320,12 @@ func TestColourTravelsInTheFileAndNotInTheCards(t *testing.T) {
 	}
 }
 
-// An event's own status round-trips, so exporting a cancelled event and reading
-// it back does not quietly revive it.
 func TestStatusSurvivesTheRoundTrip(t *testing.T) {
 	v := VEvent{UID: "a", Summary: "Off", Status: "CANCELLED"}
-	back, err := Parse(v.SharedSigned() + "\r\n" + v.SharedEncrypted())
+	if strings.Contains(v.SharedEncrypted(), "STATUS") || !strings.Contains(v.CalendarSigned(), "STATUS:CANCELLED") {
+		t.Errorf("status belongs in the calendar card:\n%s\n%s", v.SharedEncrypted(), v.CalendarSigned())
+	}
+	back, err := Parse(v.SharedSigned() + "\r\n" + v.SharedEncrypted() + "\r\n" + v.CalendarSigned())
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -349,9 +334,6 @@ func TestStatusSurvivesTheRoundTrip(t *testing.T) {
 	}
 }
 
-// A file's events are separate events, and a VALARM inside one is not an event
-// property. Reading a component's lines in flat would let a reminder's own
-// SUMMARY overwrite the event's, which is the trap this exists to avoid.
 func TestParseCalendarKeepsComponentsApart(t *testing.T) {
 	file := strings.Join([]string{
 		"BEGIN:VCALENDAR",
@@ -398,7 +380,6 @@ func TestParseCalendarKeepsComponentsApart(t *testing.T) {
 	if events[1].Summary != "Retro" {
 		t.Errorf("second event = %q, want Retro", events[1].Summary)
 	}
-	// The VTIMEZONE's TZID must not have been read as an event.
 	for _, e := range events {
 		if e.UID == "" {
 			t.Error("a component outside VEVENT was read as an event")
@@ -406,7 +387,6 @@ func TestParseCalendarKeepsComponentsApart(t *testing.T) {
 	}
 }
 
-// What this writes, it reads back.
 func TestCalendarRoundTripsThroughTheParser(t *testing.T) {
 	want := []VEvent{
 		{
@@ -437,8 +417,6 @@ func TestCalendarRoundTripsThroughTheParser(t *testing.T) {
 	}
 }
 
-// A file another tool wrote may carry properties this one has never heard of.
-// Skipping them beats refusing the events around them.
 func TestParseCalendarIgnoresPropertiesItDoesNotKnow(t *testing.T) {
 	file := strings.Join([]string{
 		"BEGIN:VCALENDAR",

@@ -40,15 +40,6 @@ export default defineConfig({
     starlight({
       customCss: ["./src/styles/proton.css"],
       description,
-      /*
-       * Half of what is shown here is terminal output, and a table that wraps
-       * is a table destroyed: the columns a reader is matching up land under
-       * each other. So a long line scrolls, and every block keeps the shape it
-       * has in a terminal.
-       *
-       * A crontab has no grammar to highlight it with, and a schedule is five
-       * fields and a command either way.
-       */
       expressiveCode: {
         shiki: { langAlias: { cron: "txt" } },
       },
@@ -64,7 +55,7 @@ export default defineConfig({
         { attrs: { content: "630", property: "og:image:height" }, tag: "meta" },
         {
           attrs: {
-            content: "proton-cli, your CLI for Proton Mail, Drive, Calendar, Pass and Contacts",
+            content: "proton-cli, your CLI for Proton Mail, Drive, Calendar, Pass, Meet and Contacts",
             property: "og:image:alt",
           },
           tag: "meta",
@@ -75,11 +66,6 @@ export default defineConfig({
       logo: { alt: "", src: "./src/assets/logo.svg" },
       plugins: [
         starlightThemeBlack({
-          /*
-           * A page here is a command line and a paragraph about it. Handing
-           * either to somebody else's chat window is not what a reader came for,
-           * and the control costs a button on every page to offer it.
-           */
           docs: { showMarkdownActions: false },
           navLinks: [
             { label: "Docs", link: "/install/" },
@@ -91,11 +77,6 @@ export default defineConfig({
         starlightLlmsTxt({
           description,
           projectName: "proton-cli",
-          /*
-           * Somebody asking a model how to do something with this wants the
-           * grammar before the catalogue: the shape is what makes the other two
-           * hundred commands guessable, and the reference is what it then reads.
-           */
           promote: ["index", "first-commands", "commands", "using/output", "about/faq"],
         }),
         starlightLinksValidator(),
@@ -106,11 +87,6 @@ export default defineConfig({
       title: "proton-cli",
     }),
   ],
-  /*
-   * Pages that were linked from elsewhere before their content found a better
-   * home. Astro writes each as a redirecting stub, so an old bookmark lands on
-   * the page that answers it rather than on a 404.
-   */
   redirects: {
     "/about/why/": "/about/faq/",
     "/apps/account/": "/account/",

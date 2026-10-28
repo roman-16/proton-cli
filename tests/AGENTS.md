@@ -147,6 +147,8 @@ The one safeguard that remains is the one that does something: **a single 429 fa
 
 The free accounts allow **50 messages an hour and 150 a day**, counted per recipient. That, not the wall clock, is what decides how often the suite can be run. So a message is only sent when the sending is the thing being tested; everything that merely needs *a* message of some shape reads one the account already holds.
 
+Proton Meet has an allowance of its own: a free account makes about **4 meetings and rooms a day**, counted over a rolling 24 hours, and refuses the next with `2028 You have recently created too many meetings`. A Proton Meet link made with `calendar events create --meet` is not counted. A run makes one standalone meeting on each free account - the meetings on the primary, the rooms on the secondary - so a few runs a day fit, and a morning of reruns can lock one account out until the next day.
+
 `tests/fixture` declares what an account holds. Nothing is made up front: the accessor a test calls finds its fixture, makes it if the account has not got it, and remembers it for the rest of the run. That is what makes a run cost only what it uses - `just test-one TestMailMessagesList` never touches Pass, Drive or Calendar.
 
 | Accessor | What it gives you | Use for |

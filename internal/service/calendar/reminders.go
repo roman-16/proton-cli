@@ -26,34 +26,21 @@ import (
 // their titles, the same events list already reads.
 
 const (
-	// remindHorizon is how far ahead a watch looks for alarms. A reminder set
-	// for an event further out than the horizon would never be seen in time,
-	// and one that falls inside it arrives the moment it is due.
 	remindHorizon = 30 * 24 * time.Hour
-	// remindRefresh is how often a watch re-reads the calendars, so an event
-	// created or moved after it started still reminds on time.
 	remindRefresh = 30 * time.Second
 	// remindLate is how far past its moment a reminder is still worth raising.
 	// Beyond that the machine was asleep or the network was gone, and what
 	// arrives is not a reminder but a history lesson. It is the web clients'
 	// own cutoff.
-	remindLate = time.Minute
-	// alarmPageSize is how many alarms a page of the endpoint holds.
+	remindLate    = time.Minute
 	alarmPageSize = 100
-	// alarmMaxPages caps how many pages a wide window may walk before giving
-	// up, so a year-long listing cannot hold the loop forever.
 	alarmMaxPages = 100
 )
 
-// Reminder is one notification of one occurrence: the event it warns about,
-// reported as `events get` reports it, and the three facts that belong to the
-// warning rather than to the event.
 type Reminder struct {
 	Event
-	// Fires is when it goes off, which the alarms endpoint says exactly.
-	Fires time.Time `json:"fires"`
-	// Remind is the trigger, spelled as --remind takes it.
-	Remind string `json:"remind"`
+	Fires  time.Time `json:"fires"`
+	Remind string    `json:"remind"`
 	// Says is the sentence a notification would carry, which is Proton's own
 	// wording. It is here because working it out means knowing how far off the
 	// start is and whether the event has a time of day at all - a judgement,
@@ -72,27 +59,13 @@ type calendarAlarm struct {
 	Trigger         string
 }
 
-// RemindersList reports every reminder due on the window's days.
-//
-// The window is the one `events list` takes, so the two commands ask the same
-// question of the same days - what differs is only which side of a reminder they
-// report, the event or the interruption.
 func (s *Service) RemindersList(ctx context.Context, calendarIDs []string, w ical.Window) ([]Reminder, error) {
 	from, until := w.Bounds()
 	return s.remindersBetween(ctx, calendarIDs, from, until, nil)
 }
 
-// reminderEvents caches the events a reminder names, so a watch that re-reads
-// the calendars alongside its short refresh does not re-fetch every event each
-// time - only the ones whose alarm has just appeared.
 type reminderEvents map[string]*Event
 
-// remindersBetween is the same question asked to the second rather than to the
-// day, which is what a watch needs.
-//
-// Alarms are fetched over the window, and the events they name are read for
-// their titles. Events are read as far ahead as the window reaches, because an
-// alarm is inside the window even when the event it warns about is not.
 func (s *Service) remindersBetween(ctx context.Context, calendarIDs []string, from, until time.Time, events reminderEvents) ([]Reminder, error) {
 	if events == nil {
 		events = reminderEvents{}
@@ -114,8 +87,8 @@ func (s *Service) remindersBetween(ctx context.Context, calendarIDs []string, fr
 		if err != nil {
 			return nil, err
 		}
-		events[key] = e
-		return e, nil
+		events[key] = &e.Event
+		return &e.Event, nil
 	}
 
 	now := time.Now()
@@ -135,14 +108,10 @@ func (s *Service) remindersBetween(ctx context.Context, calendarIDs []string, fr
 	return out, nil
 }
 
-// alarms fetches the device alarms on each calendar between the two instants,
-// de-duplicated.
 func (s *Service) alarms(ctx context.Context, calendarIDs []string, from, until time.Time) ([]calendarAlarm, error) {
 	seen := map[string]bool{}
 	var out []calendarAlarm
 	for _, calendarID := range calendarIDs {
-		// The endpoint takes the moment to resume from rather than a page
-		// number, so each answer says where the next request starts.
 		start := from.Unix()
 		err := proton.Pages(ctx, func(ctx context.Context, page int) (bool, error) {
 			var r struct {
@@ -215,9 +184,6 @@ func reminderFromAlarm(al calendarAlarm, event *Event, now time.Time) *Reminder 
 		return nil
 	}
 	start := occurrenceStart(al)
-	// The span moves with the occurrence: how long it runs is the event's, when it
-	// ends is this occurrence's. An event whose end is not after its start has
-	// none to move.
 	var end time.Time
 	if event.End.After(event.Start) {
 		end = start.Add(event.End.Sub(event.Start))
@@ -233,10 +199,6 @@ func reminderFromAlarm(al calendarAlarm, event *Event, now time.Time) *Reminder 
 	}
 }
 
-// occurrenceStart is when the alarmed occurrence begins: the server's own word
-// for it, or - should an answer leave that field out - the trigger read back
-// from the fire time, honouring its sign, since a trigger before the start puts
-// the start after the alarm and one after the start puts it before.
 func occurrenceStart(al calendarAlarm) time.Time {
 	fire := time.Unix(al.Occurrence, 0)
 	if al.EventOccurrence != 0 {
@@ -264,8 +226,6 @@ func (s *Service) RemindersWatch(ctx context.Context, calendarIDs []string, emit
 	for {
 		now := time.Now()
 		if !now.Before(nextRefresh) {
-			// A moment before now, so a reminder that came due while the
-			// calendars were being read is still found rather than skipped.
 			found, err := s.remindersBetween(ctx, calendarIDs, now.Add(-remindLate), now.Add(remindHorizon), events)
 			if err != nil {
 				return err
@@ -289,7 +249,6 @@ func (s *Service) RemindersWatch(ctx context.Context, calendarIDs []string, emit
 			continue
 		}
 
-		// The refresh is not due, so the wait ran out on the reminder itself.
 		raised[remindKey(*next)] = true
 		if time.Since(next.Fires) > remindLate {
 			continue
@@ -302,7 +261,6 @@ func (s *Service) RemindersWatch(ctx context.Context, calendarIDs []string, emit
 	}
 }
 
-// nextUnraised is the soonest reminder that has not gone off yet.
 func nextUnraised(due []Reminder, raised map[string]bool) *Reminder {
 	for i := range due {
 		if !raised[remindKey(due[i])] {
@@ -312,9 +270,6 @@ func nextUnraised(due []Reminder, raised map[string]bool) *Reminder {
 	return nil
 }
 
-// stillRaised forgets the reminders a refresh no longer knows about, so what a
-// watch remembers is bounded by what is ahead of it rather than by how long it
-// has been running.
 func stillRaised(due []Reminder, raised map[string]bool) map[string]bool {
 	kept := make(map[string]bool, len(raised))
 	for _, r := range due {
@@ -325,8 +280,6 @@ func stillRaised(due []Reminder, raised map[string]bool) map[string]bool {
 	return kept
 }
 
-// remindKey identifies one firing, so a refresh that turns up the same reminder
-// again does not raise it twice.
 func remindKey(r Reminder) string {
 	return r.CalendarID + "/" + r.ID + "/" + r.Fires.UTC().Format(time.RFC3339) + "/" + r.Remind
 }

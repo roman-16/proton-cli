@@ -7,16 +7,6 @@ import (
 	"github.com/roman-16/proton-cli/internal/contentline"
 )
 
-// A self-contained iCalendar document is what goes out by email: an invitation,
-// an update to one, or a reply. Unlike a stored card it carries a METHOD and every
-// property in one component, because the recipient's client has nothing else to
-// join it to.
-
-// Document renders the event as a complete VCALENDAR with the given METHOD,
-// suitable for attaching as text/calendar.
-//
-// REQUEST covers both a first invitation and an update to one; which it is, the
-// recipient works out from the sequence.
 func (v VEvent) Document(method string) string {
 	lines := []contentline.Line{
 		{Name: "BEGIN", Value: "VCALENDAR"},
@@ -30,13 +20,6 @@ func (v VEvent) Document(method string) string {
 	return contentline.Render(lines)
 }
 
-// Calendar renders events as one VCALENDAR with no METHOD: a file, rather than a
-// message about an event.
-//
-// The absence of METHOD is the whole difference. A document with one says what to
-// do about the event it carries - invite, update, reply - and a client that
-// opens it acts. A calendar file just holds events, which is what an export is
-// and what every other client writes.
 func Calendar(events []VEvent) string {
 	lines := []contentline.Line{
 		{Name: "BEGIN", Value: "VCALENDAR"},
@@ -51,7 +34,6 @@ func Calendar(events []VEvent) string {
 	return contentline.Render(lines)
 }
 
-// component is the VEVENT itself, which a message and a file both wrap.
 func (v VEvent) component() []contentline.Line {
 	lines := []contentline.Line{
 		{Name: "BEGIN", Value: "VEVENT"},
@@ -68,9 +50,7 @@ func (v VEvent) component() []contentline.Line {
 	if v.RRule != "" {
 		lines = append(lines, contentline.Line{Name: "RRULE", Value: v.RRule})
 	}
-	for _, d := range v.ExDates {
-		lines = append(lines, d.line("EXDATE"))
-	}
+	lines = append(lines, v.exdateLines()...)
 	if v.Summary != "" {
 		lines = append(lines, contentline.Line{Name: "SUMMARY", Value: contentline.EscapeText(v.Summary)})
 	}
@@ -96,6 +76,15 @@ func (v VEvent) component() []contentline.Line {
 	if v.Color != "" {
 		lines = append(lines, contentline.Line{Name: "COLOR", Value: v.Color})
 	}
+	if c := v.Conference; c != nil {
+		if c.ID != "" {
+			lines = append(lines, c.idLine())
+		}
+		if c.URL != "" {
+			lines = append(lines, c.urlLine())
+		}
+	}
+	lines = append(lines, v.Rest...)
 	lines = append(lines, contentline.Line{Name: "SEQUENCE", Value: strconv.Itoa(v.Sequence)})
 	for _, a := range v.Alarms {
 		lines = append(lines, a.lines()...)
@@ -103,24 +92,21 @@ func (v VEvent) component() []contentline.Line {
 	return append(lines, contentline.Line{Name: "END", Value: "VEVENT"})
 }
 
-// ReplyDocument renders the METHOD:REPLY document that answers an invitation. It
-// carries one ATTENDEE line, the responder's, tagged with the answer.
-//
-// protonReply adds the marker Proton sets on Proton-to-Proton replies.
+// ReplyDocument keeps what Proton's web client keeps in a reply: the event's
+// identity and times, and the one attendee answering.
 func (v VEvent) ReplyDocument(attendeeEmail, partstat string, protonReply bool) string {
 	reply := v
 	reply.Description = ""
+	reply.Conference = nil
+	reply.Rest = nil
 	reply.Attendees = []Attendee{{Email: attendeeEmail, PartStat: partstat}}
 	doc := reply.Document("REPLY")
 	if !protonReply {
 		return doc
 	}
-	// The marker sits with the other event properties, so it goes in before the
-	// attendee line that closes the component's meaningful content.
 	return insertBefore(doc, "ATTENDEE;", "X-PM-PROTON-REPLY;TYPE=boolean:true")
 }
 
-// insertBefore puts a line ahead of the first line starting with prefix.
 func insertBefore(doc, prefix, line string) string {
 	lines := contentline.Unfold(doc)
 	out := make([]string, 0, len(lines)+1)
@@ -149,19 +135,6 @@ func joinCRLF(lines []string) string {
 	return out
 }
 
-// ParseCalendar reads a whole .ics file into the events it holds.
-//
-// This is not what Parse does, and the difference matters. Parse merges every
-// line it is given into one event, which is right for Proton's cards - each
-// carries a disjoint slice of one event - and wrong for a file, where a second
-// VEVENT is a second event and a nested VALARM is not an event property at all.
-//
-// The nesting is the trap. A VALARM carries its own SUMMARY and DESCRIPTION, so
-// feeding a component's lines in flat would let a reminder's wording overwrite
-// the event's. Sub-components are therefore read as themselves.
-//
-// Anything outside a VEVENT - the calendar's own properties, a VTIMEZONE - is
-// skipped: this reads events, and a file may legitimately hold more than events.
 func ParseCalendar(text string) ([]VEvent, error) {
 	var (
 		out     []VEvent
@@ -206,11 +179,12 @@ func ParseCalendar(text string) ([]VEvent, error) {
 				alarm.Trigger = l.Value
 			}
 		case event != nil:
-			// A property this reader does not understand is skipped rather than
-			// failing the file: another client's extension is not a reason to
-			// refuse the events around it.
-			if err := event.set(l); err != nil && invalid == nil {
+			known, err := event.set(l)
+			if err != nil && invalid == nil {
 				invalid = err
+			}
+			if !known {
+				event.Rest = append(event.Rest, l)
 			}
 		}
 	}

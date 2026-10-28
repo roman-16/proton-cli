@@ -6,6 +6,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 Adding a version section here is what publishes a release, so this file is the one place a version is decided: see [Releases](CONTRIBUTING.md#releases). Versions that shipped before this file existed are on the [releases page](https://github.com/roman-16/proton-cli/releases).
 
+## [5.2.0] - 2026-10-28
+
+### Highlights
+
+- **Proton Meet** - `meet meetings` schedules, moves and deletes your meetings, and `meet rooms` keeps rooms and your personal room. Each prints the link people join by.
+- **Meet links on calendar events** - `calendar events create --meet` gives an event a Proton Meet link, and events with guests get one by default, as in Proton's apps. Editing an event keeps the link it has.
+
+### Added
+
+- `meet meetings` lists, shows, schedules, moves, renames and deletes Proton Meet meetings. `get` and `create` print the link; a listing never does.
+- `meet rooms` lists, shows, creates, renames and deletes rooms, and `rooms rotate personal` gives your personal room a new link, once every 24 hours.
+- `calendar events create --meet` gives a new event a Proton Meet link and prints it. `events update --meet` gives an existing event one, and `--no-meet` takes it off and deletes its meeting.
+- `calendar events get` shows an event's Proton Meet or Zoom call as `Video call`, and JSON carries `video_call`.
+- `calendar settings set auto-add-meet-links on|off`, and `settings get` shows it.
+
+### Changed
+
+- **Breaking.** `calendar events create` with an `--attendee` gives the event a Proton Meet link while `auto-add-meet-links` is on, which is Proton's default. `--no-meet` leaves it out.
+- **Breaking.** An event's description in `calendar events get`, `events list` and their JSON leaves out the join instructions of its video call. Read the link from `video_call.url` in `events get`.
+- `calendar events update --title` renames the event's Proton Meet meeting too.
+- `calendar events update --meet` and `--no-meet` email attendees outside Proton the change.
+- `calendar events export` writes each event's video call and the properties other apps stored on it.
+- `proton skill` covers Proton Meet. Print it again wherever an agent keeps a copy.
+
+### Removed
+
+- `tentative` for `--status` on `calendar events create` and `update`. An event is `confirmed` or `cancelled`.
+
+### Fixed
+
+- `calendar events update` dropped an event's Proton Meet or Zoom link, and anything else another app had stored on it.
+- An invitation its organizer cancelled read as `confirmed`, and `calendar reminders` still raised it.
+
 ## [5.1.0] - 2026-10-15
 
 ### Highlights

@@ -36,21 +36,12 @@ import (
 // which is why it is handled here and not in the Pass commands - see
 // extrapassword.go for the exchange.
 
-// Scope names an elevated capability a session can hold.
 type Scope string
 
 const (
-	// ScopeLocked guards destructive data operations: deleting a calendar,
-	// exporting a private key, reading a secret back out.
-	ScopeLocked Scope = "locked"
-	// ScopePassword guards changes to the credentials themselves: the password,
-	// two-factor settings, the recovery phrase.
+	ScopeLocked   Scope = "locked"
 	ScopePassword Scope = "password"
-	// ScopePass guards every Pass endpoint for an account whose Pass is protected
-	// with an extra password. Unlike the other two it is proved with that password
-	// rather than the account's, it is granted for the life of the session, and
-	// nothing takes it back.
-	ScopePass Scope = "pass"
+	ScopePass     Scope = "pass"
 )
 
 // endpoint is the SRP-guarded call that grants the scope. Mirrors queryUnlock
@@ -70,7 +61,6 @@ func (s Scope) endpoint() string {
 // elevated for the rest of its life would make the elevation pointless.
 const lockPath = "/core/v4/users/lock"
 
-// scopesPath reports the scopes a session currently holds.
 const scopesPath = "/core/v4/auth/scopes"
 
 // ScopeCredentials is what an elevation needs from the person. A second factor
@@ -81,12 +71,8 @@ type ScopeCredentials struct {
 	Password []byte
 }
 
-// ScopeResolver supplies credentials when the server reports a missing scope.
-// Returning an error aborts the operation with that error, so a resolver that
-// cannot ask (no terminal, --no-input) simply explains why.
 type ScopeResolver func(ctx context.Context, s Scope) (ScopeCredentials, error)
 
-// SetScopeResolver installs the callback used to elevate a session on demand.
 func (c *Client) SetScopeResolver(r ScopeResolver) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -146,14 +132,11 @@ func isMissingScope(status int, body []byte) bool {
 // directions, and discarding the server's half would throw away the guarantee
 // that we are talking to something which knows the verifier.
 func (c *Client) Elevate(ctx context.Context, s Scope, cr ScopeCredentials) error {
-	// The Pass exchange is not wrapped: it says what it is about in its own words,
-	// and a sentence about the extra password reads worse with a scope name in
-	// front of it.
 	if s == ScopePass {
 		return c.unlockPass(ctx, cr.Password)
 	}
 	if _, err := c.exchange(ctx, srpExchange{
-		parameters: c.accountParameters("", s, false),
+		parameters: c.accountParameters("", s, SessionDoor),
 		method:     "PUT", path: s.endpoint(),
 		password:     cr.Password,
 		secondFactor: c.answerSecondFactor(ctx),
@@ -190,17 +173,12 @@ func (c *Client) answerSecondFactor(ctx context.Context) func(twoFA) (map[string
 	}
 }
 
-// Relock drops every elevated scope. Best-effort: the operation it protects has
-// already finished, so a failure here is worth a log line and nothing more.
 func (c *Client) Relock(ctx context.Context) {
 	if err := c.Decode(ctx, Request{Method: "PUT", Path: lockPath}, nil); err != nil {
 		c.log.Debug("relock failed; the session stays elevated until it expires", "error", err)
 	}
 }
 
-// Scopes returns the scopes the session currently holds: what a saved session
-// can actually do, and the one question that can be asked before a guarded
-// endpoint refuses.
 func Scopes(ctx context.Context, c Doer) ([]string, error) {
 	var r struct{ Scopes []string }
 	if err := c.Decode(ctx, Request{Method: "GET", Path: scopesPath}, &r); err != nil {
@@ -209,11 +187,6 @@ func Scopes(ctx context.Context, c Doer) ([]string, error) {
 	return r.Scopes, nil
 }
 
-// elevateAndRetry handles a missing-scope response: ask for credentials, elevate,
-// run the request again, then drop the scope.
-//
-// The retry is marked so a second 403 cannot start the cycle again - an account
-// whose password no longer works would otherwise loop.
 func (c *Client) elevateAndRetry(ctx context.Context, req Request, resp *Response) (*Response, error) {
 	resolver := c.getScopeResolver()
 	if resolver == nil || req.elevated {
@@ -221,8 +194,6 @@ func (c *Client) elevateAndRetry(ctx context.Context, req Request, resp *Respons
 		return resp, apiErr
 	}
 
-	// The body names the scope when it can; ScopeLocked is the one every data
-	// operation needs, so it is the safe assumption.
 	scope := scopeFromBody(resp.Body)
 
 	cr, err := resolver(ctx, scope)
@@ -232,9 +203,6 @@ func (c *Client) elevateAndRetry(ctx context.Context, req Request, resp *Respons
 	if err := c.Elevate(ctx, scope, cr); err != nil {
 		return resp, err
 	}
-	// The Pass scope is not an elevation to be given back: it is what the session
-	// holds from here on, there is no endpoint that takes it away, and asking for
-	// the extra password again on the next request is the one outcome to avoid.
 	if scope != ScopePass {
 		defer c.Relock(ctx)
 	}
@@ -273,7 +241,4 @@ func scopeFromBody(body []byte) Scope {
 	return ScopeLocked
 }
 
-// ErrScopeUnavailable reports that an elevation was needed but could not be
-// performed. Resolvers wrap their own reason; this exists so callers can detect
-// the class.
 var ErrScopeUnavailable = errors.New("session cannot be elevated")

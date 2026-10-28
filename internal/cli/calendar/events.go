@@ -35,14 +35,8 @@ func eventsCmd() *cobra.Command {
 //	CALENDAR/EVENT                    the stored event; for a series, all of it
 //	CALENDAR/EVENT@2026-04-16T09:00   one occurrence of it
 
-// occurrenceShape is the set of forms an occurrence may be written in: the two
-// the CLI prints, plus seconds or an offset for anything generated elsewhere.
 var occurrenceShape = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2})?(Z|[+-]\d{2}:\d{2})?)?$`)
 
-// splitOccurrence separates a reference from the occurrence it names.
-//
-// The split only happens when what follows the last "@" is shaped like a time, so
-// a title or an address containing one stays a whole reference.
 func splitOccurrence(ref string) (base, occurrence string) {
 	at := strings.LastIndexByte(ref, '@')
 	if at < 0 {
@@ -54,8 +48,6 @@ func splitOccurrence(ref string) (base, occurrence string) {
 	return ref, ""
 }
 
-// eventRef renders the reference a row is addressed by, which is the form a list
-// prints and a command reads back.
 func eventRef(e calsvc.Event) string {
 	ref := kit.JoinPair(e.CalendarID, e.ID)
 	if e.Occurrence == "" {
@@ -64,8 +56,6 @@ func eventRef(e calsvc.Event) string {
 	return ref + "@" + e.Occurrence
 }
 
-// resolveEvent turns a reference into the parts the service needs. A title still
-// works, and still resolves across every calendar.
 func resolveEvent(c *kit.Invocation, ref string) (calendarID, eventID, occurrence string, err error) {
 	base, occurrence := splitOccurrence(ref)
 	if first, second, err := kit.ExpandPair(c.App, base); err != nil || first != "" {
@@ -99,9 +89,6 @@ func eventColumns() []ui.Column[calsvc.Event] {
 	}
 }
 
-// length is how long something on a calendar lasts, the way a reader counts it:
-// an all-day stretch in days. Measured in hours between local midnights, the day
-// the clocks go forward would last 23 of them.
 func length(start, end time.Time, allDay bool) string {
 	if !allDay {
 		return units.Duration(end.Sub(start))
@@ -149,12 +136,6 @@ func eventsListCmd() *cobra.Command {
 	return c
 }
 
-// listEvents is the range the listing covers and what it answers with.
-//
-// A question about days is a question about days, and stays one. A question
-// about words has no range of its own, so it covers everything unless the reader
-// named one - which is what makes "when was the dentist" a question this CLI can
-// answer at all.
 func listEvents(c *kit.Invocation, calIDs []string, days kit.DayRange, keyword string) ([]calsvc.Event, error) {
 	if keyword == "" {
 		first, last := days.Or(calsvc.DefaultDays())
@@ -200,9 +181,10 @@ func eventsGetCmd() *cobra.Command {
 					{Label: "Duration", Value: length(ev.Start, ev.End, ev.AllDay)},
 					{Label: "Location", Value: ev.Location},
 					{Label: "Description", Value: ev.Description},
+					{Label: "Video call", Value: callURL(ev.VideoCall)},
 					{Label: "Recurrence", Value: ev.RRule},
-					{Label: "Occurrence", Value: occurrenceLabel(*ev)},
-					{Label: "Series", Value: seriesLabel(*ev)},
+					{Label: "Occurrence", Value: occurrenceLabel(ev.Event)},
+					{Label: "Series", Value: seriesLabel(ev.Event)},
 					{Label: "Zone", Value: ev.Zone},
 					{Label: "Reminders", Value: strings.Join(ev.Reminders, ", ")},
 					{Label: "Status", Value: ev.Status, Always: true},
@@ -211,15 +193,13 @@ func eventsGetCmd() *cobra.Command {
 					kit.ColorField(ev.Color),
 					{Label: "Calendar", Value: name},
 					kit.SignatureField(string(ev.Signature)),
-					{Label: "ID", Value: eventRef(*ev), ID: true},
+					{Label: "ID", Value: eventRef(ev.Event), ID: true},
 				},
 			})
 		}),
 	}
 }
 
-// occurrenceLabel says where an instance sits in its series, or how far a series
-// runs when the series itself is being shown.
 func occurrenceLabel(e calsvc.Event) string {
 	switch {
 	case e.Number > 0 && e.Count != nil:
@@ -234,8 +214,6 @@ func occurrenceLabel(e calsvc.Event) string {
 	return ""
 }
 
-// seriesLabel names the series an instance belongs to, so a reader can address the
-// whole thing from a row that addresses one occurrence.
 func seriesLabel(e calsvc.Event) string {
 	if e.Occurrence == "" {
 		return ""
@@ -243,14 +221,10 @@ func seriesLabel(e calsvc.Event) string {
 	return kit.JoinPair(e.CalendarID, e.ID)
 }
 
-// colorParagraph is what both commands say about --color, since an event's
-// colour behaves the same whether it is being given one or given another.
 const colorParagraph = "--color gives an event a color of its own; without one it is drawn in its\n" +
 	"calendar's. Once it has one there is no way back. A color of its own is a paid\n" +
 	"feature: on a free account it is stored but not drawn."
 
-// details are the fields an event carries. create and update share them, so the
-// two commands cannot disagree about what an event is.
 type details struct {
 	title, location, description string
 	start, duration, rrule       string
@@ -260,6 +234,7 @@ type details struct {
 	allDay                       bool
 	reminders                    []string
 	noReminders                  bool
+	meet, noMeet                 bool
 }
 
 func (d *details) register(c *cobra.Command, verb string) {
@@ -297,7 +272,10 @@ func eventsCreateCmd() *cobra.Command {
 			"with no time of day, which --all-day has to say as well.\n\n" +
 			"Without --end or --duration an event lasts as long as the calendar it is made\n" +
 			"in says a new event lasts, which `settings calendars get` shows; an all-day\n" +
-			"event lasts a day.\n\n" + colorParagraph,
+			"event lasts a day.\n\n" +
+			"--meet gives the event a Proton Meet link, printed below the confirmation. An\n" +
+			"event with an --attendee gets one anyway while `settings set auto-add-meet-links`\n" +
+			"is on, and --no-meet leaves it out.\n\n" + colorParagraph,
 		RunE: kit.Run([]kit.Step{d.check(true), judgeAttendees(&attendees)}, func(c *kit.Invocation) error {
 			if d.title == "" || d.start == "" {
 				return kit.Fail("An event needs a title and a start.").
@@ -329,17 +307,21 @@ func eventsCreateCmd() *cobra.Command {
 			if chosen {
 				when = "in " + cal.Name + " " + when
 			}
+			meet := d.meet
+			if !c.Changed("meet") && !c.Changed("no-meet") && guests(attendees) > 0 {
+				meet = c.App.Calendar.AutoAddsMeet(c.Ctx)
+			}
 			var res *calsvc.EventResult
 			if err := kit.Create(c, ui.ResultSpec{
 				Action: ui.Created, Kind: "events", Name: d.title,
-				Detail: clauses(when, lengthClause(dur, fromCalendar)),
+				Detail: clauses(when, lengthClause(dur, fromCalendar), meetClause(&meet)),
 			}, func() (string, error) {
 				var err error
 				res, err = c.App.Calendar.EventCreate(c.Ctx, calID, calsvc.EventInput{
 					Title: d.title, Location: d.location, Description: d.description,
 					Start: start, Duration: dur,
 					RRule: d.rrule, Reminders: d.reminders, Attendees: attendees,
-					Status: calsvc.ICalStatus(status), Color: d.color.Value(),
+					Status: calsvc.ICalStatus(status), Color: d.color.Value(), Meet: meet,
 				})
 				if err != nil {
 					return "", err
@@ -348,10 +330,12 @@ func eventsCreateCmd() *cobra.Command {
 			}); err != nil {
 				return err
 			}
+			showCall(c, res)
 			return tellAttendees(c, res)
 		}),
 	}
 	d.register(c, "Set")
+	d.registerMeet(c, "Leave out the Proton Meet link your settings would add")
 	c.Flags().StringVar(&calendar, "calendar", "", "Which calendar, by name or ID (default: your default calendar)")
 	c.Flags().BoolVar(&d.allDay, "all-day", false, "An event with no time of day")
 	c.Flags().StringArrayVar(&attendees, "attendee", nil,
@@ -377,7 +361,10 @@ func eventsUpdateCmd() *cobra.Command {
 			"A reference that names one occurrence of a recurring event changes only that\n" +
 			"occurrence. Add --onwards to change it and every later one, or drop the @ part\n" +
 			"of the reference to change the whole series, which --dry-run will show you\n" +
-			"before you do.\n\n" + colorParagraph,
+			"before you do.\n\n" +
+			"--meet gives the event a Proton Meet link, printed below the confirmation.\n" +
+			"--no-meet takes it off and deletes its meeting, except on one occurrence or\n" +
+			"with --onwards, where the series keeps the meeting.\n\n" + colorParagraph,
 		RunE: kit.Run([]kit.Step{d.check(false), kit.StepExpand}, func(c *kit.Invocation) error {
 			calID, eventID, occurrence, err := resolveEvent(c, c.Args[0])
 			if err != nil {
@@ -402,7 +389,7 @@ func eventsUpdateCmd() *cobra.Command {
 			if err := kit.Mutate(c, ui.ResultSpec{
 				Action: ui.Updated, Kind: "events", Count: 1, Name: reached.name(d.title),
 				IDs: []string{c.Args[0]}, Preview: reached.preview(), Extra: reached.extra(),
-				Detail: clauses(reached.clause(occurrence, onwards), reached.moved(patch), length),
+				Detail: clauses(reached.clause(occurrence, onwards), reached.moved(patch), length, meetClause(patch.Meet)),
 			}, func() error {
 				var err error
 				switch {
@@ -417,10 +404,15 @@ func eventsUpdateCmd() *cobra.Command {
 			}); err != nil {
 				return err
 			}
+			showCall(c, res)
+			if res != nil && res.MeetUnchanged {
+				c.Note("%s", unchangedNote(*patch.Meet))
+			}
 			return tellAttendees(c, res)
 		}),
 	}
 	d.register(c, "Replace")
+	d.registerMeet(c, "Take its Proton Meet link off")
 	c.Flags().BoolVar(&d.allDay, "all-day", false, "Turn it into an event with no time of day")
 	c.Flags().BoolVar(&d.noReminders, "no-remind", false, "Remove the reminders")
 	kit.Exclusive(c, "remind", "no-remind")
@@ -428,10 +420,6 @@ func eventsUpdateCmd() *cobra.Command {
 	return c
 }
 
-// patch turns the flags the user actually set into the change to make, and the
-// clause a result needs when the length was not one of them. A flag left alone is
-// absent rather than empty, which is what lets --description "" clear a
-// description instead of meaning "leave it".
 func (d *details) patch(c *kit.Invocation, calendarID string, reached *reach) (calsvc.EventPatch, string, error) {
 	var p calsvc.EventPatch
 	if c.Changed("title") {
@@ -468,14 +456,13 @@ func (d *details) patch(c *kit.Invocation, calendarID string, reached *reach) (c
 		color := d.color.Value()
 		p.Color = &color
 	}
+	if c.Changed("meet") || c.Changed("no-meet") {
+		p.Meet = &d.meet
+	}
 
 	if !c.Changed("start") {
 		return p, "", nil
 	}
-	// A time is written against the zone the invocation works in, so re-timing an
-	// event re-anchors it. That is only true when a time is being written: an
-	// event whose location changed keeps the zone it was made in, wherever the
-	// person changing it happens to be, and so does one moved by a bare day.
 	zone, loc, err := workingZone(c)
 	if err != nil {
 		return p, "", err
@@ -487,8 +474,6 @@ func (d *details) patch(c *kit.Invocation, calendarID string, reached *reach) (c
 	start := written.Anchored(zone)
 	p.Start = &start
 
-	// An event that had no time of day and is being given one needs a length to go
-	// with it: the day it lasted is not one.
 	gainsATimeOfDay := reached.allDay && !start.AllDay
 	if !c.Changed("duration") && !c.Changed("end") && !gainsATimeOfDay {
 		return p, "", nil
@@ -501,10 +486,6 @@ func (d *details) patch(c *kit.Invocation, calendarID string, reached *reach) (c
 	return p, lengthClause(dur, fromCalendar), nil
 }
 
-// ── the zone, and what a change reaches ──
-
-// workingZone is the zone this invocation writes against, and the frame a
-// wall-clock time given on the command line is read in.
 func workingZone(c *kit.Invocation) (string, *time.Location, error) {
 	zone, err := c.App.Zone(c.Ctx)
 	if err != nil {
@@ -517,12 +498,6 @@ func workingZone(c *kit.Invocation) (string, *time.Location, error) {
 	return zone, loc, nil
 }
 
-// timeLabel is when an event sits, said in the frame it is anchored to.
-//
-// The zone is on screen because it is the one part of a written time that the
-// command line does not state and that nothing else would reveal until the event
-// turned up an hour out in somebody else's calendar. A day has none to state: it
-// has no time of day for a zone to move.
 func timeLabel(d ical.DateTime) string {
 	if d.AllDay {
 		return d.Time.Format("2006-01-02") + " (all day)"
@@ -534,9 +509,6 @@ func timeLabel(d ical.DateTime) string {
 	return d.Wall().Format("2006-01-02 15:04") + " " + zone
 }
 
-// lengthClause says how long an event lasts when the command line did not: the
-// length is then the calendar's, which is the one part of the write that nothing
-// on screen would otherwise reveal.
 func lengthClause(dur time.Duration, fromCalendar bool) string {
 	if !fromCalendar {
 		return ""
@@ -544,27 +516,13 @@ func lengthClause(dur time.Duration, fromCalendar bool) string {
 	return units.Duration(dur) + " long"
 }
 
-// previewSample is how many of a series' occurrences a preview draws.
-//
-// Enough to recognise the pattern and see where it starts, few enough that the
-// question underneath is still on the screen. How many there are in all is in
-// the sentence above the table, which is where a preview keeps its count.
 const previewSample = 20
 
-// reach is what a reference reaches: the event it names, and, when it names a
-// series rather than one instance, the occurrences that come with it.
-//
-// It is read before the change is made, because a preview has to describe the
-// same thing the change will do, and a series addressed by its bare reference is
-// where those two are furthest apart - one reference, and every meeting it ever
-// generates.
 type reach struct {
 	title  string
 	allDay bool
 	rows   []calsvc.Event
-	// total is how many occurrences there are, or nil for a series with no end.
-	total *int
-	// series records that the reference named the whole of something recurring.
+	total  *int
 	series bool
 }
 
@@ -575,7 +533,7 @@ func reachOf(c *kit.Invocation, calID, eventID, occurrence string) (*reach, erro
 			return nil, err
 		}
 		one := 1
-		return &reach{title: ev.Title, allDay: ev.AllDay, rows: []calsvc.Event{*ev}, total: &one}, nil
+		return &reach{title: ev.Title, allDay: ev.AllDay, rows: []calsvc.Event{ev.Event}, total: &one}, nil
 	}
 	got, err := c.App.Calendar.Series(c.Ctx, calID, eventID, previewSample)
 	if err != nil {
@@ -589,8 +547,6 @@ func reachOf(c *kit.Invocation, calID, eventID, occurrence string) (*reach, erro
 	return r, nil
 }
 
-// name is what the sentence calls the event: what it is being renamed to, or
-// what it is called now.
 func (r *reach) name(renamed string) string {
 	if renamed != "" {
 		return renamed
@@ -598,8 +554,6 @@ func (r *reach) name(renamed string) string {
 	return r.title
 }
 
-// clause says which occurrences the change reaches, so the preview, the
-// confirmation and the result all describe the scope the reference asked for.
 func (r *reach) clause(occurrence string, onwards bool) string {
 	switch {
 	case occurrence != "" && onwards:
@@ -616,8 +570,6 @@ func (r *reach) clause(occurrence string, onwards bool) string {
 	return ""
 }
 
-// at is where the event sits now, in the frame it is anchored to, which is what
-// a change moves it from.
 func (r *reach) at() (ical.DateTime, bool) {
 	if len(r.rows) == 0 {
 		return ical.DateTime{}, false
@@ -629,8 +581,6 @@ func (r *reach) at() (ical.DateTime, bool) {
 	return ical.Timed(first.Start, first.Zone), true
 }
 
-// moved says where a change puts the event, whenever it puts it anywhere - a
-// time of day taken away moves it as surely as a new date does.
 func (r *reach) moved(p calsvc.EventPatch) string {
 	at, ok := r.at()
 	if !p.TouchesTimes() || !ok {
@@ -653,8 +603,6 @@ func (r *reach) extra() map[string]any {
 	return map[string]any{"occurrences": r.total}
 }
 
-// clauses joins the things a result has to say into one trailing sentence,
-// leaving out whatever does not apply.
 func clauses(parts ...string) string {
 	kept := make([]string, 0, len(parts))
 	for _, part := range parts {
@@ -735,9 +683,6 @@ func (d *details) check(needsStart bool) kit.Step {
 	}
 }
 
-// judgeAttendees refuses an --attendee nobody could be invited as, before the
-// calendar is resolved: an address that is not one, or a role that is neither
-// of the two. An empty value invites nobody, and is left out.
 func judgeAttendees(attendees *[]string) kit.Step {
 	return func(*kit.Invocation) error {
 		for _, raw := range *attendees {
@@ -757,7 +702,6 @@ func judgeAttendees(attendees *[]string) kit.Step {
 	}
 }
 
-// wantsATimeOfDay is what --all-day=false asks for and cannot supply itself.
 func wantsATimeOfDay(day string) error {
 	return kit.Fail("--all-day=false gives the event a time of day, so --start has to say which.").
 		Hint("--all-day=false --start " + day + "T13:00")
@@ -823,10 +767,6 @@ func (d *details) length(c *kit.Invocation, calendarID string, start ical.DateTi
 const composerDefaultMinutes = 30
 
 func eventsRespondCmd() *cobra.Command {
-	// The word is "answer", not "status", because an event has a status of its
-	// own - whether it is going ahead - and this is the reply one participant
-	// sends. Two subjects sharing a flag name is how a name comes to mean two
-	// things.
 	answer := &kit.Enum{
 		Name: "answer", Usage: "Your reply to the invitation",
 		Values: []string{"accept", "tentative", "decline"},
@@ -925,10 +865,6 @@ func eventsDeleteCmd() *cobra.Command {
 			for _, t := range targets {
 				refs = append(refs, t.ref)
 			}
-			// One reference names one stored event however many meetings it holds,
-			// so the count says how many were addressed and the clause beside it
-			// says how far each one goes. Several references have nothing that
-			// could be said of all of them at once, so they say nothing.
 			whole := &reach{rows: rows, total: &counted, series: reached.series}
 			if endless {
 				whole.total = nil
@@ -964,8 +900,6 @@ func eventsDeleteCmd() *cobra.Command {
 	return c
 }
 
-// ── helpers ──
-
 // tellAttendees emails the participants Proton cannot reach through their own
 // calendar. A failure here does not undo the change that has already been made.
 func tellAttendees(c *kit.Invocation, res *calsvc.EventResult) error {
@@ -980,7 +914,53 @@ func tellAttendees(c *kit.Invocation, res *calsvc.EventResult) error {
 	return nil
 }
 
-// listedCalendars is the set a listing covers: the one asked for, or all of them.
+func (d *details) registerMeet(c *cobra.Command, without string) {
+	c.Flags().BoolVar(&d.meet, "meet", false, "Give it a Proton Meet link")
+	c.Flags().BoolVar(&d.noMeet, "no-meet", false, without)
+	kit.Exclusive(c, "meet", "no-meet")
+}
+
+func meetClause(meet *bool) string {
+	switch {
+	case meet == nil:
+		return ""
+	case *meet:
+		return "with a Proton Meet link"
+	}
+	return "without its Proton Meet link"
+}
+
+func unchangedNote(meet bool) string {
+	if meet {
+		return "The event already has a Proton Meet link."
+	}
+	return "The event has no Proton Meet link."
+}
+
+func callURL(call *calsvc.VideoCall) string {
+	if call == nil {
+		return ""
+	}
+	return call.URL
+}
+
+func showCall(c *kit.Invocation, res *calsvc.EventResult) {
+	if res == nil || res.Call == nil || c.UI().Format.Machine() {
+		return
+	}
+	c.Note("Join with Proton Meet: %s", res.Call.URL)
+}
+
+func guests(attendees []string) int {
+	n := 0
+	for _, a := range attendees {
+		if email, _, _ := calsvc.ParseAttendee(a); email != "" {
+			n++
+		}
+	}
+	return n
+}
+
 func listedCalendars(c *kit.Invocation, ref string) ([]string, error) {
 	if ref != "" {
 		id, err := resolveCalendar(c, ref)
@@ -1008,9 +988,6 @@ func resolveCalendar(c *kit.Invocation, ref string) (string, error) {
 	return c.App.Calendar.ResolveCalendarID(c.Ctx, expanded)
 }
 
-// targetCalendar is the calendar a new event or an import goes into: the one
-// --calendar names, or your default calendar when it names none. chosen says the
-// default was taken, which is when the result has to say which calendar that is.
 func targetCalendar(c *kit.Invocation, ref string) (cal calsvc.Calendar, chosen bool, err error) {
 	if ref == "" {
 		cal, err = c.App.Calendar.DefaultCalendar(c.Ctx)
@@ -1030,8 +1007,6 @@ func targetCalendar(c *kit.Invocation, ref string) (cal calsvc.Calendar, chosen 
 	return cal, false, cal.TakesEvents()
 }
 
-// takesEvents refuses a change to an event in a calendar nothing can be written
-// to, before anything is asked or sent.
 func takesEvents(c *kit.Invocation, calendarID string) error {
 	cal, err := calendarList(c).Find(c.Ctx, calendarID)
 	if err != nil {
@@ -1039,8 +1014,6 @@ func takesEvents(c *kit.Invocation, calendarID string) error {
 	}
 	return cal.TakesEvents()
 }
-
-// ── export ──
 
 // Export writes what a calendar holds as an .ics file, which is the format every
 // other calendar reads and the one Proton's own settings page offers.
@@ -1096,8 +1069,6 @@ func eventsExportCmd() *cobra.Command {
 	dest.Register(c)
 	return c
 }
-
-// ── import ──
 
 // Import reads an .ics file into a calendar, which is the other half of export
 // and the thing Proton's own settings page offers beside it.
@@ -1157,8 +1128,6 @@ func eventsImportCmd() *cobra.Command {
 	return c
 }
 
-// importColumns previews a file's events the way a listing shows them, so a dry
-// run answers "what is in this file" as well as "what would happen".
 func importColumns() []ui.Column[ical.VEvent] {
 	return []ui.Column[ical.VEvent]{
 		{Header: "WHEN", Cell: func(v ical.VEvent) string {

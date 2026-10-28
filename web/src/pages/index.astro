@@ -15,8 +15,8 @@ const traits = [
     title: "Real end-to-end encryption",
   },
   {
-    body: "Mail, Drive, Calendar, Pass and Contacts, in a single static executable on Linux, macOS and Windows. One grammar and one output shape across all five.",
-    title: "Five apps, one binary",
+    body: "Mail, Drive, Calendar, Pass, Meet and Contacts, in a single static executable on Linux, macOS and Windows. One grammar and one output shape across all six.",
+    title: "Six apps, one binary",
   },
   {
     body: "JSON and YAML with one envelope shape for every list, streaming stdin and stdout, exit codes that mean something, and --dry-run on everything that changes state.",
@@ -107,7 +107,7 @@ const application = {
     <h2>Common questions</h2>
     <p class="lead">
       Proton ships a CLI for Drive and one for Pass, and Bridge for mail in a desktop client. This is
-      one binary across all five apps.
+      one binary across all six apps.
     </p>
     <ul class="questions">
       {questions.map(({ href, text }) => (
@@ -136,11 +136,6 @@ const application = {
     display: none;
   }
 
-  /*
-   * The three reasons to use this rather than a browser. They were set smaller
-   * than the prose around them, which put the argument in the quietest type on
-   * the page.
-   */
   .traits {
     display: grid;
     gap: 2.5rem;
