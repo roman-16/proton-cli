@@ -20,32 +20,40 @@ import (
 	"github.com/roman-16/proton-cli/internal/skip"
 )
 
-// Exporting a message rebuilds it as RFC 822: Proton keeps the original header
-// block verbatim, so the export reuses it and overwrites only the headers that
-// describe the body, which the CLI has just rebuilt around decrypted content.
-// This is the same reconstruction the web client's "Export" action performs, with
-// one addition - a message with no stored header block (a draft) gets one
-// synthesised from its metadata, so the output is always a valid .eml rather than
-// a bare MIME entity.
-//
-// Two consequences are inherent and documented: an exported file is plaintext,
-// and the original DKIM and ARC headers will not verify against a rebuilt body.
-
-// Export renders a message as a complete RFC 822 document.
 func (s *Service) Export(ctx context.Context, id string, withAttachments bool) ([]byte, *ExportMeta, error) {
-	raw, u, err := s.messageAndKeys(ctx, id)
+	r, err := s.render(ctx, id, withAttachments)
 	if err != nil {
 		return nil, nil, err
+	}
+	return r.doc, &ExportMeta{
+		ID:      r.raw.ID,
+		Subject: r.raw.Subject,
+		From:    senderAddress(r.raw.Sender),
+		Time:    r.raw.Time,
+	}, nil
+}
+
+type rendered struct {
+	doc    []byte
+	raw    *rawMessage
+	sealed bool
+}
+
+func (s *Service) render(ctx context.Context, id string, withAttachments bool) (*rendered, error) {
+	raw, u, err := s.messageAndKeys(ctx, id)
+	if err != nil {
+		return nil, err
 	}
 	rings, ok := u.AddrRings(raw.AddressID)
 	if !ok {
 		first, _, err := u.FirstAddr()
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		rings = first
 	}
 	body, _, err := s.openBody(ctx, u, *raw, false)
+	shut := err != nil
 	if err != nil {
 		// Recorded and not counted: nothing is missing from the file. The armour
 		// goes in as it stands, so the message is exported whole and somebody
@@ -61,7 +69,7 @@ func (s *Service) Export(ctx context.Context, id string, withAttachments bool) (
 		for _, a := range raw.Attachments {
 			sk, err := decodeSessionKey(rings.Read, a.KeyPackets)
 			if err != nil {
-				return nil, nil, fmt.Errorf("attachment %s: %w", a.Name, err)
+				return nil, fmt.Errorf("attachment %s: %w", a.Name, err)
 			}
 			att := &draftAttachment{
 				ID: a.ID, Name: a.Name, MIMEType: a.MIMEType,
@@ -69,7 +77,7 @@ func (s *Service) Export(ctx context.Context, id string, withAttachments bool) (
 			}
 			data, err := s.attachmentBytes(ctx, att)
 			if err != nil {
-				return nil, nil, err
+				return nil, err
 			}
 			parts = append(parts, mimePart{
 				Filename: a.Name, MIMEType: a.MIMEType, Data: data,
@@ -86,7 +94,7 @@ func (s *Service) Export(ctx context.Context, id string, withAttachments bool) (
 	}
 	mimeHeaders, mimeBody, err := buildExportMIME(plain, html, parts)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	base := raw.Header
@@ -100,15 +108,9 @@ func (s *Service) Export(ctx context.Context, id string, withAttachments bool) (
 	if !bytes.HasSuffix(mimeBody, []byte("\r\n")) {
 		out.WriteString("\r\n")
 	}
-	return out.Bytes(), &ExportMeta{
-		ID:      raw.ID,
-		Subject: raw.Subject,
-		From:    senderAddress(raw.Sender),
-		Time:    raw.Time,
-	}, nil
+	return &rendered{doc: out.Bytes(), raw: raw, sealed: shut}, nil
 }
 
-// ExportMeta is what a caller needs to name and frame an exported message.
 type ExportMeta struct {
 	ID      string
 	Subject string
@@ -116,10 +118,6 @@ type ExportMeta struct {
 	Time    int64
 }
 
-// mergeHeaders overlays the rebuilt MIME headers onto the original header block:
-// a header the new entity defines replaces the original's, and one the original
-// lacks is appended. Everything else - Received chains, Message-ID, References -
-// survives untouched.
 func mergeHeaders(base string, overlay textproto.MIMEHeader) string {
 	lines := unfoldHeaders(base)
 	replaced := map[string]bool{}
@@ -133,7 +131,6 @@ func mergeHeaders(base string, overlay textproto.MIMEHeader) string {
 			continue
 		}
 		if replaced[key] {
-			// Drop further copies of a header the overlay owns.
 			continue
 		}
 		replaced[key] = true
@@ -161,8 +158,6 @@ func sortedHeaderKeys(h textproto.MIMEHeader) []string {
 	return keys
 }
 
-// unfoldHeaders splits a header block into one entry per header, joining the
-// continuation lines a folded header spans.
 func unfoldHeaders(block string) []string {
 	block = strings.ReplaceAll(block, "\r\n", "\n")
 	var out []string
@@ -186,8 +181,6 @@ func headerName(line string) string {
 	return ""
 }
 
-// synthesizeHeaders builds a header block for a message Proton stored without
-// one, so an exported draft is still a valid .eml.
 func synthesizeHeaders(raw *rawMessage) string {
 	var b strings.Builder
 	write := func(name, value string) {
@@ -215,11 +208,6 @@ func joinRecipients(rs []Recipient) string {
 	return strings.Join(out, ", ")
 }
 
-// ── mbox framing ──
-
-// MboxEntry frames one exported message for an mbox file: the "From " separator
-// carries the envelope sender and date, and any line in the body that would look
-// like a separator is escaped.
 func MboxEntry(doc []byte, meta *ExportMeta) []byte {
 	from := meta.From
 	if from == "" {
@@ -238,9 +226,6 @@ func MboxEntry(doc []byte, meta *ExportMeta) []byte {
 	return b.Bytes()
 }
 
-// ── import ──
-
-// ParsedEML is an RFC 822 document read back into the parts a draft needs.
 type ParsedEML struct {
 	To, CC, BCC []Recipient
 	Subject     string
@@ -249,10 +234,6 @@ type ParsedEML struct {
 	Attachments []LocalAttachment
 }
 
-// ParseEML reads an RFC 822 document into recipients, a body and attachments, so
-// a file on disk can become a draft or a message. It handles the shapes real mail
-// uses - nested multiparts, base64 and quoted-printable, non-UTF-8 charsets - and
-// prefers an HTML body when the document offers both.
 func ParseEML(r io.Reader) (*ParsedEML, error) {
 	msg, err := mail.ReadMessage(r)
 	if err != nil {
@@ -279,8 +260,6 @@ func ParseEML(r io.Reader) (*ParsedEML, error) {
 	return out, nil
 }
 
-// walkEML descends the MIME tree, collecting the text and HTML bodies and every
-// attachment it finds.
 func walkEML(header textproto.MIMEHeader, body io.Reader, out *ParsedEML, plain, html *string) error {
 	mediaType, params, err := mime.ParseMediaType(headerOr(header, "Content-Type", "text/plain"))
 	if err != nil {
@@ -338,9 +317,6 @@ func walkEML(header textproto.MIMEHeader, body io.Reader, out *ParsedEML, plain,
 	return nil
 }
 
-// decodePartBody reverses the transfer encoding and transcodes the result to
-// UTF-8 when the part declares another charset, using Proton's own MIME helpers
-// so the CLI tolerates exactly what their clients tolerate.
 func decodePartBody(header textproto.MIMEHeader, body io.Reader, mediaType string, params map[string]string) ([]byte, error) {
 	data, err := io.ReadAll(gomime.DecodeContentEncoding(body, header.Get("Content-Transfer-Encoding")))
 	if err != nil {
@@ -349,17 +325,10 @@ func decodePartBody(header textproto.MIMEHeader, body io.Reader, mediaType strin
 	if misdeclaredUTF8(params["charset"], data) {
 		return data, nil
 	}
-	// Binary attachments carry no charset; DecodeCharset passes them through and
-	// its error only reports that, so the bytes it returns are what we want.
 	decoded, _ := gomime.DecodeCharset(data, mediaType, params)
 	return decoded, nil
 }
 
-// misdeclaredUTF8 reports whether a part claims US-ASCII but actually carries
-// UTF-8. Some clients (Outlook among them) label a part us-ascii and then put
-// an em-dash in it; decoding those bytes as declared turns them into mojibake,
-// and since US-ASCII cannot contain a byte above 0x7F, the declaration is
-// provably wrong whenever one appears.
 func misdeclaredUTF8(charset string, data []byte) bool {
 	switch strings.ToLower(strings.TrimSpace(charset)) {
 	case "us-ascii", "ascii", "iso-ir-6", "ansi_x3.4-1968":
@@ -385,8 +354,6 @@ func headerOr(h textproto.MIMEHeader, key, fallback string) string {
 	return fallback
 }
 
-// decodeHeader decodes RFC 2047 encoded-words, so a Subject written in another
-// charset arrives readable.
 func decodeHeader(v string) string {
 	out, err := gomime.DecodeHeader(v)
 	if err != nil {

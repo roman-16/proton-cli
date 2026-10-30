@@ -5,14 +5,11 @@ import (
 	"time"
 
 	"github.com/roman-16/proton-cli/internal/cli/kit"
+	"github.com/roman-16/proton-cli/internal/localfile"
 	mailsvc "github.com/roman-16/proton-cli/internal/service/mail"
 	"github.com/roman-16/proton-cli/internal/ui"
 	"github.com/spf13/cobra"
 )
-
-// Export writes messages back out as RFC 822. Selection reuses the same
-// references and filters as trash and move, so "everything from this sender older
-// than a year" reads the same here as it does there.
 
 const (
 	formatEML  = "eml"
@@ -46,8 +43,6 @@ func exportCmd() *cobra.Command {
 			if err != nil {
 				return wrongTable(err, "export")
 			}
-			// One mbox is one stream whatever it contains, so the single-file
-			// check only applies to eml.
 			if err := dest.Validate(shape == formatMbox || sel.Len() == 1); err != nil {
 				return err
 			}
@@ -69,8 +64,6 @@ func exportCmd() *cobra.Command {
 	return c
 }
 
-// exportEML writes one document per message, named after when it arrived and what
-// it says, which sorts chronologically and stays readable.
 func exportEML(c *kit.Invocation, ids []string, dest *kit.Destination, withAttachments bool) error {
 	for _, id := range ids {
 		doc, meta, err := c.App.Mail.Export(c.Ctx, id, withAttachments)
@@ -84,10 +77,6 @@ func exportEML(c *kit.Invocation, ids []string, dest *kit.Destination, withAttac
 	return nil
 }
 
-// exportMbox concatenates every message into one stream.
-//
-// One entry at a time: an archive is as large as a mailbox, so holding the whole
-// thing in memory to write it would put a ceiling on what can be exported.
 func exportMbox(c *kit.Invocation, ids []string, dest *kit.Destination, withAttachments bool) error {
 	_, err := dest.Stream(c, "mail.mbox", func(w io.Writer) error {
 		for _, id := range ids {
@@ -106,10 +95,9 @@ func exportMbox(c *kit.Invocation, ids []string, dest *kit.Destination, withAtta
 
 func exportName(meta *mailsvc.ExportMeta) string {
 	stamp := time.Unix(meta.Time, 0).Local().Format("2006-01-02 1504")
-	return kit.SafeFilename(stamp+" "+meta.Subject) + ".eml"
+	return localfile.SafeName(stamp+" "+meta.Subject) + ".eml"
 }
 
-// conversationExportCmd writes a whole thread out, oldest first.
 func conversationExportCmd() *cobra.Command {
 	var dest kit.Destination
 	var noAttachments bool

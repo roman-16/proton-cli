@@ -1,9 +1,3 @@
-// Package index is the copy of the account this machine keeps so that a search
-// can read what Proton cannot: the inside of a message.
-//
-// It is one collection rather than a command under each app, because it is one
-// thing: the same key, the same directory, the same three questions - build it,
-// keep it current, remove it - whatever the app is whose contents are in it.
 package index
 
 import (
@@ -14,6 +8,7 @@ import (
 	"time"
 
 	"github.com/roman-16/proton-cli/internal/cli/kit"
+	"github.com/roman-16/proton-cli/internal/localfile"
 	"github.com/roman-16/proton-cli/internal/progress"
 	"github.com/roman-16/proton-cli/internal/search"
 	"github.com/roman-16/proton-cli/internal/ui"
@@ -67,13 +62,6 @@ func listCmd() *cobra.Command {
 	}
 }
 
-// indexedCell says how much of an app is in the index, in the app's own noun.
-//
-// A build that has not finished says so by naming both numbers, and an app
-// whose contents are still arriving says how many it has: everything is in the
-// index by then, and what a keyword reaches is the part that has its text.
-// Every message has a body, so a mailbox names the count alone; some of a drive
-// is text, so a drive names how many of those it has read.
 func indexedCell(s search.Status) string {
 	noun := ui.Quantity(s.Indexed, nounOf(s.App))
 	switch {
@@ -87,13 +75,8 @@ func indexedCell(s search.Status) string {
 	return noun
 }
 
-// owesContents reports that an index holds things whose text it has still to
-// download, which is the state an app is in between its two passes.
 func owesContents(s search.Status) bool { return s.Bodies < s.Texts }
 
-// blankAtZero leaves a column empty rather than writing a nought in it: what
-// the column reports is an exception, and a table of noughts reads as a table of
-// findings.
 func blankAtZero(n int) string {
 	if n == 0 {
 		return ""
@@ -101,10 +84,6 @@ func blankAtZero(n int) string {
 	return strconv.Itoa(n)
 }
 
-// continues points at the command that finishes what an interrupted build
-// started, which is the one thing a half-built index leaves to be done. An
-// index Proton could not describe the changes to is in the same position: what
-// finishes it is a reading of the account, which is what a build is.
 func continues(c *kit.Invocation, index search.Status) {
 	if index.Complete && !index.Stale && !owesContents(index) {
 		return
@@ -161,13 +140,6 @@ func updateCmd() *cobra.Command {
 	}
 }
 
-// bring brings the named apps' indexes up to date and reports the run as one
-// change: one line, one object for a script, whatever it took to do.
-//
-// The work comes before the report rather than inside it, because how much
-// there was to do is the thing the work finds out. A preview has no such
-// trouble - what a build would index is a number Proton will say - so the two
-// meet at the same place, and neither performs anything the other would not.
 func bring(c *kit.Invocation, apps []search.App) error {
 	parts, err := partsFor(c, apps)
 	if err != nil {
@@ -204,12 +176,6 @@ func bring(c *kit.Invocation, apps []search.App) error {
 	}, func() error { return nil })
 }
 
-// run builds what is not built and then applies what has changed, which is what
-// "bring this app's index up to date" means whichever command asked for it.
-//
-// A catch-up that comes back saying Proton could not describe what happened is
-// answered here rather than left for the next run: reading the account is what
-// settles it, and reading the account is what a build does.
 func run(ctx context.Context, session search.Session, sink progress.Sink) (search.Result, error) {
 	var done search.Result
 	for range reconciles {
@@ -227,14 +193,8 @@ func run(ctx context.Context, session search.Session, sink progress.Sink) (searc
 	return done, nil
 }
 
-// reconciles is how many times one run reads an app again because its feed said
-// it could not say what had happened. Twice is a reading, and a reading of what
-// arrived during it; a third would be a feed refreshing faster than the account
-// can be read, which is the next run's to carry on with.
 const reconciles = 2
 
-// stopped says what a run that was interrupted got through, so the person who
-// pressed Ctrl+C knows whether running it again is minutes or hours.
 func stopped(c *kit.Invocation, session search.Session, part search.Part, err error) error {
 	if !errors.Is(err, context.Canceled) {
 		return err
@@ -251,12 +211,6 @@ func stopped(c *kit.Invocation, session search.Session, part search.Part, err er
 	return err
 }
 
-// unreadable says how much this run put into the index without its contents,
-// which is the one thing about a build that is not in the count.
-//
-// What it reports is what this run could not open, not what the index holds:
-// the same thirty-one bodies said every time the index was brought up to date
-// would be a warning about nothing having happened.
 func unreadable(c *kit.Invocation, part search.Part, got search.Result) {
 	if got.Unreadable == 0 {
 		return
@@ -265,8 +219,6 @@ func unreadable(c *kit.Invocation, part search.Part, got search.Result) {
 		ui.Quantity(got.Unreadable, contentsOf(part.App())))
 }
 
-// preview counts what this run would index without writing anything, which
-// costs the one request that knows how much there is.
 func preview(c *kit.Invocation, parts []search.Part) error {
 	total := 0
 	for _, part := range parts {
@@ -328,25 +280,13 @@ func watchCmd() *cobra.Command {
 	}
 }
 
-// change is one batch of changes an index took in, as a line on a stream.
 type change struct {
-	App search.App `json:"app"`
-	// What says what the batch did, in the app's own nouns.
-	What string `json:"change"`
+	App  search.App `json:"app"`
+	What string     `json:"change"`
 }
 
-// pollEvery is how often the indexes are brought up to date, which is the
-// interval Proton's own clients poll their change feed at.
 const pollEvery = 30 * time.Second
 
-// follow keeps the indexes current until the reader stops watching.
-//
-// Each app's index is opened once and kept open, so a poll that finds nothing is
-// one request rather than a decryption of the whole file every half-minute.
-//
-// A failed poll is reported and the loop carries on: a network that dropped for
-// a minute is not a reason to stop watching, and the next poll asks from the
-// same cursor, so nothing is lost by having missed one.
 func follow(c *kit.Invocation, parts []search.Part, emit func(change) error) error {
 	sessions := make([]search.Session, 0, len(parts))
 	for _, part := range parts {
@@ -380,7 +320,6 @@ func follow(c *kit.Invocation, parts []search.Part, emit func(change) error) err
 	}
 }
 
-// described is what one batch did, said in the app's own nouns.
 func described(r search.Result, noun string) string {
 	switch {
 	case r.Indexed == 0:
@@ -439,9 +378,6 @@ func deleteCmd() *cobra.Command {
 	}
 }
 
-// onlyApp names the index being removed when there is one of them, so the
-// question is about that app rather than about a count of one. Several are
-// counted instead: naming all of them would be the listing the reader just saw.
 func onlyApp(gone []search.Status) string {
 	if len(gone) != 1 {
 		return ""
@@ -457,11 +393,6 @@ func size(indexes []search.Status) int64 {
 	return total
 }
 
-// ── the apps ──
-
-// named is the apps an argument list asks for, or all of them when it asks for
-// none. A word that is not an app is refused before anything is read, since
-// nothing about it needs an account to judge.
 func named(args []string) ([]search.App, error) {
 	if len(args) == 0 {
 		return search.Apps, nil
@@ -478,7 +409,6 @@ func named(args []string) ([]search.App, error) {
 	return once(out), nil
 }
 
-// once keeps the first mention of each app, so naming one twice indexes it once.
 func once(apps []search.App) []search.App {
 	seen := make(map[search.App]bool, len(apps))
 	out := make([]search.App, 0, len(apps))
@@ -492,7 +422,6 @@ func once(apps []search.App) []search.App {
 	return out
 }
 
-// partsFor is what indexes each named app.
 func partsFor(c *kit.Invocation, apps []search.App) ([]search.Part, error) {
 	out := make([]search.Part, 0, len(apps))
 	for _, app := range apps {
@@ -514,11 +443,9 @@ func completeApps(*cobra.Command, []string, string) ([]string, cobra.ShellCompDi
 	return search.Names(search.Apps), cobra.ShellCompDirectiveNoFileComp
 }
 
-// claim takes the directory for writing, so two runs cannot index the same
-// thing at the same time.
-func claim(c *kit.Invocation) (*search.Lock, error) {
+func claim(c *kit.Invocation) (*localfile.Lock, error) {
 	lock, err := c.App.Index.Claim()
-	if errors.Is(err, search.ErrBusy) {
+	if errors.Is(err, localfile.ErrBusy) {
 		return nil, kit.Fail("Another run is already indexing.").
 			Hint("wait for it to finish, or stop it").Exit(4)
 	}
@@ -528,8 +455,6 @@ func claim(c *kit.Invocation) (*search.Lock, error) {
 	return lock, nil
 }
 
-// kind is the noun the result counts in: the app's own when one app was
-// indexed, and a word that covers all of them when several were.
 func kind(parts []search.Part) string {
 	if len(parts) == 1 {
 		return parts[0].Noun()
@@ -537,7 +462,6 @@ func kind(parts []search.Part) string {
 	return "entries"
 }
 
-// across names the apps a count covers, for the runs that cover more than one.
 func across(parts []search.Part) string {
 	if len(parts) < 2 {
 		return ""
@@ -549,7 +473,6 @@ func across(parts []search.Part) string {
 	return "across " + ui.Listing(names)
 }
 
-// nounOf is what one app's things are called in a listing.
 func nounOf(app search.App) string {
 	switch app {
 	case search.AppCalendar:
@@ -562,10 +485,6 @@ func nounOf(app search.App) string {
 	return "entries"
 }
 
-// contentsOf is what a build warns about when it could not open something: a
-// message is named by the body that would not open, an event and a file by
-// themselves - a file that would not open may be one whose name would not
-// decrypt as easily as one whose text would not read.
 func contentsOf(app search.App) string {
 	switch app {
 	case search.AppCalendar:
@@ -576,8 +495,6 @@ func contentsOf(app search.App) string {
 	return nounOf(app)
 }
 
-// owedOf is what an app's second pass downloads, counted beside the things
-// holding it: a mailbox's bodies, a drive's texts.
 func owedOf(app search.App) string {
 	if app == search.AppDrive {
 		return "texts"
@@ -585,8 +502,6 @@ func owedOf(app search.App) string {
 	return "bodies"
 }
 
-// refusal phrases what went wrong with the index itself, which is the one
-// failure here that is the reader's to act on rather than a bug.
 func refusal(err error) error {
 	switch {
 	case errors.Is(err, search.ErrOtherAccount):

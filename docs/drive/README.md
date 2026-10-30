@@ -32,6 +32,8 @@ proton drive items download /Documents/report.pdf --dest - | less
 
 A folder needs `--recursive`, and lands as a directory of its own name inside `--dest-dir`. `--dest` names one file, so it is refused for a folder.
 
+A downloaded file keeps the modification time it has in Drive. Running a folder download again skips each file already there with that size and time, which continues a download that stopped. A file there that differs is refused without `--force`. Proton Docs and Sheets are not downloaded.
+
 Transfers show progress on stderr.
 
 **A name already taken is refused.** `--if-exists` answers instead:
@@ -323,6 +325,7 @@ Every `items` command takes `--computer`, and paths then start at that computer'
 proton drive photos list --tag favorites
 proton drive photos upload ./IMG_0001.jpg
 proton drive photos download 3Ns8pT2v --dest-dir ./photos/
+proton drive photos download --album Holidays --dest-dir ./holidays/
 proton drive photos favorite 3Ns8pT2v
 ```
 

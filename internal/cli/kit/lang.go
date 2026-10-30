@@ -9,13 +9,6 @@ const (
 
 const Docs = "https://" + Alias + ".lerchster.dev"
 
-// Verbs is every word that may end a command path.
-//
-// Each entry is the one word for its idea, and each is spoken: a word kept here
-// after the command that said it is gone describes a CLI that no longer exists,
-// and the next reader trusts it anyway. Where two words competed, the winner
-// is the one Proton's own interface uses; where Proton has no word, the winner is
-// the one that reads as ordinary English.
 var Verbs = map[string]string{
 	"list":  "enumerate a collection",
 	"get":   "show one thing in full",
@@ -32,7 +25,6 @@ var Verbs = map[string]string{
 	"empty":   "remove everything from a trash",
 	"undo":    "take back everything a piece of work brought in",
 
-	// Work Proton carries out over time
 	"cancel": "stop work that is under way",
 	"resume": "set stopped work going again",
 
@@ -121,21 +113,6 @@ var Verbs = map[string]string{
 	"api":        "send a raw authenticated request",
 }
 
-// Irreversible lists the verbs whose work neither this CLI nor Proton's own
-// clients can take back. Every command whose verb is in here stops for a yes,
-// which kit.Mutate guarantees structurally from the action it reports.
-//
-// `uninstall` belongs beside the two removals because it is the strictest case
-// of the same thing: afterwards there is no proton left to undo it with.
-//
-// `leave` is here for what it takes back: only the person who shared the thing
-// can grant it again, so nothing this account does undoes it.
-//
-// `api` is here for the reason it is a mutation: a raw request is whatever the
-// caller made it. Nothing on the command line says which requests destroy - the
-// endpoint that permanently deletes a message is a PUT - so a policy that read
-// the method would be a fence with the one thing it was put up for on the far
-// side of it.
 var Irreversible = map[string]bool{
 	"api": true, "delete": true, "empty": true, "leave": true, "uninstall": true,
 	"undo": true,
@@ -167,23 +144,6 @@ var Mutating = map[string]bool{
 	"resolve": true, "reopen": true,
 }
 
-// SettingsPages declares every collection that lives under a `settings` group,
-// and the page of Proton's own settings app it mirrors.
-//
-// Where a collection hangs is the one structural question this CLI answers over
-// and over, and it is not a matter of taste. Proton's clients already answer it:
-// what the product app itself creates and edits is a working surface, and what
-// only the settings app reaches is a setting. A vault, a contact group and a
-// photo album have no settings page at all, so they sit at app level; a filter
-// and an address have no place in the mail window, so they sit under `settings`.
-//
-// Folders, labels and calendars are the interesting case: Proton offers all
-// three in both places, in the sidebar and again as a settings page. The tie
-// goes to `settings`, because a CLI has no sidebar and the settings page is the
-// one that enumerates them.
-//
-// The value is the page, not a boolean, so the entry carries its own reason and
-// a new collection cannot be filed here without someone having looked.
 var SettingsPages = map[string]string{
 	"account settings password":          "Account and password",
 	"account settings emergency-access":  "Recovery",
@@ -233,6 +193,7 @@ const Addresses = "addresses"
 
 var Placeholders = map[string]Placeholder{
 	"ALIAS_CONTACT_REF": {Means: "an address the addressed alias may write to", Picks: PicksHolding},
+	"APP":               {Means: "one of the account's apps, by name"},
 	"ATTACHMENT_REF":    {Means: "an attachment on the addressed message or item", Picks: PicksHolding},
 	"COMMAND":           {Means: "a command, as you would type it"},
 	"CODE":              {Means: "a sign-in code another device is showing"},

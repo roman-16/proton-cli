@@ -13,23 +13,6 @@ import (
 	"testing"
 )
 
-// Every request this CLI can send is one the live suite sends.
-//
-// The live suite is the only thing that would notice Proton changing an answer,
-// and it can only notice for requests it actually makes. So the set it reaches is
-// recorded - `just coverage` writes tests/api-coverage.golden from a real run -
-// and this reads the source to find every request the CLI is able to send, and
-// fails on one the suite has never sent.
-//
-// It is checked here rather than by the suite because it needs no account and no
-// network: what the CLI can send is a property of the code. The other half, what
-// the suite did send, needs a run against Proton, which is why it is a recorded
-// file rather than a check.
-//
-// A request that appears here after a change means one of two things: a test for
-// it is missing, or it belongs in unreachable below with the reason nobody can
-// reach it.
-
 const coverageGolden = "../../tests/api-coverage.golden"
 
 const (
@@ -51,12 +34,6 @@ var unreachable = map[string]string{
 
 	"GET /core/v4/organizations/keys": "only an administrator's password change asks, and the account with an organization refuses that command",
 
-	// Everything a password reset leaves behind. Only a reset locks a key or a
-	// volume, and a run that reset a test account's password would lock that
-	// account's Drive for good and spend keys nothing can put back - so no test
-	// may make the state these requests answer, and every test account is in the
-	// state where they are refused before the network. What the CLI builds is
-	// covered offline instead, against the shape Proton documents.
 	"GET /core/v4/settings/mnemonic":        "only a key a password reset locked is opened with a recovery phrase, and no test may reset a password",
 	"PUT /core/v4/keys/user/{id}":           "the same: nothing but a reset leaves a key to reactivate",
 	"PUT /core/v4/keys/address/{id}":        "the same: only a key a reset locked comes back from a copy of itself",
@@ -69,14 +46,6 @@ var unreachable = map[string]string{
 	"PUT /core/v4/users/delete":                "deleting a test account would end every run after it; a dry run asks the check that comes first",
 	"DELETE /core/v4/organizations/membership": "only a family plan's member leaves it on the way to deleting the account, and deleting ends the account",
 
-	// Everything about reading a password-protected message. Proton seals a
-	// message to a password only for a recipient it has no keys for, so no address
-	// any test account holds can be sent one - and the link that names it arrives
-	// in that outside mailbox and nowhere else, which is a mailbox no run can
-	// read. A run can reach the first of these with an id nobody issued, and a
-	// refusal is not coverage. What is tested instead is the sending end, which is
-	// where these messages come from, and the decryption, against messages built
-	// the way Proton builds them.
 	"GET /mail/v4/eo/token/{id}":      "only a mailbox outside Proton is sent such a link, and no run can read one",
 	"GET /mail/v4/eo/message":         "the same: without a link there is no token to ask with",
 	"GET /mail/v4/eo/attachment/{id}": "the same",
@@ -84,12 +53,6 @@ var unreachable = map[string]string{
 }
 
 var untested = map[string]string{
-	// The emergency-access crisis flow. All three run on the paid account, because
-	// emergency access is paid-only, and each touches somebody's real account in a
-	// way a per-run test should not manufacture: requesting emergency access
-	// notifies the granting account, cancelling needs a request to have notified
-	// it, and signing in opens a session on it. The flow is built to the web client
-	// (packages/account/delegatedAccess) and is exercised by hand.
 	"PUT /account/v1/access/{id}/trigger": "requesting emergency access notifies the granting account, which is always the paid one",
 	"PUT /account/v1/access/{id}/reset":   "cancelling acts on a request in flight, and making one notifies the paid account",
 	"POST /account/v1/access/{id}/auth":   "signing in opens a session on the granting account, which is always the paid one",
@@ -97,17 +60,6 @@ var untested = map[string]string{
 	"GET /core/v4/organizations/settings":    "Proton answers it only for an account in an organization, and the free accounts are in none",
 	"POST /meet/v1/meetings/personal/rotate": "Proton lets a personal room's link change once every 24 hours, so a run would fail the next one that day",
 
-	// Everything that starts an import and everything that acts on one running.
-	// Proton connects to the other mailbox itself, so reaching any of these needs
-	// a mailbox on an IMAP server outside Proton - and Proton Mail speaks no IMAP
-	// without Bridge, so no test account can be the source. A server a run could
-	// stand up locally is no use either: the connection is made from Proton's
-	// machines and not from this one.
-	//
-	// What is tested is the listing of imports, the listing of what they left
-	// behind, the server lookup a create does first, and every refusal settled
-	// before the network. The mapping a start sends is covered offline, against
-	// the folder shapes Proton documents.
 	"POST /importer/v1/importers":                     "needs a mailbox on an IMAP server outside Proton, which no test account has",
 	"GET /importer/v1/mail/importers/{id}":            "the same: only an importer that connected somewhere has folders to list",
 	"POST /importer/v1/importers/start":               "the same: there is nothing to start without one",
@@ -117,25 +69,9 @@ var untested = map[string]string{
 	"POST /importer/v1/reports/{id}/undo":             "the same: only a finished import can be taken back",
 	"DELETE /importer/v1/mail/importers/reports/{id}": "the same: only a finished import leaves a record to forget",
 
-	// Both halves of confirming a mailbox. Proton meters everything under a
-	// mailbox's /verify the way a brute-force guard does, so a suite that spends
-	// a code attempt on every run fails on that quota rather than on anything
-	// real - and it stays failing for the best part of an hour, which is the
-	// opposite of what a test is for. The flow itself was walked by hand against
-	// the live API; what is left out is repeating it every run.
 	"GET /pass/v1/user/alias/mailbox/{n}/verify":  "sending the confirmation code again",
 	"POST /pass/v1/user/alias/mailbox/{n}/verify": "handing the confirmation code back",
 
-	// Confirming a watched address, which is the same guard a third time. A run
-	// adds one address and spends the one verification email that costs; asking
-	// for the email again is what the quota is counted in, and the code itself
-	// arrives at a domain that takes no mail, so there is nothing to hand back
-	// even if spending an attempt every run were free.
-	//
-	// The last two follow from it. Proton is not watching an address nobody has
-	// verified, so there is nothing there to read and nothing to pause - it
-	// refuses both, and so does the CLI, before the request. What is tested is
-	// adding the address, the three refusals, and removing it.
 	"POST /pass/v1/breach/custom_email/{id}/resend_verification": "asking for a second verification email is what Proton's quota counts",
 	"PUT /pass/v1/breach/custom_email/{id}/verify":               "handing back a code that arrives in a mailbox no run can read",
 	"GET /pass/v1/breach/custom_email/{id}/breaches":             "needs a verified address added by hand, and no run can verify one",
@@ -147,59 +83,20 @@ var untested = map[string]string{
 
 	"PUT /account/v4/breaches/state": "Dark Web Monitoring has found no breach for any test account, so there is none to resolve or reopen",
 
-	// The auto-reply is a paid feature, so only the paid account could reach it -
-	// and it is the one setting a run cannot put back. Proton keeps the last
-	// message even while the auto-reply is off and offers no way to clear it
-	// (`set --message ""` is refused), so a test would leave its own text in
-	// somebody's real settings for good. Turning it off restores the behaviour
-	// and not the state, which is not the same thing.
 	"PUT /mail/v4/settings/autoresponder": "writing an auto-reply cannot be undone, and only a real account has the plan for one",
 
-	// Wiping the security log. The events in it are the only ones the accounts
-	// have - Proton records a sign-in from a named client and never one from this
-	// CLI, so nothing a run does puts an event back, and a run that wiped once
-	// would leave the listing with nothing to be checked against for good. What is
-	// tested is the listing, the state, both toggles and the preview of the wipe.
 	"DELETE /core/v4/logs/auth": "the events it removes are ones no run can cause Proton to record again",
 
-	// Reporting phishing hands the message, decrypted, to the people at Proton
-	// who read reports. A suite that ran it every run would file its own test mail
-	// as an attack on somebody's desk, over and over, and no run could take one
-	// back. The flow was walked by hand against the live API instead.
 	"POST /core/v4/reports/phishing": "a report is read by a person at Proton and cannot be withdrawn",
 
-	// Reporting abuse in Drive hands Proton the key to a share, and a person at
-	// Proton reads the report. The suite previews reports on a share, a link, a
-	// revision and an invitation, which resolves everything a report names; the
-	// bodies are held to the shape Proton's SDK sends by the drive service's own
-	// tests against a stub.
 	"POST /drive/report/share":        "a report is read by a person at Proton and cannot be withdrawn",
 	"POST /drive/unauth/report/share": "a report is read by a person at Proton and cannot be withdrawn",
 
-	// A refresh happens when a session expires mid-run, which is Proton's to
-	// decide and no test can arrange - so whether a run reaches it is luck. It
-	// stays listed rather than being relied on: a golden line that appears and
-	// disappears with the age of a saved session is not coverage. The exchange
-	// itself is covered by internal/proton's own tests against a stub, and a run
-	// that does happen to refresh will report this entry as stale.
 	"POST /auth/v4/refresh": "only an expiring session causes one, and a run cannot make its session expire",
 
-	// Everything about a computer. Only the Proton Drive desktop app registers
-	// one - the web client cannot, so neither can this CLI - and no test account
-	// has one for a run to find, which a test cannot arrange and cannot skip over.
-	// What the CLI does with the answers is covered offline instead, by
-	// internal/service/drive/computers_test.go against the shape Proton documents;
-	// what is not covered anywhere is that the live answers have that shape.
-	"GET /drive/devices":         "needs an account with a computer, and only the Proton Drive desktop app makes one",
-	"PUT /drive/devices/{id}":    "the same, and it fires only for a computer named before Proton moved the name onto the root",
-	"DELETE /drive/devices/{id}": "the same, and deleting the one computer an account has cannot be undone by a run",
+	"PUT /drive/devices/{id}":    "needs a computer, which only the Proton Drive desktop app makes, named before Proton moved the name onto the root",
+	"DELETE /drive/devices/{id}": "needs a computer, which only the Proton Drive desktop app makes, and deleting an account's one computer cannot be undone by a run",
 
-	// Leaving a mailing list, from either end: the message that arrived, or the
-	// sender behind it. Proton records a subscription when mail carrying List-
-	// headers arrives from a real sender, and nothing a run does puts one there -
-	// a message these accounts send each other has no such headers, so the record
-	// never appears and the four requests that act on one cannot be reached. The
-	// listing is tested, and so is every refusal that is settled before a request.
 	"POST /mail/v4/messages/{id}/unsubscribe":                 "reaching it needs a message from a real mailing list carrying a List-Unsubscribe header, which no seeding can put on these accounts",
 	"PUT /mail/v4/messages/mark/unsubscribed":                 "the same message: only one from a real list is left by sending mail or opening a link",
 	"POST /mail/v4/newsletter-subscriptions/{id}":             "only a real list leaves a subscription record to mark as left",
@@ -208,69 +105,26 @@ var untested = map[string]string{
 	"DELETE /mail/v4/newsletter-subscriptions/{id}":           "the same record, which has to exist before it can be forgotten",
 	"GET /calendar/v1/{id}/events/{id}/attendees":             "reaching it needs an event with more attendees than a page holds, which would mean inviting a hundred addresses from these accounts",
 
-	// Asking when somebody is busy. Proton's calendar asks only from a plan with
-	// room for several people, and so does the CLI; the paid account is on
-	// Unlimited, which has room for one, so every run is refused before the
-	// request. What is tested is that refusal on both kinds of account, and the
-	// answers the CLI reads, against the shapes Proton was seen to send.
 	"GET /calendar/v1/{id}/busy-schedule": "only Duo, Family, Visionary and business plans may ask, and the paid test account is on Unlimited",
 
-	// Deleting an address. Proton allows one a year, and the paid account - the
-	// one account that may delete at all - refuses the command outright, so
-	// nothing here spends it.
 	"PUT /core/v4/addresses/{id}/delete":          "Proton allows one address deletion a year, and no test may spend it",
 	"GET /core/v4/addresses/allowAddressDeletion": "only deleting an address asks whether the year's allowance is still there",
 
 	"POST /core/v4/addresses": "the fixture address is minted once in an account's life, and every test account is past that moment",
 
-	// Changing a recovery address or number. Proton guards both against somebody
-	// taking the account over, and a suite that writes them on every run trips
-	// the guard: after a few runs every write is refused with 2028, as unusual
-	// activity targeting the account, and the refusal lasts days rather than
-	// minutes. Setting, allowing, verifying and removing both have been walked
-	// against the live API; what is left out is repeating it every run. What is
-	// tested is reading them, the preview, and every refusal settled before a
-	// write.
 	"PUT /core/v4/settings/email":       "Proton refuses a recovery address changed on every run as an attempt to take the account over",
 	"PUT /core/v4/settings/email/reset": "the same guard, and allowing recovery needs an address in place to allow it through",
 	"PUT /core/v4/settings/phone":       "the same guard, for the number",
 	"PUT /core/v4/settings/phone/reset": "the same guard, and allowing recovery needs a number in place to allow it through",
 	"POST /core/v4/verify/send":         "only an address in place is sent a verification, and the guard refuses putting one there",
 
-	// Both halves of verifying a recovery phone. Proton texts a code to a real
-	// number, and no test account has one: a number a run can set is one nobody
-	// receives the code at, so the send is all there is and the code cannot come
-	// back. The flow was walked by hand against the live API with a real phone.
 	"POST /core/v4/users/code":   "Proton texts a code to a real phone, and no test account has one",
 	"POST /core/v4/verify/phone": "handing back a code that arrives on a phone no run can read",
 
-	// Handing the keys to somebody who was offered a vault before they had a
-	// Proton account. Reaching it needs the mailbox the offer went to to become a
-	// Proton account between one command and the next, which is somebody at a
-	// signup form and not something a run can arrange - and once it happened the
-	// account would exist for good, so the state could not be made again.
-	//
-	// Everything up to it is tested: the offer is made, listed as waiting,
-	// refused for confirmation while it is, and withdrawn. Drive's half of the
-	// same feature is covered the same way, and its conversion is one request the
-	// suite already sends - an ordinary invitation - so what is untested here is
-	// the Pass request alone.
 	"POST /pass/v1/share/{id}/invite/new_user/{id}/keys": "reaching it needs a mailbox to become a Proton account mid-run, which nobody can arrange",
 
-	// Turning on the short-domain address. An account has one for its lifetime
-	// and the paid account's is already on, so the only account a run could turn
-	// one on for is a free one, which Proton does not let have it. The refusal on
-	// each side is tested instead: the free plan is refused before the request,
-	// and the paid account is told the address is already there.
 	"POST /core/v4/addresses/setup": "the short domain is turned on once in an account's life, and every test account is past that moment",
 
-	// Everything a verified alias domain has. Proving a domain is yours means a
-	// TXT entry in a real zone, which no run can add, so the domains a run makes
-	// under the paid account's own name stay unverified - and Proton keeps the
-	// settings from an unverified domain, so the CLI refuses to change them before
-	// the request. Adding a domain, checking its DNS, choosing the default and
-	// deleting it are tested; what is left is reached only through a domain
-	// somebody verified by hand.
 	"GET /pass/v1/user/alias/custom_domain/{n}/settings":               "needs a custom alias domain somebody verified by hand, and no run can put an entry in a real zone",
 	"PUT /pass/v1/user/alias/custom_domain/{n}/settings/catch_all":     "the same: only a verified domain has a catch-all to switch",
 	"PUT /pass/v1/user/alias/custom_domain/{n}/settings/mailboxes":     "the same: only a verified domain has mailboxes to point stray mail at",

@@ -24,22 +24,6 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// This file is the interface's specification, expressed as assertions rather
-// than as prose.
-//
-// The CLI's inconsistencies did not arrive through carelessness; they arrived
-// because nothing could tell that a new command had picked a different word for
-// an existing idea. Every rule the design rests on is checked here, over the
-// whole tree, with no network and no credentials, so a divergence fails a test
-// instead of shipping.
-//
-// Rules that the tree does not satisfy yet are skipped with the step that turns
-// them on. A skip is a debt with an address.
-
-// ── walking the tree ──
-
-// leaves returns every command that does work, and groups returns every command
-// that only holds others.
 func partition(t *testing.T) (leaves, groups []*cobra.Command) {
 	t.Helper()
 	var walk func(*cobra.Command)
@@ -62,8 +46,6 @@ func partition(t *testing.T) (leaves, groups []*cobra.Command) {
 }
 
 func cmdPath(c *cobra.Command) string { return c.CommandPath() }
-
-// ── rule 1: every leaf introduces itself the same way ──
 
 func TestEveryLeafHasAShortInTheHouseStyle(t *testing.T) {
 	leaves, _ := partition(t)
@@ -92,8 +74,6 @@ func TestEveryGroupHasAShort(t *testing.T) {
 	}
 }
 
-// ── rule 2: groups never act ──
-
 func TestGroupsNeverAct(t *testing.T) {
 	_, groups := partition(t)
 	for _, c := range groups {
@@ -103,9 +83,6 @@ func TestGroupsNeverAct(t *testing.T) {
 	}
 }
 
-// A group holds commands, so a word it does not hold is a mistake worth
-// reporting. Cobra makes that check only at the root; unknownSubcommand makes
-// it everywhere, and this is what says so for every group in the tree.
 func TestGroupsRejectAnUnknownSubcommand(t *testing.T) {
 	_, groups := partition(t)
 	for _, c := range groups {
@@ -119,14 +96,6 @@ func TestGroupsRejectAnUnknownSubcommand(t *testing.T) {
 	}
 }
 
-// ── rule 3: one placeholder set ──
-
-// The only argument names the CLI uses are the ones kit.Placeholders declares.
-// A new one means a new idea, which is exactly the thing worth noticing.
-//
-// The list is read from kit rather than repeated here: a second copy would make
-// the declaration and the check two things that can disagree, and the one that
-// loses is the file that calls itself the vocabulary.
 func TestUsageUsesOnlyDeclaredPlaceholders(t *testing.T) {
 	leaves, _ := partition(t)
 	for _, c := range leaves {
@@ -138,9 +107,6 @@ func TestUsageUsesOnlyDeclaredPlaceholders(t *testing.T) {
 	}
 }
 
-// A command that takes the word for none names the argument that takes it, and
-// that argument has to be one its usage line shows and a check holds - otherwise
-// the declaration lets through nothing, and reads as though it did.
 func TestNoneIsTakenOnlyByAnArgumentACheckHolds(t *testing.T) {
 	leaves, _ := partition(t)
 	for _, c := range leaves {
@@ -157,15 +123,6 @@ func TestNoneIsTakenOnlyByAnArgumentACheckHolds(t *testing.T) {
 	}
 }
 
-// How many arguments a command takes is said once, on the usage line its help
-// screen shows, and kit is what reads it. A command that declared an arity of
-// its own would be a command that can disagree with the line above its own
-// flags, and two of them did: `completion` showed no argument and demanded one,
-// `filters reorder` showed one and demanded two.
-//
-// A value check is a different thing and stays with the command: what a setting
-// key may be is the command's own knowledge. It runs after the count, so it can
-// take the arguments it is handed as given.
 func TestNoCommandCountsItsOwnArguments(t *testing.T) {
 	arity := []string{
 		"cobra.NoArgs", "cobra.ArbitraryArgs", "cobra.ExactArgs", "cobra.MinimumNArgs",
@@ -184,17 +141,6 @@ func TestNoCommandCountsItsOwnArguments(t *testing.T) {
 	}
 }
 
-// An argument that names one of the CLI's own things completes from a collection
-// something lists, and a command's REF from one that can be listed by naming it
-// alone.
-//
-// That is the whole promise behind a reference completing: what the shell offers
-// back is what a listing put on the screen, so there has to be a listing that
-// could have put it there. The stricter half is what a REF needs, because a REF
-// is the first thing typed and nothing has been named yet - which is why
-// `messages attachments download` has to reach past attachments to messages,
-// whose listing needs nothing, while the attachment it takes second comes from a
-// listing that had to be told which message.
 func TestEveryReferenceCompletesFromSomethingListable(t *testing.T) {
 	leaves, _ := partition(t)
 	for _, c := range leaves {
@@ -222,10 +168,6 @@ func TestEveryReferenceCompletesFromSomethingListable(t *testing.T) {
 	}
 }
 
-// A column or field that files its reference under another collection names one
-// that exists, so a typo cannot quietly send what was shown somewhere nothing
-// reads it. The declarations are inside closures, so the source is where they can
-// be found.
 func TestEveryCrossReferenceNamesACollection(t *testing.T) {
 	root := newRoot()
 	names := regexp.MustCompile(`Ref: +"([^"]+)"`)
@@ -250,13 +192,10 @@ func TestEveryCrossReferenceNamesACollection(t *testing.T) {
 	}
 }
 
-// lists reports whether a command line names a collection with a list of its
-// own, which is what puts anything into that collection's memory at all.
 func lists(root *cobra.Command, collection string) bool {
 	return listing(root, collection) != nil
 }
 
-// listable reports whether that list needs nothing named first.
 func listable(root *cobra.Command, collection string) bool {
 	l := listing(root, collection)
 	return l != nil && len(kit.Arguments(l.Use)) == 0
@@ -275,8 +214,6 @@ func listing(root *cobra.Command, collection string) *cobra.Command {
 	return nil
 }
 
-// argTokens is the placeholder names in a Use string, read the way the CLI
-// itself reads them.
 func argTokens(use string) []string {
 	args := kit.Arguments(use)
 	out := make([]string, 0, len(args))
@@ -286,14 +223,6 @@ func argTokens(use string) []string {
 	return out
 }
 
-// ── rule 8: a flag name means one thing ──
-
-// The flag vocabulary lives in kit.Flags, beside the verbs and the argument
-// names, because it is the same kind of declaration: a word this CLI may use and
-// what it means. It is checked in both directions.
-//
-// This is the rule that would have caught --all meaning four different things
-// and --html meaning three.
 func TestSharedFlagNamesShareOneMeaning(t *testing.T) {
 	leaves, _ := partition(t)
 	users := map[string][]string{}
@@ -311,10 +240,6 @@ func TestSharedFlagNamesShareOneMeaning(t *testing.T) {
 				name, len(cmds), strings.Join(cmds, "\n  "))
 		}
 	}
-	// The other direction. A vocabulary that keeps a word after nothing says it
-	// stops describing the CLI, and the next reader trusts it anyway: --totp-uri,
-	// --cvv and five more outlived the flags they described by a whole release.
-	// Global flags are declared too, and no leaf owns one, so they are exempt.
 	global := map[string]bool{}
 	newRoot().PersistentFlags().VisitAll(func(f *pflag.Flag) { global[f.Name] = true })
 	for name := range kit.Flags {
@@ -324,25 +249,6 @@ func TestSharedFlagNamesShareOneMeaning(t *testing.T) {
 	}
 }
 
-// A flag whose meaning is shared is registered from one place.
-//
-// The rule above asks only that a name appear in the registry, which a flag
-// satisfies by being written down once however many different things it goes on
-// to mean. That is how --all came to say "everything in scope" on twenty-five
-// commands, "reply to everyone" on two, "every scheduled send" on one and "every
-// profile on this machine" on one, with the registry holding a single sentence
-// true of the first group only.
-//
-// Comparing the help text would be the obvious repair and it is the wrong
-// instrument: usage strings vary for good reasons - "Set the postal address" on
-// a create and "Replace the postal address" on the update beside it are one
-// meaning, not two - so a textual check either passes everything or fails on
-// wording.
-//
-// So the enforcement is structural instead. The names below belong to kit, which
-// registers each with the one usage string it has; a command that wants a
-// different meaning has to pick a different name, because this fails on any
-// command that declares one of them itself.
 var kitOwnedFlags = map[string]string{
 	"after":                  "kit.DayRange",
 	"all":                    "kit.All",
@@ -363,8 +269,6 @@ var kitOwnedFlags = map[string]string{
 	"totp":                   "kit.Reauth",
 }
 
-// kitFlagUsage is what kit itself registers each of those with, so the guard
-// below can tell kit's own registration from a command redeclaring the name.
 var kitFlagUsage = map[string]string{
 	"after":                  kit.AfterUsage,
 	"all":                    kit.AllUsage,
@@ -385,35 +289,9 @@ var kitFlagUsage = map[string]string{
 	"totp":                   kit.TOTPUsage,
 }
 
-// A flag name that names a fixed set of values names the same set everywhere.
-//
-// The rule above catches a shared flag whose meaning is a shared *behaviour*, by
-// making kit own the registration. It cannot catch the other half: two commands
-// that each declare their own Enum under one name, with different values. Those
-// are two meanings wearing one word just as surely, and they are easier to write
-// by accident, because each declaration reads fine on its own.
-//
-// `--status` was the case that proved it - whether an event is going ahead
-// (confirmed, tentative, cancelled) against whether one participant is coming
-// (accept, tentative, decline). Two subjects, one word, and nothing said so.
-//
-// The domains are compared rather than the help text, because a domain is what
-// the flag actually means: two commands offering different values are asking
-// different questions whatever their usage strings say.
-//
-// domainsByCollection are the four that ask one question whose answers belong
-// to whatever is being acted on: which column to order by, which layout to
-// write, what somebody may do with a shared thing, and what kind of thing it
-// is. A message can be laid down as eml or mbox and a vault cannot; a card
-// sorts by name and a file by size; a Pass vault has a manager and a Drive
-// folder has nothing above editor; a Pass item is a login or a note and a
-// watched address is on the account or an alias. The question is the same word
-// in every one of them, and anything not named here that offers a second set is
-// not.
 var domainsByCollection = map[string]bool{"access": true, "format": true, "sort": true, "type": true}
 
 func TestAFlagNameNamesOneSetOfValues(t *testing.T) {
-	// Building the tree is what populates the registry.
 	newRoot()
 
 	domains := map[string]map[string][]string{}
@@ -456,21 +334,6 @@ func TestAFlagNameNamesOneSetOfValues(t *testing.T) {
 	}
 }
 
-// A flag that takes a value off names the flag that puts it on.
-//
-// There are three ways to say "none" in this CLI and each is the right one
-// somewhere. A value that can carry the word says it: `--expires never`, which
-// is what every screen prints for something that does not expire. A state
-// somebody can also choose when making the thing is `--no-x`: `--no-remind`
-// removes an event's reminders and gives a new event none, one word for one
-// idea. What is left is a single-valued field of something that already exists
-// whose flag cannot carry the word - a signature typed as text, a password read
-// from a file - and that is `--clear-x`.
-//
-// So a `--clear-x` sits beside the `x` it clears, and this fails on one that
-// does not: a `--clear-something` alone on a command is either a flag whose own
-// value could have said "never", or a name that no longer matches what it takes
-// off.
 func TestAClearFlagSitsBesideWhatItClears(t *testing.T) {
 	leaves, _ := partition(t)
 	for _, c := range leaves {
@@ -522,20 +385,6 @@ func TestSharedFlagsAreRegisteredFromOnePlace(t *testing.T) {
 	}
 }
 
-// ── rule 4: a collection sits where Proton's own clients put it ──
-
-// `settings` means one thing: what you set.
-//
-// It is the group most likely to become a drawer, because anything can be argued
-// into it and nothing argues its way out. So every collection filed under one
-// has to name the page of Proton's settings app it mirrors, and a collection
-// that names a page has to be filed under one. Both halves matter: the first
-// stops `settings` collecting things Proton puts in the product window, and the
-// second stops a declaration going stale after a move.
-//
-// This is what decides where a new collection goes, and it decides it by
-// research rather than by taste - which is the only way five apps end up
-// agreeing.
 func TestCollectionsUnderSettingsMirrorASettingsPage(t *testing.T) {
 	_, groups := partition(t)
 	found := map[string]bool{}
@@ -579,22 +428,8 @@ func TestEverySettingSetTakesIsOneGetReports(t *testing.T) {
 	}
 }
 
-// ── rule 4b: a filter can be read before it is acted on ──
-
-// Whatever narrows a bulk verb narrows the listing beside it.
-//
-// A filter decides what a removal touches, so the command to work one out on
-// should be the one that only reads. Where `list` does not take what `trash`
-// takes, the only way to see a selection is to point the destructive verb at it
-// and add --dry-run, which is exactly the wrong place to be finding out.
-//
-// The comparison is one-way: a listing may offer more than a bulk verb - paging
-// is its own business - but it may not offer less.
 var filterParityExceptions = map[string]string{}
 
-// notNarrowing are flags a bulk verb carries that say something other than which
-// things: how many, whether everything was meant, where to look when there is no
-// argument to say it with, and what to do with what it found.
 var notNarrowing = map[string]bool{
 	"limit": true, "page": true, "scope": true, "help": true,
 	"into": true, "dest": true, "dest-dir": true, "force": true,
@@ -602,9 +437,6 @@ var notNarrowing = map[string]bool{
 	"expires": true, "until": true,
 }
 
-// narrows reports whether a flag on a bulk verb says which things it acts on.
-// Nothing kit registers does: those say how the command is run, not what it is
-// run over.
 func narrows(name string) bool {
 	_, fromKit := kitOwnedFlags[name]
 	return !fromKit && !notNarrowing[name]
@@ -655,8 +487,6 @@ func TestListTakesWhateverNarrowsTheVerbsBesideIt(t *testing.T) {
 	}
 }
 
-// ── rule 5: flag help reads like the rest of the CLI ──
-
 func TestFlagUsageIsInTheHouseStyle(t *testing.T) {
 	leaves, groups := partition(t)
 	seen := map[string]bool{}
@@ -682,12 +512,7 @@ func TestFlagUsageIsInTheHouseStyle(t *testing.T) {
 	}
 }
 
-// ── rule 7: only the ui package writes to the process streams ──
-
 func TestOnlyTheUIPackageTouchesTheProcessStreams(t *testing.T) {
-	// Execute is the one place with nowhere else to write: it reports the failures
-	// that happen before an App - and therefore a renderer - exists, such as a
-	// flag that could not be parsed.
 	allowed := map[string]bool{"../cli/root.go": true}
 
 	offenders := grepGo(t, []string{"../cli", "../service"}, func(src string) bool {
@@ -700,10 +525,6 @@ func TestOnlyTheUIPackageTouchesTheProcessStreams(t *testing.T) {
 	}
 }
 
-// ── rule 10: only one place may ask a person for a credential ──
-
-// A command that reads stdin behind the user's back is a command that can hang a
-// cron job. Keeping the ability in one file is what makes that checkable.
 func TestOnlyOnePlaceReadsCredentialsFromStdin(t *testing.T) {
 	allowed := map[string]bool{
 		"../ui/prompt.go": true,
@@ -718,12 +539,6 @@ func TestOnlyOnePlaceReadsCredentialsFromStdin(t *testing.T) {
 	}
 }
 
-// ── rule 13: no environment variable may name an account ──
-
-// An account is attached to a profile by `account login` and nowhere else. The
-// moment a credential can arrive through the environment as well, a command can
-// act as an account nobody named on the command line, which is how a profile
-// ends up quietly meaning a different one.
 func TestNoEnvironmentVariableCarriesACredential(t *testing.T) {
 	forbidden := []string{"PROTON_USER", "PROTON_PASSWORD", "PROTON_TOTP"}
 	offenders := grepGo(t, []string{"../cli", "../app", "../service", "../account", "../proton"},
@@ -740,18 +555,7 @@ func TestNoEnvironmentVariableCarriesACredential(t *testing.T) {
 	}
 }
 
-// ── rule 13b: the settings file and the flags say the same words ──
-
-// A setting has one name wherever it is written.
-//
-// The file, the flags and the variables are three ways of saying the same
-// thing, so a key that names no flag is a key nobody can discover from --help,
-// and a rename that moves one and not the other leaves two spellings for one
-// idea. The struct tags are the list; the flag set is the check.
 func TestEverySettingsKeyIsAlsoAFlag(t *testing.T) {
-	// Two are settable only in the file and by their variable: the release check
-	// has never had a flag, and the policy's own scope words are its value rather
-	// than a flag name.
 	variableOnly := map[string]bool{"no-update-check": true}
 
 	pf := newRoot().PersistentFlags()
@@ -765,15 +569,6 @@ func TestEverySettingsKeyIsAlsoAFlag(t *testing.T) {
 	}
 }
 
-// Three things are decided per run and never persisted, and one of them is the
-// reason the other rules hold at all.
-//
-// A file that could say `yes: true` would answer every confirmation the same
-// file went on to demand, including a deny - which would make the whole policy
-// decorative. `dry-run` in a file turns every command into a preview that looks
-// exactly like work getting done, `verified` is one token from one refusal, and
-// `api-url` is a durable way to point a signed-in CLI at a host that is not
-// Proton.
 func TestTheSettingsFileHoldsNoPerRunDecision(t *testing.T) {
 	keys := map[string]bool{}
 	for _, k := range settingsKeys(t) {
@@ -786,8 +581,6 @@ func TestTheSettingsFileHoldsNoPerRunDecision(t *testing.T) {
 	}
 }
 
-// settingsKeys is every key the file accepts, read off the struct that decodes
-// it so the list cannot fall behind the type.
 func settingsKeys(t *testing.T) []string {
 	t.Helper()
 	var keys []string
@@ -808,15 +601,6 @@ func settingsKeys(t *testing.T) []string {
 	return keys
 }
 
-// ── rule 13c: a global flag's name is not available to a leaf ──
-
-// A leaf that declares a flag the root already declares does not clash - it
-// shadows, silently, and the global becomes unreachable on that command.
-//
-// This is how fourteen download commands came to have no way of asking for JSON:
-// they each registered an --output meaning a file path, and cobra handed it the
-// name before the root's format flag ever saw it. A name means one thing, and
-// the root's names mean theirs everywhere.
 func TestNoLeafShadowsAGlobalFlag(t *testing.T) {
 	root := newRoot()
 	global := map[string]bool{}
@@ -833,19 +617,7 @@ func TestNoLeafShadowsAGlobalFlag(t *testing.T) {
 	}
 }
 
-// ── rule 14: standard input has one owner ──
-
-// Everything that wants stdin asks with the same word: `--password-file -` for
-// the account password, `--secret-file password=-` for a stored one, and a bare
-// `-` for a body, a key, or a file to upload. Whichever read it second would find
-// an empty stream and fail somewhere further along with a puzzle.
-//
-// So every reader goes through App.Stdin, which hands it out once and names both
-// claimants when they collide - which is the only reason a command may declare
-// one of these flags beside an argument that reads the same stream.
 func TestStandardInputHasOneOwner(t *testing.T) {
-	// internal/ui owns the process streams (rule 7) and supplies the reader that
-	// App.Stdin hands out.
 	allowed := map[string]bool{"../ui/ui.go": true}
 	offenders := grepGo(t, []string{"../cli", "../app", "../service", "../account", "../proton", "../ui"},
 		func(src string) bool { return strings.Contains(src, "os.Stdin") })
@@ -856,13 +628,6 @@ func TestStandardInputHasOneOwner(t *testing.T) {
 	}
 }
 
-// ── rule 15: the commands that can be asked to re-authenticate are declared ──
-
-// Proton guards a few endpoints behind an elevated session and grants that only
-// for another SRP exchange, so the commands reaching one carry the credentials
-// to answer with. Which endpoints those are is Proton's to decide and not
-// discoverable from here, so the set is written down: adding to it is a decision
-// rather than a reflex, and the integration harness keeps the same list.
 func TestReauthCommandsAreDeclared(t *testing.T) {
 	want := []string{
 		"proton account delete",
@@ -933,12 +698,6 @@ func TestReauthCommandsAreDeclared(t *testing.T) {
 	}
 }
 
-// The second password belongs to signing in and to nothing else.
-//
-// It is not what Proton asks for when it wants a session proved: that is the
-// password, over SRP. It is what opens the keys, which every other command finds
-// already sealed into its session - so a second command offering the flag would
-// be offering one that almost never does anything.
 func TestOnlySigningInTakesTheSecondPassword(t *testing.T) {
 	want := []string{"proton account login"}
 	leaves, _ := partition(t)
@@ -955,16 +714,6 @@ func TestOnlySigningInTakesTheSecondPassword(t *testing.T) {
 	}
 }
 
-// The Pass extra password is taken by signing in and by the two commands whose
-// subject it is.
-//
-// Any Pass command can be the one that finds the session without the scope the
-// extra password buys, so the flags could be argued onto every one of them. They
-// are on none: the scope lasts as long as the session, so a command that offered
-// them would be offering a secret to hand over again for something already held -
-// and the one run that cannot be asked for it is the one that signs in. Turning
-// the extra password on or off is the other case, where the secret is not a toll
-// on the way to something else but the thing being changed.
 func TestExtraPasswordCommandsAreDeclared(t *testing.T) {
 	want := []string{
 		"proton account login",
@@ -985,17 +734,6 @@ func TestExtraPasswordCommandsAreDeclared(t *testing.T) {
 	}
 }
 
-// ── rule 12b: what a preview has to be true about is declared ──
-
-// A dry run asserts that an account exists, because it sends no request and
-// would otherwise be the one path answering as though it had one. The exceptions
-// are the commands that would have run with nobody signed in, and there are
-// exactly four: the three that change this machine, and the one that makes the
-// session the rest of them assume.
-//
-// The set is pinned rather than counted, because the failure this guards against
-// is a fifth command quietly declaring itself exempt and skipping a check it
-// needed.
 func TestCommandsThatRunSignedOutAreDeclared(t *testing.T) {
 	want := []string{
 		"proton account login",
@@ -1017,12 +755,6 @@ func TestCommandsThatRunSignedOutAreDeclared(t *testing.T) {
 	}
 }
 
-// ── the vocabulary is closed ──
-
-// The vocabulary is read from kit rather than restated here. A test that keeps
-// its own copy of the list it is checking will eventually be checking the copy:
-// this one had drifted to hold a verb the CLI no longer has.
-
 func TestEveryVerbIsInTheVocabulary(t *testing.T) {
 	leaves, _ := partition(t)
 	spoken := map[string]bool{}
@@ -1035,13 +767,7 @@ func TestEveryVerbIsInTheVocabulary(t *testing.T) {
 			t.Errorf("%s: %q is not in the declared verb vocabulary", cmdPath(c), c.Name())
 		}
 	}
-	// `completion` is a command and is not one of the leaves: partition drops it,
-	// because cobra writes it and it answers to none of the rules the rest are
-	// held to. It is still a word this CLI says.
 	spoken["completion"] = true
-	// The other direction. `expire`, `forget`, `link`, `unlink` and `options`
-	// outlived the commands that said them by a whole release, and a vocabulary
-	// holding words nothing speaks describes a CLI that is not there.
 	for verb := range kit.Verbs {
 		if !spoken[verb] {
 			t.Errorf("kit.Verbs declares %q and no command ends in it", verb)
@@ -1049,17 +775,6 @@ func TestEveryVerbIsInTheVocabulary(t *testing.T) {
 	}
 }
 
-// ── rule 12: what cannot be taken back is declared, not remembered ──
-
-// The CLI stops for a yes for one reason: something is about to be removed. The
-// verbs that can never be taken back and the actions that say so have to name
-// the same set, because the verb is what a user reads in the help and the action
-// is what actually decides at run time. Two lists that can disagree are one bug
-// away from a `delete` that never asks.
-//
-// An opaque verb is the one that answers through neither: it has nothing to
-// resolve, so it is put to the person at the gate and reports no action of its
-// own to carry the cost.
 func TestIrreversibleVerbsAndActionsAgree(t *testing.T) {
 	fromActions := map[string]bool{}
 	for _, a := range ui.Actions {
@@ -1084,8 +799,6 @@ func TestIrreversibleVerbsAndActionsAgree(t *testing.T) {
 	}
 }
 
-// Every leaf named by an irreversible verb has to be reachable as one, so a
-// command cannot quietly sit outside the guard by being spelled differently.
 func TestIrreversibleVerbsAreMutatingVerbs(t *testing.T) {
 	for verb := range kit.Irreversible {
 		if _, ok := kit.Verbs[verb]; !ok {
@@ -1097,14 +810,6 @@ func TestIrreversibleVerbsAreMutatingVerbs(t *testing.T) {
 	}
 }
 
-// Whether a change happens at all is settled globally, so no command may
-// redefine the two flags that settle it.
-//
-// A local --yes is not a naming clash to be tidied up; it is a command deciding
-// for itself what consent means, which is the one thing the guard cannot
-// survive. `uninstall` used to spell "actually do it" that way, leaving --yes
-// meaning "proceed without asking" everywhere except the command with the most
-// to lose.
 func TestNoCommandRedefinesConsent(t *testing.T) {
 	leaves, groups := partition(t)
 	for _, c := range append(leaves, groups...) {
@@ -1116,16 +821,6 @@ func TestNoCommandRedefinesConsent(t *testing.T) {
 	}
 }
 
-// ── rule 14: nothing is logged under a name nobody declared ──
-
-// The diagnostic log is written to be handed to a stranger, and every attribute
-// in it is redacted according to a policy declared for its name. So a name with
-// no policy is a value nobody decided about, which is how an address ends up in
-// a file somebody attaches to a public issue.
-//
-// This reads every log call in the tree and checks its attribute names against
-// redact.Fields. The handler refuses an undeclared name at run time as well -
-// this is the half that says so before anybody ships it.
 func TestNothingIsLoggedUnderAnUndeclaredName(t *testing.T) {
 	for _, call := range logCalls(t, []string{".."}) {
 		for _, name := range call.names {
@@ -1137,13 +832,6 @@ func TestNothingIsLoggedUnderAnUndeclaredName(t *testing.T) {
 	}
 }
 
-// And the other direction: the vocabulary holds the names in use and no others.
-//
-// A policy for a name nothing writes is a decision nobody has had to make,
-// carrying the authority of one that somebody did. Left alone it accumulates -
-// this caught five entries describing records that were never written - and a
-// reader can no longer tell the declarations that hold from the ones that are
-// aspirations.
 func TestTheLogVocabularyHoldsOnlyWhatIsWritten(t *testing.T) {
 	written := map[string]bool{}
 	for _, call := range logCalls(t, []string{".."}) {
@@ -1159,21 +847,12 @@ func TestTheLogVocabularyHoldsOnlyWhatIsWritten(t *testing.T) {
 	}
 }
 
-// logCall is one log statement and the attribute names it writes.
 type logCall struct {
 	file  string
 	line  int
 	names []string
 }
 
-// logCalls finds every attribute name a record can be written under: the pairs
-// passed to a Debug/Info/Warn/Error call, and the attributes attached to a
-// handler, which name one in every record that handler writes.
-//
-// Only the literal names are read: slog takes alternating key/value pairs, so
-// the keys are the even arguments, and a key that is not a literal string is a
-// key nobody can check. Those are reported too, under a name that is declared
-// nowhere on purpose.
 func logCalls(t *testing.T, dirs []string) []logCall {
 	t.Helper()
 	var out []logCall
@@ -1214,8 +893,6 @@ func logCalls(t *testing.T, dirs []string) []logCall {
 				if !levels[sel.Sel.Name] || !logReceiver(sel.X) {
 					return true
 				}
-				// The message, and a context before it for the Context variants,
-				// come first; the attributes are pairs after that.
 				start := 1
 				if strings.HasSuffix(sel.Sel.Name, "Context") {
 					start = 2
@@ -1246,8 +923,6 @@ func logCalls(t *testing.T, dirs []string) []logCall {
 	return out
 }
 
-// logReceiver reports whether what is being called looks like a logger: the
-// slog package, or a field named for one.
 func logReceiver(x ast.Expr) bool {
 	switch v := x.(type) {
 	case *ast.Ident:
@@ -1258,17 +933,6 @@ func logReceiver(x ast.Expr) bool {
 	return false
 }
 
-// ── rule 15: an error is never dropped on the floor ──
-
-// A loop that decrypts cannot stop at the first item it fails to open: one
-// damaged item is no reason to refuse the other forty-one. But carrying on
-// silently is how a listing comes to under-report and exit zero, which is a
-// wrong answer presented as a right one - and it took thirty instances of this
-// exact three-line shape before anybody noticed.
-//
-// So a skipped item is recorded: counted on the invocation where a listing can
-// warn about it, or at minimum written to the log where a report can find it.
-// This finds the shape and checks that something was said.
 func TestNoErrorIsSkippedInSilence(t *testing.T) {
 	srcs := []string{"../service", "../account"}
 	swallow := regexp.MustCompile(`(?m)err\s*!=\s*nil\s*\{\n\s*continue\n`)
@@ -1295,28 +959,8 @@ func TestNoErrorIsSkippedInSilence(t *testing.T) {
 	}
 }
 
-// ── rule 16: a name out of the account travels beside the error ──
-
-// Every other value a message picks up has a shape redact can find again - an
-// address, an ID, an absolute path. What somebody called a vault item, an event
-// or an attachment is words, and no reader of the finished sentence can tell it
-// from the sentence, so a log carrying that message carries the name with it.
-//
-// errs.Naming is what separates the two readers: the person is told which of
-// their things failed, and the file gets <name> in its place. Formatting one in
-// with %s tells the person the same thing and hands the file the name, which is
-// why this fails on it.
-//
-// It reads the arguments rather than the sentence, so what it catches is exactly
-// the shape that leaks: a field of something fetched from the account going into
-// a message. A name held in a local first is invisible here - the check is a net
-// under the rule, not the rule itself, which is written in AGENTS.md.
-//
-// kit is outside it. It phrases what the command line got wrong, so the Name it
-// formats in is a flag's own - `--%s accepts:` - and never the account's.
 var accountNames = map[string]bool{"Name": true, "Subject": true, "Title": true}
 
-// phrasing is what turns a failure into a sentence for a person.
 var phrasing = map[string]bool{"Fail": true, "Problemf": true, "Unsupportedf": true}
 
 func TestTheAccountsOwnNamesReachErrorsThroughNaming(t *testing.T) {
@@ -1348,9 +992,6 @@ func TestTheAccountsOwnNamesReachErrorsThroughNaming(t *testing.T) {
 	}
 }
 
-// namedOutsideNaming are the messages built from a thing's own name with nothing
-// carrying that name beside them. The wrapper encloses the call it is given, so
-// the question is whether one of them is inside one.
 func namedOutsideNaming(file *ast.File) []*ast.CallExpr {
 	var named, phrased []*ast.CallExpr
 	ast.Inspect(file, func(n ast.Node) bool {
@@ -1382,8 +1023,6 @@ func namedOutsideNaming(file *ast.File) []*ast.CallExpr {
 	return out
 }
 
-// The checker earns its own test: reading no name out of any message would pass
-// forever while every one of them carried one.
 func TestTheNamingCheckerFindsAMessageCarryingAName(t *testing.T) {
 	const src = `package p
 
@@ -1424,7 +1063,6 @@ func TestTheNamingCheckerKnowsANameFromAWord(t *testing.T) {
 		{`kit.Fail("A vault needs a name.")`, false},
 		{`errs.Problemf("%q is not a time zone this machine knows.", name)`, false},
 		{`kit.Fail("could not read PATH from stdin: %v", err)`, false},
-		// What kit says about a flag of its own, which is why kit is not walked.
 		{`Fail("--%s accepts: %s", e.Name, strings.Join(e.Values, ", "))`, true},
 	} {
 		expr, err := parser.ParseExpr(c.src)
@@ -1437,8 +1075,6 @@ func TestTheNamingCheckerKnowsANameFromAWord(t *testing.T) {
 	}
 }
 
-// carriesAName reports whether one of the values a message is built from is a
-// thing's own name, read off whatever it was fetched from.
 func carriesAName(call *ast.CallExpr) bool {
 	for _, arg := range call.Args[min(1, len(call.Args)):] {
 		sel, ok := arg.(*ast.SelectorExpr)
@@ -1449,10 +1085,6 @@ func carriesAName(call *ast.CallExpr) bool {
 	return false
 }
 
-// ── helpers ──
-
-// grepGo returns the non-test Go files under the given directories whose source
-// satisfies match, as paths relative to this package.
 func grepGo(t *testing.T, dirs []string, match func(string) bool) []string {
 	t.Helper()
 	var hits []string
@@ -1468,7 +1100,6 @@ func grepGo(t *testing.T, dirs []string, match func(string) bool) []string {
 			if err != nil {
 				return err
 			}
-			// Parse so a mention inside a comment does not count as a use.
 			fset := token.NewFileSet()
 			file, perr := parser.ParseFile(fset, p, src, parser.SkipObjectResolution)
 			if perr == nil {
@@ -1498,70 +1129,30 @@ func grepGo(t *testing.T, dirs []string, match func(string) bool) []string {
 	return hits
 }
 
-// ── rule 11: layers import downward only ──
-
-// layers records, per package, which of our own packages it may import.
-//
-// The direction is what keeps the design honest. An inversion - a domain service
-// reaching for the progress bar, the presentation package holding mail body
-// transforms - stays invisible until stated as a rule, and shows up as the same
-// symptom either way: neither half can be tested without the other.
 var layers = map[string][]string{
-	// ui may reach ref for one thing: the notation a reference is written in.
-	// It prints references, so it has to shorten them without taking them apart
-	// wrongly, and the alternative to borrowing that is restating it - which is
-	// precisely what produced listings whose rows the next command rejected.
-	// ref is a leaf over errs, so this is a downward import and not an inversion.
-	// ui reaches redact for the reason it reaches ref: it writes the diagnostic
-	// log, and what may be written in one is declared in redact rather than
-	// restated by each handler. Putting the policy above every destination is
-	// what makes "the log holds nothing sensitive" one rule instead of two.
-	"ui": {"units", "progress", "errs", "inflect", "ref", "redact"},
-	// proton reaches units for the reason ui does: it announces a wait to the
-	// person sitting through it, and how long a span is put to a reader is
-	// declared once rather than spelled a second way here.
-	"proton":   {"errs", "units", "crypto/aead", "hv", "hv/hvexit"},
-	"errs":     {"inflect"},
-	"inflect":  {},
-	"units":    {},
-	"progress": {},
-	// mailtext reaches tidyurl for the links a body carries: taking the tracking
-	// out of them is one more transform of the body, and tidyurl knows nothing
-	// about mail.
-	"mailtext": {"tidyurl"},
-	"tidyurl":  {},
-	// redact reaches ref for the reason ui does: it decides which part of an API
-	// path names a thing rather than an endpoint, and what a Proton ID looks like
-	// is declared where references are read and written. A rule of thumb here
-	// instead would disagree with that one, and did.
-	"redact": {"ref"},
-	// search is the index on disk and the rules for matching against it. It seals
-	// records with the symmetric primitive Pass items are sealed with, seals its
-	// own key through the handle every other key goes through, and reports a build
-	// through the same sink a transfer reports through; the keys it seals to are
-	// handed in, so it reaches for nothing that knows about an account.
-	"search": {"crypto/aead", "crypto/pgp", "progress"},
-	// crypto/pgp is the one handle every key, message and signature is made
-	// through, so it reaches for nothing of ours.
-	"crypto/pgp": {},
-	// skip logs through the package-level logger and counts on the context, so it
-	// needs nothing of ours. That is what lets every service reach it.
-	"skip":   {},
-	"runlog": {},
-	// idcache reaches ref for the reason ui does: it stores whole IDs and answers
-	// short ones, and how the two relate belongs where the notation is declared
-	// rather than restated here.
+	"ui":          {"units", "progress", "errs", "inflect", "ref", "redact"},
+	"proton":      {"errs", "units", "crypto/aead", "hv", "hv/hvexit"},
+	"errs":        {"inflect"},
+	"inflect":     {},
+	"units":       {},
+	"progress":    {},
+	"mailtext":    {"tidyurl"},
+	"tidyurl":     {},
+	"redact":      {"ref"},
+	"search":      {"crypto/aead", "crypto/pgp", "localfile", "progress"},
+	"localfile":   {"errs"},
+	"export":      {"localfile", "progress", "proton"},
+	"crypto/pgp":  {},
+	"skip":        {},
+	"runlog":      {},
 	"idcache":     {"ref"},
 	"ref":         {"errs"},
 	"changelog":   {},
 	"contentline": {},
-	// accent is Proton's palette, which a flag and an import both need: one to
-	// refuse what a person typed, one to snap what a file said. It is a table and
-	// the arithmetic over it, so it reaches for nothing.
-	"accent":  {},
-	"ical":    {"contentline"},
-	"vcard":   {"contentline"},
-	"profile": {},
+	"accent":      {},
+	"ical":        {"contentline"},
+	"vcard":       {"contentline"},
+	"profile":     {},
 }
 
 func TestPackagesImportDownwardOnly(t *testing.T) {
@@ -1582,7 +1173,6 @@ func TestPackagesImportDownwardOnly(t *testing.T) {
 	}
 }
 
-// ourImports lists the internal packages dir's non-test sources import.
 func ourImports(t *testing.T, dir, prefix string) []string {
 	t.Helper()
 	seen := map[string]bool{}
@@ -1613,17 +1203,6 @@ func ourImports(t *testing.T, dir, prefix string) []string {
 	return out
 }
 
-// ── rule 9: every command shows how it is used ──
-
-// The grammar is the whole premise of this CLI: one shape, learned once, and
-// then guessed correctly everywhere else. --help is where that learning happens,
-// so a command that shows its flags but never shows itself being used has left
-// the reader to assemble the sentence from parts.
-//
-// The examples are checked rather than decorative. Each one is parsed against
-// the real tree, so an example cannot name a command that does not exist, a flag
-// that was renamed, or a different command from the one it illustrates - the
-// failure modes that turn documentation into a liability as a tree moves.
 func TestEveryLeafShowsHowItIsUsed(t *testing.T) {
 	leaves, _ := partition(t)
 	for _, c := range leaves {
@@ -1655,9 +1234,6 @@ func TestEveryExampleIsTheCommandItIllustrates(t *testing.T) {
 				t.Errorf("%s: example %q: %v", cmdPath(c), line, err)
 				continue
 			}
-			// The usage line is what counts a command's arguments, so an example
-			// is where the two meet: a line the reader is invited to copy has to
-			// survive the check the command makes of it.
 			if err := found.Args(found, found.Flags().Args()); err != nil {
 				t.Errorf("%s: example %q is refused by %q: %v", cmdPath(c), line, found.Use, err)
 			}
@@ -1665,8 +1241,6 @@ func TestEveryExampleIsTheCommandItIllustrates(t *testing.T) {
 	}
 }
 
-// An entry filed under a path that names nothing is an example nobody will ever
-// read, which is how a renamed command leaves its documentation behind.
 func TestNoExampleIsFiledUnderACommandThatDoesNotExist(t *testing.T) {
 	leaves, groups := partition(t)
 	paths := map[string]bool{}
@@ -1680,8 +1254,6 @@ func TestNoExampleIsFiledUnderACommandThatDoesNotExist(t *testing.T) {
 	}
 }
 
-// A group never acts, so an example filed under one would show a command that
-// cannot be run.
 func TestNoGroupHasExamples(t *testing.T) {
 	_, groups := partition(t)
 	for _, c := range groups {
@@ -1691,8 +1263,6 @@ func TestNoGroupHasExamples(t *testing.T) {
 	}
 }
 
-// exampleLines returns the runnable lines of an Example block, dropping blank
-// lines and the comments that head a group of them.
 func exampleLines(example string) []string {
 	var out []string
 	for _, line := range strings.Split(example, "\n") {
@@ -1700,9 +1270,6 @@ func exampleLines(example string) []string {
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		// Anything piped or redirected is a shell construct illustrating the
-		// command's place in a pipeline; only the proton side is ours to
-		// check, and it is whichever segment names the binary.
 		for _, seg := range strings.Split(line, "|") {
 			seg = strings.TrimSpace(seg)
 			if strings.HasPrefix(seg, kit.Program+" ") {
@@ -1713,9 +1280,6 @@ func exampleLines(example string) []string {
 	return out
 }
 
-// splitExample splits a command line into arguments, honouring the single and
-// double quotes an example uses to hold a subject or a name together, and
-// stopping at a redirection.
 func splitExample(line string) ([]string, error) {
 	var (
 		args  []string
@@ -1756,20 +1320,6 @@ func splitExample(line string) ([]string, error) {
 	return args, nil
 }
 
-// ── rule 12: shorthands are the root's alone ──
-
-// shorthands is every single-letter flag the CLI answers to, and what it means.
-//
-// A shorthand is a second name for a flag, which is exactly what the rest of
-// this file exists to prevent. They are allowed only where the letter is the one
-// every other tool already uses for the idea, so it is guessed rather than
-// learned, and only on flags typed often enough to be worth a letter.
-//
-// The namespace is small and global on purpose. `-p` is the profile everywhere,
-// which is only safe because no leaf may claim `-p` for `--page`; a shorthand
-// that meant one thing on `messages list` and another on `messages send` would
-// be the worst version of a flag name meaning two things, because the reader
-// cannot even see which one they got.
 var shorthands = map[string]string{
 	"h": "help",
 	"v": "version",
@@ -1795,9 +1345,6 @@ func TestOnlyTheRootDefinesShorthands(t *testing.T) {
 	}
 }
 
-// Every letter the root hands out is declared above, and every letter declared
-// above is handed out. A shorthand that arrives without being written down is a
-// second name nobody agreed to.
 func TestShorthandsAreDeclared(t *testing.T) {
 	root := newRoot()
 	seen := map[string]bool{}
@@ -1814,7 +1361,6 @@ func TestShorthandsAreDeclared(t *testing.T) {
 	}
 	root.PersistentFlags().VisitAll(check)
 	root.Flags().VisitAll(check)
-	// cobra supplies these two itself, so they are declared but never visited.
 	seen["h"], seen["v"] = true, true
 	for letter, name := range shorthands {
 		if !seen[letter] {
@@ -1823,21 +1369,6 @@ func TestShorthandsAreDeclared(t *testing.T) {
 	}
 }
 
-// A creation reports the identity it made.
-//
-// `ID=$(proton ... create ...)` is the whole reason stdout and stderr are split,
-// and it works because kit.Create puts the new ID on stdout. A create routed
-// through kit.Mutate instead reports the same sentence to a human and gives a
-// script nothing, which is a contract broken in the one place nobody looks:
-// the exit code is zero and the output is empty.
-//
-// So the action names the seam. Anything reporting ui.Created goes through
-// kit.Create, and this reads the source rather than trusting it.
-//
-// AnswerFollows is the one exception, and it is the same contract by another
-// route: the command writes its own record to stdout straight after, so what a
-// script captures is that - the URL of a link it just made, which is the thing
-// worth capturing and is not the ID.
 func TestACreationIsReportedByTheSeamThatKnowsItsID(t *testing.T) {
 	for _, dir := range []string{"."} {
 		err := filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
@@ -1878,8 +1409,6 @@ func TestACreationIsReportedByTheSeamThatKnowsItsID(t *testing.T) {
 	}
 }
 
-// writesItsOwnAnswer reports whether a result spec says a record follows it on
-// stdout.
 func writesItsOwnAnswer(arg ast.Expr) bool {
 	lit, ok := arg.(*ast.CompositeLit)
 	if !ok {
@@ -1897,8 +1426,6 @@ func writesItsOwnAnswer(arg ast.Expr) bool {
 	return false
 }
 
-// reportsCreated reports whether an argument is a result spec whose action is
-// ui.Created.
 func reportsCreated(arg ast.Expr) bool {
 	lit, ok := arg.(*ast.CompositeLit)
 	if !ok || selectorName(lit.Type) != "ui.ResultSpec" {
@@ -1917,7 +1444,6 @@ func reportsCreated(arg ast.Expr) bool {
 	return false
 }
 
-// selectorName renders a package-qualified name, or "" for anything else.
 func selectorName(e ast.Expr) string {
 	sel, ok := e.(*ast.SelectorExpr)
 	if !ok {

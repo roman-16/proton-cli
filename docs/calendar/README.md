@@ -244,11 +244,12 @@ The last column is the sentence a notification would say, which is `says` in JSO
 
 ```bash
 proton calendar events export --after 2026-01-01 --before 2026-12-31 --dest year.ics
+proton calendar events export --calendar Work --all --dest-dir .
 proton calendar events import holidays.ics
 curl -s https://example.com/team.ics | proton calendar events import -
 ```
 
-A recurring series is exported **once** with its rule rather than expanded, so another client reads it back as the same series. Reminders travel as `VALARM` components. An event that cannot be decrypted is left out rather than written as a stub.
+Without `--after` or `--before` an export covers the next 30 days; `--all` covers every event, in a file named after the calendar. A recurring series is exported **once**, with its rule, rather than expanded. Reminders travel as `VALARM` components. An event that cannot be decrypted is left out rather than written as a stub.
 
 An event's own colour travels as a `COLOR` property, so a round trip keeps it. On the way in, a colour the file names in CSS - `tomato`, `#FF6347` - becomes the nearest of the twenty accent colours.
 

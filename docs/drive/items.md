@@ -121,6 +121,8 @@ Download a file or folder.
 
 A folder is refused without --recursive. With it, the folder lands as a directory of its own name inside --dest-dir, subfolders and all, and --dest is refused: one path cannot take a tree.
 
+A file already there with the size and modification time it has in Drive is skipped, so running it again continues a download that stopped. A file there that differs is refused without --force. Proton Docs and Sheets are not downloaded.
+
 Behind a public link, a file is / when the link points at the file itself, and a path inside the folder when it points at a folder. A link with a password takes it from --link-password-file, which takes - for stdin.
 
 ```

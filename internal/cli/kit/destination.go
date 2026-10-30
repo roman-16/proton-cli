@@ -1,29 +1,15 @@
 package kit
 
 import (
-	"errors"
-	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
+	"time"
 
+	"github.com/roman-16/proton-cli/internal/localfile"
 	"github.com/spf13/cobra"
 )
 
-// Where downloaded bytes go.
-//
-// Every command that writes a payload to disk answers the same three questions:
-// which path, what if it exists, and can it stream to stdout instead. Answering
-// them once means attachments, Drive files, photos and exports behave the same,
-// and that `--force` means exactly one thing across the whole CLI.
-
-// Destination is the --dest / --dest-dir / --force group.
-//
-// A local path is named by --dest and a remote container by --into, which is
-// what keeps the two halves of "where does this go" from sharing a word: bytes
-// land on this machine, a message lands in a folder.
 type Destination struct {
 	dest    string
 	destDir string
@@ -37,12 +23,6 @@ func (d *Destination) Register(c *cobra.Command) {
 	f.BoolVar(&d.force, "force", false, "Overwrite a file that already exists")
 }
 
-// Validate rejects combinations that cannot mean anything, before any bytes are
-// fetched. single says whether exactly one item is being written.
-//
-// A named path that is already taken is one of them: whether the file is there
-// is a local fact, so finding out after the download would mean spending the
-// whole transfer to learn something that was true before it started.
 func (d *Destination) Validate(single bool) error {
 	if d.dest != "" && d.destDir != "" {
 		return Fail("--dest and --dest-dir cannot both be given.").
@@ -52,8 +32,6 @@ func (d *Destination) Validate(single bool) error {
 		return err
 	}
 	if !single && d.dest != "" {
-		// Several separate files down one stream arrive as one unusable run of
-		// bytes, so stdout is no more of an answer here than a single path is.
 		names := "--dest names one file"
 		if d.dest == "-" {
 			names = "--dest - writes one stream"
@@ -64,89 +42,24 @@ func (d *Destination) Validate(single bool) error {
 	return nil
 }
 
-// free reports that a named path may be written, which --force is the way to say
-// about one that is taken. It is asked twice: once before the work, so a
-// collision costs nothing, and again as the bytes are published, because the
-// answer can change while a large payload is arriving.
 func (d *Destination) free(path string) error {
-	if path == "" || path == "-" || d.force || !exists(path) {
+	if path == "" || path == "-" || d.force || !localfile.Exists(path) {
 		return nil
 	}
 	return Fail("%s already exists.", path).Hint("--force to overwrite it.")
 }
 
-// Stdout reports whether the payload streams to standard output.
+func (d *Destination) Force() bool { return d.force }
+
 func (d *Destination) Stdout() bool { return d.dest == "-" }
 
-// WriteNamed writes data to the path the user named, and is the one place that
-// decides what to do when something is already there.
-//
-// A path somebody typed is refused rather than replaced: they named that exact
-// file, and destroying something they did not mention is not a thing a command
-// may do quietly. --force is how they say they meant it.
 func WriteNamed(path string, data []byte, force bool) (string, error) {
-	if !force && exists(path) {
+	if !force && localfile.Exists(path) {
 		return "", Fail("%s already exists.", path).Hint("--force to overwrite it.")
 	}
-	return path, commit(path, data)
+	return path, localfile.Publish(path, data, time.Time{})
 }
 
-// commit puts data at path, whatever stands there now.
-//
-// The bytes go to a file of the payload's own beside the destination, and that
-// file is renamed onto it. Two things follow from the rename that would not be
-// true of a write to the path itself. The file that ends up there is the one
-// this made, so it is private however readable whatever it replaced was - a mode
-// handed to a write is a creation mode, and an overwrite creates nothing. And a
-// name cannot be turned into a link to somewhere else between the moment the
-// destination is checked and the moment it is written, because a rename replaces
-// a link rather than following it.
-func commit(path string, data []byte) error {
-	dir := filepath.Dir(path)
-	if err := EnsureDir(dir); err != nil {
-		return err
-	}
-	tmp, err := privateTemp(dir)
-	if err != nil {
-		return err
-	}
-	committed := false
-	defer func() {
-		_ = tmp.Close()
-		if !committed {
-			_ = os.Remove(tmp.Name())
-		}
-	}()
-	if _, err := tmp.Write(data); err != nil {
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		return err
-	}
-	if err := os.Rename(tmp.Name(), path); err != nil {
-		return err
-	}
-	committed = true
-	return nil
-}
-
-// privateTemp opens the file a payload is assembled in: in the directory it is
-// destined for, so the rename that publishes it stays within one filesystem, and
-// readable by nobody else from the moment it exists.
-func privateTemp(dir string) (*os.File, error) {
-	f, err := os.CreateTemp(dir, ".proton-cli-*")
-	if err != nil {
-		return nil, err
-	}
-	if err := f.Chmod(0o600); err != nil {
-		_ = f.Close()
-		_ = os.Remove(f.Name())
-		return nil, err
-	}
-	return f, nil
-}
-
-// Describe names the destination for a confirmation.
 func (d *Destination) Describe() string {
 	switch {
 	case d.dest == "-":
@@ -159,9 +72,6 @@ func (d *Destination) Describe() string {
 	return "the current directory"
 }
 
-// Where names the path one payload of this name would be written to, for a
-// confirmation that says so before anything is written. Nothing is made: a
-// directory that does not exist yet is named rather than created.
 func (d *Destination) Where(name string) (string, error) {
 	switch {
 	case d.dest == "-":
@@ -169,21 +79,13 @@ func (d *Destination) Where(name string) (string, error) {
 	case d.dest != "":
 		return d.dest, nil
 	}
-	target := filepath.Join(d.destDir, SafeFilename(name))
+	target := filepath.Join(d.destDir, localfile.SafeName(name))
 	if d.force {
 		return target, nil
 	}
-	return freePath(target)
+	return localfile.Free(target)
 }
 
-// Write puts data where the flags say, returning the path written, or "" when it
-// streamed to stdout.
-//
-// The collision policy differs by intent, and deliberately so: an explicit
-// --dest path is refused if it exists, because the user named that exact file
-// and silently replacing it would destroy something they did not mention. A name
-// the CLI chose itself gets a numbered suffix instead, because there was no
-// promise to keep.
 func (d *Destination) Write(c *Invocation, name string, data []byte) (string, error) {
 	if d.dest == "-" {
 		_, err := c.UI().Out.Write(data)
@@ -192,188 +94,93 @@ func (d *Destination) Write(c *Invocation, name string, data []byte) (string, er
 	if d.dest != "" {
 		return WriteNamed(d.dest, data, d.force)
 	}
-	target := filepath.Join(d.destDir, SafeFilename(name))
+	target := filepath.Join(d.destDir, localfile.SafeName(name))
 	if !d.force {
-		free, err := freePath(target)
+		free, err := localfile.Free(target)
 		if err != nil {
 			return "", err
 		}
 		target = free
 	}
-	return target, commit(target, data)
+	return target, localfile.Publish(target, data, time.Time{})
 }
 
-// Stream writes one payload without ever holding it whole in memory.
-//
-// It exists because a payload can be larger than the machine: an mbox of a whole
-// mailbox, a Drive file of any size. File output goes to a temporary file beside
-// the destination and is renamed once the producer is done, so a failure part way
-// through leaves nothing behind rather than a plausible-looking truncated file.
-//
-// name is only consulted when the caller has no --dest path of its own.
 func (d *Destination) Stream(c *Invocation, name string, write func(io.Writer) error) (string, error) {
 	return d.StreamDiscovered(c, func(w io.Writer) (string, error) { return name, write(w) })
 }
 
-// StreamDiscovered is Stream for a payload whose own name only becomes known once
-// it starts arriving, which is the case for a Drive photo: the producer returns
-// the name it found.
 func (d *Destination) StreamDiscovered(c *Invocation, write func(io.Writer) (string, error)) (string, error) {
+	return d.StreamStamped(c, func(w io.Writer) (string, time.Time, error) {
+		name, err := write(w)
+		return name, time.Time{}, err
+	})
+}
+
+func (d *Destination) StreamStamped(c *Invocation, write func(io.Writer) (string, time.Time, error)) (string, error) {
 	if d.dest == "-" {
-		_, err := write(c.UI().Out)
+		_, _, err := write(c.UI().Out)
 		return "", err
 	}
 	dir, err := d.Dir()
 	if err != nil {
 		return "", err
 	}
-	tmp, err := privateTemp(dir)
+	tmp, err := localfile.Temp(dir)
 	if err != nil {
 		return "", err
 	}
-	committed := false
-	defer func() {
-		_ = tmp.Close()
-		if !committed {
-			_ = os.Remove(tmp.Name())
+	var target string
+	err = localfile.CommitTo(tmp, func(w io.Writer) (string, time.Time, error) {
+		name, modified, err := write(w)
+		if err != nil {
+			return "", time.Time{}, err
 		}
-	}()
-	name, err := write(tmp)
+		target, err = d.Reserve(name)
+		return target, modified, err
+	})
 	if err != nil {
 		return "", err
 	}
-	if err := tmp.Close(); err != nil {
-		return "", err
-	}
-	target, err := d.Reserve(name)
-	if err != nil {
-		return "", err
-	}
-	if err := os.Rename(tmp.Name(), target); err != nil {
-		return "", err
-	}
-	committed = true
 	return target, nil
 }
 
-// StreamInto writes one payload to a path the caller worked out, on the same
-// collision policy as everything else here.
-//
-// A tree names its own files: where each one goes is decided by where it sits
-// in the tree rather than by a flag, so it cannot come through Reserve, which
-// answers for one payload landing in one directory. What --force means is the
-// same either way - a file already there is refused without it - and the bytes
-// are published by a rename, so a transfer that fails leaves nothing behind.
-func (d *Destination) StreamInto(path string, write func(io.Writer) error) error {
+func (d *Destination) StreamInto(path string, modified time.Time, write func(io.Writer) error) error {
 	if err := d.free(path); err != nil {
 		return err
 	}
-	dir := filepath.Dir(path)
-	if err := EnsureDir(dir); err != nil {
-		return err
-	}
-	tmp, err := privateTemp(dir)
-	if err != nil {
-		return err
-	}
-	committed := false
-	defer func() {
-		_ = tmp.Close()
-		if !committed {
-			_ = os.Remove(tmp.Name())
-		}
-	}()
-	if err := write(tmp); err != nil {
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		return err
-	}
-	if err := os.Rename(tmp.Name(), path); err != nil {
-		return err
-	}
-	committed = true
-	return nil
+	return localfile.Stream(path, modified, write)
 }
 
-// EnsureDir creates a directory if it is missing, and refuses a path that exists
-// as something else.
-func EnsureDir(dir string) error {
-	if fi, err := os.Stat(dir); err == nil {
-		if !fi.IsDir() {
-			return Fail("%s exists and is not a directory.", dir)
+func (d *Destination) Reserve(name string) (string, error) {
+	if d.dest != "" {
+		if err := d.free(d.dest); err != nil {
+			return "", err
 		}
-		return nil
+		return d.dest, nil
 	}
-	return os.MkdirAll(dir, 0o755)
-}
-
-const maxSuffix = 1000
-
-// freePath returns the first unused name of the form "stem (2).ext".
-func freePath(path string) (string, error) {
-	if !exists(path) {
-		return path, nil
-	}
-	dir, base := filepath.Split(path)
-	stem, ext := splitExt(base)
-	for i := 2; i <= maxSuffix; i++ {
-		candidate := filepath.Join(dir, fmt.Sprintf("%s (%d)%s", stem, i, ext))
-		if !exists(candidate) {
-			return candidate, nil
+	if d.destDir != "" {
+		if err := localfile.EnsureDir(d.destDir); err != nil {
+			return "", err
 		}
 	}
-	return "", Fail("could not find a free name next to %s.", path)
+	target := filepath.Join(d.destDir, localfile.SafeName(name))
+	if d.force {
+		return target, nil
+	}
+	return localfile.Free(target)
 }
 
-// splitExt splits on the last dot, so "archive.tar.gz" keeps ".gz" as its
-// extension and "archive.tar" as its stem. A leading dot belongs to the stem, so
-// ".bashrc" is not treated as an extension.
-func splitExt(name string) (stem, ext string) {
-	i := strings.LastIndexByte(name, '.')
-	if i <= 0 {
-		return name, ""
+func (d *Destination) Dir() (string, error) {
+	switch {
+	case d.dest != "":
+		dir := filepath.Dir(d.dest)
+		return dir, localfile.EnsureDir(dir)
+	case d.destDir != "":
+		return d.destDir, localfile.EnsureDir(d.destDir)
 	}
-	return name[:i], name[i:]
+	return ".", nil
 }
 
-// SafeFilename turns arbitrary text - a mail subject, say - into a name every
-// filesystem the CLI targets will accept.
-func SafeFilename(s string) string {
-	const maxLen = 120
-	var b strings.Builder
-	for _, r := range s {
-		switch {
-		case strings.ContainsRune(`/\:*?"<>|`, r), r < 0x20:
-			b.WriteByte(' ')
-		default:
-			b.WriteRune(r)
-		}
-	}
-	out := strings.Join(strings.Fields(b.String()), " ")
-	if len(out) > maxLen {
-		out = strings.TrimSpace(out[:maxLen])
-	}
-	// A trailing dot makes a file unopenable on Windows.
-	out = strings.TrimRight(out, ".")
-	if out == "" {
-		return "download"
-	}
-	return out
-}
-
-func exists(path string) bool {
-	_, err := os.Stat(path)
-	if err == nil {
-		return true
-	}
-	return !errors.Is(err, fs.ErrNotExist)
-}
-
-// ReadTextArg resolves a text flag that may be "-", meaning stdin. Centralising
-// the convention is what makes `--body -`, `--sieve -`, `--dest -` and
-// `--password-file -` all behave the same - and what lets stdin have one owner,
-// so no two of them can quietly drain the same stream.
 func ReadTextArg(c *Invocation, value, flag string) (string, error) {
 	if value != "-" {
 		return value, nil
@@ -389,52 +196,6 @@ func ReadTextArg(c *Invocation, value, flag string) (string, error) {
 	return string(b), nil
 }
 
-// Reserve returns the path Write would use, without writing anything.
-//
-// Streaming downloads need the file open before the bytes arrive, so they cannot
-// hand a finished buffer to Write. Reserving keeps them on the same collision
-// policy as everything else instead of inventing their own.
-func (d *Destination) Reserve(name string) (string, error) {
-	if d.dest != "" {
-		if err := d.free(d.dest); err != nil {
-			return "", err
-		}
-		return d.dest, nil
-	}
-	if d.destDir != "" {
-		if err := EnsureDir(d.destDir); err != nil {
-			return "", err
-		}
-	}
-	target := filepath.Join(d.destDir, SafeFilename(name))
-	if d.force {
-		return target, nil
-	}
-	return freePath(target)
-}
-
-// Dir is the directory a download will land in, for callers that must open a
-// temporary file beside the final destination.
-//
-// It creates the directory, because a caller reaches for it before Reserve has
-// had a chance to, and a temporary file cannot be opened in a directory that is
-// not there yet.
-func (d *Destination) Dir() (string, error) {
-	switch {
-	case d.dest != "":
-		dir := filepath.Dir(d.dest)
-		return dir, EnsureDir(dir)
-	case d.destDir != "":
-		return d.destDir, EnsureDir(d.destDir)
-	}
-	return ".", nil
-}
-
-// ReadBytesArg resolves a path argument that may be "-", meaning stdin, for
-// something that is not text.
-//
-// An archive is bytes rather than a string, so reading one through ReadTextArg
-// would put it through a conversion it does not survive on every platform.
 func ReadBytesArg(c *Invocation, path, name string) ([]byte, error) {
 	if path == "-" {
 		r, err := c.App.Stdin(name + " -")

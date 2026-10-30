@@ -1,8 +1,3 @@
-// Package account is the `proton account` tree: the account itself, its
-// settings, and the session this machine holds.
-//
-// It is a first-class app, the way Proton treats it: account settings live at
-// account.proton.me, not inside Mail.
 package account
 
 import (
@@ -20,22 +15,16 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// New builds the account tree.
 func New() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "account",
 		Short: "Your Proton account, its settings and your session",
 	}
-	c.AddCommand(breachesCmd(), deleteCmd(), getCmd(), keysCmd(), loginCmd(), logoutCmd(),
+	c.AddCommand(breachesCmd(), deleteCmd(), exportCmd(), getCmd(), keysCmd(), loginCmd(), logoutCmd(),
 		profilesCmd(), securityLogCmd(), sessionsCmd(), settingsCmd())
 	return c
 }
 
-// ── account get ──
-
-// state is what `account get` answers: not just who the account is, but whether
-// this machine can currently act as it. Those are the same question to a user,
-// so they are one command rather than an `account get` plus an `account status`.
 type state struct {
 	*acctsvc.Account
 	Profile  string   `json:"profile"`
@@ -53,8 +42,6 @@ func getCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			// Reaching this point means the session worked, which is the only
-			// honest way to report that it is valid.
 			st := state{Account: acct, Profile: c.App.Profile.String(), Session: "valid"}
 			if sess, err := session.Load(c.App.Profile); err == nil {
 				st.Unlocked = sess.Unlocked()
@@ -64,8 +51,6 @@ func getCmd() *cobra.Command {
 				// this line the two causes are indistinguishable on screen.
 				slog.DebugContext(c.Ctx, "session unreadable, reporting locked", "error", err.Error())
 			}
-			// Scopes are informative rather than essential: an account whose
-			// session cannot list them is still worth reporting.
 			if scopes, err := proton.Scopes(c.Ctx, c.App.API); err == nil {
 				st.Scopes = scopes
 			} else {
@@ -94,14 +79,8 @@ func getCmd() *cobra.Command {
 	}
 }
 
-// storageBar is how many cells the quota bar is drawn in. Narrow enough to sit
-// inside a record's value column without becoming the widest thing on screen.
 const storageBar = 20
 
-// storage renders usage as a person reads it: how much of how much, the share
-// that represents, and a bar for the share - which is the form the question
-// "am I running out?" is actually asked in, and the one Proton's own clients
-// answer it with.
 func storage(used, max int64) string {
 	if max <= 0 {
 		return units.Size(used)
@@ -123,15 +102,12 @@ func yesNo(b bool) string {
 	return "no"
 }
 
-// count renders a number that is only worth a line when it is not zero.
 func count(n int) string {
 	if n == 0 {
 		return ""
 	}
 	return fmt.Sprintf("%d", n)
 }
-
-// ── account login / logout ──
 
 func loginCmd() *cobra.Command {
 	var (
@@ -142,10 +118,8 @@ func loginCmd() *cobra.Command {
 		user   string
 	)
 	c := &cobra.Command{
-		Use:   "login",
-		Short: "Sign in and save the session for this profile",
-		// The one mutation whose preview cannot want a session: this is what makes
-		// one, so a machine with none is exactly where previewing it is asked for.
+		Use:         "login",
+		Short:       "Sign in and save the session for this profile",
 		Annotations: map[string]string{kit.SignedOut: "yes"},
 		Long: "Sign in and save the session for this profile.\n\n" +
 			"Signing in also unlocks your keys, so your password is needed once per\n" +
@@ -177,9 +151,6 @@ func loginCmd() *cobra.Command {
 					return err
 				}
 			}
-			// A preview of signing in signs nobody in, which is the whole of what it
-			// has to get right: everything past here asks Proton for a session and
-			// writes it to disk.
 			if c.App.DryRun {
 				return kit.Mutate(c, signedIn(c, wouldSignInAs(c, user, qr)),
 					func() error { return nil })
@@ -199,8 +170,6 @@ func loginCmd() *cobra.Command {
 			return kit.Mutate(c, signedIn(c, c.App.Email()), func() error { return nil })
 		}),
 	}
-	// Naming an account belongs here. Every other command acts as whichever
-	// profile it was given, and already knows the address from its session.
 	c.Flags().StringVar(&user, "user", "", "Proton account email to sign in as")
 	c.Flags().BoolVar(&qr, "qr", false, "Sign in by approving a code on another device")
 	extra.Declare(c)
@@ -209,8 +178,6 @@ func loginCmd() *cobra.Command {
 	return c
 }
 
-// signIn attaches an account to this profile: by proving its password here, or
-// by having somebody approve a code on a device that already holds one.
 func signIn(c *kit.Invocation, qr bool, user string) error {
 	if !qr {
 		return c.App.Login(c.Ctx, user)
@@ -218,8 +185,6 @@ func signIn(c *kit.Invocation, qr bool, user string) error {
 	return c.App.LoginQR(c.Ctx, func(code string) error { return showCode(c, code) })
 }
 
-// showCode puts a sign-in code in front of a person twice over: as a square for
-// a camera, and as a line for a device that has none.
 func showCode(c *kit.Invocation, code string) error {
 	u := c.UI()
 	u.Instruct("Scan this with a Proton app on a device that is already signed in:")
@@ -237,8 +202,6 @@ func showCode(c *kit.Invocation, code string) error {
 	return nil
 }
 
-// signedIn is the one shape a sign-in is reported in, whether it happened or is
-// being previewed.
 func signedIn(c *kit.Invocation, account string) ui.ResultSpec {
 	return ui.ResultSpec{
 		Action: ui.SignedIn, Count: 1, Name: account,
@@ -246,11 +209,6 @@ func signedIn(c *kit.Invocation, account string) ui.ResultSpec {
 	}
 }
 
-// wouldSignInAs is who a preview says the account would be.
-//
-// A code names nobody until somebody approves it, and approving it is the change
-// a preview exists not to make - so that is what the preview says, rather than
-// an address it would have had to sign in to learn.
 func wouldSignInAs(c *kit.Invocation, user string, qr bool) string {
 	switch {
 	case qr:
@@ -263,8 +221,6 @@ func wouldSignInAs(c *kit.Invocation, user string, qr bool) string {
 	return "the account you name"
 }
 
-// refuseCredentials stops --qr being handed something it has no use for, before
-// a code is minted for nobody.
 func refuseCredentials(c *kit.Invocation) error {
 	for _, flag := range []string{"password-file", "second-password-file", "totp"} {
 		if c.Changed(flag) {
@@ -315,9 +271,6 @@ func logoutCmd() *cobra.Command {
 				Action: ui.SignedOut, Kind: "profiles", Count: len(targets),
 				Name: single(refs), IDs: refs,
 			}, func() error {
-				// Revoking needs the session that is about to be deleted, so it
-				// happens first and only for the active profile: the others'
-				// tokens are not loaded.
 				if revoke {
 					if err := c.App.Authenticate(c.Ctx); err == nil {
 						uid, _, _ := c.App.API.Tokens()
@@ -340,8 +293,6 @@ func logoutCmd() *cobra.Command {
 	return c
 }
 
-// single returns the sole element of ss, or "" when there is more than one, so a
-// confirmation can name one thing and count many.
 func single(ss []string) string {
 	if len(ss) == 1 {
 		return ss[0]

@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 Adding a version section here is what publishes a release, so this file is the one place a version is decided: see [Releases](CONTRIBUTING.md#releases). Versions that shipped before this file existed are on the [releases page](https://github.com/roman-16/proton-cli/releases).
 
+## [5.3.0] - 2026-10-30
+
+### Highlights
+
+- **A copy of your whole account** - `account export --dest-dir DIR` writes your mail, files, photos, calendars, contacts and Pass into one directory. Running it again continues a run that stopped, or brings the copy up to date.
+- **Folder downloads you can resume** - running `drive items download --recursive` again skips what already arrived, and every Drive download keeps the modification time it has in Drive.
+
+### Added
+
+- `account export --dest-dir DIR` writes the account to a directory: mail as `.eml` files that Proton's Mail Export Tool restores, Drive files, computers and photos, a `.ics` per calendar you own, `contacts.vcf` and the Pass archive. Running it again fetches only what is missing or changed, and naming apps such as `mail drive` exports only those.
+- `calendar events export --all` exports every event, in a file named after the calendar.
+- `drive photos download` takes several photos, or picks them with `--album`, `--tag` or `--all`.
+
+### Changed
+
+- `drive items download --recursive` skips a file already there with the size and modification time it has in Drive, and refuses one that differs before downloading anything. `--force` still downloads everything.
+- `drive items download` and `drive photos download` give each file the modification time it has in Drive.
+- `drive items download --recursive` passes over Proton Docs and Sheets and says how many. Downloading one on its own is refused.
+
 ## [5.2.0] - 2026-10-28
 
 ### Highlights

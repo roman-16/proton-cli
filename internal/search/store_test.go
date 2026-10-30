@@ -11,13 +11,9 @@ import (
 
 	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
+	"github.com/roman-16/proton-cli/internal/localfile"
 )
 
-// A store for a test: a temporary directory, one account, and a key of its own.
-//
-// The key is a real OpenPGP key rather than a stand-in, because how the index
-// key is sealed is half of what this package is: a test that skipped it would
-// leave the one thing worth checking unchecked.
 func testStore(t *testing.T) *Store {
 	t.Helper()
 	key, err := pgphelper.GenerateKey("Test", "test@proton.me")
@@ -51,8 +47,6 @@ func bodyOf(t *testing.T, r Record) string {
 	return held["body"]
 }
 
-// What goes in comes back out, and the newest record about a thing is the one
-// that answers for it.
 func TestALogAnswersWithTheNewestRecordOfEachThing(t *testing.T) {
 	s := testStore(t)
 	log, err := s.Load(t.Context(), AppMail)
@@ -85,8 +79,6 @@ func TestALogAnswersWithTheNewestRecordOfEachThing(t *testing.T) {
 	}
 }
 
-// A thing the account no longer has leaves the index, and stays gone when the
-// log is read again.
 func TestATombstoneTakesAThingOutOfTheIndex(t *testing.T) {
 	s := testStore(t)
 	log, err := s.Load(t.Context(), AppMail)
@@ -115,9 +107,6 @@ func TestATombstoneTakesAThingOutOfTheIndex(t *testing.T) {
 	}
 }
 
-// A run that stopped between a write and its end leaves a frame that is not
-// whole. Everything in front of it is still the index, and the next write goes
-// over the torn tail rather than behind it.
 func TestATornTailIsReadAsTheEndAndWrittenOver(t *testing.T) {
 	s := testStore(t)
 	log, err := s.Load(t.Context(), AppMail)
@@ -167,10 +156,6 @@ func TestATornTailIsReadAsTheEndAndWrittenOver(t *testing.T) {
 	}
 }
 
-// A record that went bad where it lay is not a torn tail: the records after it
-// are as good as they were and are read on, the index says it owes a reading of
-// the account for the one it lost, and the first write leaves a file without
-// the bad frame in it.
 func TestARecordThatWentBadIsSkippedAndOwed(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
@@ -240,7 +225,6 @@ func TestARecordThatWentBadIsSkippedAndOwed(t *testing.T) {
 	}
 }
 
-// frameAt is where the n-th frame of a log begins and ends.
 func frameAt(data []byte, n int) (int, int) {
 	at := 0
 	for range n {
@@ -249,9 +233,6 @@ func frameAt(data []byte, n int) (int, int) {
 	return at, at + frameLen + int(binary.BigEndian.Uint32(data[at:at+frameLen]))
 }
 
-// An index is sealed to the account it was built for. Another account's keys
-// open none of it, and the record says whose it is so that the refusal is a
-// sentence rather than a decryption failure per record.
 func TestAnIndexBelongsToTheAccountThatBuiltIt(t *testing.T) {
 	s := testStore(t)
 	log, err := s.Load(t.Context(), AppMail)
@@ -274,8 +255,6 @@ func TestAnIndexBelongsToTheAccountThatBuiltIt(t *testing.T) {
 	}
 }
 
-// Nothing about a thing is written outside the ciphertext. The index key is not
-// in the clear either: what is beside the log is counts and a cursor.
 func TestNothingAboutAThingIsWrittenInTheClear(t *testing.T) {
 	s := testStore(t)
 	log, err := s.Load(t.Context(), AppMail)
@@ -306,8 +285,6 @@ func TestNothingAboutAThingIsWrittenInTheClear(t *testing.T) {
 	}
 }
 
-// Deleting the last index takes the key with it: a key that opens nothing is a
-// key nothing should keep.
 func TestDeletingTheLastIndexTakesTheKey(t *testing.T) {
 	s := testStore(t)
 	log, err := s.Load(t.Context(), AppMail)
@@ -337,8 +314,6 @@ func TestDeletingTheLastIndexTakesTheKey(t *testing.T) {
 	}
 }
 
-// Only one run writes at a time, and it says so rather than waiting: whatever
-// holds the directory is keeping the index current anyway.
 func TestOnlyOneRunWritesAtATime(t *testing.T) {
 	s := testStore(t)
 	held, err := s.Claim()
@@ -346,8 +321,8 @@ func TestOnlyOneRunWritesAtATime(t *testing.T) {
 		t.Fatalf("claim: %v", err)
 	}
 	other := New(s.Dir(), s.account, s.unlock)
-	if _, err := other.Claim(); err != ErrBusy {
-		t.Errorf("second claim = %v, want %v", err, ErrBusy)
+	if _, err := other.Claim(); err != localfile.ErrBusy {
+		t.Errorf("second claim = %v, want %v", err, localfile.ErrBusy)
 	}
 	held.Release()
 	again, err := other.Claim()
@@ -357,11 +332,6 @@ func TestOnlyOneRunWritesAtATime(t *testing.T) {
 	again.Release()
 }
 
-// Removing one index leaves the others alone, and leaves the key that opens
-// them where it is.
-//
-// The key is the directory's rather than the index's, so taking it away with
-// one app's log would leave the others as records nothing can read.
 func TestDeletingOneIndexLeavesTheOthers(t *testing.T) {
 	s := testStore(t)
 	for _, app := range []App{AppCalendar, AppDrive, AppMail} {

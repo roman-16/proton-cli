@@ -1,4 +1,4 @@
-package search
+package localfile
 
 import (
 	"os"

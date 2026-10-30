@@ -9,17 +9,8 @@ import (
 	"github.com/roman-16/proton-cli/tests/account"
 )
 
-// The account itself: whose it is, what this machine's session can do with it,
-// which profiles are signed in here, and the account-wide preferences.
-//
-// The two free accounts are in the two password modes, and this is the only
-// place that covers the second one - so a check on the accounts as much as on
-// the commands.
-
 func TestAccountGetReportsBothHalves(t *testing.T) {
 	stdout := runOK(t, "account", "get")
-	// The question people ask is "whose account, and can this machine act as it",
-	// so one command has to answer both.
 	for _, want := range []string{"Email:", "Storage:", "Profile:", "Session:", "Unlocked:"} {
 		assertContains(t, stdout, want)
 	}
@@ -37,8 +28,6 @@ func TestAccountGetJSON(t *testing.T) {
 	} else if !unlocked {
 		t.Error("the suite runs with an unlocked session, so this should be true")
 	}
-	// Keys a password reset locked are counted, and an account with none is not
-	// told about a state it is not in.
 	if locked, ok := data["locked_keys"]; ok {
 		t.Errorf("locked_keys = %v, want the field absent while no key is locked", locked)
 	}
@@ -64,7 +53,6 @@ func TestAccountDeleteDryRunAsksProtonFirst(t *testing.T) {
 	}
 }
 
-// Storage is reported as a share of a total, which is how a person reads it.
 func TestAccountGetStorageIsHumanReadable(t *testing.T) {
 	stdout := runOK(t, "account", "get")
 	for _, line := range strings.Split(stdout, "\n") {
@@ -84,7 +72,6 @@ func TestAccountSettingsGetAndList(t *testing.T) {
 		assertContains(t, stdout, want)
 	}
 
-	// The listing is a collection, so it comes out of --output json as one.
 	keys := runJSONArray(t, "account", "settings", "list")
 	if len(keys) == 0 {
 		t.Fatal("there are writable account settings")
@@ -106,12 +93,6 @@ func TestAccountSettingsGetAndList(t *testing.T) {
 	}
 }
 
-// The two accounts are in the two password modes, and `get` says which.
-//
-// This is the suite's only check on two-password mode, and it is a check on the
-// accounts as much as on the command: the secondary is signed in through the
-// second password every run, so an account switched back to one password would
-// take that coverage away without anything failing. This is what fails.
 func TestAccountSettingsReportTwoPasswordMode(t *testing.T) {
 	if mode := runJSON(t, "account", "settings", "get")["two_password_mode"]; mode != "off" {
 		t.Errorf("the primary account's two_password_mode = %v, want off", mode)
@@ -122,7 +103,6 @@ func TestAccountSettingsReportTwoPasswordMode(t *testing.T) {
 	}
 }
 
-// Reads and writes speak the same vocabulary: what `get` shows is what `set` takes.
 func TestAccountSettingsRoundTripsNames(t *testing.T) {
 	before := runJSON(t, "account", "settings", "get")
 	original, ok := before["week_start"].(string)
@@ -142,12 +122,6 @@ func TestAccountSettingsRoundTripsNames(t *testing.T) {
 	}
 }
 
-// An account in the paid slot has to actually be on a paid plan.
-//
-// Proton says so in the session's scopes, and this is the cheapest possible way
-// to find out: without it, free credentials put in the paid variables would make
-// every gated test fail with Proton's refusal, which reads exactly like the
-// feature being broken.
 func TestThePaidAccountIsOnAPaidPlan(t *testing.T) {
 	scopes, _ := runJSONPaid(t, "account", "get")["scopes"].([]interface{})
 	for _, s := range scopes {
@@ -159,9 +133,6 @@ func TestThePaidAccountIsOnAPaidPlan(t *testing.T) {
 		"its scopes are %v", scopes)
 }
 
-// TestProfileFromEnv: PROTON_PROFILE selects the profile with no --profile flag.
-// The harness runs every command that way, so this asserts the account it lands
-// on is the one the variable names.
 func TestProfileFromEnv(t *testing.T) {
 	acct := runJSONSecondary(t, "account", "get")
 	email, _ := acct["email"].(string)
@@ -170,9 +141,6 @@ func TestProfileFromEnv(t *testing.T) {
 	}
 }
 
-// A profile nobody signed in acts as nobody, and says so before the network -
-// so a mistyped profile name is a refusal rather than a command that quietly
-// reached whichever account the environment happened to name.
 func TestProfileNotSignedInIsRefusedLocally(t *testing.T) {
 	_, stderr, code := runWithEnv(t, map[string]string{"PROTON_PROFILE": "no-such-" + testID()},
 		"mail", "messages", "list")
@@ -183,8 +151,6 @@ func TestProfileNotSignedInIsRefusedLocally(t *testing.T) {
 	assertContains(t, stderr, "account login")
 }
 
-// TestProfileSessionsAreSeparateFiles: each profile keeps its own session, so
-// two accounts on one machine cannot clobber each other.
 func TestProfileSessionsAreSeparateFiles(t *testing.T) {
 	configDir, err := os.UserConfigDir()
 	if err != nil {
@@ -198,9 +164,6 @@ func TestProfileSessionsAreSeparateFiles(t *testing.T) {
 	}
 }
 
-// TestProfilesListNamesEverySignedInAccount: the session directory is the whole
-// truth about who is signed in here, so listing it needs no API call and cannot
-// disagree with what a command would act as.
 func TestProfilesListNamesEverySignedInAccount(t *testing.T) {
 	rows := runJSONArray(t, "account", "profiles", "list")
 	seen := map[string]string{}
@@ -267,8 +230,6 @@ func TestAccountSettings(t *testing.T) {
 	}
 }
 
-// The JSON is the view the command renders, in the CLI's own snake_case names,
-// not Proton's envelope passed through.
 func TestAccountSettingsJSON(t *testing.T) {
 	data := runJSON(t, "account", "settings", "get")
 	for _, want := range []string{"locale", "date_format", "week_start", "two_factor"} {
@@ -278,10 +239,109 @@ func TestAccountSettingsJSON(t *testing.T) {
 	}
 }
 
-// `set` writes one key; `list` is what shows which keys there are.
 func TestAccountSettingsListsKeys(t *testing.T) {
 	stdout := runOK(t, "account", "settings", "list")
 	for _, want := range []string{"Language and time", "locale", "week-start"} {
 		assertContains(t, stdout, want)
 	}
+}
+
+func TestAccountExportWritesEachAppAndRunsAgain(t *testing.T) {
+	into := filepath.Join(t.TempDir(), "copy")
+	_, stderr := runOKStderr(t, "account", "export", "pass", "contacts", "calendar", "--dest-dir", into)
+	assertContains(t, stderr, "The Pass archive is not encrypted")
+	for _, want := range []string{"pass/proton-pass-export.zip", "contacts/contacts.vcf"} {
+		if fi, err := os.Stat(filepath.Join(into, filepath.FromSlash(want))); err != nil || fi.Size() == 0 {
+			t.Errorf("%s was not written: %v", want, err)
+		}
+	}
+	calendars, err := filepath.Glob(filepath.Join(into, "calendar", "*.ics"))
+	if err != nil || len(calendars) == 0 {
+		t.Errorf("no calendar was written: %v", err)
+	}
+
+	again := runJSON(t, "account", "export", "pass", "contacts", "calendar", "--dest-dir", into)
+	if again["count"] != float64(0) {
+		t.Errorf("running it again exported %v, want nothing: %v", again["count"], again)
+	}
+}
+
+func TestAccountExportMailIsLaidOutForRestoring(t *testing.T) {
+	msgID, _, subject := plainMail(t)
+	into := filepath.Join(t.TempDir(), "copy")
+	runOK(t, "account", "export", "mail", "--dest-dir", into)
+
+	labels, err := os.ReadFile(filepath.Join(into, "mail", "labels.json"))
+	if err != nil {
+		t.Fatalf("labels.json was not written: %v", err)
+	}
+	assertContains(t, string(labels), `"Version": 1`)
+	sidecars, err := filepath.Glob(filepath.Join(into, "mail", "*.metadata.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := ""
+	for _, sidecar := range sidecars {
+		raw, err := os.ReadFile(sidecar)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(raw), `"ID": "`+msgID+`"`) {
+			found = sidecar
+		}
+	}
+	if found == "" {
+		t.Fatalf("no sidecar names the fixture message %s", msgID)
+	}
+	eml, err := os.ReadFile(strings.TrimSuffix(found, ".metadata.json") + ".eml")
+	if err != nil {
+		t.Fatalf("the sidecar has no message beside it: %v", err)
+	}
+	assertContains(t, string(eml), subject)
+
+	again := runJSON(t, "account", "export", "mail", "--dest-dir", into)
+	if again["count"] != float64(0) {
+		t.Errorf("running it again exported %v messages, want none", again["count"])
+	}
+}
+
+func TestAccountExportDriveFollowsAMove(t *testing.T) {
+	folder := "/" + testID() + "-copy"
+	src := filepath.Join(t.TempDir(), "kept.txt")
+	if err := os.WriteFile(src, []byte("kept"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runOK(t, "drive", "items", "create", folder)
+	cleanupRun(t, "Delete folder: proton drive items delete "+folder, "drive", "items", "delete", folder)
+	runOK(t, "drive", "items", "create", folder+"/moved")
+	runOK(t, "drive", "items", "upload", src, folder)
+
+	into := filepath.Join(t.TempDir(), "copy")
+	runOK(t, "account", "export", "drive", "--dest-dir", into)
+	top := filepath.Join(into, "drive", "My files", strings.TrimPrefix(folder, "/"))
+	if got, err := os.ReadFile(filepath.Join(top, "kept.txt")); err != nil || string(got) != "kept" {
+		t.Fatalf("the file did not land: %q, %v", got, err)
+	}
+
+	runOK(t, "drive", "items", "move", "--into", folder+"/moved", folder+"/kept.txt")
+	again := runJSON(t, "account", "export", "drive", "--dest-dir", into)
+	if again["count"] != float64(1) {
+		t.Errorf("after one move the run exported %v, want 1", again["count"])
+	}
+	if _, err := os.Stat(filepath.Join(top, "kept.txt")); err == nil {
+		t.Error("the file is still where it was before the move")
+	}
+	if got, err := os.ReadFile(filepath.Join(top, "moved", "kept.txt")); err != nil || string(got) != "kept" {
+		t.Errorf("the file did not follow the move: %q, %v", got, err)
+	}
+}
+
+func TestAccountExportRefusesAnotherAccountsCopy(t *testing.T) {
+	into := filepath.Join(t.TempDir(), "copy")
+	runOK(t, "account", "export", "contacts", "--dest-dir", into)
+	_, stderr, code := runSecondary(t, "account", "export", "contacts", "--dest-dir", into)
+	if code != 4 {
+		t.Errorf("exit %d, want 4", code)
+	}
+	assertContains(t, stderr, "is a copy of")
 }

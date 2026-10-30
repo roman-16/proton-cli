@@ -23,18 +23,6 @@ func eventsCmd() *cobra.Command {
 	return c
 }
 
-// References to an event.
-//
-// An event needs two IDs to address it, because Proton stores it inside a
-// calendar, and a recurring event needs a third thing: which occurrence. Both are
-// written into the one REF every command takes - the two IDs separated by a
-// slash, which is safe because Proton's IDs are base64url, and the occurrence's
-// own start after an "@", which is safe because it has to parse as a time to
-// count as one.
-//
-//	CALENDAR/EVENT                    the stored event; for a series, all of it
-//	CALENDAR/EVENT@2026-04-16T09:00   one occurrence of it
-
 var occurrenceShape = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2})?(Z|[+-]\d{2}:\d{2})?)?$`)
 
 func splitOccurrence(ref string) (base, occurrence string) {
@@ -613,17 +601,6 @@ func clauses(parts ...string) string {
 	return strings.Join(kept, ", ")
 }
 
-// check judges what the command line alone decides, before anything is asked of
-// Proton: whether an event's length was stated twice, whether a length was stated
-// with no beginning to hang off, and whether what was written agrees with itself
-// about the one thing an event either has or has not - a time of day.
-//
-// It is a step so that it runs before the calendar is resolved. Without it a
-// contradiction costs a sign-in and two requests to discover, which is the one
-// thing local validation exists to prevent. The zone the account works in is one
-// of those requests, so what is judged here is the form of what was written and
-// never the instant it names: the same values are read again in that zone, which
-// is where a reading that no clock ever shows is refused.
 func (d *details) check(needsStart bool) kit.Step {
 	return func(c *kit.Invocation) error {
 		if d.end != "" && d.duration != "" {
@@ -707,21 +684,6 @@ func wantsATimeOfDay(day string) error {
 		Hint("--all-day=false --start " + day + "T13:00")
 }
 
-// length is how long an event lasts, said either way, and settled in one place
-// for both commands.
-//
-// Proton's own composer takes an end time, and a duration is what a terminal
-// reaches for, so both are accepted and neither is derived from the other's
-// spelling. Which of them was given is settled by check, before this runs.
-//
-// An end that names a day is the last day the event is on, because that is what
-// an end date means on a calendar - iCalendar's exclusive end is a storage
-// convention and not something to make anybody count around.
-//
-// Absent either, an event with no time of day lasts a day, and one with a time of
-// day lasts whatever the calendar it is in says a new event lasts, which is the
-// answer Proton's own clients take. That the length came from there rather than
-// from the command line is the second answer, for a result to say.
 func (d *details) length(c *kit.Invocation, calendarID string, start ical.DateTime,
 	loc *time.Location) (dur time.Duration, fromCalendar bool, err error) {
 	const day = 24 * time.Hour
@@ -762,8 +724,6 @@ func (d *details) length(c *kit.Invocation, calendarID string, start ical.DateTi
 	return time.Duration(minutes) * time.Minute, true, nil
 }
 
-// composerDefaultMinutes is how long a new event lasts when its calendar has
-// never been asked, which is the length Proton's own composer opens with.
 const composerDefaultMinutes = 30
 
 func eventsRespondCmd() *cobra.Command {
@@ -900,8 +860,6 @@ func eventsDeleteCmd() *cobra.Command {
 	return c
 }
 
-// tellAttendees emails the participants Proton cannot reach through their own
-// calendar. A failure here does not undo the change that has already been made.
 func tellAttendees(c *kit.Invocation, res *calsvc.EventResult) error {
 	if res == nil || res.Mail == nil {
 		return nil
@@ -1015,22 +973,18 @@ func takesEvents(c *kit.Invocation, calendarID string) error {
 	return cal.TakesEvents()
 }
 
-// Export writes what a calendar holds as an .ics file, which is the format every
-// other calendar reads and the one Proton's own settings page offers.
-//
-// A series goes out once, carrying its rule, rather than expanded into the
-// occurrences a listing shows: that is what a calendar file is, and expanding it
-// would turn one weekly standup into fifty-two unrelated events.
 func eventsExportCmd() *cobra.Command {
 	var calendar string
 	var days kit.DayRange
 	var dest kit.Destination
+	var all bool
 	c := &cobra.Command{
 		Use:   "export",
 		Short: "Write events out as an .ics file",
 		Long: "Write events out as an .ics file.\n\n" +
 			"With neither --after nor --before it covers the next 30 days, starting today.\n" +
-			"With one of them, it covers the 30 days starting or ending there.\n\n" +
+			"With one of them, it covers the 30 days starting or ending there. --all covers\n" +
+			"every event, whenever it is.\n\n" +
 			"A recurring series is written once, with its rule, so another client reads\n" +
 			"it back as the same series.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
@@ -1041,13 +995,23 @@ func eventsExportCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			first, last := days.Or(calsvc.DefaultDays())
-			events, err := c.App.Calendar.EventsExport(c.Ctx, calIDs, ical.Days(first, last))
+			var within *ical.Window
+			name := ""
+			if all {
+				if name, err = wholeName(c, calendar, calIDs); err != nil {
+					return err
+				}
+			} else {
+				first, last := days.Or(calsvc.DefaultDays())
+				w := ical.Days(first, last)
+				within = &w
+				name = fmt.Sprintf("%s to %s.ics", first.Format("2006-01-02"), last.Format("2006-01-02"))
+			}
+			events, err := c.App.Calendar.EventsExport(c.Ctx, calIDs, within)
 			if err != nil {
 				return err
 			}
 			doc := []byte(ical.Calendar(events))
-			name := fmt.Sprintf("%s to %s.ics", first.Format("2006-01-02"), last.Format("2006-01-02"))
 			var written string
 			if err := kit.Mutate(c, ui.ResultSpec{
 				Action: ui.Exported, Kind: "events", Count: len(events),
@@ -1067,11 +1031,28 @@ func eventsExportCmd() *cobra.Command {
 	c.Flags().StringVar(&calendar, "calendar", "", "Which calendar, by name or ID (default: all of them)")
 	days.Register(c)
 	dest.Register(c)
+	kit.All(c.Flags(), &all)
+	kit.Exclusive(c, "all", "after")
+	kit.Exclusive(c, "all", "before")
 	return c
 }
 
-// Import reads an .ics file into a calendar, which is the other half of export
-// and the thing Proton's own settings page offers beside it.
+func wholeName(c *kit.Invocation, calendar string, ids []string) (string, error) {
+	if calendar == "" || len(ids) != 1 {
+		return "all calendars.ics", nil
+	}
+	cals, err := c.App.Calendar.CalendarsList(c.Ctx)
+	if err != nil {
+		return "", err
+	}
+	for _, cal := range cals {
+		if cal.ID == ids[0] {
+			return cal.Name + ".ics", nil
+		}
+	}
+	return ids[0] + ".ics", nil
+}
+
 func eventsImportCmd() *cobra.Command {
 	var calendar string
 	c := &cobra.Command{

@@ -2,7 +2,7 @@
 
 Sign in once and your password is never asked for again on that machine.
 
-This page covers signing in and out, unattended and two-password sign-in, running several Proton accounts side by side, the sessions Proton holds across your devices, your encryption keys, unlocking data after a password reset, data breaches, your account settings, and deleting the account.
+This page covers signing in and out, unattended and two-password sign-in, running several Proton accounts side by side, the sessions Proton holds across your devices, your encryption keys, unlocking data after a password reset, keeping a copy of the account, data breaches, your account settings, and deleting the account.
 
 For every command and flag, see the reference: [account](account.md), [breaches](breaches.md), [keys](keys.md), [security-log](security-log.md), [sessions](sessions.md), [profiles](profiles.md), [settings](settings.md).
 
@@ -374,6 +374,41 @@ An unattended run hands both secrets over:
 proton account keys reactivate \
     --previous-password-file /run/secrets/proton-old \
     --password-file /run/secrets/proton
+```
+
+## Keep a copy of your account
+
+`account export` writes everything the account holds into one directory, decrypted:
+
+```bash
+proton account export --dest-dir ~/proton-backup
+```
+
+The directory has to be new, empty, or one an earlier export wrote. Run the same command again to continue a run that stopped, or later to bring the copy up to date: only what is missing or changed is downloaded. Nothing is removed from the copy, so what you delete in Proton stays in it.
+
+Name apps to export only those, and preview what each one holds:
+
+```bash
+proton account export mail drive --dest-dir ~/proton-backup
+proton account export --dest-dir ~/proton-backup --dry-run
+```
+
+| In the copy | What it holds | How to put it back |
+| --- | --- | --- |
+| `mail/` | One `.eml` per message, a `.metadata.json` beside each with its folder, labels and read state, and `labels.json` | The restore option of the Proton Mail Export Tool reads this directory |
+| `drive/My files/` | Your files and folders, with the modification time each has in Drive | `proton drive items upload --recursive` |
+| `drive/Computers/` | One directory per computer that syncs to Drive | `proton drive items upload --recursive` |
+| `drive/Photos/` | The photo library, one directory per year | `proton drive photos upload` |
+| `calendar/` | One `.ics` file per calendar you own | `proton calendar events import` |
+| `contacts/contacts.vcf` | Every contact | `proton contacts import` |
+| `pass/proton-pass-export.zip` | The vaults you own, with their attachments | `proton pass import` |
+
+Files in the Drive trash, Proton Docs and Sheets, and vaults and calendars somebody shared with you are not in the copy.
+
+The Pass archive holds every password in the clear unless you lock it:
+
+```bash
+proton account export --dest-dir ~/proton-backup --passphrase-file ~/.backup-passphrase
 ```
 
 ## Sign out

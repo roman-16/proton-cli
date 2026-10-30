@@ -12,6 +12,7 @@ import (
 
 	"github.com/roman-16/proton-cli/internal/cli/kit"
 	"github.com/roman-16/proton-cli/internal/errs"
+	"github.com/roman-16/proton-cli/internal/localfile"
 	drivesvc "github.com/roman-16/proton-cli/internal/service/drive"
 	"github.com/roman-16/proton-cli/internal/ui"
 	"github.com/roman-16/proton-cli/internal/units"
@@ -31,18 +32,12 @@ func childColumns() []ui.Column[drivesvc.Child] {
 		{Header: "ID", ID: true, Cell: func(ch drivesvc.Child) string { return ch.LinkID }},
 		{Header: "TYPE", Cell: func(ch drivesvc.Child) string { return ch.Type }},
 		{Header: "SIZE", Right: true, Cell: func(ch drivesvc.Child) string {
-			// A folder has no size of its own. Blank is how every other column
-			// says "nothing here"; a placeholder glyph would read like a value.
 			if ch.Type == drivesvc.TypeFolder {
 				return ""
 			}
 			return units.Size(ch.Size)
 		}},
 		{Header: "MODIFIED", Cell: func(ch drivesvc.Child) string { return units.Time(ch.ModifyTime) }},
-		// A row that came out of the tree says where it sits, because that is the
-		// answer: two files of the same name in different folders are one row each,
-		// and the path is what the next command takes. A plain listing of one folder
-		// is already somewhere, so it shows names.
 		{Header: "NAME", Flex: true, Cell: func(ch drivesvc.Child) string {
 			if ch.Path != "" {
 				return ch.Path
@@ -79,8 +74,6 @@ func itemsListCmd() *cobra.Command {
 			if len(c.Args) > 0 {
 				at = c.Args[0]
 			}
-			// A listing with no filter is the folder itself, which is one request;
-			// a filtered one is the same walk the bulk verbs do.
 			var cover drivesvc.Coverage
 			children, err := c.App.Drive.List(c.Ctx, dc, at)
 			if f.narrowed() {
@@ -101,8 +94,6 @@ func itemsListCmd() *cobra.Command {
 			}, rows); err != nil {
 				return err
 			}
-			// What the answer did not cover is said after the answer, so the rows and
-			// the count come first and the caveat reads as being about them.
 			shortIndex(c, cover, &f)
 			return nil
 		}),
@@ -115,12 +106,6 @@ func itemsListCmd() *cobra.Command {
 	return c
 }
 
-// childOrder is how a Drive listing may be ordered. A folder's children arrive
-// whole, so the ordering is this process's to do.
-//
-// Folders lead whichever key is chosen, as they do in every file manager: a
-// listing sorted by size that scattered the folders through it would be
-// answering a question about files with a mix of both.
 func childOrder() kit.Comparators[drivesvc.Child] {
 	byKind := func(a, b drivesvc.Child) int {
 		return kit.Ints(boolInt(a.Type != drivesvc.TypeFolder), boolInt(b.Type != drivesvc.TypeFolder))
@@ -197,8 +182,6 @@ func itemsGetCmd() *cobra.Command {
 	return c
 }
 
-// ── moving bytes ──
-
 func itemsUploadCmd() *cobra.Command {
 	var recursive bool
 	var t tree
@@ -228,8 +211,6 @@ func itemsUploadCmd() *cobra.Command {
 				return err
 			}
 			onConflict := drivesvc.OnConflict(choice)
-			// A link named by its URL is known to be one before anything is asked of
-			// Proton; one named by --shared turns out to be one when it opens.
 			if onConflict == drivesvc.ConflictReplace && t.link != "" {
 				return noNewRevisions()
 			}
@@ -260,8 +241,6 @@ func itemsUploadCmd() *cobra.Command {
 	return c
 }
 
-// noNewRevisions is what a public link answers to --if-exists replace: Proton
-// serves a link the version a file holds now, and nothing there adds another.
 func noNewRevisions() error {
 	return kit.Fail("A public link cannot take a new revision of a file.").
 		Hint("--if-exists rename to keep both, or --if-exists skip to leave it alone.")
@@ -280,8 +259,6 @@ func uploadOne(c *kit.Invocation, dc *drivesvc.Context, src, dest string, on dri
 		}
 		r = stdin
 		name = fmt.Sprintf("stdin-%d", time.Now().Unix())
-		// A stream has no name, so DEST carries it: an existing folder receives
-		// the generated name, and any other path is parent plus new file name.
 		resolved, err := c.App.Drive.ResolvePath(c.Ctx, dc, dest)
 		var notFound *errs.NotFound
 		if err != nil && !errors.As(err, &notFound) {
@@ -311,9 +288,6 @@ func uploadOne(c *kit.Invocation, dc *drivesvc.Context, src, dest string, on dri
 	if err != nil {
 		return sayHowToGoAhead(err, on)
 	}
-	// What the plan says is what gets reported, so a skip is a count of nothing
-	// rather than a claim to have uploaded something, and a dry run promises the
-	// name the file will really end up with.
 	spec := ui.ResultSpec{
 		Action: ui.Uploaded, Count: 1, Name: plan.Name,
 		Detail: "to " + dest, Extra: map[string]any{"size": size},
@@ -333,12 +307,6 @@ func uploadOne(c *kit.Invocation, dc *drivesvc.Context, src, dest string, on dri
 	}), on)
 }
 
-// sayHowToGoAhead turns a refusal to write over a name into the question Proton's
-// own client asks.
-//
-// The three answers are offered only when none was given. A refusal that survives
-// an answer is one no answer reaches: a file and a folder cannot take each
-// other's place, whatever the flag says.
 func sayHowToGoAhead(err error, on drivesvc.OnConflict) error {
 	var exists *errs.Exists
 	if !errors.As(err, &exists) {
@@ -356,11 +324,6 @@ func sayHowToGoAhead(err error, on drivesvc.OnConflict) error {
 	return exists
 }
 
-// uploadTree mirrors a local directory into Drive.
-//
-// The walk is local and the plan is remote: what the tree will do is settled
-// before any of it is done, so the count is what will be written, a dry run
-// promises the same, and anything in the way is refused while nothing has been.
 func uploadTree(c *kit.Invocation, dc *drivesvc.Context, src, dest string, on drivesvc.OnConflict) error {
 	srcAbs, err := filepath.Abs(src)
 	if err != nil {
@@ -403,9 +366,6 @@ func uploadTree(c *kit.Invocation, dc *drivesvc.Context, src, dest string, on dr
 			return err
 		}
 		for i, file := range plan.Files {
-			// Each file draws its own bar, so without saying where it sits in the
-			// tree a five-hundred-file upload is five hundred identical lines and
-			// no sense of how far along it is.
 			if err := uploadInto(c, dc, plan, file, srcAbs, i+1, len(plan.Files)); err != nil {
 				return err
 			}
@@ -414,9 +374,6 @@ func uploadTree(c *kit.Invocation, dc *drivesvc.Context, src, dest string, on dr
 	}), on)
 }
 
-// landing is how many things a tree upload puts inside its destination: the
-// files, and the folders it has to make to hold them. The tree's own folder is
-// the destination rather than something landing in it, so it is not among them.
 func landing(plan *drivesvc.TreePlan) int {
 	n := len(plan.Files)
 	for _, folder := range plan.Folders {
@@ -427,9 +384,6 @@ func landing(plan *drivesvc.TreePlan) int {
 	return n
 }
 
-// uploadInto writes one of a tree's files, reading it from where the tree came
-// from: the plan names it by where it lands, which is the same path with the
-// tree's own folder swapped for the local one.
 func uploadInto(c *kit.Invocation, dc *drivesvc.Context, plan *drivesvc.TreePlan, file drivesvc.TreeFile, srcAbs string, index, count int) error {
 	local := filepath.Join(srcAbs, filepath.FromSlash(strings.TrimPrefix(file.Path, plan.Top+"/")))
 	f, err := os.Open(local)
@@ -469,6 +423,10 @@ func itemsDownloadCmd() *cobra.Command {
 			"A folder is refused without --recursive. With it, the folder lands as a\n" +
 			"directory of its own name inside --dest-dir, subfolders and all, and --dest is\n" +
 			"refused: one path cannot take a tree.\n\n" +
+			"A file already there with the size and modification time it has in Drive is\n" +
+			"skipped, so running it again continues a download that stopped. A file there\n" +
+			"that differs is refused without --force. Proton Docs and Sheets are not\n" +
+			"downloaded.\n\n" +
 			"Behind a public link, a file is / when the link points at the file itself, and\n" +
 			"a path inside the folder when it points at a folder. A link with a password\n" +
 			"takes it from --link-password-file, which takes - for stdin.",
@@ -484,9 +442,6 @@ func itemsDownloadCmd() *cobra.Command {
 			if recursive {
 				return downloadTree(c, dc, &dest, src)
 			}
-			// The file is looked for before anything is promised about it, and
-			// what it is called comes off the item rather than off the path: a
-			// shared file is named by the tree it is the whole of.
 			file, err := c.App.Drive.ResolvePath(c.Ctx, dc, src)
 			if err != nil {
 				return err
@@ -499,10 +454,11 @@ func itemsDownloadCmd() *cobra.Command {
 			if name == "" {
 				name = path.Base(src)
 			}
+			if kind, app := file.OtherProduct(); kind != "" {
+				return errs.Naming(name, kit.Fail("%s is a %s.", name, kind).Hint("open it in "+app))
+			}
 
 			if dest.Stdout() {
-				// Streaming to stdout means the bar would compete with the
-				// payload's own consumer for the terminal, so it stays off.
 				return c.App.Drive.Download(c.Ctx, file, c.UI().Out, drivesvc.DownloadOptions{
 					Label: "Downloading " + name, OnSignatureIssue: signatureIssue(c, name),
 				})
@@ -511,14 +467,12 @@ func itemsDownloadCmd() *cobra.Command {
 				Action: ui.Downloaded, Count: 1, Name: name,
 				Detail: "to " + dest.Describe(),
 			}, func() error {
-				// A download that fails its integrity checks part way through must
-				// not leave a plausible-looking file behind, so the bytes land
-				// beside the destination and are moved into place at the end.
-				_, err := dest.Stream(c, name, func(w io.Writer) error {
-					return c.App.Drive.Download(c.Ctx, file, w, drivesvc.DownloadOptions{
+				_, err := dest.StreamStamped(c, func(w io.Writer) (string, time.Time, error) {
+					err := c.App.Drive.Download(c.Ctx, file, w, drivesvc.DownloadOptions{
 						Label: "Downloading " + name, Progress: ui.NewProgress(c.UI()),
 						OnSignatureIssue: signatureIssue(c, name),
 					})
+					return name, file.Modified(), err
 				})
 				return err
 			})
@@ -530,14 +484,6 @@ func itemsDownloadCmd() *cobra.Command {
 	return c
 }
 
-// downloadTree writes a folder and everything under it into a directory of its
-// own name.
-//
-// The tree is read before any of it is written, so the count is what will land,
-// a dry run promises the same, and the folders exist before the files that go
-// in them. Each file is published only once it is whole, which is what a
-// download of one does: a tree interrupted half way holds the files it finished
-// and nothing half-written.
 func downloadTree(c *kit.Invocation, dc *drivesvc.Context, dest *kit.Destination, src string) error {
 	plan, err := c.App.Drive.PlanDownload(c.Ctx, dc, src)
 	if err != nil {
@@ -547,27 +493,34 @@ func downloadTree(c *kit.Invocation, dc *drivesvc.Context, dest *kit.Destination
 	if err != nil {
 		return err
 	}
-	top := filepath.Join(dir, kit.SafeFilename(plan.Top))
+	top := filepath.Join(dir, localfile.SafeName(plan.Top))
+	owed, held, err := sortTree(top, plan.Files, dest.Force())
+	if err != nil {
+		return err
+	}
+	folders := plan.Folders
+	if held > 0 {
+		folders = missingFolders(top, plan.Folders)
+		c.Note("%s already there and unchanged.", areFiles(held))
+	}
+	elsewhere(c, plan.Elsewhere)
 	return kit.Mutate(c, ui.ResultSpec{
-		Action: ui.Downloaded, Kind: "items", Count: plan.Count(),
+		Action: ui.Downloaded, Kind: "items", Count: len(owed) + len(folders),
 		Detail: "to " + top,
 	}, func() error {
-		if err := kit.EnsureDir(top); err != nil {
+		if err := localfile.EnsureDir(top); err != nil {
 			return err
 		}
-		for _, folder := range plan.Folders {
-			if err := kit.EnsureDir(localPath(top, folder)); err != nil {
+		for _, folder := range folders {
+			if err := localfile.EnsureDir(localPath(top, folder)); err != nil {
 				return err
 			}
 		}
-		for i, file := range plan.Files {
-			// Each file draws its own bar, so without saying where it sits in the
-			// tree a five-hundred-file download is five hundred identical lines and
-			// no sense of how far along it is.
-			err := dest.StreamInto(localPath(top, file.Path), func(w io.Writer) error {
+		for i, file := range owed {
+			err := localfile.Stream(localPath(top, file.Path), file.Modified, func(w io.Writer) error {
 				return c.App.Drive.DownloadPlanned(c.Ctx, dc, file, w, drivesvc.DownloadOptions{
 					Label:            "Downloading " + file.Name,
-					Progress:         ui.Batch(ui.NewProgress(c.UI()), i+1, len(plan.Files)),
+					Progress:         ui.Batch(ui.NewProgress(c.UI()), i+1, len(owed)),
 					OnSignatureIssue: signatureIssue(c, file.Name),
 				})
 			})
@@ -579,21 +532,77 @@ func downloadTree(c *kit.Invocation, dc *drivesvc.Context, dest *kit.Destination
 	})
 }
 
-// localPath is where one thing of a tree lands, named the way this machine
-// names a path and with each part safe to write.
+func sortTree(top string, files []drivesvc.PlannedFile, force bool) ([]drivesvc.PlannedFile, int, error) {
+	owed := make([]drivesvc.PlannedFile, 0, len(files))
+	held := 0
+	var differ []string
+	for _, file := range files {
+		at := localPath(top, file.Path)
+		switch {
+		case force || !localfile.Exists(at):
+			owed = append(owed, file)
+		case localfile.Holds(at, file.Plain, file.Modified):
+			held++
+		default:
+			differ = append(differ, strings.TrimPrefix(file.Path, "/"))
+		}
+	}
+	if len(differ) > 0 {
+		names := ui.Listing(differ)
+		return nil, 0, errs.Naming(names, kit.Fail("%s in %s differ from the ones in Drive: %s.",
+			ui.Quantity(len(differ), "files"), top, names).Hint("--force to overwrite "+them(len(differ))+"."))
+	}
+	return owed, held, nil
+}
+
+func missingFolders(top string, folders []string) []string {
+	out := make([]string, 0, len(folders))
+	for _, folder := range folders {
+		if !localfile.Exists(localPath(top, folder)) {
+			out = append(out, folder)
+		}
+	}
+	return out
+}
+
+func areFiles(n int) string {
+	if n == 1 {
+		return "1 file is"
+	}
+	return fmt.Sprintf("%d files are", n)
+}
+
+func them(n int) string {
+	if n == 1 {
+		return "it"
+	}
+	return "them"
+}
+
+func elsewhere(c *kit.Invocation, e drivesvc.Elsewhere) {
+	if e.Documents > 0 {
+		c.Note("%s not downloaded; open %s in Proton Docs.", wasNot(e.Documents, "Proton Docs documents"), them(e.Documents))
+	}
+	if e.Spreadsheets > 0 {
+		c.Note("%s not downloaded; open %s in Proton Sheets.", wasNot(e.Spreadsheets, "Proton Sheets spreadsheets"), them(e.Spreadsheets))
+	}
+}
+
+func wasNot(n int, noun string) string {
+	if n == 1 {
+		return ui.Quantity(1, noun) + " was"
+	}
+	return ui.Quantity(n, noun) + " were"
+}
+
 func localPath(top, inTree string) string {
 	parts := strings.Split(strings.Trim(inTree, "/"), "/")
 	for i, part := range parts {
-		parts[i] = kit.SafeFilename(part)
+		parts[i] = localfile.SafeName(part)
 	}
 	return filepath.Join(append([]string{top}, parts...)...)
 }
 
-// signatureIssue reports a block whose author signature does not check out.
-//
-// The content is already known to be what the revision was signed for, so this is
-// not a reason to refuse the file; it is a reason to say who cannot be confirmed as
-// having written it. Once said, it is not said again for every remaining block.
 func signatureIssue(c *kit.Invocation, name string) func(int, string) {
 	reported := false
 	return func(index int, verdict string) {
@@ -605,8 +614,6 @@ func signatureIssue(c *kit.Invocation, name string) func(int, string) {
 			name, index, verdict)
 	}
 }
-
-// ── organising ──
 
 func itemsUpdateCmd() *cobra.Command {
 	var name string
@@ -660,9 +667,6 @@ func itemsCopyCmd() *cobra.Command {
 		})
 }
 
-// relocateCmd builds move and copy, which differ only in whether the original
-// stays. Both take the selection model, so a filtered move is as available as a
-// filtered trash.
 func relocateCmd(use, short string, action ui.Action,
 	apply func(*kit.Invocation, *drivesvc.Context, string, *drivesvc.Resolved) error) *cobra.Command {
 	var f filters
@@ -680,8 +684,6 @@ func relocateCmd(use, short string, action ui.Action,
 			if err != nil {
 				return err
 			}
-			// The destination is looked for before anything is promised about it, and
-			// once for the whole selection rather than once per item.
 			dest, err := c.App.Drive.ResolveFolder(c.Ctx, dc, into)
 			if err != nil {
 				return err
@@ -757,10 +759,6 @@ func itemsDeleteCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			// What the tree will not part with is settled before the question is
-			// asked, so the count somebody answers is the number of things that will
-			// really go, and the reason is on the screen while there is still
-			// something to decide.
 			plan, err := c.App.Drive.PlanDelete(c.Ctx, dc, sel.Rows)
 			if err != nil {
 				return err
@@ -781,8 +779,6 @@ func itemsDeleteCmd() *cobra.Command {
 	t.register(c, edits)
 	return c
 }
-
-// ── revisions ──
 
 func revisionsCmd() *cobra.Command {
 	c := &cobra.Command{
@@ -839,9 +835,6 @@ func revisionsListCmd() *cobra.Command {
 	return c
 }
 
-// findRevision resolves the file and the version every PATH REVISION_REF command
-// addresses, so each of them says which version it is about to act on rather than
-// the reference it was handed.
 func findRevision(c *kit.Invocation, t *tree) (*drivesvc.FileRevision, error) {
 	dc, err := t.context(c)
 	if err != nil {
@@ -939,11 +932,6 @@ func revisionsDeleteCmd() *cobra.Command {
 	return c
 }
 
-// ── creating a folder ──
-
-// A folder is the one thing in Drive you make rather than upload, so it is
-// `items create`: Drive addresses one collection, and rename, move, trash and
-// delete already treat files and folders alike.
 func itemsCreateCmd() *cobra.Command {
 	var t tree
 	c := &cobra.Command{
@@ -958,9 +946,6 @@ func itemsCreateCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			// What the folders above it are is worked out before any of them is
-			// made, so the count is the answer to what happened rather than a
-			// claim, and a dry run promises the same number.
 			paths, err := c.App.Drive.PlanFolders(c.Ctx, dc, c.Args[0])
 			if err != nil {
 				return err

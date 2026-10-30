@@ -2,6 +2,7 @@ package drive
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
@@ -9,6 +10,7 @@ import (
 	"io"
 	"log/slog"
 	"strconv"
+	"time"
 
 	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
@@ -18,33 +20,12 @@ import (
 	"github.com/roman-16/proton-cli/internal/skip"
 )
 
-// A download is not finished when the bytes arrive; it is finished when the bytes
-// are known to be the ones that were uploaded.
-//
-// Proton commits a revision by signing a manifest: the SHA-256 of every encrypted
-// block, concatenated in order. So the integrity of a whole file reduces to one
-// signature over a list of hashes, and the order of operations is what makes that
-// worth having. The manifest is verified before a single block is fetched, which
-// makes the hash list trustworthy; then each block is checked against its hash
-// before it is decrypted and written. Verifying afterwards, once the bytes have
-// gone to a file or down a pipe, would only be able to report the bad news.
-
 type DownloadOptions struct {
-	// Label names the transfer for the progress report.
-	Label string
-	// Progress receives byte counts; nil discards them.
-	Progress progress.Sink
-	// OnSignatureIssue reports a block whose author signature does not check out.
-	//
-	// It is a report rather than a failure because it answers a different question
-	// from the manifest: the manifest says the content is what was committed, which
-	// is either true or not, while a per-block signature says who wrote it, which
-	// this machine may simply not hold the key to judge. Blocks uploaded
-	// anonymously carry no such signature at all.
+	Label            string
+	Progress         progress.Sink
 	OnSignatureIssue func(index int, verdict string)
 }
 
-// revisionBlock is one encrypted block of a revision.
 type revisionBlock struct {
 	Index        int
 	BareURL      string
@@ -57,8 +38,6 @@ type revisionThumbnail struct {
 	Hash string
 }
 
-// revision is the metadata a download needs: the blocks, the thumbnails that come
-// before them in the manifest, and who signed it.
 type revision struct {
 	ManifestSignature string
 	SignatureAddress  string
@@ -67,8 +46,6 @@ type revision struct {
 	Blocks            []revisionBlock
 }
 
-// author is the address whose key signed the manifest. Older revisions name it in
-// SignatureAddress; newer ones in SignatureEmail.
 func (r revision) author() string {
 	if r.SignatureEmail != "" {
 		return r.SignatureEmail
@@ -76,53 +53,90 @@ func (r revision) author() string {
 	return r.SignatureAddress
 }
 
-// Download streams and decrypts what a file holds now.
-//
-// It takes the resolved file rather than a path, because the command already has
-// one: the name the bytes land under on disk is the item's, which is not a thing
-// a path always carries - the root of a shared file is `/`.
 func (s *Service) Download(ctx context.Context, res *Resolved, w io.Writer, opts DownloadOptions) error {
 	return s.downloadFile(ctx, res.dc, res.Link, res.NodeKR, activeRevisionID(res.Link), res.Link.Size, w, opts)
 }
 
-// DownloadPlan is what downloading a folder will write: the folders to make and
-// the files to fetch, each already opened enough to be fetched.
-//
-// It is worked out before any of it is written, so the count somebody is shown
-// is the number of things that will land, a dry run promises the same, and the
-// walk that finds them is done once rather than per file.
 type DownloadPlan struct {
-	// Top is what the folder is called, which is the directory everything lands
-	// in.
-	Top string
-	// Folders is every folder below it, outermost first, as paths relative to
-	// Top.
-	Folders []string
-	Files   []PlannedFile
+	Top       string
+	Folders   []string
+	Files     []PlannedFile
+	Elsewhere Elsewhere
 }
 
-// PlannedFile is one file of a folder download.
 type PlannedFile struct {
-	// Path is where it sits below Top, and Name what it is called.
-	Path string
-	Name string
-	Size int64
+	Path     string
+	Name     string
+	Size     int64
+	Plain    int64
+	Modified time.Time
 
 	link   *Link
 	nodeKR *pgp.KeyRing
 }
 
-// Count is how many things a folder download writes: the files, and the folders
-// made to hold them. The folder asked for is the destination rather than
-// something landing in it, so it is not among them.
+func (f PlannedFile) LinkID() string { return f.link.LinkID }
+
+func (f PlannedFile) Revision() string { return activeRevisionID(f.link) }
+
+type Elsewhere struct{ Documents, Spreadsheets int }
+
+func (e Elsewhere) Count() int { return e.Documents + e.Spreadsheets }
+
+func (e Elsewhere) With(other Elsewhere) Elsewhere {
+	return Elsewhere{Documents: e.Documents + other.Documents, Spreadsheets: e.Spreadsheets + other.Spreadsheets}
+}
+
+func (e *Elsewhere) take(link *Link) bool {
+	switch link.MIMEType {
+	case mimeProtonDocument:
+		e.Documents++
+	case mimeProtonSpreadsheet:
+		e.Spreadsheets++
+	default:
+		return false
+	}
+	return true
+}
+
+const (
+	mimeProtonDocument    = "application/vnd.proton.doc"
+	mimeProtonSpreadsheet = "application/vnd.proton.sheet"
+)
+
+func (r *Resolved) OtherProduct() (kind, app string) {
+	switch r.Link.MIMEType {
+	case mimeProtonDocument:
+		return "Proton Docs document", "Proton Docs"
+	case mimeProtonSpreadsheet:
+		return "Proton Sheets spreadsheet", "Proton Sheets"
+	}
+	return "", ""
+}
+
+func (r *Resolved) Modified() time.Time {
+	modified, _ := stamped(r.Link, r.NodeKR)
+	return modified
+}
+
+func stamped(link *Link, nodeKR *pgp.KeyRing) (time.Time, int64) {
+	modified := time.Unix(cmp.Or(link.RealModifyTime, link.ModifyTime), 0)
+	plain := int64(-1)
+	x, err := decryptXAttr(link.XAttr, nodeKR)
+	if err != nil {
+		return modified, plain
+	}
+	if x.Common.Size > 0 || len(x.Common.BlockSizes) == 0 {
+		plain = x.Common.Size
+	}
+	if t, err := time.Parse(time.RFC3339, x.Common.ModificationTime); err == nil {
+		modified = t
+	}
+	return modified, plain
+}
+
 func (p *DownloadPlan) Count() int { return len(p.Files) + len(p.Folders) }
 
-// PlanDownload reads a folder and everything under it, and keeps what opening
-// each file will need.
-//
-// A folder whose key will not open is recorded and passed over: what is inside
-// it cannot be fetched by anybody holding these keys, and refusing the whole
-// download over it would be refusing the files that can.
 func (s *Service) PlanDownload(ctx context.Context, dc *Context, path string) (*DownloadPlan, error) {
 	res, err := s.ResolvePath(ctx, dc, path)
 	if err != nil {
@@ -141,39 +155,35 @@ func (s *Service) PlanDownload(ctx context.Context, dc *Context, path string) (*
 			return nil
 		}
 		link := f.Link
+		if plan.Elsewhere.take(&link) {
+			// Recorded and not counted: the run names how many it passed over, and
+			// what they hold lives in another product rather than in a revision.
+			slog.DebugContext(ctx, "drive: a document of another product was passed over", "link", link.LinkID)
+			return nil
+		}
 		nodeKR, err := unlockNode(&link, f.ParentKR, nil)
 		if err != nil {
-			// Recorded and counted: the file is one the download will not write,
-			// and the count somebody is shown leaves it out rather than promising
-			// bytes these keys cannot produce.
 			skip.Record(ctx, skip.KindItem, f.Link.LinkID, skip.Unlockable, err)
 			return nil
 		}
+		modified, plain := stamped(&link, nodeKR)
 		plan.Files = append(plan.Files, PlannedFile{
-			Path: f.Path, Name: f.label(), Size: f.Link.Size, link: &link, nodeKR: nodeKR,
+			Path: f.Path, Name: f.label(), Size: f.Link.Size, Plain: plain, Modified: modified,
+			link: &link, nodeKR: nodeKR,
 		})
 		return nil
 	})
 	return plan, err
 }
 
-// DownloadPlanned streams and decrypts one file of a folder download.
 func (s *Service) DownloadPlanned(ctx context.Context, dc *Context, f PlannedFile, w io.Writer, opts DownloadOptions) error {
 	return s.downloadFile(ctx, dc, f.link, f.nodeKR, activeRevisionID(f.link), f.Size, w, opts)
 }
 
-// DownloadRevision streams and decrypts one earlier version of a file.
-//
-// Reading an old version is a read: the file keeps whatever it holds now, which
-// is the difference between wanting the bytes back and wanting them back in
-// place.
 func (s *Service) DownloadRevision(ctx context.Context, fr *FileRevision, w io.Writer, opts DownloadOptions) error {
 	return s.downloadFile(ctx, fr.res.dc, fr.res.Link, fr.res.NodeKR, fr.ID, fr.Size, w, opts)
 }
 
-// activeRevisionID is the version a file holds now, which is what a download
-// means when nobody names another. A link with no file properties has none, and
-// downloadFile is where that is reported.
 func activeRevisionID(link *Link) string {
 	if link.FileProperties == nil {
 		return ""
@@ -181,9 +191,6 @@ func activeRevisionID(link *Link) string {
 	return link.FileProperties.ActiveRevision.ID
 }
 
-// downloadFile streams and decrypts one revision of a file link whose node key
-// ring (nodeKR) has already been unwrapped. The content session key belongs to
-// the file rather than to any one revision, so every version opens with it.
 func (s *Service) downloadFile(ctx context.Context, dc *Context, link *Link, nodeKR *pgp.KeyRing,
 	revisionID string, size int64, w io.Writer, opts DownloadOptions) error {
 	if link.FileProperties == nil {
@@ -240,12 +247,6 @@ func (s *Service) downloadFile(ctx context.Context, dc *Context, link *Link, nod
 	return nil
 }
 
-// blockAuthor checks the per-block signature that says who wrote a block.
-//
-// The signature is stored encrypted to the node key and covers the block's
-// plaintext, so opening it needs the node and judging it needs the uploader's
-// address key. That key is fetched once and only if a block turns out to carry a
-// signature at all.
 type blockAuthor struct {
 	s      *Service
 	email  string
@@ -254,9 +255,6 @@ type blockAuthor struct {
 	loaded bool
 }
 
-// newBlockAuthor takes the address to judge the blocks against, and nobody at
-// all where there is no account to judge with: settling who wrote something
-// means fetching their published key, which only an account may ask for.
 func newBlockAuthor(s *Service, dc *Context, email string, nodeKR *pgp.KeyRing) *blockAuthor {
 	if dc.Anonymous {
 		email = ""
@@ -264,10 +262,6 @@ func newBlockAuthor(s *Service, dc *Context, email string, nodeKR *pgp.KeyRing) 
 	return &blockAuthor{s: s, email: email, nodeKR: nodeKR}
 }
 
-// verify returns "" when there is nothing to report, and the verdict otherwise.
-//
-// A block whose author is not named is nobody's to judge, which is every block
-// of an upload nobody was signed in for.
 func (a *blockAuthor) verify(ctx context.Context, plain []byte, encSignature string) string {
 	if encSignature == "" || a.email == "" {
 		return ""
@@ -295,11 +289,6 @@ func (a *blockAuthor) verify(ctx context.Context, plain []byte, encSignature str
 	return ""
 }
 
-// revision reads every page of a revision's block list.
-//
-// A public link serves the version its file holds now and no other, so there is
-// no revision to name there: what a reader of a link can have is what they would
-// get by opening it.
 func (s *Service) revision(ctx context.Context, dc *Context, linkID, revID string) (revision, error) {
 	const pageSize = 50
 	var out revision
@@ -331,13 +320,6 @@ func (s *Service) revision(ctx context.Context, dc *Context, linkID, revID strin
 	}
 }
 
-// revisionRequest asks for one version of a file, of whichever endpoint serves
-// the tree it is in.
-//
-// A tree of your own is addressed by the share it hangs from. A tree somebody
-// published is addressed by the volume its items live on, and answered for
-// whoever holds the link - which is what a reader with no account has instead
-// of a share. What hangs below either is the same request.
 func revisionRequest(dc *Context, linkID, revID string) proton.Request {
 	if dc.Public() {
 		return proton.Request{
@@ -350,13 +332,6 @@ func revisionRequest(dc *Context, linkID, revID string) proton.Request {
 	}
 }
 
-// manifest rebuilds what the revision's signature covers: every thumbnail hash
-// followed by every block hash, in order. It returns the block hashes separately so
-// each block can be checked as it arrives.
-//
-// The block indexes have to run unbroken from 1, because a manifest assembled from
-// a list with a gap in it is a manifest over different content than the file being
-// written.
 func (r revision) manifest() ([]byte, [][]byte, error) {
 	manifest := make([]byte, 0, (len(r.Thumbnails)+len(r.Blocks))*sha256.Size)
 	for i, thumbnail := range r.Thumbnails {
@@ -392,15 +367,6 @@ func decodeSHA256(encoded string) ([]byte, error) {
 	return hash, nil
 }
 
-// verifyManifest checks the revision signature against the key of whoever
-// committed it, or against the node key for content uploaded anonymously.
-//
-// A public link is served without one. Whoever opens a link is outside the share
-// and cannot hold the key that signed it, so Proton sends no signature there and
-// its own clients skip the check for the same reason. Every block is still
-// checked against the hash list the revision came with, so what arrives is what
-// that list describes; the list itself is then Proton's word rather than the
-// author's, which is the one guarantee a link cannot carry.
 func (s *Service) verifyManifest(ctx context.Context, dc *Context, nodeKR *pgp.KeyRing, signedBy string, manifest []byte, signature string) error {
 	if dc.Public() {
 		slog.DebugContext(ctx, "drive: a public link serves no manifest signature, so the block hashes are Proton's word",

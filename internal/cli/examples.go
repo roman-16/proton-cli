@@ -25,6 +25,11 @@ var examples = map[string][]string{
 		"proton account breaches disable",
 		"proton account breaches disable --emails",
 	},
+	"proton account export": {
+		"proton account export --dest-dir ~/proton-backup",
+		"proton account export mail drive --dest-dir ~/proton-backup",
+		"proton account export --dest-dir ~/proton-backup --dry-run",
+	},
 	"proton account delete": {
 		"proton account delete --reason other-service --message 'Moving everything to one provider'",
 		"proton account delete --reason merge",
@@ -248,6 +253,7 @@ var examples = map[string][]string{
 	"proton calendar events export": {
 		"proton calendar events export --after 2026-01-01 --before 2026-12-31 --dest year.ics",
 		"proton calendar events export --calendar Work --dest - > work.ics",
+		"proton calendar events export --calendar Work --all --dest-dir .",
 	},
 	"proton calendar events import": {
 		"proton calendar events import holidays.ics",
@@ -649,8 +655,12 @@ var examples = map[string][]string{
 		"proton drive photos list --album Holidays",
 		"proton drive photos list --tag favorites",
 	},
-	"proton drive photos upload":      {"proton drive photos upload ./IMG_2291.jpg"},
-	"proton drive photos download":    {"proton drive photos download 5bH2mQxK --dest-dir ."},
+	"proton drive photos upload": {"proton drive photos upload ./IMG_2291.jpg"},
+	"proton drive photos download": {
+		"proton drive photos download 5bH2mQxK 9xL4pQrT --dest-dir holidays",
+		"proton drive photos download --album Holidays --dest-dir holidays",
+		"proton drive photos download --all --dest-dir photos",
+	},
 	"proton drive photos favorite":    {"proton drive photos favorite 5bH2mQxK"},
 	"proton drive photos unfavorite":  {"proton drive photos unfavorite 5bH2mQxK"},
 	"proton drive photos trash":       {"proton drive photos trash 5bH2mQxK"},
@@ -1479,10 +1489,6 @@ var examples = map[string][]string{
 	},
 }
 
-// attachExamples gives every leaf the examples filed under its path.
-//
-// Cobra indents an Example block itself only in some templates, so the lines are
-// indented here, once, and every command's help reads the same.
 func attachExamples(root *cobra.Command) {
 	var walk func(*cobra.Command)
 	walk = func(c *cobra.Command) {

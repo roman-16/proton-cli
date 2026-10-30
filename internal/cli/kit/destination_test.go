@@ -7,11 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/roman-16/proton-cli/internal/localfile"
 )
 
-// The collision policy is the interesting part, and it differs by intent on
-// purpose: a path the user named is never replaced silently, while a name the CLI
-// chose itself may be adjusted.
 func TestDestinationCollisionPolicy(t *testing.T) {
 	t.Run("an explicit path is refused when it exists", func(t *testing.T) {
 		dir := t.TempDir()
@@ -83,21 +82,6 @@ func TestDestinationCollisionPolicy(t *testing.T) {
 	})
 }
 
-// A double extension keeps the part that identifies the format.
-func TestSplitExt(t *testing.T) {
-	for _, tc := range []struct{ in, stem, ext string }{
-		{"report.pdf", "report", ".pdf"},
-		{"archive.tar.gz", "archive.tar", ".gz"},
-		{"README", "README", ""},
-		{".bashrc", ".bashrc", ""},
-	} {
-		stem, ext := splitExt(tc.in)
-		if stem != tc.stem || ext != tc.ext {
-			t.Errorf("splitExt(%q) = (%q, %q), want (%q, %q)", tc.in, stem, ext, tc.stem, tc.ext)
-		}
-	}
-}
-
 func TestValidateRejectsImpossibleCombinations(t *testing.T) {
 	t.Run("both destinations", func(t *testing.T) {
 		d := &Destination{dest: "a", destDir: "b"}
@@ -125,31 +109,6 @@ func TestValidateRejectsImpossibleCombinations(t *testing.T) {
 	})
 }
 
-// A mail subject becomes a file name on every platform the CLI targets, which
-// means losing the characters Windows forbids and anything that would escape the
-// directory.
-func TestSafeFilename(t *testing.T) {
-	for _, tc := range []struct{ in, want string }{
-		{"Invoice #2291 is ready", "Invoice #2291 is ready"},
-		{"Re: budget/2026", "Re budget 2026"},
-		{`a"b<c>d|e?f*g:h\i`, "a b c d e f g h i"},
-		{"  collapsed   spaces  ", "collapsed spaces"},
-		{"trailing dots...", "trailing dots"},
-		{"", "download"},
-		{"../../etc/passwd", ".. .. etc passwd"},
-	} {
-		if got := SafeFilename(tc.in); got != tc.want {
-			t.Errorf("SafeFilename(%q) = %q, want %q", tc.in, got, tc.want)
-		}
-	}
-	if n := len(SafeFilename(strings.Repeat("x", 500))); n > 120 {
-		t.Errorf("length not capped: %d", n)
-	}
-}
-
-// --dest-dir names where the bytes go, so a directory that is not there yet is
-// a request to make it. Photo downloads open a temporary file in it before
-// anything else does, which is where this used to give way.
 func TestDirCreatesTheDestination(t *testing.T) {
 	nested := filepath.Join(t.TempDir(), "pics", "2026")
 	d := &Destination{destDir: nested}
@@ -169,8 +128,6 @@ func TestDirCreatesTheDestination(t *testing.T) {
 	}
 }
 
-// A file where the directory should be is a mistake worth naming, not a stack of
-// permission errors later on.
 func TestDirRefusesAPathThatIsAFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "not-a-dir")
 	write(t, path, "x")
@@ -196,8 +153,6 @@ func read(t *testing.T, path string) string {
 	return string(b)
 }
 
-// A payload larger than memory has to be written as it arrives, and a producer
-// that fails part way through must not leave a file that looks complete.
 func TestStreamCommitsOnlyAFinishedPayload(t *testing.T) {
 	dir := t.TempDir()
 
@@ -225,17 +180,14 @@ func TestStreamCommitsOnlyAFinishedPayload(t *testing.T) {
 	}); err == nil {
 		t.Fatal("Stream ignored the producer's error")
 	}
-	if exists(failed) {
+	if localfile.Exists(failed) {
 		t.Error("Stream left a partial file at the destination")
 	}
-	// Only the finished payload is left: no temporary file, and nothing at the
-	// destination the failed producer was aiming for.
 	if names := entryNames(t, dir); len(names) != 1 || names[0] != "mail.mbox" {
 		t.Errorf("the directory holds %v, want only the finished payload", names)
 	}
 }
 
-// A producer that only learns the name as the bytes arrive names the file itself.
 func TestStreamDiscoveredUsesTheNameTheProducerFound(t *testing.T) {
 	dir := t.TempDir()
 	d := &Destination{destDir: dir}

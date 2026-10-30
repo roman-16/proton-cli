@@ -1,17 +1,16 @@
 package drive
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/roman-16/proton-cli/internal/localfile"
 	drivesvc "github.com/roman-16/proton-cli/internal/service/drive"
 )
 
-// What a listing puts under NAME is what the next command takes.
-//
-// A row that came out of the tree is somewhere, and two files of the same name
-// in different folders are one row each: a listing of names would show the
-// same word twice and answer neither question. A listing of one folder is
-// already somewhere, so the folder is not repeated down the column.
 func TestAListingNamesAFileByWhereItIs(t *testing.T) {
 	name := nameCell(t)
 	if got := name(drivesvc.Child{Name: "scratch.tmp", Path: "/Build/obj/scratch.tmp"}); got != "/Build/obj/scratch.tmp" {
@@ -31,4 +30,35 @@ func nameCell(t *testing.T) func(drivesvc.Child) string {
 	}
 	t.Fatal("a listing of items has no NAME column")
 	return func(drivesvc.Child) string { return "" }
+}
+
+func TestAFolderDownloadSortsWhatIsAlreadyThere(t *testing.T) {
+	top := filepath.Join(t.TempDir(), "Documents")
+	when := time.Date(2026, 3, 12, 9, 41, 0, 0, time.UTC)
+	if err := localfile.Publish(filepath.Join(top, "held.txt"), []byte("held"), when); err != nil {
+		t.Fatal(err)
+	}
+	files := []drivesvc.PlannedFile{
+		{Path: "/held.txt", Plain: 4, Modified: when},
+		{Path: "/sub/new.txt", Plain: 3, Modified: when},
+	}
+	owed, held, err := sortTree(top, files, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if held != 1 || len(owed) != 1 || owed[0].Path != "/sub/new.txt" {
+		t.Errorf("held %d, owed %+v; want the file already there kept and the new one owed", held, owed)
+	}
+
+	if err := os.WriteFile(filepath.Join(top, "held.txt"), []byte("changed"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, _, err = sortTree(top, files, false)
+	if err == nil || !strings.Contains(err.Error(), "held.txt") || !strings.Contains(err.Error(), "differ") {
+		t.Errorf("a file that differs = %v, want a refusal naming it", err)
+	}
+	owed, held, err = sortTree(top, files, true)
+	if err != nil || held != 0 || len(owed) != 2 {
+		t.Errorf("--force owes %d and keeps %d (%v), want everything downloaded again", len(owed), held, err)
+	}
 }

@@ -25,29 +25,27 @@ import (
 )
 
 type Event struct {
-	ID          string    `json:"id"`
-	StoredID    string    `json:"stored_id,omitempty"`
-	CalendarID  string    `json:"calendar_id"`
-	Title       string    `json:"title"`
-	Location    string    `json:"location,omitempty"`
-	Description string    `json:"description,omitempty"`
-	Start       time.Time `json:"start"`
-	End         time.Time `json:"end"`
-	AllDay      bool      `json:"all_day"`
-	Zone        string    `json:"zone,omitempty"`
-	UID         string    `json:"uid,omitempty"`
-	RRule       string    `json:"rrule,omitempty"`
-	Occurrence  string    `json:"occurrence,omitempty"`
-	Number      int       `json:"occurrence_number,omitempty"`
-	Count       *int      `json:"occurrence_count,omitempty"`
-	Reminders   []string  `json:"reminders"`
-	Attendees   []string  `json:"attendees"`
-	Status      string    `json:"status"`
-	Organizer   string    `json:"organizer,omitempty"`
-	// Color is the event's own accent colour, as the hex Proton stores. Empty
-	// means it has none of its own and is drawn in its calendar's.
-	Color     string                 `json:"color,omitempty"`
-	Signature pgphelper.VerifyResult `json:"signature,omitempty"`
+	ID          string                 `json:"id"`
+	StoredID    string                 `json:"stored_id,omitempty"`
+	CalendarID  string                 `json:"calendar_id"`
+	Title       string                 `json:"title"`
+	Location    string                 `json:"location,omitempty"`
+	Description string                 `json:"description,omitempty"`
+	Start       time.Time              `json:"start"`
+	End         time.Time              `json:"end"`
+	AllDay      bool                   `json:"all_day"`
+	Zone        string                 `json:"zone,omitempty"`
+	UID         string                 `json:"uid,omitempty"`
+	RRule       string                 `json:"rrule,omitempty"`
+	Occurrence  string                 `json:"occurrence,omitempty"`
+	Number      int                    `json:"occurrence_number,omitempty"`
+	Count       *int                   `json:"occurrence_count,omitempty"`
+	Reminders   []string               `json:"reminders"`
+	Attendees   []string               `json:"attendees"`
+	Status      string                 `json:"status"`
+	Organizer   string                 `json:"organizer,omitempty"`
+	Color       string                 `json:"color,omitempty"`
+	Signature   pgphelper.VerifyResult `json:"signature,omitempty"`
 }
 
 func (e Event) Recurring() bool { return e.RRule != "" || e.Occurrence != "" }
@@ -64,12 +62,8 @@ type rawNotification struct {
 }
 
 type rawEvent struct {
-	ID         string
-	CalendarID string
-	// StartTime and EndTime are the cleartext times Proton keeps beside the
-	// encrypted content. For a full-day event they are the dates it names, held as
-	// UTC midnights; for any other event they are instants anchored to the zones
-	// below. They are what places an event nobody can decrypt.
+	ID                   string
+	CalendarID           string
 	StartTime            int64
 	EndTime              int64
 	StartTimezone        string
@@ -125,7 +119,6 @@ func (e rawEvent) triggers() []string {
 	return out
 }
 
-// stored is an event as Proton holds it, together with what its cards said.
 type stored struct {
 	raw     rawEvent
 	model   ical.VEvent
@@ -270,15 +263,6 @@ func (s *Service) rawEventsBetween(ctx context.Context, calendarID string, w ica
 	return out, nil
 }
 
-// fetchBounds are the instants the events endpoint is asked for: the window, a day
-// wider at each end, and nothing before the epoch.
-//
-// Wider on purpose. An all-day event names a date rather than an instant, so Proton
-// holds it at an instant up to a day from the day it belongs to here, and the
-// endpoint's own idea of which events touch the edge of a range is not this CLI's.
-// What is fetched only has to contain the answer; the window decides it.
-//
-// Nothing before the epoch is asked for; see sinceEpoch.
 func fetchBounds(w ical.Window) (from, to time.Time) {
 	first, until := w.Bounds()
 	return sinceEpoch(first.AddDate(0, 0, -1), until.AddDate(0, 0, 1))
@@ -407,11 +391,6 @@ func expand(events []stored, w ical.Window) []Event {
 	return out
 }
 
-// when is the pair of values the event occupies, whether or not its content could
-// be read.
-//
-// An event nobody can decrypt is still placed on the right day, because the times
-// Proton keeps in the clear beside it are the same values its content carries.
 func (e stored) when() (start, end ical.DateTime) {
 	if e.readErr == nil {
 		return e.model.Span()
@@ -606,20 +585,14 @@ type EventInput struct {
 	Reminders   []string
 	Attendees   []string
 	Status      string
-	// Color is the event's own accent colour, as the hex Proton stores. Empty
-	// gives it none, which is how an event comes to be drawn in its calendar's.
-	Color string
-	Meet  bool
+	Color       string
+	Meet        bool
 }
 
-// EventResult is the outcome of a write. Mail is non-nil when participants have
-// to be told by email, which is the case for attendees Proton cannot reach
-// through their own calendar.
 type EventResult struct {
-	ID   string
-	Ref  string
-	Mail *Mail
-	// Call is the Proton Meet call this write gave the event.
+	ID            string
+	Ref           string
+	Mail          *Mail
 	Call          *ical.Call
 	MeetUnchanged bool
 }
@@ -632,7 +605,6 @@ func gaveCall(v ical.VEvent, made *meet.Meeting) *ical.Call {
 	return &call
 }
 
-// Mail is a ready-to-send iCalendar message.
 type Mail struct {
 	ICS        string
 	Recipients []string
@@ -701,9 +673,6 @@ func (s *Service) EventCreate(ctx context.Context, calendarID string, in EventIn
 	return res, nil
 }
 
-// attachAttendees resolves the participants onto an event: their tokens, the
-// cleartext record, the keys their copies have to be readable with, and the
-// addresses Proton cannot deliver to, which have to be emailed instead.
 func (s *Service) attachAttendees(ctx context.Context, body *eventBody, emails []string) (external []string, err error) {
 	if len(emails) == 0 {
 		return nil, nil
@@ -740,12 +709,6 @@ func updateMail(v ical.VEvent, recipients []string) *Mail {
 	}
 }
 
-// resolveAttendees computes per-attendee tokens, the cleartext Attendees list, the
-// keys of the participants with Proton accounts, and the addresses without one,
-// which have to be emailed.
-//
-// None of it needs the event's session key, which is what lets the key be made
-// once, when the cards are built.
 func (s *Service) resolveAttendees(ctx context.Context, uid string, emails []string) (atts []ical.Attendee, clear []map[string]any, keys []protonAttendee, external []string, err error) {
 	written := make([]string, 0, len(emails))
 	roles := make(map[string]string, len(emails))
@@ -767,8 +730,6 @@ func (s *Service) resolveAttendees(ctx context.Context, uid string, emails []str
 
 	seen := map[canonicalAddr]bool{}
 	for _, email := range written {
-		// Two addresses Proton reduces to the same one are the same person, so
-		// the canonical form is what decides a duplicate.
 		if seen[canonical[email]] {
 			continue
 		}
@@ -790,8 +751,6 @@ func (s *Service) resolveAttendees(ctx context.Context, uid string, emails []str
 	return atts, clear, keys, external, nil
 }
 
-// attendeeKeyRing is an address's public key, or nil when the address has no
-// Proton account and therefore no calendar to deliver to.
 func (s *Service) attendeeKeyRing(ctx context.Context, email string) (*pgp.KeyRing, error) {
 	return keys.Published(ctx, s.C, email)
 }
@@ -826,10 +785,6 @@ func (s *Service) ResolveEvent(ctx context.Context, needle string) (calendarID, 
 	return m.CalendarID, m.ID, m.Occurrence, nil
 }
 
-// Proton's two kinds of reminder. The web client offers both wherever it offers
-// one, so a reminder here says which it is by suffixing the duration - "1d:email"
-// - and a bare duration is the notification, which is what the composer defaults
-// to.
 const (
 	remindByEmail  = 0
 	remindOnDevice = 1
@@ -869,10 +824,6 @@ func reminderKind(r string) (spec string, kind int, err error) {
 	return "", 0, fmt.Errorf("reminder %q: after the colon write email or notification", r)
 }
 
-// iCalendar's two participation roles. Proton's composer lets an organiser mark
-// anyone optional, so an attendee says which by suffixing the address -
-// "jane@example.com:optional" - and a bare address is required, which is what
-// inviting someone ordinarily means.
 const (
 	roleRequired = "REQ-PARTICIPANT"
 	roleOptional = "OPT-PARTICIPANT"
@@ -902,16 +853,12 @@ func AttendeeText(email, role string) string {
 	return email
 }
 
-// Event statuses, as iCalendar spells them and as the CLI does.
 var eventStatuses = map[string]string{
 	"confirmed": "CONFIRMED", "tentative": "TENTATIVE", "cancelled": "CANCELLED",
 }
 
-// EventStatuses are what Proton stores an event's status as: it refuses
-// TENTATIVE, which only an invitation from another service carries.
 func EventStatuses() []string { return []string{"confirmed", "cancelled"} }
 
-// ICalStatus turns the word a person writes into the one iCalendar stores.
 func ICalStatus(word string) string { return eventStatuses[strings.ToLower(word)] }
 
 func StatusText(status string) string {
@@ -945,9 +892,6 @@ func icalTrigger(dur string) (string, error) {
 	return fmt.Sprintf("-PT%dM", int(d/time.Minute)), nil
 }
 
-// triggerDuration reads an iCalendar trigger back into how long before the start
-// it fires. It is icalTrigger's inverse, over the shapes icalTrigger writes and
-// the ones Proton's other clients write beside them.
 func triggerDuration(trigger string) time.Duration {
 	body := strings.TrimPrefix(strings.TrimPrefix(trigger, "-"), "P")
 	date, clock, _ := strings.Cut(body, "T")
@@ -974,19 +918,12 @@ func triggerDuration(trigger string) time.Duration {
 	return total
 }
 
-// EventsExport returns what a calendar holds as iCalendar models, ready to be
-// written as a file.
-//
-// A series is exported **once**, carrying its rule, rather than expanded into the
-// occurrences a listing shows. That is what a calendar file is: expanding it
-// would turn one weekly standup into fifty-two unrelated events, and no client
-// could put it back.
-//
-// An event that cannot be decrypted is left out rather than written as a stub,
-// because a file is something another client will trust - and recorded, because a
-// file that is short says nothing about what is missing from it.
-func (s *Service) EventsExport(ctx context.Context, calendarIDs []string, w ical.Window) ([]ical.VEvent, error) {
-	groups, err := s.readCalendars(ctx, calendarIDs, s.inWindow(w))
+func (s *Service) EventsExport(ctx context.Context, calendarIDs []string, within *ical.Window) ([]ical.VEvent, error) {
+	events := s.everyEvent
+	if within != nil {
+		events = s.inWindow(*within)
+	}
+	groups, err := s.readCalendars(ctx, calendarIDs, events)
 	if err != nil {
 		return nil, err
 	}
@@ -1009,8 +946,6 @@ func (s *Service) EventsExport(ctx context.Context, calendarIDs []string, w ical
 	return out, nil
 }
 
-// alarmsOf turns Proton's notifications into the VALARM components every other
-// client reads.
 func alarmsOf(raw rawEvent) []ical.Alarm {
 	alarms := make([]ical.Alarm, 0, len(raw.Notifications))
 	for _, n := range raw.Notifications {
@@ -1045,24 +980,6 @@ func (s SkippedEvent) String() string {
 	}
 }
 
-// EventsImport writes the events of a parsed calendar file into a calendar.
-//
-// Each event keeps its own UID, so importing the same file twice into the same
-// calendar produces duplicates rather than merging - which is what Proton's own
-// import does, and the honest behaviour: this cannot know whether two events
-// sharing a UID are the same event or a file somebody edited.
-//
-// Attendees are dropped. An imported event is a record of something, not an
-// invitation being reissued, and writing the participants back would make this
-// account the organiser of a meeting it did not call - which, for an event with
-// external addresses, means email going out.
-//
-// A colour is snapped onto Proton's palette, which is the only set of colours it
-// stores: a file may name any colour CSS has, and the event is worth more than
-// the exactness of its decoration.
-//
-// An event that cannot be written is reported and the rest continue: a file of a
-// thousand events should not be lost to one of them.
 func (s *Service) EventsImport(ctx context.Context, calendarID string, events []ical.VEvent) (*ImportResult, error) {
 	ck, err := s.unlockCalendar(ctx, calendarID)
 	if err != nil {
@@ -1127,8 +1044,6 @@ func importable(v ical.VEvent) ical.VEvent {
 	return v
 }
 
-// notificationsOf turns VALARM components back into Proton's notifications, so a
-// file's reminders survive the import.
 func notificationsOf(alarms []ical.Alarm) []map[string]any {
 	if len(alarms) == 0 {
 		return nil

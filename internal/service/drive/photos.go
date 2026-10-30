@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	pgp "github.com/ProtonMail/gopenpgp/v3/crypto"
 	"github.com/roman-16/proton-cli/internal/errs"
@@ -34,10 +35,6 @@ type Album struct {
 
 const photosPageSize = 500
 
-// photoTags maps the user-facing tag names to Proton's PhotoTag enum values
-// (packages/shared/lib/interfaces/drive/file.ts). Proton assigns tags 1-9
-// server-side by automatic classification; only Favorites (0) is user-
-// togglable, via the dedicated favorite endpoint.
 var photoTags = []struct {
 	name string
 	id   int
@@ -54,12 +51,8 @@ var photoTags = []struct {
 	{"raw", 9},
 }
 
-// favoriteTag is PhotoTag.Favorites, the only user-togglable tag.
 const favoriteTag = 0
 
-// TagName returns the user-facing name for a PhotoTag id, falling back to the
-// decimal id for tags this build doesn't know so future backend tags still
-// render legibly.
 func TagName(id int) string {
 	for _, t := range photoTags {
 		if t.id == id {
@@ -69,8 +62,6 @@ func TagName(id int) string {
 	return strconv.Itoa(id)
 }
 
-// ParseTag resolves a user-supplied tag name to its PhotoTag id. Names only:
-// integer input is rejected so the CLI never leaks raw enum values.
 func ParseTag(name string) (int, error) {
 	for _, t := range photoTags {
 		if t.name == name {
@@ -84,7 +75,6 @@ func ParseTag(name string) (int, error) {
 	return 0, fmt.Errorf("unknown tag %q; valid: %s", name, strings.Join(names, ", "))
 }
 
-// tagNames maps PhotoTag ids to their names for display and JSON output.
 func tagNames(ids []int) []string {
 	if len(ids) == 0 {
 		return nil
@@ -96,8 +86,6 @@ func tagNames(ids []int) []string {
 	return out
 }
 
-// photosRoot unwraps the photos share root's node key ring, the parent for every
-// photo and album.
 func (s *Service) photosRoot(ctx context.Context, dc *Context) (*Link, *pgp.KeyRing, error) {
 	kr, err := dc.RootKR()
 	if err != nil {
@@ -106,11 +94,7 @@ func (s *Service) photosRoot(ctx context.Context, dc *Context) (*Link, *pgp.KeyR
 	return dc.rootLink, kr, nil
 }
 
-// PhotosList returns all photos on the photos volume (paginated server-side).
-// When filter is set, the server filters to the single PhotoTag id in tag.
 func (s *Service) PhotosList(ctx context.Context, dc *Context, tag int, filter bool) ([]Photo, error) {
-	// The endpoint resumes from the last photo of the previous answer rather
-	// than from a page number.
 	lastID := ""
 	return proton.All(ctx, func(ctx context.Context, _ int) ([]Photo, bool, error) {
 		q := proton.Request{Method: "GET", Path: fmt.Sprintf("/drive/volumes/%s/photos", dc.VolumeID)}
@@ -145,9 +129,6 @@ func (s *Service) PhotosList(ctx context.Context, dc *Context, tag int, filter b
 	})
 }
 
-// AlbumsList returns the photo albums. The list endpoint omits the (encrypted)
-// album name, so the links are read back together and their names decrypted
-// with the photos-root key.
 func (s *Service) AlbumsList(ctx context.Context, dc *Context) ([]Album, error) {
 	_, rootKR, err := s.photosRoot(ctx, dc)
 	if err != nil {
@@ -188,7 +169,6 @@ func (s *Service) AlbumsList(ctx context.Context, dc *Context) ([]Album, error) 
 	return out, nil
 }
 
-// AlbumItems lists the photos in an album.
 func (s *Service) AlbumItems(ctx context.Context, dc *Context, albumLinkID string) ([]Photo, error) {
 	entries, err := s.albumPhotos(ctx, dc, albumLinkID)
 	if err != nil {
@@ -201,8 +181,6 @@ func (s *Service) AlbumItems(ctx context.Context, dc *Context, albumLinkID strin
 	return out, nil
 }
 
-// sharedAlbum is an album somebody shared with this account, as the photo
-// library answers for it: which album it is, and the share it is held by.
 type sharedAlbum struct {
 	VolumeID string
 	ShareID  string
@@ -210,14 +188,7 @@ type sharedAlbum struct {
 	Locked   bool
 }
 
-// albumsSharedWithMe names the albums other people have shared with this
-// account.
-//
-// Proton answers for them here rather than among the shares, so they are asked
-// for separately and matched up by share ID with whatever the share listing
-// held.
 func (s *Service) albumsSharedWithMe(ctx context.Context) ([]sharedAlbum, error) {
-	// The endpoint hands back the anchor its next answer starts from.
 	anchor := ""
 	return proton.All(ctx, func(ctx context.Context, _ int) ([]sharedAlbum, bool, error) {
 		q := proton.Request{Method: "GET", Path: "/drive/photos/albums/shared-with-me"}
@@ -237,9 +208,6 @@ func (s *Service) albumsSharedWithMe(ctx context.Context) ([]sharedAlbum, error)
 	})
 }
 
-// albumPhoto is one photo an album holds, as the album's own endpoint answers:
-// which photo it is and what the library knows about it, but nothing that would
-// open it.
 type albumPhoto struct {
 	LinkID      string
 	CaptureTime int64
@@ -247,9 +215,7 @@ type albumPhoto struct {
 	Tags        []int
 }
 
-// albumPhotos names what an album holds.
 func (s *Service) albumPhotos(ctx context.Context, dc *Context, albumLinkID string) ([]albumPhoto, error) {
-	// The endpoint hands back the anchor its next answer starts from.
 	anchor := ""
 	return proton.All(ctx, func(ctx context.Context, _ int) ([]albumPhoto, bool, error) {
 		q := proton.Request{Method: "GET", Path: fmt.Sprintf("/drive/photos/volumes/%s/albums/%s/children", dc.VolumeID, albumLinkID)}
@@ -269,9 +235,6 @@ func (s *Service) albumPhotos(ctx context.Context, dc *Context, albumLinkID stri
 	})
 }
 
-// albumChildren reads an album's photos as links, which is what a tree walk
-// needs of them: the album endpoint says which photos are in it, and the links
-// themselves carry the names and the keys.
 func (s *Service) albumChildren(ctx context.Context, dc *Context, albumLinkID string) ([]Link, error) {
 	entries, err := s.albumPhotos(ctx, dc, albumLinkID)
 	if err != nil {
@@ -292,25 +255,20 @@ func (s *Service) albumChildren(ctx context.Context, dc *Context, albumLinkID st
 	return out, nil
 }
 
-// PhotoDownload streams and decrypts a photo by its link ID.
-func (s *Service) PhotoDownload(ctx context.Context, dc *Context, linkID string, w io.Writer, opts DownloadOptions) (string, error) {
+func (s *Service) PhotoDownload(ctx context.Context, dc *Context, linkID string, w io.Writer, opts DownloadOptions) (string, time.Time, error) {
 	res, err := s.ResolveRef(ctx, dc, linkID)
 	if err != nil {
-		return "", err
+		return "", time.Time{}, err
 	}
 	name := res.Name
 	if name == "" {
 		name = linkID
 	}
 	link := res.Link
-	return name, s.downloadFile(ctx, dc, link, res.NodeKR, activeRevisionID(link), link.Size, w, opts)
+	return name, res.Modified(), s.downloadFile(ctx, dc, link, res.NodeKR, activeRevisionID(link), link.Size, w, opts)
 }
 
-// PhotoPlan is what uploading a photo will do, worked out before it does it:
-// nothing at all when the library already holds the photo.
 type PhotoPlan struct {
-	// Duplicate is the photo the library already holds under the same name and
-	// with the same content, and empty when it holds none.
 	Duplicate string
 
 	upload  *UploadPlan
@@ -318,13 +276,6 @@ type PhotoPlan struct {
 	open    func() (io.ReadCloser, error)
 }
 
-// PlanPhotoUpload decides what uploading the photo open reads, under name, will
-// do.
-//
-// A photo is a duplicate when the library holds one of the same name and the
-// same content, which is the test Proton's own apps apply: cameras reuse names,
-// so a name alone says nothing. The content is read for the comparison only
-// when the name matches.
 func (s *Service) PlanPhotoUpload(ctx context.Context, dc *Context, name string, open func() (io.ReadCloser, error)) (*PhotoPlan, error) {
 	root, rootKR, err := s.photosRoot(ctx, dc)
 	if err != nil {
@@ -348,11 +299,8 @@ func (s *Service) PlanPhotoUpload(ctx context.Context, dc *Context, name string,
 	return &PhotoPlan{upload: upload, hashKey: hashKey, open: open}, nil
 }
 
-// linkActive is the state of an item that is neither a draft nor in the trash.
 const linkActive = 1
 
-// photoDuplicate names the photo in the library that has name and the content
-// open reads, or nothing.
 func (s *Service) photoDuplicate(ctx context.Context, dc *Context, name string, hashKey []byte, open func() (io.ReadCloser, error)) (string, error) {
 	nameHash, err := lookupHash(name, hashKey)
 	if err != nil {
@@ -393,7 +341,6 @@ func (s *Service) photoDuplicate(ctx context.Context, dc *Context, name string, 
 	return candidates[contentHash], nil
 }
 
-// contentDigest is the SHA-1 of what open reads, as the hex a revision records.
 func contentDigest(open func() (io.ReadCloser, error)) (string, error) {
 	r, err := open()
 	if err != nil {
@@ -407,9 +354,6 @@ func contentDigest(open func() (io.ReadCloser, error)) (string, error) {
 	return hex.EncodeToString(digest.Sum(nil)), nil
 }
 
-// PhotoUpload writes the photo a plan describes into the library, as taken at
-// captureTime (Unix seconds). A plan that found the photo already there writes
-// nothing.
 func (s *Service) PhotoUpload(ctx context.Context, dc *Context, plan *PhotoPlan, captureTime int64, opts UploadOptions) error {
 	if plan.Duplicate != "" {
 		return nil
@@ -423,7 +367,6 @@ func (s *Service) PhotoUpload(ctx context.Context, dc *Context, plan *PhotoPlan,
 	return s.Upload(ctx, dc, plan.upload, r, opts)
 }
 
-// AlbumCreate creates a new (unlocked) photo album and returns its link ID.
 func (s *Service) AlbumCreate(ctx context.Context, dc *Context, name string) (string, error) {
 	root, rootKR, err := s.photosRoot(ctx, dc)
 	if err != nil {
@@ -473,11 +416,6 @@ func (s *Service) AlbumCreate(ctx context.Context, dc *Context, name string) (st
 	return r.Album.Link.LinkID, nil
 }
 
-// AlbumRename changes what an album is called.
-//
-// An album is a link in the photo volume, so it renames the way anything else
-// does: the new name encrypted to the volume root's key, and a hash of it so
-// Proton can refuse a name the root already holds without reading either.
 func (s *Service) AlbumRename(ctx context.Context, dc *Context, album Album, newName string) error {
 	root, rootKR, err := s.photosRoot(ctx, dc)
 	if err != nil {
@@ -509,10 +447,6 @@ func (s *Service) AlbumRename(ctx context.Context, dc *Context, album Album, new
 	return err
 }
 
-// AlbumAddPhotos adds existing timeline photos to an album. Each photo's node
-// passphrase and name are re-encrypted to the album's node key (the same
-// re-wrap used by Copy), and a fresh name hash is computed against the album's
-// hash key.
 func (s *Service) AlbumAddPhotos(ctx context.Context, dc *Context, albumLinkID string, photoLinkIDs []string) error {
 	_, rootKR, err := s.photosRoot(ctx, dc)
 	if err != nil {
@@ -530,8 +464,6 @@ func (s *Service) AlbumAddPhotos(ctx context.Context, dc *Context, albumLinkID s
 	if err != nil {
 		return err
 	}
-	// The album-add payload requires each photo's ContentHash; reuse the photo's
-	// existing one (the web client's documented fallback).
 	contentHashes := map[string]string{}
 	photos, err := s.PhotosList(ctx, dc, 0, false)
 	if err != nil {
@@ -577,8 +509,6 @@ func (s *Service) AlbumAddPhotos(ctx context.Context, dc *Context, albumLinkID s
 	}, nil)
 }
 
-// AlbumRemovePhotos removes photos from an album (the photos themselves remain
-// on the timeline).
 func (s *Service) AlbumRemovePhotos(ctx context.Context, dc *Context, albumLinkID string, linkIDs []string) error {
 	return s.C.Decode(ctx, proton.Request{
 		Method: "POST", Path: fmt.Sprintf("/drive/photos/volumes/%s/albums/%s/remove-multiple", dc.VolumeID, albumLinkID),
@@ -586,12 +516,6 @@ func (s *Service) AlbumRemovePhotos(ctx context.Context, dc *Context, albumLinkI
 	}, nil)
 }
 
-// PhotosDelete moves photos to the trash. When permanent is set, the photos are
-// then purged from it.
-//
-// A photo library is the largest collection an account has, so it goes through
-// the same batching every other bulk change does: the photo volume's trash is
-// the file tree's trash under another volume ID.
 func (s *Service) PhotosDelete(ctx context.Context, dc *Context, linkIDs []string, permanent bool) ([]Refused, error) {
 	if permanent {
 		return s.Delete(ctx, dc, removing(linkIDs))
@@ -599,8 +523,6 @@ func (s *Service) PhotosDelete(ctx context.Context, dc *Context, linkIDs []strin
 	return s.Trash(ctx, dc, linkIDs)
 }
 
-// AlbumDelete deletes an album. When deletePhotos is true the album's photos
-// are trashed too; otherwise they remain on the timeline.
 func (s *Service) AlbumDelete(ctx context.Context, dc *Context, albumLinkID string, deletePhotos bool) error {
 	q := url.Values{}
 	if deletePhotos {
@@ -614,7 +536,6 @@ func (s *Service) AlbumDelete(ctx context.Context, dc *Context, albumLinkID stri
 	}, nil)
 }
 
-// PhotoTagsRemove removes classification tags from a photo.
 func (s *Service) PhotoTagsRemove(ctx context.Context, dc *Context, linkID string, tags []int) error {
 	return s.C.Decode(ctx, proton.Request{
 		Method: "DELETE", Path: fmt.Sprintf("/drive/photos/volumes/%s/links/%s/tags", dc.VolumeID, linkID),
@@ -622,12 +543,6 @@ func (s *Service) PhotoTagsRemove(ctx context.Context, dc *Context, linkID strin
 	}, nil)
 }
 
-// PhotosFavorite marks photos as favorite (PhotoTag.Favorites). A photo already
-// in the timeline (parent == photos root) is tagged in place with an empty
-// body. A photo that lives only in an album is copied into the timeline first:
-// its name and node passphrase are re-encrypted to the photos root (along with
-// any related burst/live photos) and sent as PhotoData, mirroring the web
-// client's favorite-with-copy flow. It returns how many photos were copied.
 func (s *Service) PhotosFavorite(ctx context.Context, dc *Context, linkIDs []string) (copied int, err error) {
 	root, rootKR, err := s.photosRoot(ctx, dc)
 	if err != nil {
@@ -661,7 +576,6 @@ func (s *Service) PhotosFavorite(ctx context.Context, dc *Context, linkIDs []str
 	return copied, nil
 }
 
-// PhotosUnfavorite removes the Favorites tag from photos (DELETE .../tags).
 func (s *Service) PhotosUnfavorite(ctx context.Context, dc *Context, linkIDs []string) error {
 	for _, id := range linkIDs {
 		if err := s.PhotoTagsRemove(ctx, dc, id, []int{favoriteTag}); err != nil {
@@ -671,10 +585,6 @@ func (s *Service) PhotosUnfavorite(ctx context.Context, dc *Context, linkIDs []s
 	return nil
 }
 
-// buildFavoritePhotoData builds the PhotoData body that copies an album-only
-// photo (and any related burst/live photos) into the timeline while favoriting
-// it: each photo's name and node passphrase are re-encrypted from its current
-// parent to the photos root.
 func (s *Service) buildFavoritePhotoData(ctx context.Context, dc *Context, link *Link, rootKR *pgp.KeyRing, rootHashKey []byte) (map[string]any, error) {
 	main, err := s.favoriteMovedParams(ctx, dc, link, rootKR, rootHashKey)
 	if err != nil {
@@ -699,9 +609,6 @@ func (s *Service) buildFavoritePhotoData(ctx context.Context, dc *Context, link 
 	return map[string]any{"PhotoData": main}, nil
 }
 
-// favoriteMovedParams re-encrypts a single photo's name + node passphrase from
-// its current parent to the photos root and returns the fields the favorite
-// endpoint's PhotoData expects.
 func (s *Service) favoriteMovedParams(ctx context.Context, dc *Context, link *Link, rootKR *pgp.KeyRing, rootHashKey []byte) (map[string]any, error) {
 	parentKR, err := s.photoParentKR(ctx, dc, link, rootKR)
 	if err != nil {
@@ -733,9 +640,6 @@ func (s *Service) favoriteMovedParams(ctx context.Context, dc *Context, link *Li
 	}, nil
 }
 
-// photoParentKR returns the key ring that wraps a photo's node passphrase and
-// name: the photos-root key ring for a photo in the timeline, and the album's
-// for one that lives only in an album.
 func (s *Service) photoParentKR(ctx context.Context, dc *Context, link *Link, rootKR *pgp.KeyRing) (*pgp.KeyRing, error) {
 	albumID := heldBy(link, dc.RootLinkID)
 	if albumID == "" {
@@ -748,10 +652,6 @@ func (s *Service) photoParentKR(ctx context.Context, dc *Context, link *Link, ro
 	return album.NodeKR, nil
 }
 
-// photoContentHash returns the photo's content hash (HMAC of its SHA-1 digest
-// under the photos-root hash key, used for duplicate detection). It prefers the
-// value the API already stores on the revision, falling back to recomputing it
-// from the node's XAttr SHA-1 digest.
 func (s *Service) photoContentHash(link *Link, parentKR *pgp.KeyRing, rootHashKey []byte) (string, error) {
 	if link.FileProperties != nil && link.FileProperties.ActiveRevision.Photo.ContentHash != "" {
 		return link.FileProperties.ActiveRevision.Photo.ContentHash, nil
@@ -767,18 +667,11 @@ func (s *Service) photoContentHash(link *Link, parentKR *pgp.KeyRing, rootHashKe
 	return lookupHash(x.Common.Digests.SHA1, rootHashKey)
 }
 
-// AlbumSetCover chooses which of an album's photos represents it.
-//
-// The cover is a plain reference to a photo already in the album, so nothing is
-// re-encrypted and nothing moves: it is the album saying which of its own
-// children to show.
 func (s *Service) AlbumSetCover(ctx context.Context, dc *Context, albumLinkID, photoLinkID string) error {
 	photos, err := s.AlbumItems(ctx, dc, albumLinkID)
 	if err != nil {
 		return err
 	}
-	// A cover that is not in the album would be a reference the album cannot
-	// resolve, so it is refused here rather than stored and shown as a gap.
 	for _, p := range photos {
 		if p.LinkID == photoLinkID {
 			return s.C.Decode(ctx, proton.Request{

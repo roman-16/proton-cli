@@ -215,21 +215,28 @@ proton drive photos delete 5bH2mQxK
 
 ## `download`
 
-Download a photo.
+Download photos.
+
+Name the photos, or choose them with --album, --tag or --all. Each lands under its own name with the modification time it has in Drive.
 
 ```
-proton drive photos download REF
+proton drive photos download [REF...]
 ```
 
 ```bash
-proton drive photos download 5bH2mQxK --dest-dir .
+proton drive photos download 5bH2mQxK 9xL4pQrT --dest-dir holidays
+proton drive photos download --album Holidays --dest-dir holidays
+proton drive photos download --all --dest-dir photos
 ```
 
 | Flag | Description |
 | --- | --- |
+| `--album string` | Download what is in this album, by name or ID |
+| `--all` | Act on everything in scope, rather than a subset |
 | `--dest string` | Write to this path, or - for stdout |
 | `--dest-dir string` | Write into this directory, keeping each item's own name |
 | `--force` | Overwrite a file that already exists |
+| `--tag string` | Download the photos with this tag: favorites, screenshots, videos, live-photos, motion-photos, selfies, portraits, bursts, panoramas, raw |
 
 ## `favorite`
 

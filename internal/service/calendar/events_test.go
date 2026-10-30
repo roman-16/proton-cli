@@ -16,9 +16,6 @@ import (
 	"github.com/roman-16/proton-cli/internal/skip"
 )
 
-// windowDoer answers the events endpoint from a per-window fixture and records
-// which windows, spans and pages were asked for. A calendar named in failing
-// refuses every request, the way one deleted a moment ago does.
 type windowDoer struct {
 	mu      sync.Mutex
 	asked   []string
@@ -61,8 +58,6 @@ func (d *windowDoer) Decode(_ context.Context, r proton.Request, out any) error 
 	return json.Unmarshal(raw, out)
 }
 
-// someWindow is any window at all, for the tests that care about which queries the
-// endpoint is asked rather than about what falls in the range.
 func someWindow() ical.Window {
 	day := time.Date(2026, 8, 14, 0, 0, 0, 0, time.UTC)
 	return ical.Days(day, day)
@@ -76,7 +71,6 @@ func (d *windowDoer) askedFor() []string {
 	return out
 }
 
-// spansAsked are the distinct Start-End pairs the endpoint was asked for.
 func (d *windowDoer) spansAsked() []string {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -92,7 +86,6 @@ func (d *windowDoer) spansAsked() []string {
 	return out
 }
 
-// calendarOf is the calendar a request names.
 func calendarOf(r proton.Request) string {
 	return strings.TrimSuffix(strings.TrimPrefix(r.Path, "/calendar/v1/"), "/events")
 }
@@ -101,9 +94,6 @@ func rawJSON(id string) map[string]any {
 	return map[string]any{"ID": id, "CalendarID": "cal1", "UID": "uid-" + id, "SharedEvents": []any{}}
 }
 
-// opened is a service whose calendars are already unlocked, which is what lets a
-// test about reading them run without a key hierarchy. A calendar mapped to an
-// error is one whose keys will not open.
 func opened(d proton.Doer, calendars map[string]error) *Service {
 	s := New(d, testKeys(nil))
 	for id, err := range calendars {
@@ -117,10 +107,6 @@ func opened(d proton.Doer, calendars map[string]error) *Service {
 	return s
 }
 
-// Type is a two-by-two selector, not a kind of event. Asking only for the first
-// window hides every all-day event, and hides every recurring series whose first
-// occurrence is in the past - which is the only way a series reaches a later
-// window at all.
 func TestRawEventsBetweenAsksForAllFourWindows(t *testing.T) {
 	d := &windowDoer{byType: map[string][][]map[string]any{
 		"0": {{rawJSON("a")}},
@@ -142,8 +128,6 @@ func TestRawEventsBetweenAsksForAllFourWindows(t *testing.T) {
 	}
 }
 
-// An event can legitimately answer more than one window: a recurring series both
-// starts in the range and reaches into it.
 func TestRawEventsBetweenDeduplicatesAcrossWindows(t *testing.T) {
 	d := &windowDoer{byType: map[string][][]map[string]any{
 		"0": {{rawJSON("a")}},
@@ -158,8 +142,6 @@ func TestRawEventsBetweenDeduplicatesAcrossWindows(t *testing.T) {
 	}
 }
 
-// The endpoint caps a page and reports whether more follow. A single request keeps
-// whatever came back, so a busy window silently loses its tail.
 func TestRawEventsBetweenWalksEveryPage(t *testing.T) {
 	d := &windowDoer{byType: map[string][][]map[string]any{
 		"0": {{rawJSON("a")}, {rawJSON("b")}, {rawJSON("c")}},
@@ -178,9 +160,6 @@ func TestRawEventsBetweenWalksEveryPage(t *testing.T) {
 	}
 }
 
-// Proton refuses a range wider than it cares to answer, and a person asking about a
-// semester or a year has asked a fair question. The range is asked for a span at a
-// time, every span for all four windows, and the answers are one list.
 func TestRawEventsBetweenAsksEverySpanForAllFourWindows(t *testing.T) {
 	first := time.Date(2026, 9, 16, 0, 0, 0, 0, time.UTC)
 	w := ical.Days(first, first.AddDate(0, 0, 90))
@@ -213,9 +192,6 @@ func TestRawEventsBetweenAsksEverySpanForAllFourWindows(t *testing.T) {
 	}
 }
 
-// Consecutive spans meet, none is wider than the endpoint accepts, and together
-// they are exactly the bounds - so nothing between them goes unasked and nothing
-// outside them is asked for.
 func TestFetchSpansCoverTheBoundsInRangesTheEndpointAccepts(t *testing.T) {
 	first := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	w := ical.Days(first, first.AddDate(1, 0, 0))
@@ -240,9 +216,6 @@ func TestFetchSpansCoverTheBoundsInRangesTheEndpointAccepts(t *testing.T) {
 	}
 }
 
-// A listing that names no days covers the next thirty, and it pays four requests
-// rather than eight: the span is wide enough for the default window plus the day
-// either side of it.
 func TestFetchSpansAskForADefaultListingAtOnce(t *testing.T) {
 	first, last := DefaultDays()
 	if spans := fetchSpans(ical.Days(first, last)); len(spans) != 1 {
@@ -250,8 +223,6 @@ func TestFetchSpansAskForADefaultListingAtOnce(t *testing.T) {
 	}
 }
 
-// The endpoint refuses a negative timestamp and nothing is stored before the
-// epoch, so a window reaching back past it is asked for from the epoch on.
 func TestFetchBoundsStartNoEarlierThanTheEpoch(t *testing.T) {
 	last := time.Date(1970, 1, 10, 0, 0, 0, 0, time.UTC)
 	from, to := fetchBounds(ical.Days(time.Date(1969, 12, 20, 0, 0, 0, 0, time.UTC), last))
@@ -266,10 +237,6 @@ func TestFetchBoundsStartNoEarlierThanTheEpoch(t *testing.T) {
 	}
 }
 
-// The endpoint is asked for a day either side of the window. An all-day event names
-// a date rather than an instant, so Proton holds it at an instant up to a day from
-// the day it belongs to here, and the endpoint's own idea of which events touch the
-// edge of a range is not this CLI's.
 func TestFetchBoundsReachADayPastTheWindow(t *testing.T) {
 	first := time.Date(2026, 8, 14, 0, 0, 0, 0, time.UTC)
 	from, to := fetchBounds(ical.Days(first, first))
@@ -281,10 +248,6 @@ func TestFetchBoundsReachADayPastTheWindow(t *testing.T) {
 	}
 }
 
-// The list of calendars is eventually consistent, so one deleted a moment ago can
-// still be named. What the others hold is worth answering with - but a listing that
-// is short and says nothing is a wrong answer presented as a right one, so the
-// calendar left out is recorded.
 func TestReadCalendarsLeavesOutTheOneItCannotRead(t *testing.T) {
 	d := &windowDoer{
 		byType:  map[string][][]map[string]any{"0": {{rawJSON("a")}}},
@@ -311,9 +274,6 @@ func TestReadCalendarsLeavesOutTheOneItCannotRead(t *testing.T) {
 	}
 }
 
-// Only when nothing could be read at all is the failure the answer, which is what
-// makes a single named calendar strict. Every failure is recorded on the way, since
-// the run reports one of them and the log is where the others survive.
 func TestReadCalendarsIsStrictWhenNothingCouldBeRead(t *testing.T) {
 	first, second := errors.New("first is gone"), errors.New("second is gone")
 	d := &windowDoer{
@@ -335,8 +295,6 @@ func TestReadCalendarsIsStrictWhenNothingCouldBeRead(t *testing.T) {
 	}
 }
 
-// Which half failed is what the record says, so a report tells a calendar nobody
-// can open from one the server would not hand over.
 func TestReadCalendarsRecordsACalendarItCannotUnlock(t *testing.T) {
 	d := &windowDoer{byType: map[string][][]map[string]any{"0": {{rawJSON("a")}}}}
 	s := opened(d, map[string]error{"cal1": nil, "cal2": errors.New("the passphrase will not open")})
@@ -354,9 +312,6 @@ func TestReadCalendarsRecordsACalendarItCannotUnlock(t *testing.T) {
 	}
 }
 
-// Each calendar's events stay their own group: a series is expanded by UID, and the
-// same UID lives in two calendars whenever somebody holds both an invitation and
-// the organiser's shared copy.
 func TestReadCalendarsKeepsEachCalendarsEventsApart(t *testing.T) {
 	d := &windowDoer{byType: map[string][][]map[string]any{"0": {{rawJSON("a")}}}}
 	s := opened(d, map[string]error{"cal1": nil, "cal2": nil})
@@ -370,15 +325,13 @@ func TestReadCalendarsKeepsEachCalendarsEventsApart(t *testing.T) {
 	}
 }
 
-// An export leaves out an event it cannot decrypt, because a file is something
-// another client will trust. A file that is short says nothing about what is
-// missing from it, so the screen has to.
 func TestEventsExportRecordsAnEventItCannotRead(t *testing.T) {
 	d := &windowDoer{byType: map[string][][]map[string]any{"0": {{rawJSON("a"), rawJSON("b")}}}}
 	s := opened(d, map[string]error{"cal1": nil})
 	ctx, tally := skip.With(context.Background())
 
-	out, err := s.EventsExport(ctx, []string{"cal1"}, someWindow())
+	w := someWindow()
+	out, err := s.EventsExport(ctx, []string{"cal1"}, &w)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -393,10 +346,6 @@ func TestEventsExportRecordsAnEventItCannotRead(t *testing.T) {
 	}
 }
 
-// The times a row carries are read in the reader's own zone, because that is the
-// only frame in which an all-day event is on the day it says: read as an instant it
-// slips to the day before in every zone behind UTC, taking the date column, the
-// sort order and the machine output with it.
 func TestRowReadsAnAllDayEventInTheReadersZone(t *testing.T) {
 	loc, err := time.LoadLocation("America/New_York")
 	if err != nil {
@@ -419,8 +368,6 @@ func TestRowReadsAnAllDayEventInTheReadersZone(t *testing.T) {
 	}
 }
 
-// An event nobody can decrypt is still placed and still anchored, from the times
-// Proton keeps in the clear beside it.
 func TestRowPlacesAnEventItCannotRead(t *testing.T) {
 	at := atVienna(t, 4, 16, 9)
 	row := unreadableStored(at).row()
@@ -438,8 +385,6 @@ func TestRowPlacesAnEventItCannotRead(t *testing.T) {
 	}
 }
 
-// An event's colour is Proton's own cleartext field, so a row reports it whether
-// or not the content behind it could be read.
 func TestRowReportsTheColourTheEventCarries(t *testing.T) {
 	hex := "#179FD9"
 	day := time.Date(2026, 8, 14, 0, 0, 0, 0, time.UTC)
@@ -471,9 +416,6 @@ func contains(ss []string, want string) bool {
 }
 
 func TestNotificationsPreserveTheDifferenceBetweenNoneAndDefaults(t *testing.T) {
-	// Proton reads a null reminder list as "use the calendar's defaults" and an
-	// empty one as "no reminders", so a round trip has to keep them apart or an
-	// edit silently resets somebody's reminders.
 	var absent rawEvent
 	if got := absent.notifications(); got != nil {
 		t.Errorf("an event with no reminder list produced %v, want nil", got)
@@ -505,17 +447,8 @@ func TestBuildRemindersKeepsAnEmptyRequestDistinctFromNoRequest(t *testing.T) {
 	}
 }
 
-// A Proton attendee reads their copy of an event with the event's session key,
-// wrapped to their own. So the key that is wrapped has to be the key the event was
-// encrypted with, and the only way to guarantee that is to make the key once.
-//
-// This pins the property that makes the mistake impossible: working out who the
-// attendees are needs no session key at all, so nothing has to build the event's
-// cards in order to find out.
 func TestResolveAttendeesNeedsNoSessionKey(t *testing.T) {
 	d := &attendeeDoer{proton: map[string]bool{"alice@proton.me": true}}
-	// A service with no calendar keys: anything that tried to build the event's
-	// cards here would have nothing to build them with.
 	s := New(d, testKeys(nil))
 
 	atts, clear, keys, external, err := s.resolveAttendees(context.Background(), "uid-1",
@@ -539,7 +472,6 @@ func TestResolveAttendeesNeedsNoSessionKey(t *testing.T) {
 	}
 }
 
-// attendeeDoer answers the canonical-address and public-key endpoints.
 type attendeeDoer struct{ proton map[string]bool }
 
 func (d *attendeeDoer) Do(context.Context, proton.Request) (*proton.Response, error) {
@@ -568,8 +500,6 @@ func (d *attendeeDoer) Decode(_ context.Context, r proton.Request, out any) erro
 	return json.Unmarshal(body, out)
 }
 
-// testPublicKey is a throwaway key, so a fake can answer the public-key endpoint
-// the way Proton does for an address that has an account.
 const testPublicKey = `-----BEGIN PGP PUBLIC KEY BLOCK-----
 Comment: https://gopenpgp.org
 Version: GopenPGP 2.10.0

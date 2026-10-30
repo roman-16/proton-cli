@@ -4,11 +4,13 @@ Your Proton account, its settings and your session.
 
 Every command under `proton account`, with the arguments and flags it takes. For these commands in use, see [the account guide](README.md).
 
-Holds `breaches`, `delete`, `get`, `keys`, `login`, `logout`, `profiles`, `security-log`, `sessions` and `settings`.
+Holds `breaches`, `delete`, `export`, `get`, `keys`, `login`, `logout`, `profiles`, `security-log`, `sessions` and `settings`.
 
 ## `delete`
 
 Delete the account and everything in it: every address, message, contact, event, file and password. It cannot be reactivated.
+
+`proton account export` keeps a copy of everything first.
 
 Proton may refuse before anything is asked. Otherwise you confirm, then give your password. A member of a family or duo plan leaves the plan first.
 
@@ -32,6 +34,31 @@ proton account delete --reason other --message 'Checking the preview' --dry-run
 | `--password-file string` | Read the account password from a file, or - for stdin |
 | `--reason string` | The main reason you are leaving: different-account, too-expensive, missing-feature, other-service, merge, other |
 | `--totp string` | Two-factor code |
+
+## `export`
+
+Write a copy of the account to a directory.
+
+Name the apps to export, or none for all of them: calendar, contacts, drive, mail and pass. The directory has to be new, empty, or one this command wrote before.
+
+Run it again into the same directory to continue a run that stopped, or later to bring the copy up to date. Only what is missing or changed is fetched, and nothing is removed from the copy.
+
+Everything is written decrypted. Only the Pass archive can be locked, with --passphrase-file.
+
+```
+proton account export [APP...]
+```
+
+```bash
+proton account export --dest-dir ~/proton-backup
+proton account export mail drive --dest-dir ~/proton-backup
+proton account export --dest-dir ~/proton-backup --dry-run
+```
+
+| Flag | Description |
+| --- | --- |
+| `--dest-dir string` | Directory to keep the copy in |
+| `--passphrase-file string` | Read the passphrase that locks the file from a file, or - for stdin |
 
 ## `get`
 

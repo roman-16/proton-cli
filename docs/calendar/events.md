@@ -74,7 +74,7 @@ proton calendar events delete 4f2a1b9c@2026-05-04T09:00 --onwards
 
 Write events out as an .ics file.
 
-With neither --after nor --before it covers the next 30 days, starting today. With one of them, it covers the 30 days starting or ending there.
+With neither --after nor --before it covers the next 30 days, starting today. With one of them, it covers the 30 days starting or ending there. --all covers every event, whenever it is.
 
 A recurring series is written once, with its rule, so another client reads it back as the same series.
 
@@ -85,11 +85,13 @@ proton calendar events export
 ```bash
 proton calendar events export --after 2026-01-01 --before 2026-12-31 --dest year.ics
 proton calendar events export --calendar Work --dest - > work.ics
+proton calendar events export --calendar Work --all --dest-dir .
 ```
 
 | Flag | Description |
 | --- | --- |
 | `--after string` | First day to include (YYYY-MM-DD) |
+| `--all` | Act on everything in scope, rather than a subset |
 | `--before string` | Last day to include (YYYY-MM-DD) |
 | `--calendar string` | Which calendar, by name or ID (default: all of them) |
 | `--dest string` | Write to this path, or - for stdout |

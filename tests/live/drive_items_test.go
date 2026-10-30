@@ -17,14 +17,6 @@ import (
 	"github.com/roman-16/proton-cli/tests/account"
 )
 
-// Items: the tree, the bytes, and what happens when a name is already taken.
-//
-// Drive addresses an item by PATH, because that is what Proton resolves and what
-// a person means. An item with no place in the tree is addressed by the REF its
-// listing showed.
-
-// A table draws no header when it has no rows, so the listing needs something
-// to list rather than whatever another test happened to leave behind.
 func TestDriveItemsList(t *testing.T) {
 	folder := "/" + testID() + "-list"
 	runOK(t, "drive", "items", "create", folder)
@@ -68,8 +60,6 @@ func TestDriveItemsInfo(t *testing.T) {
 	if sz, _ := info["size_bytes"].(float64); sz <= 0 {
 		t.Errorf("size_bytes = %v, want > 0", info["size_bytes"])
 	}
-	// An upload is typed by its name, so what other clients show of it is what
-	// it is rather than an unknown blob.
 	if info["mime_type"] != "application/pdf" {
 		t.Errorf("mime_type = %v, want application/pdf", info["mime_type"])
 	}
@@ -80,7 +70,6 @@ func TestDriveItemsInfo(t *testing.T) {
 		t.Errorf("signature = %v, want verified (we uploaded it)", info["signature"])
 	}
 
-	// Text mode renders the key/value block.
 	text := runOK(t, "drive", "items", "get", folder+"/doc.pdf")
 	assertContains(t, text, "Type:")
 	assertContains(t, text, "Size:")
@@ -133,7 +122,6 @@ func TestDriveItemsUploadFromStdin(t *testing.T) {
 		t.Fatalf("stdin upload failed (exit %d): %s", code, truncateOutput(stderr))
 	}
 
-	// Find the uploaded file (name is stdin-<ts>)
 	children := runJSONArray(t, "drive", "items", "list", folder)
 	if len(children) != 1 {
 		t.Fatalf("expected 1 child after stdin upload, got %d", len(children))
@@ -143,15 +131,12 @@ func TestDriveItemsUploadFromStdin(t *testing.T) {
 		t.Errorf("expected name to start with stdin-, got %q", name)
 	}
 
-	// Download back via explicit "-" (stdout capture)
 	stdout := runOK(t, "drive", "items", "download", folder+"/"+name, "--dest", "-")
 	if !strings.Contains(stdout, "piped payload") {
 		t.Errorf("stdout download mismatch: %q", stdout)
 	}
 }
 
-// A stdin DEST whose last segment isn't an existing folder names the new file:
-// the basename becomes the file name and its parent is the target folder.
 func TestDriveItemsUploadFromStdinNamed(t *testing.T) {
 	folder := "/" + testID() + "-stdin-named"
 	runOK(t, "drive", "items", "create", folder)
@@ -178,8 +163,6 @@ func TestDriveItemsUploadFromStdinNamed(t *testing.T) {
 	}
 }
 
-// A stdin upload under a non-existent parent fails as not-found (exit 3) and
-// names the missing folder segment, never the intended filename.
 func TestDriveItemsUploadFromStdinMissingParent(t *testing.T) {
 	missing := testID() + "-nope"
 	_, stderr, code := runWithStdin(t, strings.NewReader("x\n"),
@@ -195,10 +178,6 @@ func TestDriveItemsUploadFromStdinMissingParent(t *testing.T) {
 	}
 }
 
-// TestDriveItemsDownloadBehaviors exercises the three download-destination
-// behaviors (refuse-on-collision, --force overwrite, stdout default) against a
-// single folder + uploads created once, rather than one folder+upload per
-// behavior. Subtests keep per-behavior reporting.
 func TestDriveItemsDownloadBehaviors(t *testing.T) {
 	folder := "/" + testID() + "-dl"
 	tmp := t.TempDir()
@@ -254,11 +233,6 @@ func TestDriveItemsDownloadBehaviors(t *testing.T) {
 	})
 }
 
-// A folder comes back the way it went up: the same tree, the same bytes.
-//
-// Downloading one is not something a `download` of a file can be asked to do
-// by accident, so the refusal without --recursive is half the test - it is
-// what says a mistyped path cannot start a download of somebody's whole drive.
 func TestDriveItemsDownloadsAFolder(t *testing.T) {
 	folder := "/" + testID() + "-dltree"
 	tmp := t.TempDir()
@@ -337,7 +311,7 @@ func TestDriveItemsUploadMultiBlock(t *testing.T) {
 	folder := "/" + testID() + "-big"
 	tmp := t.TempDir()
 	src := filepath.Join(tmp, "big.bin")
-	big := make([]byte, 8*1024*1024) // 8 MB → two 4 MB blocks
+	big := make([]byte, 8*1024*1024)
 	if _, err := io.ReadFull(rand.Reader, big); err != nil {
 		t.Fatal(err)
 	}
@@ -362,15 +336,11 @@ func TestDriveItemsUploadMultiBlock(t *testing.T) {
 	}
 }
 
-// TestDriveItemsUploadManyBlocks crosses the upload link-batch boundary (11
-// blocks > the 10-per-batch request size) so the streaming uploader has to
-// request links in multiple batches and upload blocks in parallel; the sha256
-// round-trip proves block ordering survives the concurrency.
 func TestDriveItemsUploadManyBlocks(t *testing.T) {
 	folder := "/" + testID() + "-many"
 	tmp := t.TempDir()
 	src := filepath.Join(tmp, "many.bin")
-	big := make([]byte, 11*4*1024*1024) // 44 MiB -> 11 x 4 MiB blocks
+	big := make([]byte, 11*4*1024*1024)
 	if _, err := io.ReadFull(rand.Reader, big); err != nil {
 		t.Fatal(err)
 	}
@@ -417,7 +387,6 @@ func TestDriveItemsRename(t *testing.T) {
 		t.Error("expected new.txt after rename")
 	}
 
-	// Decryption round-trip after rename
 	out := filepath.Join(tmp, "after.txt")
 	runOK(t, "drive", "items", "download", folder+"/new.txt", "--dest", out)
 	if b, _ := os.ReadFile(out); string(b) != "renameme" {
@@ -452,7 +421,6 @@ func TestDriveItemsMove(t *testing.T) {
 		t.Error("expected f.txt in dst after move")
 	}
 
-	// Re-encryption round-trip after move
 	out := filepath.Join(tmp, "after.txt")
 	runOK(t, "drive", "items", "download", dst+"/f.txt", "--dest", out)
 	if b, _ := os.ReadFile(out); string(b) != "moveme" {
@@ -460,9 +428,6 @@ func TestDriveItemsMove(t *testing.T) {
 	}
 }
 
-// The three answers to a name that is taken, and the refusal when none is given.
-// Each is its own upload path, and replacing is the only way this CLI can make a
-// file have a history at all.
 func TestDriveItemsUploadRefusesADuplicate(t *testing.T) {
 	folder, src := uploadedTwice(t, "first")
 
@@ -494,16 +459,12 @@ func TestDriveItemsUploadIfExistsRenameKeepsBoth(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Which name is free is a question rather than a change, so a preview may ask
-	// it - and then promises the name the file will really land under.
 	_, preview := runOKStderr(t, "drive", "items", "upload", "--if-exists", "rename", "--dry-run", src, folder)
 	assertContains(t, preview, "would upload")
 	assertContains(t, preview, "note (1).txt")
 
 	_, stderr := runOKStderr(t, "drive", "items", "upload", "--if-exists", "rename", src, folder)
 
-	// The number goes before the extension, in brackets, after a space - the same
-	// name Proton's own client gives the copy it keeps.
 	assertContains(t, stderr, "note (1).txt")
 	assertReads(t, folder+"/note.txt", "first")
 	assertReads(t, folder+"/note (1).txt", "second")
@@ -535,16 +496,12 @@ func TestDriveItemsUploadIfExistsReplaceKeepsHistory(t *testing.T) {
 	}
 
 	runOK(t, "drive", "items", "revisions", "restore", folder+"/note.txt", earlier)
-	// Proton answers a restore with "accepted" and carries it out in the
-	// background, so the earlier contents come back a moment later.
 	waitFor(30*time.Second, 2*time.Second, func() bool {
 		return reads(t, folder+"/note.txt") == "first"
 	})
 	assertReads(t, folder+"/note.txt", "first")
 }
 
-// Wanting an old version's bytes is not wanting them back in place, so reading
-// one leaves the file alone.
 func TestDriveRevisionsDownloadLeavesTheFileAlone(t *testing.T) {
 	folder, path, earlier := fileWithHistory(t)
 
@@ -558,8 +515,6 @@ func TestDriveRevisionsDownloadLeavesTheFileAlone(t *testing.T) {
 	if string(got) != "first" {
 		t.Errorf("the earlier revision reads %q, want %q", got, "first")
 	}
-	// The date is what tells two versions of one file apart, so the confirmation
-	// says which one arrived rather than only the name they share.
 	assertContains(t, stderr, "as it was on")
 	assertReads(t, folder+"/note.txt", "second")
 }
@@ -576,9 +531,6 @@ func TestDriveRevisionsDeleteDropsOneVersion(t *testing.T) {
 	assertReads(t, path, "second")
 }
 
-// The current version is what the file is made of, so neither command that acts
-// on history will touch it: restoring it is nothing, and deleting it is deleting
-// the file, which is a different command.
 func TestDriveRevisionsRefuseTheCurrentVersion(t *testing.T) {
 	_, path, _ := fileWithHistory(t)
 	current := currentRevision(t, path)
@@ -596,8 +548,6 @@ func TestDriveRevisionsRefuseTheCurrentVersion(t *testing.T) {
 	assertContains(t, stderr, "already at")
 }
 
-// A revision nobody can find is an unfound reference like any other, which the
-// CLI answers with exit 3 rather than passing the string to Proton.
 func TestDriveRevisionsUnknownReferenceExitsNotFound(t *testing.T) {
 	_, path, _ := fileWithHistory(t)
 
@@ -607,8 +557,6 @@ func TestDriveRevisionsUnknownReferenceExitsNotFound(t *testing.T) {
 	}
 }
 
-// fileWithHistory makes a file with two versions, and hands back the folder, the
-// file, and the ID of the version that was superseded.
 func fileWithHistory(t *testing.T) (folder, path, earlier string) {
 	t.Helper()
 	folder, src := uploadedTwice(t, "first")
@@ -643,8 +591,6 @@ func currentRevision(t *testing.T, path string) string {
 	return ""
 }
 
-// uploadedTwice makes a folder holding note.txt, and hands back the folder and a
-// local file of the same name to upload over it.
 func uploadedTwice(t *testing.T, content string) (folder, src string) {
 	t.Helper()
 	folder = "/" + testID() + "-conflict"
@@ -660,7 +606,6 @@ func uploadedTwice(t *testing.T, content string) (folder, src string) {
 	return folder, src
 }
 
-// reads downloads a file and hands back what it holds.
 func reads(t *testing.T, path string) string {
 	t.Helper()
 	out := filepath.Join(t.TempDir(), "downloaded")
@@ -679,9 +624,6 @@ func assertReads(t *testing.T, path, want string) {
 	}
 }
 
-// A tree is one thing with one name, so the answer is about the folder it lands
-// in rather than about each file: it merges into what is there, moves aside
-// whole, or is not written at all.
 func TestDriveItemsUploadTreeIfExistsReplaceMerges(t *testing.T) {
 	dest, local := uploadedTree(t)
 	writeLocal(t, filepath.Join(local, "a.txt"), "second")
@@ -719,8 +661,6 @@ func TestDriveItemsUploadTreeIfExistsSkipWritesNothing(t *testing.T) {
 	}
 }
 
-// A file and a folder cannot take each other's place, so no answer reaches this
-// one - and the refusal has to come before any of the tree is written.
 func TestDriveItemsUploadTreeRefusesAFileWhereAFolderGoes(t *testing.T) {
 	dest := "/" + testID() + "-mismatch"
 	runOK(t, "drive", "items", "create", dest)
@@ -744,8 +684,6 @@ func TestDriveItemsUploadTreeRefusesAFileWhereAFolderGoes(t *testing.T) {
 	}
 }
 
-// uploadedTree puts a small tree in Drive and hands back the folder it went into
-// and the local directory it came from.
 func uploadedTree(t *testing.T) (dest, local string) {
 	t.Helper()
 	dest = "/" + testID() + "-tree"
@@ -805,14 +743,6 @@ func TestDriveBatchDeletePatternDryRun(t *testing.T) {
 	assertNotContains(t, stderr, "keep.txt")
 }
 
-// Deleting is permanent, so it is confirmed rather than assumed - and never more
-// so than with --all, which covers the whole drive. A test is not a terminal, so
-// the only way through is --yes, and its absence has to stop the command rather
-// than hang it.
-//
-// This one runs without --yes on purpose. Nothing else in the suite does, and if
-// the guard ever stopped working this is the test standing between a stray --all
-// and the account's entire Drive.
 func TestDriveBatchDeleteAllNeedsConfirming(t *testing.T) {
 	_, stderr, code := run(t, "drive", "items", "delete", "--all")
 	if code != 1 {
@@ -842,8 +772,6 @@ func TestDriveFoldersCreate(t *testing.T) {
 	}
 }
 
-// A path names every folder along it, so naming one that is three deep makes
-// three, and says so rather than reporting the one that was typed.
 func TestDriveFoldersCreateMakesTheFoldersAboveIt(t *testing.T) {
 	top := "/" + testID() + "-nested"
 	deep := top + "/season/episode"
@@ -855,8 +783,6 @@ func TestDriveFoldersCreateMakesTheFoldersAboveIt(t *testing.T) {
 	assertContains(t, runOK(t, "drive", "items", "list", top+"/season"), "episode")
 }
 
-// The folder asked for is the one thing the command does not make twice: it is
-// what was named, and a name Drive already holds is a conflict, not a no-op.
 func TestDriveFoldersCreateRefusesANameAlreadyThere(t *testing.T) {
 	folder := "/" + testID() + "-taken"
 	runOK(t, "drive", "items", "create", folder)
@@ -928,10 +854,6 @@ func TestDriveSettingsSetListsKeys(t *testing.T) {
 	assertContains(t, stdout, "version-history")
 }
 
-// A report is previewed rather than sent: a person at Proton reads every one, so
-// the suite proves everything a report resolves - the share, the item, the
-// version - and stops short of filing it. Earlier versions are open to editors
-// alone, so the share allows editing.
 func TestDriveItemsAbuseInSomethingSharedWithYou(t *testing.T) {
 	folder := "/" + testID() + "-abuse"
 	runOK(t, "drive", "items", "create", folder)
@@ -959,7 +881,6 @@ func TestDriveItemsAbuseInSomethingSharedWithYou(t *testing.T) {
 	assertContains(t, stderr, "of invoice.txt to Proton as copyright infringement.")
 }
 
-// A link is reported by whoever holds it, with no membership of anything.
 func TestDriveItemsAbuseInALink(t *testing.T) {
 	_, url := sharedLink(t, "abuselink", "link-payload")
 
@@ -967,4 +888,53 @@ func TestDriveItemsAbuseInALink(t *testing.T) {
 		"--link", url, "--category", "spam", "--good-faith", "/payload.txt")
 
 	assertContains(t, stderr, "Dry run - would report payload.txt to Proton as spam.")
+}
+
+func TestDriveItemsDownloadingAFolderAgainContinues(t *testing.T) {
+	folder := "/" + testID() + "-again"
+	tree := filepath.Join(t.TempDir(), "tree")
+	if err := os.MkdirAll(filepath.Join(tree, "sub"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	stamped := time.Date(2026, 3, 12, 9, 41, 0, 0, time.UTC)
+	for name, content := range map[string]string{"a.txt": "A", "sub/b.txt": "B"} {
+		path := filepath.Join(tree, filepath.FromSlash(name))
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chtimes(path, stamped, stamped); err != nil {
+			t.Fatal(err)
+		}
+	}
+	runOK(t, "drive", "items", "create", folder)
+	cleanupRun(t, fmt.Sprintf("Delete folder: proton drive items delete %s", folder),
+		"drive", "items", "delete", folder)
+	runOK(t, "drive", "items", "upload", "--recursive", tree, folder)
+
+	into := t.TempDir()
+	runOK(t, "drive", "items", "download", "--recursive", "--dest-dir", into, folder+"/tree")
+	landed := filepath.Join(into, "tree", "a.txt")
+	fi, err := os.Stat(landed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gap := fi.ModTime().Sub(stamped); gap > 2*time.Second || gap < -2*time.Second {
+		t.Errorf("the download is stamped %v, want the %v it has in Drive", fi.ModTime(), stamped)
+	}
+
+	_, stderr := runOKStderr(t, "drive", "items", "download", "--recursive", "--dest-dir", into, folder+"/tree")
+	assertContains(t, stderr, "2 files are already there and unchanged")
+
+	if err := os.WriteFile(landed, []byte("changed here"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, stderr, code := run(t, "drive", "items", "download", "--recursive", "--dest-dir", into, folder+"/tree")
+	if code != 1 {
+		t.Errorf("exit %d, want 1 for a file that differs", code)
+	}
+	assertContains(t, stderr, "differ from the ones in Drive")
+	runOK(t, "drive", "items", "download", "--recursive", "--force", "--dest-dir", into, folder+"/tree")
+	if got, err := os.ReadFile(landed); err != nil || string(got) != "A" {
+		t.Errorf("--force left %q, %v", got, err)
+	}
 }

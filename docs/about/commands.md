@@ -11,6 +11,7 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | Command | What it does |
 | --- | --- |
 | [`proton account delete`](../account/account.md#delete) | Delete the account and everything in it |
+| [`proton account export`](../account/account.md#export) | Write a copy of the account to a directory |
 | [`proton account get`](../account/account.md#get) | Show the account, its storage and this machine's session |
 | [`proton account login`](../account/account.md#login) | Sign in and save the session for this profile |
 | [`proton account logout`](../account/account.md#logout) | Discard the saved session for this profile |
@@ -191,7 +192,7 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton drive photos albums share update`](../drive/photos.md#albums-share-update) | Change what somebody may do with an album |
 | [`proton drive photos albums update`](../drive/photos.md#albums-update) | Rename an album, or change its cover |
 | [`proton drive photos delete`](../drive/photos.md#delete) | Delete photos permanently |
-| [`proton drive photos download`](../drive/photos.md#download) | Download a photo |
+| [`proton drive photos download`](../drive/photos.md#download) | Download photos |
 | [`proton drive photos favorite`](../drive/photos.md#favorite) | Mark photos as favourites |
 | [`proton drive photos links create`](../drive/photos.md#links-create) | Make a link that opens a photo for anyone |
 | [`proton drive photos links get`](../drive/photos.md#links-get) | Show the link on a photo, URL and all |

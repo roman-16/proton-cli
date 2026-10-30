@@ -27,6 +27,7 @@ func deleteCmd() *cobra.Command {
 		Short: "Delete the account and everything in it",
 		Long: "Delete the account and everything in it: every address, message, contact,\n" +
 			"event, file and password. It cannot be reactivated.\n\n" +
+			"`" + kit.Program + " account export` keeps a copy of everything first.\n\n" +
 			"Proton may refuse before anything is asked. Otherwise you confirm, then give\n" +
 			"your password. A member of a family or duo plan leaves the plan first.\n\n" +
 			"--message says in at least ten characters why you are leaving, and is left\n" +

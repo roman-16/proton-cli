@@ -11,11 +11,6 @@ import (
 	"time"
 )
 
-// The photo library, which is a share of its own rather than part of the tree.
-//
-// A photo has no name in a listing, so a test finds the one it uploaded by what
-// the upload added - which is why there is one helper for putting one there.
-
 func writePNG(t *testing.T, path string) {
 	t.Helper()
 	f, err := os.Create(path)
@@ -28,21 +23,12 @@ func writePNG(t *testing.T, path string) {
 	}
 }
 
-// uploadedPhoto puts a photo in the library and hands back the ID it landed
-// under, registering the cleanup that removes it again.
-//
-// A photo has no name in a listing, so what the upload added is the only way to
-// tell it from the rest - which is why this is one helper rather than the same
-// twenty lines in every test. Uploading is also what bootstraps the library, so
-// nothing has to check whether the account has one first.
 func uploadedPhoto(t *testing.T) string {
 	t.Helper()
 	id, _ := uploadedPhotoNamed(t, testID()+".png")
 	return id
 }
 
-// uploadedPhotoNamed is uploadedPhoto under a name of the test's choosing, and
-// hands back the file it uploaded as well, for a test about uploading it again.
 func uploadedPhotoNamed(t *testing.T, name string) (id, path string) {
 	t.Helper()
 	before := photoLinkIDs(t)
@@ -68,9 +54,6 @@ func uploadedPhotoNamed(t *testing.T, name string) (id, path string) {
 	return photoID, img
 }
 
-// A photo the library already holds is not uploaded again, and saying so names
-// the photo it already is. The name carries capitals, which is how a camera
-// names a file.
 func TestDrivePhotosUploadLeavesAPhotoTheLibraryHoldsAlone(t *testing.T) {
 	photoID, img := uploadedPhotoNamed(t, testID()+"-IMG.PNG")
 	held := photoLinkIDs(t)
@@ -96,8 +79,6 @@ func TestDrivePhotosUploadLeavesAPhotoTheLibraryHoldsAlone(t *testing.T) {
 	}
 }
 
-// A photo of the same name with other content is a different photo, and the
-// library holds both: cameras reuse names.
 func TestDrivePhotosUploadKeepsADifferentPhotoOfTheSameName(t *testing.T) {
 	firstID, img := uploadedPhotoNamed(t, testID()+"-IMG.PNG")
 	held := photoLinkIDs(t)
@@ -133,11 +114,6 @@ func TestDrivePhotosUploadKeepsADifferentPhotoOfTheSameName(t *testing.T) {
 	}
 }
 
-// createdAlbum makes an album and hands back the ID it landed under,
-// registering the cleanup that removes it again.
-//
-// An album is found the way a photo is, by what the creation added: the listing
-// is the only thing that says which album is which.
 func createdAlbum(t *testing.T, name string) string {
 	t.Helper()
 	before := map[string]bool{}
@@ -181,8 +157,6 @@ func TestDrivePhotosWriteLifecycle(t *testing.T) {
 	photoID := uploadedPhoto(t)
 	dir := t.TempDir()
 
-	// A photo comes back as a named file or into a directory, and both have to
-	// write something.
 	outFile := filepath.Join(dir, "photo.out")
 	runOK(t, "drive", "photos", "download", "--dest", outFile, photoID)
 	if fi, err := os.Stat(outFile); err != nil || fi.Size() == 0 {
@@ -196,7 +170,6 @@ func TestDrivePhotosWriteLifecycle(t *testing.T) {
 
 	albumID := createdAlbum(t, testID()+"-album")
 
-	// Add the photo to the album (node-passphrase re-wrap), verify, remove.
 	runOK(t, "drive", "photos", "albums", "add", albumID, photoID)
 	found := false
 	for _, it := range runJSONArray(t, "drive", "photos", "list", "--album", albumID) {
@@ -220,8 +193,6 @@ func photoInFavorites(t *testing.T, photoID string) bool {
 	return false
 }
 
-// favoritePhotoTags returns the tag names JSON-listed for a favorited photo,
-// proving tags surface as names (e.g. "favorites") rather than raw ints.
 func favoritePhotoTags(t *testing.T, photoID string) []string {
 	t.Helper()
 	for _, p := range runJSONArray(t, "drive", "photos", "list", "--tag", "favorites") {
@@ -241,8 +212,6 @@ func favoritePhotoTags(t *testing.T, photoID string) []string {
 	return nil
 }
 
-// Trashing a photo takes it out of the timeline; deleting it is permanent and
-// is what clears up afterwards.
 func TestDrivePhotosTrash(t *testing.T) {
 	photoID := uploadedPhoto(t)
 
@@ -276,19 +245,16 @@ func TestDrivePhotosFavoriteRoundTrip(t *testing.T) {
 	cleanupRun(t, fmt.Sprintf("Delete photo: proton drive photos delete %s", photoID),
 		"drive", "photos", "delete", "--", photoID)
 
-	// --dry-run must not favorite.
 	_, stderr := runOKStderr(t, "--dry-run", "drive", "photos", "favorite", "--", photoID)
 	assertContains(t, stderr, "Dry run")
 	if photoInFavorites(t, photoID) {
 		t.Error("dry-run favorite should not actually favorite the photo")
 	}
 
-	// A freshly uploaded timeline photo is favorited in place (empty body).
 	runOK(t, "drive", "photos", "favorite", "--", photoID)
 	if !waitFor(20*time.Second, 1*time.Second, func() bool { return photoInFavorites(t, photoID) }) {
 		t.Error("photo did not appear under --tags favorites after favorite")
 	}
-	// Tags are surfaced by name, never as raw ints.
 	tags := favoritePhotoTags(t, photoID)
 	hasFav := false
 	for _, tg := range tags {
@@ -299,13 +265,11 @@ func TestDrivePhotosFavoriteRoundTrip(t *testing.T) {
 	if !hasFav {
 		t.Errorf("favorited photo tags = %v, want to contain the name \"favorites\"", tags)
 	}
-	// Text mode (forced TTY) also renders the tag name, never a raw int.
 	ttyOut, _, _ := runWithEnv(t, map[string]string{"PROTON_CLI_FORCE_TTY": "1"}, "drive", "photos", "list", "--tag", "favorites")
 	if !strings.Contains(ttyOut, "favorites") {
 		t.Errorf("text-mode list --tags favorites should show the 'favorites' tag name; got:\n%s", truncateOutput(ttyOut))
 	}
 
-	// --dry-run must not unfavorite either.
 	_, stderr = runOKStderr(t, "--dry-run", "drive", "photos", "unfavorite", "--", photoID)
 	assertContains(t, stderr, "Dry run")
 	if !photoInFavorites(t, photoID) {
@@ -318,30 +282,21 @@ func TestDrivePhotosFavoriteRoundTrip(t *testing.T) {
 	}
 }
 
-// Which tag names exist is judged from the command line, so that is asserted in
-// the offline suite. What is left here is that a name Proton knows actually
-// filters against the library.
 func TestDrivePhotosListTags(t *testing.T) {
 	uploadedPhoto(t)
 	runOK(t, "drive", "photos", "list", "--tag", "videos")
 }
 
-// An album's cover is which of its own photos represents it, so a photo that is
-// not in the album is refused rather than stored as a reference nothing resolves.
 func TestDrivePhotoAlbumCover(t *testing.T) {
 	name := testID() + "-cover"
 	albumID := strings.TrimSpace(runOK(t, "drive", "photos", "albums", "create", "--name", name))
 	cleanupRun(t, fmt.Sprintf("Delete album: proton drive photos albums delete %s", albumID),
 		"drive", "photos", "albums", "delete", "--", albumID)
 
-	// A photo of this test's own, so the cover is something it made rather than
-	// whichever of the library's the listing happened to put first.
 	photoID := uploadedPhoto(t)
 	runOK(t, "drive", "photos", "albums", "add", albumID, photoID)
 	runOK(t, "drive", "photos", "albums", "update", "--cover", photoID, "--", albumID)
 
-	// A photo outside the album cannot represent it, so the reference is refused
-	// rather than stored as one nothing resolves.
 	_, stderr, code := run(t, "drive", "photos", "albums", "update",
 		"--cover", "notaphoto", "--", albumID)
 	if code == 0 {
@@ -352,15 +307,6 @@ func TestDrivePhotoAlbumCover(t *testing.T) {
 	}
 }
 
-// ── sharing ──
-//
-// An album is shared with people and a photo either way, so what is asserted
-// here is the half the file tree's tests cannot: that Proton takes a share on
-// the photo volume, that an album arrives at the other account as an album, and
-// that the photos inside it can be read there.
-
-// TestDriveAlbumShareMemberRoundTrip invites a real Proton address to an album,
-// changes what it may do, and withdraws it again.
 func TestDriveAlbumShareMemberRoundTrip(t *testing.T) {
 	invitee := secondaryEmail()
 	albumID := createdAlbum(t, testID()+"-shared-album")
@@ -383,8 +329,6 @@ func TestDriveAlbumShareMemberRoundTrip(t *testing.T) {
 	assertNotContains(t, after, invitee)
 }
 
-// TestDriveAlbumSharedWithAnotherAccount follows an album the whole way: the
-// second account is invited, accepts, and reads the photos the album holds.
 func TestDriveAlbumSharedWithAnotherAccount(t *testing.T) {
 	invitee := secondaryEmail()
 	albumName := testID() + "-album-rt"
@@ -396,8 +340,6 @@ func TestDriveAlbumSharedWithAnotherAccount(t *testing.T) {
 	cleanupRun(t, fmt.Sprintf("Revoke member: proton drive photos albums share remove %s %s", albumID, invitee),
 		"drive", "photos", "albums", "share", "remove", "--", albumID, invitee)
 
-	// What is on offer says which thing it is, which is the whole use of a
-	// listing of invitations.
 	var offer map[string]interface{}
 	waitFor(45*time.Second, 3*time.Second, func() bool {
 		for _, i := range runJSONArraySecondary(t, "drive", "invitations", "list") {
@@ -438,8 +380,6 @@ func TestDriveAlbumSharedWithAnotherAccount(t *testing.T) {
 		t.Errorf("shared album type: got %q want album", got)
 	}
 
-	// The album opens like anything else shared, and the photos in it are what
-	// is inside it.
 	ref := shared["link_id"].(string)
 	inside := runJSONArraySecondary(t, "drive", "items", "list", "--shared", ref, "/")
 	if len(inside) == 0 {
@@ -456,7 +396,6 @@ func TestDriveAlbumSharedWithAnotherAccount(t *testing.T) {
 	}
 }
 
-// A photo is handed to somebody by address the way anything else is.
 func TestDrivePhotoSharedWithAnAddress(t *testing.T) {
 	invitee := secondaryEmail()
 	photoID := uploadedPhoto(t)
@@ -473,7 +412,6 @@ func TestDrivePhotoSharedWithAnAddress(t *testing.T) {
 	assertNotContains(t, runOKBothStreams(t, "drive", "photos", "share", "get", "--", photoID), invitee)
 }
 
-// A photo carries a public link, and the URL it hands back is the one to send.
 func TestDrivePhotoLinkLifecycle(t *testing.T) {
 	photoID := uploadedPhoto(t)
 
@@ -491,8 +429,6 @@ func TestDrivePhotoLinkLifecycle(t *testing.T) {
 	assertField(t, after, "Shared:", "no")
 }
 
-// An album has no public link, so the command that would make one refuses
-// before anything is created.
 func TestDrivePhotoLinkRefusesAnAlbum(t *testing.T) {
 	albumID := createdAlbum(t, testID()+"-album-nolink")
 
@@ -501,4 +437,26 @@ func TestDrivePhotoLinkRefusesAnAlbum(t *testing.T) {
 		t.Error("a public link for an album should be refused")
 	}
 	assertContains(t, stderr, "is an album")
+}
+
+func TestDrivePhotosDownloadSeveralAtOnce(t *testing.T) {
+	first := uploadedPhoto(t)
+	second := uploadedPhoto(t)
+
+	named := t.TempDir()
+	runOK(t, "drive", "photos", "download", "--dest-dir", named, first, second)
+	if entries, err := os.ReadDir(named); err != nil || len(entries) != 2 {
+		t.Errorf("naming two photos wrote %d files: %v", len(entries), err)
+	}
+
+	albumID := createdAlbum(t, testID()+"-album")
+	runOK(t, "drive", "photos", "albums", "add", albumID, first, second)
+	fromAlbum := t.TempDir()
+	result := runJSON(t, "drive", "photos", "download", "--album", albumID, "--dest-dir", fromAlbum)
+	if result["count"] != float64(2) {
+		t.Errorf("the album download reported %v photos, want 2", result["count"])
+	}
+	if entries, err := os.ReadDir(fromAlbum); err != nil || len(entries) != 2 {
+		t.Errorf("the album download wrote %d files: %v", len(entries), err)
+	}
 }

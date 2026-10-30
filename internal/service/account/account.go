@@ -1,9 +1,3 @@
-// Package account reads the account itself: who it belongs to, how much space it
-// uses, and what the current session is allowed to do.
-//
-// Plan and billing are deliberately absent. They live behind the payments
-// endpoints, they are not something a script should be changing in one line, and
-// the CLI's scope is what the web clients let a user do with their data.
 package account
 
 import (
@@ -17,16 +11,12 @@ import (
 )
 
 type Service struct {
-	C proton.Doer
-	// keys opens the account's own hierarchy, for the one thing this service does
-	// that touches it: handing a copy of the account's keys to a trusted contact.
+	C    proton.Doer
 	keys keys.Get
 }
 
 func New(c proton.Doer, k keys.Get) *Service { return &Service{C: c, keys: k} }
 
-// Account is the account as the CLI reports it. Field names follow
-// /core/v4/users, converted to the CLI's snake_case convention.
 type Account struct {
 	ID          string `json:"id"`
 	Email       string `json:"email"`
@@ -36,24 +26,22 @@ type Account struct {
 	MaxSpace    int64  `json:"max_space"`
 	MaxUpload   int64  `json:"max_upload"`
 	CreateTime  int64  `json:"create_time"`
-	// LockedKeys is how many of the account's keys a password reset left shut,
-	// counting the user's own and every address's. Everything sealed to them
-	// stays sealed until they are reactivated.
-	LockedKeys int `json:"locked_keys,omitempty"`
+	LockedKeys  int    `json:"locked_keys,omitempty"`
 
 	names []string
+	spent map[string]int64
 }
+
+func (a *Account) SpentOn(product string) int64 { return a.spent[product] }
 
 func (a *Account) AnswersTo(name string) bool {
 	return name != "" && slices.ContainsFunc(a.names, func(n string) bool { return strings.EqualFold(n, name) })
 }
 
-// keyed is anything Proton hands back with its keys: the user, an address.
 type keyed struct {
 	Keys []struct{ Active int }
 }
 
-// locked counts the keys that are shut.
 func (k keyed) locked() int {
 	n := 0
 	for _, key := range k.Keys {
@@ -64,11 +52,6 @@ func (k keyed) locked() int {
 	return n
 }
 
-// Get fetches the account record.
-//
-// The account and its addresses are asked for together: the keys of both are
-// what says whether a password reset left anything locked, and neither answer
-// is needed to ask for the other.
 func (s *Service) Get(ctx context.Context) (*Account, error) {
 	var r struct {
 		User struct {
@@ -81,6 +64,8 @@ func (s *Service) Get(ctx context.Context) (*Account, error) {
 			MaxUpload   int64
 			CreateTime  int64
 			keyed
+
+			ProductUsedSpace map[string]int64
 		}
 	}
 	var a struct {
@@ -100,9 +85,6 @@ func (s *Service) Get(ctx context.Context) (*Account, error) {
 		return nil, err
 	}
 	u := r.User
-	// Proton leaves Email empty on some accounts and carries the username in
-	// Name instead; the address is what a person recognises, so prefer it and
-	// fall back rather than showing nothing.
 	email := u.Email
 	if email == "" {
 		email = u.Name
@@ -123,5 +105,6 @@ func (s *Service) Get(ctx context.Context) (*Account, error) {
 		MaxUpload: u.MaxUpload, CreateTime: u.CreateTime,
 		LockedKeys: locked,
 		names:      names,
+		spent:      u.ProductUsedSpace,
 	}, nil
 }

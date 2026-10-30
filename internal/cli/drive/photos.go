@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/roman-16/proton-cli/internal/cli/kit"
 	drivesvc "github.com/roman-16/proton-cli/internal/service/drive"
@@ -15,9 +16,6 @@ import (
 	"github.com/roman-16/proton-cli/internal/units"
 	"github.com/spf13/cobra"
 )
-
-// Photos live on their own volume, so they are addressed by REF - their link ID -
-// rather than by path.
 
 func photosCmd() *cobra.Command {
 	c := &cobra.Command{Use: "photos", Short: "Your photo library"}
@@ -43,11 +41,7 @@ func photoColumns() []ui.Column[drivesvc.Photo] {
 func photosListCmd() *cobra.Command {
 	var held kit.Held[drivesvc.Photo]
 	var album string
-	tag := &kit.Enum{
-		Name: "tag", Usage: "Show only photos with this tag",
-		Values: []string{"favorites", "screenshots", "videos", "live-photos",
-			"motion-photos", "selfies", "portraits", "bursts", "panoramas", "raw"},
-	}
+	tag := photoTag("Show only photos with this tag")
 	c := &cobra.Command{
 		Use:   "list",
 		Short: "List photos",
@@ -56,32 +50,7 @@ func photosListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			// An album is a place to look, so it is a flag on list rather than a
-			// verb of its own.
-			if album != "" {
-				ref, err := kit.Expand(c.App, album)
-				if err != nil {
-					return err
-				}
-				photos, err := c.App.Drive.AlbumItems(c.Ctx, dc, ref)
-				if err != nil {
-					return err
-				}
-				return listPhotos(c, &held, photos)
-			}
-			tagID, filter := 0, false
-			if tag.Set() {
-				name, err := tag.Value()
-				if err != nil {
-					return err
-				}
-				id, err := drivesvc.ParseTag(name)
-				if err != nil {
-					return err
-				}
-				tagID, filter = id, true
-			}
-			photos, err := c.App.Drive.PhotosList(c.Ctx, dc, tagID, filter)
+			photos, err := photosIn(c, dc, album, tag)
 			if err != nil {
 				return err
 			}
@@ -96,6 +65,37 @@ func photosListCmd() *cobra.Command {
 		}},
 	)
 	return c
+}
+
+func photoTag(usage string) *kit.Enum {
+	return &kit.Enum{
+		Name: "tag", Usage: usage,
+		Values: []string{"favorites", "screenshots", "videos", "live-photos",
+			"motion-photos", "selfies", "portraits", "bursts", "panoramas", "raw"},
+	}
+}
+
+func photosIn(c *kit.Invocation, dc *drivesvc.Context, album string, tag *kit.Enum) ([]drivesvc.Photo, error) {
+	if album != "" {
+		ref, err := kit.Expand(c.App, album)
+		if err != nil {
+			return nil, err
+		}
+		return c.App.Drive.AlbumItems(c.Ctx, dc, ref)
+	}
+	tagID, filter := 0, false
+	if tag.Set() {
+		name, err := tag.Value()
+		if err != nil {
+			return nil, err
+		}
+		id, err := drivesvc.ParseTag(name)
+		if err != nil {
+			return nil, err
+		}
+		tagID, filter = id, true
+	}
+	return c.App.Drive.PhotosList(c.Ctx, dc, tagID, filter)
 }
 
 func listPhotos(c *kit.Invocation, held *kit.Held[drivesvc.Photo], photos []drivesvc.Photo) error {
@@ -152,37 +152,79 @@ func photosUploadCmd() *cobra.Command {
 
 func photosDownloadCmd() *cobra.Command {
 	var dest kit.Destination
+	var album string
+	var all bool
+	tag := photoTag("Download the photos with this tag")
+	filtered := func() bool { return album != "" || tag.Set() || all }
+	hint, scope := kit.HintList("album", "tag"), "every photo in the library"
 	c := &cobra.Command{
-		Use:   "download REF",
-		Short: "Download a photo",
-		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
-			if err := dest.Validate(true); err != nil {
+		Use:   "download [REF...]",
+		Short: "Download photos",
+		Long: "Download photos.\n\n" +
+			"Name the photos, or choose them with --album, --tag or --all. Each lands\n" +
+			"under its own name with the modification time it has in Drive.",
+		RunE: kit.Run([]kit.Step{kit.StepSelection(filtered, hint, scope), kit.StepExpand}, func(c *kit.Invocation) error {
+			if _, err := tag.Value(); tag.Set() && err != nil {
 				return err
 			}
 			dc, err := photosContext(c)
 			if err != nil {
 				return err
 			}
+			library := &kit.Lookup[drivesvc.Photo]{
+				Kind: "photo",
+				Load: func(ctx stdctx.Context) ([]drivesvc.Photo, error) {
+					return c.App.Drive.PhotosList(ctx, dc, 0, false)
+				},
+				ID: func(p drivesvc.Photo) string { return p.LinkID },
+			}
+			selector := kit.Selector[drivesvc.Photo]{
+				Noun: "photos", Columns: photoColumns(),
+				IDOf:  func(p drivesvc.Photo) string { return p.LinkID },
+				ByRef: library.Find, FilterHint: hint, Scope: scope,
+			}
+			if filtered() {
+				selector.ByFilter = func(stdctx.Context) ([]drivesvc.Photo, error) {
+					if all && album == "" && !tag.Set() {
+						return library.Rows(c.Ctx)
+					}
+					return photosIn(c, dc, album, tag)
+				}
+			}
+			sel, err := kit.Select(c, selector)
+			if err != nil {
+				return err
+			}
+			if err := dest.Validate(sel.Len() == 1); err != nil {
+				return err
+			}
 			if dest.Stdout() {
-				_, err := c.App.Drive.PhotoDownload(c.Ctx, dc, c.Args[0], c.UI().Out,
+				_, _, err := c.App.Drive.PhotoDownload(c.Ctx, dc, sel.IDs[0], c.UI().Out,
 					drivesvc.DownloadOptions{Label: "Downloading"})
 				return err
 			}
-			// A photo's own filename only becomes known once the download starts,
-			// so the producer is the one that names the file it lands in.
 			return kit.Mutate(c, ui.ResultSpec{
-				Action: ui.Downloaded, Kind: "photos", Count: 1,
-				Detail: "to " + dest.Describe(),
+				Action: ui.Downloaded, Kind: "photos", Count: sel.Len(),
+				Detail: "to " + dest.Describe(), Preview: sel.Preview(),
 			}, func() error {
-				_, err := dest.StreamDiscovered(c, func(w io.Writer) (string, error) {
-					return c.App.Drive.PhotoDownload(c.Ctx, dc, c.Args[0], w,
-						drivesvc.DownloadOptions{Label: "Downloading", Progress: ui.NewProgress(c.UI())})
-				})
-				return err
+				for i, id := range sel.IDs {
+					_, err := dest.StreamStamped(c, func(w io.Writer) (string, time.Time, error) {
+						return c.App.Drive.PhotoDownload(c.Ctx, dc, id, w, drivesvc.DownloadOptions{
+							Label: "Downloading", Progress: ui.Batch(ui.NewProgress(c.UI()), i+1, sel.Len()),
+						})
+					})
+					if err != nil {
+						return err
+					}
+				}
+				return nil
 			})
 		}),
 	}
 	dest.Register(c)
+	tag.Register(c)
+	c.Flags().StringVar(&album, "album", "", "Download what is in this album, by name or ID")
+	kit.All(c.Flags(), &all)
 	return c
 }
 
@@ -209,9 +251,6 @@ func photoTagVerb(use, short string, action ui.Action) *cobra.Command {
 				return err
 			}
 			if copied > 0 {
-				// A photo shared into an album is not yours to tag, so Proton
-				// copies it into your timeline first. Saying so avoids a surprise
-				// duplicate later.
 				c.Note("%s had to be copied into your own timeline first.",
 					ui.Quantity(copied, "photos"))
 			}
@@ -229,9 +268,6 @@ func photosRemoveCmd(use, short string, action ui.Action, permanent bool) *cobra
 			if err != nil {
 				return err
 			}
-			// A photo has no name of its own, so the only way to show which ones
-			// would go is to fetch them - and a permanent removal is exactly the
-			// case where a link ID is not something a person can check.
 			sel, err := kit.SelectFrom(c, "photos", photoColumns(), &kit.Lookup[drivesvc.Photo]{
 				Kind: "photo",
 				Load: func(ctx stdctx.Context) ([]drivesvc.Photo, error) {
@@ -256,8 +292,6 @@ func photosRemoveCmd(use, short string, action ui.Action, permanent bool) *cobra
 	}
 }
 
-// ── albums ──
-
 func albumsCmd() *cobra.Command {
 	c := &cobra.Command{Use: "albums", Short: "Photo albums"}
 	c.AddCommand(albumsListCmd(), albumsCreateCmd(), albumsDeleteCmd(), albumsUpdateCmd(),
@@ -277,8 +311,6 @@ func albumColumns() []ui.Column[drivesvc.Album] {
 	}
 }
 
-// An album's cover is which of its own photos represents it. Nothing is
-// re-encrypted and nothing moves: the album names one of its children.
 func albumsUpdateCmd() *cobra.Command {
 	var cover, name string
 	c := &cobra.Command{
@@ -425,8 +457,6 @@ func albumsDeleteCmd() *cobra.Command {
 	return c
 }
 
-// albumMembersCmd builds `albums add` and `albums remove`. The album comes first
-// because the command lives in the albums collection.
 func albumMembersCmd(use, short string, action ui.Action, preposition string) *cobra.Command {
 	return &cobra.Command{
 		Use:   use + " REF PHOTO_REF...",

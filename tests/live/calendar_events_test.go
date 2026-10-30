@@ -191,14 +191,6 @@ func TestCalendarEventWithProtonAttendee(t *testing.T) {
 	runOK(t, "calendar", "events", "get", eventID)
 }
 
-// An attendee outside Proton has no calendar to deliver to, so they are emailed
-// the invitation instead. What decides which of the two happens is the key
-// lookup, and Proton answers that for an address it does not hold by refusing
-// rather than by returning no keys - so the refusal has to read as "nobody here"
-// and not as a failure.
-//
-// Nothing else in the suite invites one. Reading a refusal as a failure breaks
-// every invitation to a work address, and the free accounts would go on passing.
 func TestCalendarEventWithAttendeeOutsideProton(t *testing.T) {
 	guest := externalRecipient(t)
 	calID := firstCalendarID(t)
@@ -313,10 +305,6 @@ func TestCalendarAllDayEventAppearsInAList(t *testing.T) {
 		"--calendar", "Default", "--after", "2027-05-04", "--before", "2027-05-04"), "all day")
 }
 
-// A whole-day event runs for a day, whichever way the end was stored: Proton keeps
-// an all-day range non-inclusively and clients differ on whether they write the end
-// at all, so a consumer that measured the row would otherwise get 0 or 24 hours for
-// the same event.
 func TestCalendarAllDayEventLastsAWholeDay(t *testing.T) {
 	title := testID() + "-allday-span"
 	ref := strings.TrimSpace(runOK(t, "calendar", "events", "create",
@@ -376,9 +364,6 @@ func TestCalendarAllDayEventGainsAndLosesItsTimeOfDay(t *testing.T) {
 	}
 }
 
-// An end date on a calendar is the last day the event is on. iCalendar stores the
-// midnight after it, and that convention is storage's business rather than
-// something to make anybody count around.
 func TestCalendarAllDayEventEndsOnTheDayNamed(t *testing.T) {
 	title := testID() + "-allday-through"
 	ref := strings.TrimSpace(runOK(t, "calendar", "events", "create",
@@ -396,9 +381,6 @@ func TestCalendarAllDayEventEndsOnTheDayNamed(t *testing.T) {
 	}
 }
 
-// A new event that says nothing about how long it lasts lasts as long as its
-// calendar says, which is the setting `settings calendars update` writes and the
-// one Proton's own composer opens with.
 func TestCalendarEventWithNoLengthTakesTheCalendarsDefault(t *testing.T) {
 	before := runJSON(t, "calendar", "settings", "calendars", "get", "Default")
 	defaults, _ := before["defaults"].(map[string]interface{})
@@ -457,10 +439,6 @@ func TestCalendarListIncludesTheLastDayNamed(t *testing.T) {
 	}
 }
 
-// Proton answers the events endpoint for a few weeks at a time and refuses a range
-// of months, and a person asking about a semester has asked a fair question. The
-// listing is what the days named hold, however many: an event at either end of a
-// four-month window is on it, once.
 func TestCalendarListCoversMoreDaysThanProtonAnswersAtOnce(t *testing.T) {
 	prefix := testID() + "-wide"
 	ends := []struct{ name, day string }{
@@ -489,9 +467,6 @@ func TestCalendarListCoversMoreDaysThanProtonAnswersAtOnce(t *testing.T) {
 	}
 }
 
-// Proton reads an absent reminder list as "use the calendar's defaults", so
-// sending one on every write silently resets whatever the event had. 42 minutes is
-// a value no default uses.
 func TestCalendarUpdatingAnEventKeepsItsReminders(t *testing.T) {
 	title := testID() + "-remind"
 	ref := strings.TrimSpace(runOK(t, "calendar", "events", "create",
@@ -836,9 +811,6 @@ func TestCalendarSeriesRuleCanBeChanged(t *testing.T) {
 	}
 }
 
-// Proton's composer takes an end time, so this one does too. It has to land on
-// the same event a duration would have made, or the two spellings mean different
-// things.
 func TestCalendarEventEndIsTheSameAsADuration(t *testing.T) {
 	title := testID() + "-end"
 	ref := strings.TrimSpace(runOK(t, "calendar", "events", "create",
@@ -864,8 +836,6 @@ func TestCalendarEventEmailReminderRoundTrips(t *testing.T) {
 	cleanupRun(t, fmt.Sprintf("Delete event: proton calendar events delete -- %s", ref),
 		"calendar", "events", "delete", "--", ref)
 
-	// Proton stores the delivery as the notification's Type: 0 emails, 1 is the
-	// device. Read from the API so the assertion does not rest on our own words.
 	data := runJSON(t, "api", "GET", eventPath(t, ref))
 	ev, _ := data["Event"].(map[string]interface{})
 	notifs, _ := ev["Notifications"].([]interface{})
@@ -973,11 +943,6 @@ func editEventNamed(t *testing.T, ics, title, line string) string {
 	return ""
 }
 
-// Export and import are each other's inverse, so a file written here reads back
-// as the same events - which is the only thing that makes an export a backup.
-//
-// The colour is part of that. It travels as a COLOR property, and a colour the
-// file names in CSS comes back as the nearest of Proton's twenty.
 func TestCalendarEventsImportRoundTripsAnExport(t *testing.T) {
 	title := testID() + "-roundtrip"
 	day := "2027-10-04"
@@ -1019,7 +984,6 @@ func TestCalendarEventsImportRoundTripsAnExport(t *testing.T) {
 		t.Fatalf("re-importing an export made %d events out of one", len(copies))
 	}
 	assertContains(t, runOK(t, "calendar", "events", "get", "--", copies[0]), "Room 12")
-	// tomato is not a colour Proton has, so it arrives as the accent nearest it.
 	if got := colourOf(t, copies[0]); got != "#EC3E7C" {
 		t.Errorf("the imported colour is %q, want the accent nearest tomato", got)
 	}
@@ -1040,10 +1004,6 @@ func eventsTitled(t *testing.T, day, title string) []string {
 	return refs
 }
 
-// A new event with no calendar named goes into the default calendar, which
-// `--default` makes of one of your own calendars, and the result says which it
-// went into. Deleting that calendar hands the role to the next calendar of your
-// own, as Proton's clients do.
 func TestCalendarNewEventsGoToTheDefaultCalendar(t *testing.T) {
 	was, _ := runJSON(t, "calendar", "settings", "get")["default_calendar"].(string)
 	restore := was
@@ -1157,5 +1117,28 @@ func TestCalendarEventsAutoAddMeetLinks(t *testing.T) {
 	cleanupRun(t, "Delete event: proton calendar events delete "+without, "calendar", "events", "delete", without)
 	if meetLinkOf(t, without) != "" {
 		t.Error("--no-meet left a Proton Meet link on the event")
+	}
+}
+
+func TestCalendarEventsExportAllTakesEveryDay(t *testing.T) {
+	title := testID() + "-whole"
+	ref := strings.TrimSpace(runOK(t, "calendar", "events", "create",
+		"--calendar", "Default", "--title", title,
+		"--start", "2029-03-05T09:00", "--duration", "15m"))
+	cleanupRun(t, fmt.Sprintf("Delete event: proton calendar events delete -- %s", ref),
+		"calendar", "events", "delete", "--", ref)
+
+	if month := runOK(t, "calendar", "events", "export", "--calendar", "Default", "--dest", "-"); strings.Contains(month, title) {
+		t.Error("the next 30 days hold an event three years out")
+	}
+	whole := runOK(t, "calendar", "events", "export", "--calendar", "Default", "--all", "--dest", "-")
+	if got := strings.Count(whole, title); got != 1 {
+		t.Errorf("the whole calendar names the event %d times, want once", got)
+	}
+
+	into := t.TempDir()
+	runOK(t, "calendar", "events", "export", "--calendar", "Default", "--all", "--dest-dir", into)
+	if _, err := os.Stat(filepath.Join(into, "Default.ics")); err != nil {
+		t.Errorf("the file is not named after the calendar: %v", err)
 	}
 }
