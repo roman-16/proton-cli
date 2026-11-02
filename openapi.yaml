@@ -85,7 +85,7 @@ components:
   # BLOCK_SENDER_CONFIRMATION: 1=DO_NOT_ASK
   # BUSY_TIME_SLOT_TYPE: 0=PARTIAL_DAY_IN, 1=PARTIAL_DAY_BEFORE, 2=FULL_DAY_IN, 3=FULL_DAY_BEFORE
   # BYOE_ADDRESS_ERROR: 2011=ADDRESS_ALREADY_EXISTS
-  # BYOE_CLAIM_PROTON_ADDRESS_SOURCE: MAIL_ONBOARDING=MAIL_ONBOARDING, MAIL_COMPOSER=MAIL_COMPOSER, MAIL_TOOLBAR=MAIL_TOOLBAR, CALENDAR_WIDGET=CALENDAR_WIDGET, CALENDAR_DRAWER=CALENDAR_DRAWER, OPEN_CALENDAR_APP=OPEN_CALENDAR_APP, IMPORT=IMPORT, EASY_SWITCH=EASY_SWITCH, ADD_ADDRESS=ADD_ADDRESS, ADD_ADDRESS_FREE=ADD_ADDRESS_FREE, SHARED_PLAN_PENDING_INVITATION=SHARED_PLAN_PENDING_INVITATION
+  # BYOE_CLAIM_PROTON_ADDRESS_SOURCE: mail-onboarding=MAIL_ONBOARDING, mail-composer=MAIL_COMPOSER, mail-toolbar=MAIL_TOOLBAR, calendar-widget=CALENDAR_WIDGET, calendar-drawer=CALENDAR_DRAWER, open-calendar-app=OPEN_CALENDAR_APP, import=IMPORT, easy-switch=EASY_SWITCH, add-address=ADD_ADDRESS, add-address-free=ADD_ADDRESS_FREE, shared-plan-pending-invitation=SHARED_PLAN_PENDING_INVITATION
   # CALENDAR_CARD_TYPE: 0=CLEAR_TEXT, 1=ENCRYPTED, 2=SIGNED, 3=ENCRYPTED_AND_SIGNED
   # CALENDAR_DISPLAY: 0=HIDDEN, 1=VISIBLE
   # CALENDAR_FLAGS: 0=INACTIVE, 1=ACTIVE, 2=UPDATE_PASSPHRASE, 4=RESET_NEEDED, 8=INCOMPLETE_SETUP, 16=LOST_ACCESS, 32=SELF_DISABLED, 64=SUPER_OWNER_DISABLED
@@ -369,20 +369,20 @@ components:
   # TelemetryAccountCancellationEvents: start_cancellation=startCancellation, cancel_page=cancelPage, cancel_modal=cancelModal, feedback_modal=feedbackModal, resubscribe_modal=resubscribeModal, dashboard_reactivate=dashboardReactivate, upsell_modal=upsellModal
   # TelemetryAccountCancellationFlowFeedbackEvents: start_cancellation=startCancellation, feedback_step=feedbackStep, second_step=secondStep, confirm_cancellation=confirmCancellation, managed_externally=managedExternally
   # TelemetryAccountDashboardEvents: page_load=pageLoad, cross_product_click=crossProductClick, feature_card_click=featureCardClick, upgrade_button_click=upgradeButtonClick, upsell_cta_click=upsellCtaClick, download_cta_click=downloadCtaClick
+  # TelemetryAccountImportFlowEvents: step_load=stepLoad, step_interacted=stepInteracted, step_completed=stepCompleted, flow_finished=flowFinished, flow_error=flowError
   # TelemetryAccountOrganizationLogoUploadEvents: process_start=processStart, process_success=processSuccess, process_failure=processFailure
   # TelemetryAccountSecurityCheckupEvents: page_load=pageLoad, cohort_change.complete_recovery_multiple=completeRecoveryMultiple, cohort_change.complete_recovery_single=completeRecoverySingle, cohort_change.account_recovery_enabled=accountRecoveryEnabled
   # TelemetryAccountSignupEvents: fe.page_load=pageLoad, user.plan_select=planSelect, user.cycle_select=cycleSelect, user.currency_select=currencySelect, user.payment_select=paymentSelect, user.checkout=userCheckout, user.sign_in=userSignIn, user.interact.account_create=interactAccountCreate, user.interact.upsell=interactUpsell, user.interact.credit_card=interactCreditCard, user.interact.password=interactPassword, user.interact.recovery=interactRecoveryKit, user.interact.download=interactDownload, be.available_external=beAvailableExternal, be.sign_in_success=beSignInSuccess, be.sign_out_success=beSignOutSuccess, be.payments_available=bePaymentMethods, be.checkout_error=checkoutError, fe.onboarding_start=onboardingStart, fe.onboarding_shown=onboardShown, fe.onboarding_finish=onboardFinish, fe.signup_finish=signupFinish
   # TelemetryAlwaysOnUpsellEvents: click_upsell_button=clickUpsellButton, click_top_navbar=clickTopNavbar, close_offer=closeOffer, user_subscribed=userSubscribed
   # TelemetryAppSwitcher: dropdown_app_click=dropdown_app_click
   # TelemetryB2BOnboardingEvents: modal_displayed=modal_displayed, click_modal_item=click_modal_item, hide_navbar_button=hide_navbar_button
-  # TelemetryBringYourOwnEmailEvents: claim_proton_address=claim_proton_address
-  # TelemetryBYOECreationFunnelEvents: creation_started=creationStarted, google_sign_in_clicked=googleSignInClicked, authenticated=authenticated, upsell_modal_viewed=upsellModalViewed, importer_created=importerCreated, creation_error=creationError
   # TelemetryCalendarClientEvents: legacy_signature_fallback=legacy_signature_fallback
   # TelemetryCalendarEvents: change_temporary_time_zone=change_temporary_time_zone, answer_invite=answer_invite
   # TelemetryCalendarVideoConferencing: video_conference_widget=video_conference_widget, video_conference_settings_toggle=video_conference_settings_toggle, video_conference_zoom_integration=video_conference_zoom_integration, video_conference_proton_meet_integration=video_conference_proton_meet_integration, video_conference_proton_meet_settings_toggle=video_conference_proton_meet_settings_toggle
   # TelemetryCategoriesOnboardingEvents: onboarding_reply=onboarding_reply, category_nav=category_nav, recategorize_email=recategorize_email, settings_toggle_category_view=settings_toggle_category_view, settings_toggle_category=settings_toggle_category, settings_toggle_notification=settings_toggle_notification, report_unread_count=report_unread_count
   # TelemetryChangelog: opened=opened
   # TelemetryCollapsibleLeftSidebarEvents: toggle_left_sidebar=toggleLeftSidebar
+  # TelemetryComposerBookingsEvents: booking_action_click=booking_action_click, booking_page_inserted=booking_page_inserted, create_booking_page_click=create_booking_page_click, booking_upsell_displayed=booking_upsell_displayed, booking_upsell_dismissed=booking_upsell_dismissed, booking_upsell_subscribed=booking_upsell_subscribed, booking_limit_displayed=booking_limit_displayed
   # TelemetryContentSearchEvents: query_completed=query_completed, result_opened=result_opened, result_action=result_action, search_session_completed=search_session_completed
   # TelemetryContentSearchIndexEvents: mailbox_index_completed=mailbox_index_completed
   # TelemetryDesktopEvents: client_first_launch=client_first_launch
@@ -390,8 +390,6 @@ components:
   # TelemetryDocsEvents: suggestion.created=suggestion_created, suggestion.resolved=suggestion_resolved, suggestion.comment=suggestion_commented
   # TelemetryDocsHomepageEvents: document.opened=document_opened, document.opened_in_trash=document_opened_in_trash, document.created=document_created, document.shared=document_shared, document.trashed=document_trashed, document.restored=document_restored, document.permanently_deleted=document_permanently_deleted, document.renamed=document_renamed, document.moved=document_moved, document.source.opened=document_source_opened, sorting.changed.to_name=sorting_changed_to_name, sorting.changed.to_time=sorting_changed_to_time, sorting.changed.to_owner=sorting_changed_to_owner, sorting.changed.to_location=sorting_changed_to_location, invite.accepted=invite_accepted, invite.rejected=invite_rejected, drive.opened=drive_opened
   # TelemetryDriveWebFeature: drive_web_feature_performance_unauth=performance, drive_web_actions_unauth=actions
-  # TelemetryEasySwitchCreationFunnelEvents: creation_started=creationStarted, products_submitted=productsSubmitted, instructions_viewed=instructionsViewed, prepare_import_viewed=prepareImportViewed, importer_created=importerCreated, creation_error=creationError
-  # TelemetryEasySwitchEvents: import_report_action=importReportAction, byoe_address_action=byoeAddressAction, byoe_claimable_address_modal_shown=byoeClaimableAddressModalShown, byoe_claimable_address_modal_action=byoeClaimableAddressModalAction, byoe_address_linked_modal_shown=byoeAddressLinkedModalShown, byoe_address_linked_modal_action=byoeAddressLinkedModalAction
   # TelemetryEncryptedSearchEvents: start_es_indexing=start_es_indexing, end_es_indexing=end_es_indexing, pause_es_indexing=pause_es_indexing, perform_search=perform_search, es_search_complete=es_search_complete, clear_search_fields=clear_search_fields, delete_es_data=delete_es_data, switch_search_type=switch_search_type
   # TelemetryESMigrationToolEvents: es_migration_tool.migration_finished=migration_finished
   # TelemetryExploreAppsEvents: page_load=page_load, app_click=app_click
@@ -414,7 +412,7 @@ components:
   # TelemetryMailPostSignupZeroNinetyNineEvents: automatic_modal_open=automaticModalOpen, click_top_navbar=clickTopNavbar, click_upsell_button=clickUpsellButton, close_offer=closeOffer, click_hide_offer=clickHideOffer, user_subscribed=userSubscribed
   # TelemetryMailSelectAllEvents: button_move_to_archive=button_move_to_archive, button_move_to_trash=button_move_to_trash, banner_move_to=banner_move_to, banner_label_as=banner_label_as, banner_mark_as_read=banner_mark_as_read, banner_mark_as_unread=banner_mark_as_unread, banner_permanent_delete=banner_permanent_delete
   # TelemetryMailTrial2024UpsellModal: no_thanks=noThanks, close_modal=closeModal, upsell=upsell
-  # TelemetryMeasurementGroups: account.any.signup=accountSignup, account.web.org_logo_upload=accountOrgLogoUpload, account.web.security_checkup=accountSecurityCheckup, account.web.safety_review_ctr=accountSafetyReviewCtr, account.web.safety_review_score_diff=accountSafetyReviewScoreDiff, account.web.recovery_settings=accountRecoverySettings, account.web.password_reminder=accountPasswordReminder, account.web.reset_password=accountResetPassword, account.web.unauth_lost_2fa=accountUnauthLost2FA, account.web.dashboard=accountDashboard, account.web.upgrade_page=accountUpgradePage, any.web.easy_switch=easySwitch, any.web.easy_switch_creation_funnel=easySwitchCreationFunnel, any.web.referral_discover=referralDiscover, any.web.always_on_upsell=alwaysOnUpsell, calendar.web.ics_surgery=calendarIcsSurgery, calendar.client=calendarClient, calendar.web.timezone_selector=calendarTimeZoneSelector, calendar.web.video_conferencing=calendarVideoConferencing, meet.web.meet_funnel_telemetry=meetFunnelTelemetry, meet.web.actions=meetActions, meet.web.dashboard=meetDashboard, meet.web.performance=meetPerformance, account.web.cancellation=accountCancellation, account.web.cancellation_feedback_first=accountCancellationFeedbackFirst, any.web.settings_heart_beat=settingsHeartBeat, any.web.calendar_settings_heart_beat=calendarSettingsHeartBeat, any.web.calendar_invite=calendarInvite, any.web.key_transparency=keyTransparency, any.web.subscription_modal=subscriptionModal, mail.web.onboarding=oldMailOnboarding, any.web.paid_users_nudge=paidUsersNudge, mail.web.privacy_dropdown=mailPrivacyDropdown, mail.web.select_all=mailSelectAll, mail.web.snooze=mailSnooze, mail.web.signup=mailSignup, mail.web.composer_assistant=mailComposerAssistant, mail.web.lumo=mailLumo, mail.web.proton_tips=mailProtonTips, any.web.post_subscription_tour_events=postSubscriptionTourEvents, mail.desktop.default_mailto=mailDesktopDefaultMailto, mail.desktop.daily_stats=mailDesktopDailyStats, mail.web.clicks_mail_actions=mailActions, mail.web.list_settings=mailListSettings, mail.web.post_signup_one_dollar=mailPostSignupOneDollar, mail.web.post_signup_zero_ninety_nine=mailPostSignupZeroNinetyNine, mail.web.paging_controls=mailPagingControls, mail.web.expand_blockquotes=mailExpandBlockquotes, mail.any.categories_view=categoriesView, mail.any.signup_onboarding=mailOnboarding, mail.web.pass_nudge=passNudge, mail.any.search=contentSearch, mail.any.search_index=contentSearchIndex, mail.web.newsletter_subscriptions=mailNewsletterSubscriptions, any.web.unlimited_offer_2025=unlimitedOffer2025, any.web.unlimited_to_duo_offer=unlimitedToDuoOffer, any.web.unlimited_to_duo_discounted_offer=unlimitedToDuoDiscountedOffer, mail.es_migration_tool=esMigrationTool, any.web.security_center=securityCenter, any.web.vpn_drawer=vpnDrawer, payments.flow=paymentsFlow, drive.web.feature_performance_unauth=driveWebFeaturePerformance, drive.web.actions_unauth=driveWebActions, drive.web.post_signup_one_dollar=drivePostSignupOneDollar, any.web.collapsible_left_sidebar=collapsibleLeftSidebar, any.web.smart_banner=smartBanner, common.any.client_installs=clientInstalls, any.web.client_search=clientSearch, any.web.b2b_onboarding=b2bOnboarding, any.web.bring_your_own_email=bringYourOwnEmail, mail.any.bring_your_own_email=mailBringYourOwnEmail, any.web.byoe_creation_funnel=byoeCreationFunnel, any.web.app_switcher=appSwitcher, account.web.explore_apps=accountExploreApps, any.web.prevent_wasm_loading=preventWasmLoading, common.web.suggestions=docsSuggestions, drive.docs.homepage=docsHomepage, drive.docs.editor=docsEditor, vpn.any.tv_signin=vpnTv, vpn.web.always_on_policy=vpnAlwaysOnPolicy, vpn.web.b2b_user_activity=vpnB2bUserActivity, mail.common.foreground_activity=mailForegroundActivity
+  # TelemetryMeasurementGroups: account.any.signup=accountSignup, account.web.org_logo_upload=accountOrgLogoUpload, account.web.security_checkup=accountSecurityCheckup, account.web.safety_review_ctr=accountSafetyReviewCtr, account.web.safety_review_score_diff=accountSafetyReviewScoreDiff, account.web.recovery_settings=accountRecoverySettings, account.web.password_reminder=accountPasswordReminder, account.web.reset_password=accountResetPassword, account.web.unauth_lost_2fa=accountUnauthLost2FA, account.web.dashboard=accountDashboard, account.web.upgrade_page=accountUpgradePage, any.web.referral_discover=referralDiscover, any.web.always_on_upsell=alwaysOnUpsell, calendar.web.ics_surgery=calendarIcsSurgery, calendar.client=calendarClient, calendar.web.timezone_selector=calendarTimeZoneSelector, calendar.web.video_conferencing=calendarVideoConferencing, meet.web.meet_funnel_telemetry=meetFunnelTelemetry, meet.web.actions=meetActions, meet.web.dashboard=meetDashboard, meet.web.performance=meetPerformance, account.web.cancellation=accountCancellation, account.web.cancellation_feedback_first=accountCancellationFeedbackFirst, any.web.settings_heart_beat=settingsHeartBeat, any.web.calendar_settings_heart_beat=calendarSettingsHeartBeat, any.web.calendar_invite=calendarInvite, any.web.key_transparency=keyTransparency, any.web.subscription_modal=subscriptionModal, mail.web.onboarding=oldMailOnboarding, any.web.paid_users_nudge=paidUsersNudge, mail.web.privacy_dropdown=mailPrivacyDropdown, mail.web.select_all=mailSelectAll, mail.web.snooze=mailSnooze, mail.web.signup=mailSignup, mail.web.composer_assistant=mailComposerAssistant, mail.web.lumo=mailLumo, mail.web.proton_tips=mailProtonTips, any.web.post_subscription_tour_events=postSubscriptionTourEvents, mail.desktop.default_mailto=mailDesktopDefaultMailto, mail.desktop.daily_stats=mailDesktopDailyStats, mail.web.clicks_mail_actions=mailActions, mail.web.list_settings=mailListSettings, mail.web.post_signup_one_dollar=mailPostSignupOneDollar, mail.web.post_signup_zero_ninety_nine=mailPostSignupZeroNinetyNine, mail.web.paging_controls=mailPagingControls, mail.web.expand_blockquotes=mailExpandBlockquotes, mail.any.categories_view=categoriesView, mail.any.signup_onboarding=mailOnboarding, mail.any.signup_onboarding_account_poc=mailSignupOnboardingPoc, mail.web.pass_nudge=passNudge, mail.any.search=contentSearch, mail.any.search_index=contentSearchIndex, mail.web.newsletter_subscriptions=mailNewsletterSubscriptions, mail.web.composer_bookings=mailComposerBookings, any.web.unlimited_offer_2025=unlimitedOffer2025, any.web.unlimited_to_duo_offer=unlimitedToDuoOffer, any.web.unlimited_to_duo_discounted_offer=unlimitedToDuoDiscountedOffer, mail.es_migration_tool=esMigrationTool, any.web.security_center=securityCenter, any.web.vpn_drawer=vpnDrawer, payments.flow=paymentsFlow, drive.web.feature_performance_unauth=driveWebFeaturePerformance, drive.web.actions_unauth=driveWebActions, drive.web.post_signup_one_dollar=drivePostSignupOneDollar, any.web.collapsible_left_sidebar=collapsibleLeftSidebar, any.web.smart_banner=smartBanner, common.any.client_installs=clientInstalls, any.web.client_search=clientSearch, any.web.b2b_onboarding=b2bOnboarding, mail.any.bring_your_own_email=mailBringYourOwnEmail, any.web.account_import_flow=accountImportFlow, any.web.app_switcher=appSwitcher, account.web.explore_apps=accountExploreApps, any.web.prevent_wasm_loading=preventWasmLoading, common.web.suggestions=docsSuggestions, drive.docs.homepage=docsHomepage, drive.docs.editor=docsEditor, vpn.any.tv_signin=vpnTv, vpn.web.always_on_policy=vpnAlwaysOnPolicy, vpn.web.b2b_user_activity=vpnB2bUserActivity, mail.common.foreground_activity=mailForegroundActivity
   # TelemetryMeetActionsEvents: prejoin_viewed=prejoin_viewed, display_name_entered=display_name_entered, waiting_room_toggled=waiting_room_toggled, waiting_room_retry_clicked=waiting_room_retry_clicked, desktop_app_banner_shown=desktop_app_banner_shown, desktop_app_banner_clicked=desktop_app_banner_clicked, join_clicked=join_clicked, mic_toggled=mic_toggled, camera_toggled=camera_toggled, device_selected=device_selected, camera_rotated=camera_rotated, mic_test_completed=mic_test_completed, speaker_test_completed=speaker_test_completed, permission_requested=permission_requested, permission_blocked_modal_shown=permission_blocked_modal_shown, no_device_detected=no_device_detected, noise_cancellation_toggled=noise_cancellation_toggled, background_effect_selected=background_effect_selected, custom_background_uploaded=custom_background_uploaded, custom_background_deleted=custom_background_deleted, screen_share_toggled=screen_share_toggled, screen_share_leave_warning_answered=screen_share_leave_warning_answered, picture_in_picture_toggled=picture_in_picture_toggled, layout_changed=layout_changed, self_view_toggled=self_view_toggled, incoming_video_toggled=incoming_video_toggled, participant_list_toggled=participant_list_toggled, participant_muted_by_host=participant_muted_by_host, participant_removed=participant_removed, host_assigned=host_assigned, hand_lowered_by_host=hand_lowered_by_host, waiting_room_admission_handled=waiting_room_admission_handled, poor_connection_indicator_shown=poor_connection_indicator_shown, chat_toggled=chat_toggled, chat_reaction_sent=chat_reaction_sent, chat_mention_used=chat_mention_used, chat_scrolled_to_message=chat_scrolled_to_message, emoji_reaction_sent=emoji_reaction_sent, hand_raise_toggled=hand_raise_toggled, captions_toggled=captions_toggled, captions_failed=captions_failed, recording_toggled=recording_toggled, recording_upsell_shown=recording_upsell_shown, recording_upsell_clicked=recording_upsell_clicked, recording_download_prompt_answered=recording_download_prompt_answered, settings_opened=settings_opened, meeting_lock_toggled=meeting_lock_toggled, meeting_details_opened=meeting_details_opened, connection_lost_modal_shown=connection_lost_modal_shown, connection_lost_modal_answered=connection_lost_modal_answered
   # TelemetryMeetDashboardEvents: dashboard_viewed=dashboard_viewed, meeting_started_instant=meeting_started_instant, join_with_link_opened=join_with_link_opened, join_with_link_submitted=join_with_link_submitted, schedule_meeting_opened=schedule_meeting_opened, meeting_scheduled=meeting_scheduled, room_created=room_created, room_edited=room_edited, meeting_deleted=meeting_deleted, meeting_link_copied=meeting_link_copied, personal_link_rotated=personal_link_rotated, upsell_banner_shown=upsell_banner_shown, upsell_banner_clicked=upsell_banner_clicked, recordings_page_viewed=recordings_page_viewed, recording_downloaded=recording_downloaded, recording_deleted=recording_deleted, sign_in_clicked=sign_in_clicked, sign_up_clicked=sign_up_clicked
   # TelemetryMeetFunnelTelemetry: spotlight_displayed=spotlight_displayed, explore_meet_clicked=explore_meet_clicked, meeting_created=meeting_created, meet_opened=meet_opened
@@ -1584,6 +1582,25 @@ paths:
                   type: string
                 ActiveOrganizationID:
                   type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+  /auth/v4/sessions/forks/code/{encodeURIComponent(userCode)}:
+    get:
+      tags: [Auth]
+      summary: Get Fork Code Location
+      operationId: getForkCodeLocation
+      description: "Where the device that created a fork's user code is, for the user approving it."
+      parameters:
+        - name: encodeURIComponent(userCode)
+          in: path
+          required: true
+          schema:
+            type: string
       responses:
         "200":
           description: Success
@@ -18232,6 +18249,8 @@ paths:
                   items: {}
                 ImportOrganizationSettings:
                   type: boolean
+                DomainName:
+                  type: string
       responses:
         "200":
           description: Success
@@ -18250,6 +18269,23 @@ paths:
           required: true
           schema:
             type: string
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+  /importer/v1/organizations/domains:
+    get:
+      tags: [Importer]
+      summary: Get Organization Domains
+      operationId: getOrganizationDomains
+      parameters:
+        - name: Provider
+          in: query
+          schema:
+            type: integer
       responses:
         "200":
           description: Success
@@ -18662,13 +18698,6 @@ paths:
           application/json:
             schema:
               type: object
-              required:
-                - Email
-              properties:
-                Email:
-                  type: string
-                OrganizationId:
-                  type: string
       responses:
         "200":
           description: Success
