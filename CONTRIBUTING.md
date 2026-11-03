@@ -1,6 +1,13 @@
 # Contributing
 
-Thanks for helping out. Issues, ideas, and pull requests are all welcome.
+proton-cli is written by its maintainer. Pull requests are turned off, so the way to shape it is an issue:
+
+- **A bug** - [report it](https://github.com/roman-16/proton-cli/issues/new?template=bug.yml) with the output of `proton report`.
+- **Something it should do** - [request it](https://github.com/roman-16/proton-cli/issues/new?template=feature.yml). Describe the task. Anything you found out about how Proton's web client does it belongs in the same issue.
+- **A question or an idea** - [Discussions](https://github.com/roman-16/proton-cli/discussions).
+- **A security issue** - privately, through [`SECURITY.md`](SECURITY.md).
+
+The rest of this file is how the code is built and tested.
 
 ## Scope
 
@@ -79,7 +86,7 @@ Why a design is the way it is belongs in the commit message and, when contributo
 
 A help screen and a reference page agree about where a command is documented because `kit.Reference` answers for both. Adding a command therefore documents it in three places at once, and none of them by hand.
 
-[The site](https://proton-cli.lerchster.dev) is `docs/` rendered. The pages stay plain markdown that reads on GitHub, and `web/scripts/import-docs.ts` derives what a site needs from what a page already has: the title from its heading, the description from its lead paragraph, and absolute links from the relative ones. So a page is edited in `docs/` and nowhere else, and a merge to `main` publishes it.
+[The site](https://proton-cli.lerchster.dev) is `docs/` rendered. The pages stay plain markdown that reads on GitHub, and `web/scripts/import-docs.ts` derives what a site needs from what a page already has: the title from its heading, the description from its lead paragraph, and absolute links from the relative ones. So a page is edited in `docs/` and nowhere else, and a push to `main` publishes it.
 
 `just web` builds it the way CI does, which type-checks the site and fails on a link that goes nowhere. `just web-dev` serves it while you write.
 
@@ -178,10 +185,10 @@ just openapi
 
 A weekly workflow does the same thing and commits when upstream changes. See [`scripts/README.md`](scripts/README.md).
 
-## Pull requests
+## Commits
 
-- Keep the change focused, and match the surrounding style.
-- Run `just lint` and `just test-fast`.
+- Keep each commit to one focused change, and match the surrounding style.
+- Run `just lint` and `just test-fast` before it lands.
 - Add or adjust integration tests when you touch behaviour that they cover.
 - Update the guides in `docs/` and, when it's user-facing, the README. Run `just docs` rather than editing a generated reference page.
 - Leave [`CHANGELOG.md`](CHANGELOG.md) alone; its entries are written when a release is cut, from the commits that went into it. Write the commit message so the entry can be written from it.
@@ -189,11 +196,11 @@ A weekly workflow does the same thing and commits when upstream changes. See [`s
 
 ## Releases
 
-[`CHANGELOG.md`](CHANGELOG.md) is the release button. Add a version section to it in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) form and merge it to `main`; that is the whole of it. The version, the tag and the release notes all come from the one file the change was reviewed in, so shipping is a decision made once, in a diff, rather than a version typed into a form afterwards.
+[`CHANGELOG.md`](CHANGELOG.md) is the release button. Add a version section to it in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) form and push it to `main`; that is the whole of it. The version, the tag and the release notes all come from that one file, so shipping is a decision made once, in a diff, rather than a version typed into a form afterwards.
 
 A section may open with `### Highlights` above the categories - the few bullets somebody skims to learn what the release is about, each restating an entry below it rather than adding to it. A release that amounts to bug fixes has none.
 
-The section is written when the release is cut, from the commits since the last tag, so there is no `[Unreleased]` heading accumulating between releases and a merge that is not a release leaves the file untouched. That puts the whole of a release in one reviewable diff, and it puts the burden on commit messages, which is where the reasoning is while it is still fresh.
+The section is written when the release is cut, from the commits since the last tag, so there is no `[Unreleased]` heading accumulating between releases and a commit that is not a release leaves the file untouched. That puts the whole of a release in one reviewable diff, and it puts the burden on commit messages, which is where the reasoning is while it is still fresh.
 
 The **Release** workflow runs when CI passes on `main`, reads the newest version section, and stops there when a release for it is already published - which is what nearly every merge does, in seconds. Otherwise it tags and hands the section to GoReleaser as the release notes. The tag is pushed last on purpose: it is fetched by users, resolved by `go install`, and the version GoReleaser derives, so nothing that outlives a failed run happens until everything that can fail has passed. GoReleaser then builds every target, publishes the GitHub release, and updates the APT repository, AUR, Homebrew tap, winget, and npm.
 

@@ -3,12 +3,12 @@
 //
 // It is the whole of the release trigger. A version heading with no published
 // release is a release request, so the file is validated in full before either
-// answer is given: a malformed changelog fails here, in a pull request, rather
-// than halfway through a publish that cannot be undone.
+// answer is given: a malformed changelog fails here, in CI, rather than
+// halfway through a publish that cannot be undone.
 //
 // Nothing is printed when the file asks for no release - a changelog with no
 // version section yet, or whose newest version was yanked. That is a normal
-// answer, not an error, and it is what makes a routine merge a no-op.
+// answer, not an error, and it is what makes a routine push a no-op.
 package main
 
 import (

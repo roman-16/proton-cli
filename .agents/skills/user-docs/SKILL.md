@@ -1,6 +1,6 @@
 ---
 name: user-docs
-description: Writes and revises proton-cli's user-facing documentation - the README, the hand-written pages under docs/, and the Short, Long and examples that --help and the generated reference are built from - so it states what the CLI does and refuses, keeps one home per topic, and carries no mechanism, rationale or Proton internals. Use when adding or changing a page in docs/, the README, a command's help text or its examples, or when reviewing documentation in a pull request.
+description: Writes and revises proton-cli's user-facing documentation - the README, the hand-written pages under docs/, and the Short, Long and examples that --help and the generated reference are built from - so it states what the CLI does and refuses, keeps one home per topic, and carries no mechanism, rationale or Proton internals. Use when adding or changing a page in docs/, the README, a command's help text or its examples, or when reviewing a documentation change.
 ---
 
 # User docs

@@ -8,7 +8,6 @@ concurrency:
 # on this one succeeding, so these checks gate a publish without being stated
 # twice or run twice.
 on:
-  pull_request:
   push:
     branches: [main]
 

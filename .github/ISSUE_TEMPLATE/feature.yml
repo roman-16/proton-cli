@@ -5,6 +5,8 @@ body:
   - type: markdown
     attributes:
       value: |
+        Describe what you want to do and leave the code to the maintainer. Pull requests are turned off, and every feature is built from an issue like this one.
+
         proton mirrors what Proton's own web clients let you do, rather than everything their API exposes. If the official web app cannot do it either, it is probably out of scope - say so and make the case anyway.
 
   - type: textarea
@@ -29,5 +31,13 @@ body:
       label: The command you would want to type
       description: A guess is fine. It says more about the shape than a paragraph does.
       render: console
+    validations:
+      required: false
+
+  - type: textarea
+    id: found
+    attributes:
+      label: What you have found out
+      description: "How Proton's web client does it: the page, the request it sends, the payload."
     validations:
       required: false

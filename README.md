@@ -86,7 +86,7 @@ Everything is at **[proton-cli.lerchster.dev](https://proton-cli.lerchster.dev)*
 
 ## Contributing
 
-Bug reports, ideas, and pull requests are all welcome. [`CONTRIBUTING.md`](CONTRIBUTING.md) covers the setup, and [`SECURITY.md`](SECURITY.md) has the private channel for security issues.
+proton-cli takes bug reports and feature requests, not pull requests. [Report a bug](https://github.com/roman-16/proton-cli/issues/new?template=bug.yml), [request a feature](https://github.com/roman-16/proton-cli/issues/new?template=feature.yml), or bring a question or an idea to [Discussions](https://github.com/roman-16/proton-cli/discussions). [`SECURITY.md`](SECURITY.md) has the private channel for security issues, and [`CONTRIBUTING.md`](CONTRIBUTING.md) covers building it yourself.
 
 ## Disclaimer
 

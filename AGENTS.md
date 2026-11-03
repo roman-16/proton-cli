@@ -16,7 +16,7 @@ The exception is a **local capability over what the user can already fetch**: so
 
 ## The changelog is the release button
 
-`CHANGELOG.md` is not documentation about releases, it is what causes them. A version section reaching `main` is a release request: CI passes, the Release workflow reads the newest section, and that version's tag, artifacts and release notes all follow from it. Nearly every merge adds no section and releases nothing.
+`CHANGELOG.md` is not documentation about releases, it is what causes them. A version section reaching `main` is a release request: CI passes, the Release workflow reads the newest section, and that version's tag, artifacts and release notes all follow from it. Nearly every push adds no section and releases nothing.
 
 - **There is no `[Unreleased]` section here, and adding one is not how to record a change.** The file gains a section only when a release is cut, written then from the commits since the last tag. Between releases it is not touched at all.
 - **Never add a version section unless the user asked for a release.** There is nowhere to park an entry: a section is a release.

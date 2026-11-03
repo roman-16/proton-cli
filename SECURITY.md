@@ -6,11 +6,11 @@ How credentials are stored, what is encrypted with what, and how to reduce your 
 
 ## Reporting a vulnerability
 
-**Please do not report security issues via public GitHub issues, pull requests, or discussions.**
+**Please do not report security issues via public GitHub issues or discussions.**
 
 Instead, use one of these private channels:
 
-1. **Preferred** - Open a [private security advisory](https://github.com/roman-16/proton-cli/security/advisories/new) on GitHub. This is encrypted, scoped to the maintainer, and lets us collaborate on a fix in a private fork.
+1. **Preferred** - Open a [private security advisory](https://github.com/roman-16/proton-cli/security/advisories/new) on GitHub. This is encrypted and scoped to the maintainer.
 2. **Alternative** - Email <roman@lerchster.dev> with the details. Use `[proton security]` in the subject line.
 
 Please include:

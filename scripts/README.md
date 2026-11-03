@@ -60,7 +60,7 @@ The release trigger, and the only thing that reads it. `CHANGELOG.md` declares a
 just notes
 ```
 
-It validates the whole file before answering either question, against Keep a Changelog 1.1.0 and a little more: categories only from the six and in the specification's order, no empty sections, and versions that move one step at a time so a typed 2.30.0 is a failing test rather than a tag nobody can take back. An `[Unreleased]` section is allowed and never releasable, but this project has none: a section is written when the release is cut. `just test-fast` runs that check over the repository's own changelog, so a file that cannot be released cannot be merged.
+It validates the whole file before answering either question, against Keep a Changelog 1.1.0 and a little more: categories only from the six and in the specification's order, no empty sections, and versions that move one step at a time so a typed 2.30.0 is a failing test rather than a tag nobody can take back. An `[Unreleased]` section is allowed and never releasable, but this project has none: a section is written when the release is cut. `just test-fast` runs that check over the repository's own changelog, so a file that cannot be released fails CI, and the Release workflow never reads it.
 
 Printing nothing is an answer: the file names no version to release, which is the state of every commit that is not a release. A `[YANKED]` section counts as nothing too, since a withdrawn release must never be republished.
 

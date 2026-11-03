@@ -5,9 +5,8 @@ name: Web
 # APT repository. Keeping the two apart is what stops a documentation change from
 # ever reaching the tree `apt update` reads.
 #
-# The pages themselves stay where they are written, so a pull request that
-# renames a command regenerates the reference and republishes the site in the
-# same merge, and the release that adds a changelog section publishes it here.
+# The pages themselves stay where they are written, so a commit that renames a
+# command regenerates the reference and republishes the site in the same push, and the release that adds a changelog section publishes it here.
 on:
   push:
     branches: [main]

@@ -4,7 +4,7 @@ name: Release
 # published release is a release request, and this workflow's only job is to make
 # that true. So every run is a function of the tree rather than of the event that
 # started it: a release that died halfway through finishes by being re-run, and a
-# merge that adds no version is a no-op costing seconds.
+# push that adds no version is a no-op costing seconds.
 #
 # It follows CI rather than repeating it. The release is the continuation of the
 # checks that just passed on that commit, which is what makes "nothing is
@@ -28,9 +28,8 @@ concurrency:
 jobs:
   resolve:
     # workflow_run is a privileged trigger: it carries this repository's write
-    # token whatever the run that finished. A fork's pull request can come from a
-    # branch named `main` and would pass the branch filter on its own, so the
-    # release only ever follows a push to this repository's own main.
+    # token whatever the run that finished, so the release only ever follows a
+    # push to this repository's own main.
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
