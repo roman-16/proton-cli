@@ -278,7 +278,7 @@ jobs:
 
       - name: Build signed APT repository
         id: apt
-        uses: morph027/apt-repo-action@b6b977523e6a5e235075787489bb073c60b71eb4 # v3.8
+        uses: morph027/apt-repo-action@b891498be5731844ce362eec9c07e929fe68f4fa # v3.10
         with:
           repo-name: proton-cli
           scan-dir: debs
