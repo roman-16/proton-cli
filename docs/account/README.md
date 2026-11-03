@@ -384,7 +384,7 @@ proton account keys reactivate \
 proton account export --dest-dir ~/proton-backup
 ```
 
-The directory has to be new, empty, or one an earlier export wrote. Run the same command again to continue a run that stopped, or later to bring the copy up to date: only what is missing or changed is downloaded. Nothing is removed from the copy, so what you delete in Proton stays in it.
+The directory has to be new, empty, or one an earlier export wrote. Run the same command again to continue a run that stopped, or later to bring the copy up to date: only what is missing or changed is downloaded. Nothing is removed from the copy, so what you delete in Proton stays in it, and putting the copy back brings it back.
 
 Name apps to export only those, and preview what each one holds:
 
@@ -410,6 +410,10 @@ The Pass archive holds every password in the clear unless you lock it:
 ```bash
 proton account export --dest-dir ~/proton-backup --passphrase-file ~/.backup-passphrase
 ```
+
+Every later run needs the same passphrase. A run without it, or with another one, is refused and leaves the archive as it is. To lock the archive with a new passphrase, move `pass/proton-pass-export.zip` away and run the export again.
+
+A calendar file that no longer reads back is left as it is and named in a warning. Move it away and run the export again to write it afresh.
 
 ## Sign out
 

@@ -68,7 +68,7 @@ func (v VEvent) component() []contentline.Line {
 		})
 	}
 	for _, a := range v.Attendees {
-		lines = append(lines, attendeeLine(a))
+		lines = append(lines, attendeeLine(a, a.answer()))
 	}
 	if v.Status != "" {
 		lines = append(lines, contentline.Line{Name: "STATUS", Value: v.Status})
@@ -104,7 +104,37 @@ func (v VEvent) ReplyDocument(attendeeEmail, partstat string, protonReply bool) 
 	if !protonReply {
 		return doc
 	}
-	return insertBefore(doc, "ATTENDEE;", "X-PM-PROTON-REPLY;TYPE=boolean:true")
+	return insertBefore(doc, "ATTENDEE;", protonReplyName+";TYPE=boolean:true")
+}
+
+const protonReplyName = "X-PM-PROTON-REPLY"
+
+func (v VEvent) ProtonReply() bool {
+	for _, l := range v.Rest {
+		if l.Name == protonReplyName && strings.EqualFold(strings.TrimSpace(l.Value), "true") {
+			return true
+		}
+	}
+	return false
+}
+
+func Method(text string) string {
+	nested := 0
+	for _, raw := range contentline.Unfold(text) {
+		l, ok := contentline.Parse(raw)
+		if !ok {
+			continue
+		}
+		switch {
+		case l.Name == "BEGIN" && !strings.EqualFold(l.Value, "VCALENDAR"):
+			nested++
+		case l.Name == "END" && !strings.EqualFold(l.Value, "VCALENDAR"):
+			nested--
+		case nested == 0 && l.Name == "METHOD":
+			return strings.ToUpper(strings.TrimSpace(l.Value))
+		}
+	}
+	return ""
 }
 
 func insertBefore(doc, prefix, line string) string {

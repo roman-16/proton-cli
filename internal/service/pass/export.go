@@ -9,41 +9,22 @@ import (
 	"github.com/roman-16/proton-cli/internal/progress"
 )
 
-// Gathering an account into the document a backup is written from.
-//
-// The document is Proton's own, so what this writes Proton Pass reads back, and
-// the three shapes it can be laid down in - the archive, the document alone, a
-// spreadsheet - are all rendered from this one gather.
-
-// ExportPlan is everything a backup will hold, worked out before any of it is
-// written: the document, and the attachments that go beside it.
 type ExportPlan struct {
-	Doc *passfile.ExportDocument
-	// Files are the attachments to write, in the order they are written.
-	Files []ExportFile
-	// SkippedVaults is how many vaults were left out because somebody else owns
-	// them, since an archive quietly smaller than the account is worth a word.
+	Doc           *passfile.ExportDocument
+	Files         []ExportFile
+	Kept          []passfile.ArchiveFile
 	SkippedVaults int
 }
 
-// ExportFile is one attachment on its way into an archive.
 type ExportFile struct {
 	ShareID string
 	ItemID  string
-	// Entry is where it lands inside the archive.
-	Entry string
-	File  Attachment
+	Entry   string
+	File    Attachment
 }
 
-// Items is how many items the backup will hold.
 func (p *ExportPlan) Items() int { return p.Doc.Count() }
 
-// PlanExport gathers the vaults this account owns, and their items, into the
-// document Proton Pass reads, and names the attachments that travel with them.
-//
-// What somebody else shared is theirs to back up: it stays out, as it does in
-// Proton's own export, so restoring this file cannot turn a vault you were let
-// into to a second copy of it under your name.
 func (s *Service) PlanExport(ctx context.Context, userID string, withFiles bool) (*ExportPlan, error) {
 	vaults, err := s.VaultsList(ctx)
 	if err != nil {
@@ -105,7 +86,6 @@ func (s *Service) PlanExport(ctx context.Context, userID string, withFiles bool)
 	return plan, nil
 }
 
-// exportedFolders are a vault's folders as the document lists them.
 func exportedFolders(tree *folderTree) []passfile.ExportedFolder {
 	out := []passfile.ExportedFolder{}
 	for _, f := range tree.list() {
@@ -119,14 +99,8 @@ func exportedFolders(tree *folderTree) []passfile.ExportedFolder {
 	return out
 }
 
-// WriteArchive writes the zip Proton Pass reads.
-//
-// Each attachment is streamed out of Proton and into the archive rather than
-// held whole, so an account with more attachments than memory still has a
-// backup. An attachment that will not come stops the export: an archive quietly
-// missing a file is worse than no archive.
 func (s *Service) WriteArchive(ctx context.Context, w io.Writer, plan *ExportPlan, passphrase string, sink func(index, total int) progress.Sink) error {
-	files := make([]passfile.ArchiveFile, 0, len(plan.Files))
+	files := make([]passfile.ArchiveFile, 0, len(plan.Files)+len(plan.Kept))
 	for i, f := range plan.Files {
 		files = append(files, passfile.ArchiveFile{
 			Entry: f.Entry,
@@ -143,11 +117,9 @@ func (s *Service) WriteArchive(ctx context.Context, w io.Writer, plan *ExportPla
 			},
 		})
 	}
-	return passfile.WriteArchive(w, plan.Doc, files, passphrase)
+	return passfile.WriteArchive(w, plan.Doc, append(files, plan.Kept...), passphrase)
 }
 
-// WriteDocument writes the items without the attachments: the document the
-// archive holds, on its own, or the spreadsheet Proton Pass also exports.
 func (s *Service) WriteDocument(w io.Writer, plan *ExportPlan, format, passphrase string) error {
 	if format == "csv" {
 		return passfile.WriteCSV(w, plan.Doc)

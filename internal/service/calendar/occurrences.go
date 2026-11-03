@@ -3,19 +3,12 @@ package calendar
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"time"
 
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/ical"
 	"github.com/roman-16/proton-cli/internal/proton"
 )
-
-// A recurring event is one record standing for many occurrences, plus one extra
-// record for every occurrence somebody has edited on its own. Changing "this
-// one", "this one and the rest" or "all of them" therefore means writing a
-// different combination of those records, and the combinations are Proton's, not
-// this CLI's invention: they are what its own clients do.
 
 type EventPatch struct {
 	Title       *string
@@ -26,17 +19,9 @@ type EventPatch struct {
 	AllDay      *bool
 	RRule       *string
 	Reminders   *[]string
-	// Status is whether the event is going ahead: CONFIRMED, TENTATIVE or
-	// CANCELLED. Cancelling this way keeps the event and its history, which is
-	// what the web client does and what `delete` does not.
-	Status *string
-	// Color is the event's own accent colour, as the hex Proton stores.
-	//
-	// There is no value here that takes a colour away: Proton offers no colour
-	// meaning "none", so an event that has been given one can only be given
-	// another. Its own clients cannot do it either.
-	Color *string
-	Meet  *bool
+	Status      *string
+	Color       *string
+	Meet        *bool
 }
 
 func (p EventPatch) TouchesTimes() bool {
@@ -101,11 +86,6 @@ func (p EventPatch) apply(v ical.VEvent) ical.VEvent {
 	return withTimes(v, p.Lands(start), dur)
 }
 
-// withTimes puts an event at a moment, for a length.
-//
-// An all-day event's end is exclusive in iCalendar, so a single day runs to the
-// next one, and a length too short to reach the next day still has to end there:
-// an event that lasts no time at all is not what a whole day means.
 func withTimes(v ical.VEvent, start ical.DateTime, dur time.Duration) ical.VEvent {
 	if start.AllDay {
 		last := ical.Day(start.Time.Add(dur))
@@ -165,23 +145,8 @@ func (c series) allOverrideIDs() []string {
 	return out
 }
 
-// loadSeries fetches every record sharing a UID.
-//
-// Proton has an endpoint for exactly this - the chain is what its own clients
-// need in order to know which occurrences have been edited - so the separately
-// edited ones are looked up rather than guessed at from a date window.
 func (s *Service) loadSeries(ctx context.Context, ck *calKeys, calendarID string, master stored) (series, error) {
-	q := url.Values{}
-	q.Set("UID", master.raw.UID)
-	q.Set("PageSize", fmt.Sprintf("%d", eventsPageSize))
-	raws, err := proton.All(ctx, func(ctx context.Context, page int) ([]rawEvent, bool, error) {
-		q.Set("Page", fmt.Sprintf("%d", page))
-		var r struct{ Events []rawEvent }
-		if err := s.C.Decode(ctx, proton.Request{Method: "GET", Path: "/calendar/v1/events", Query: q}, &r); err != nil {
-			return nil, false, err
-		}
-		return r.Events, proton.Full(r.Events, eventsPageSize), nil
-	})
+	raws, err := s.eventsByUID(ctx, master.raw.UID)
 	if err != nil {
 		return series{}, err
 	}
@@ -593,8 +558,6 @@ func overrideRaw(t occurrenceTarget, master stored) rawEvent {
 	return master.raw
 }
 
-// rewrite is what writing model in place of the stored event sends: everything
-// Proton keeps beside the cards carried over as it is.
 func (e stored) rewrite(model ical.VEvent) eventBody {
 	return eventBody{
 		model:             model,
@@ -626,11 +589,6 @@ func emailsOf(v ical.VEvent) []string {
 	return out
 }
 
-// changeMail is the message participants need when a change is one they have to
-// know about.
-//
-// Only attendees outside Proton are emailed: Proton writes a change straight into
-// a Proton attendee's own calendar, so mailing them as well would tell them twice.
 func (s *Service) changeMail(ctx context.Context, updated, old ical.VEvent, p EventPatch, external []string) (*Mail, error) {
 	rescheduled := p.breaks() && updated.Sequence > old.Sequence
 	if len(updated.Attendees) == 0 || (!rescheduled && callOf(updated) == callOf(old)) {
@@ -648,7 +606,6 @@ func (s *Service) changeMail(ctx context.Context, updated, old ical.VEvent, p Ev
 	return updateMail(updated, external), nil
 }
 
-// externalAttendees returns the addresses with no Proton account.
 func (s *Service) externalAttendees(ctx context.Context, emails []string) ([]string, error) {
 	var out []string
 	for _, email := range emails {

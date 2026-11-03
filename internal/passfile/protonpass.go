@@ -17,14 +17,6 @@ import (
 	pb "github.com/roman-16/proton-cli/internal/service/pass/proto"
 )
 
-// Reading back what Proton Pass wrote: the archive, the document inside it with
-// or without its passphrase, and the spreadsheet the app also offers.
-//
-// Which of the four it is follows from the file, because the app decides the
-// same way: an export is an export whichever shape it was saved in.
-
-// protonCSVColumns are what the app's own CSV carries, and what a file has to
-// have to be read as one.
 var protonCSVColumns = []string{"name", "url", "username", "password", "note", "totp"}
 
 func readProton(in source) (*Document, error) {
@@ -54,23 +46,8 @@ func readProton(in source) (*Document, error) {
 	}
 }
 
-// readProtonArchive finds the document inside the zip and notes the attachments
-// beside it, which are opened only if an item asks for one.
 func readProtonArchive(in source, z *zip.ReadCloser) (*Document, error) {
-	files := map[string]*zip.File{}
-	var document *zip.File
-	for _, f := range z.File {
-		switch {
-		case strings.HasSuffix(f.Name, "data.json"), strings.HasSuffix(f.Name, "data.pgp"):
-			if document == nil {
-				document = f
-			}
-		default:
-			if base := zipBase(f.Name); base != "" {
-				files[base] = f
-			}
-		}
-	}
+	document, files := archiveParts(z)
 	if document == nil {
 		return nil, notThisFormat(in, Proton)
 	}
@@ -89,6 +66,23 @@ func readProtonArchive(in source, z *zip.ReadCloser) (*Document, error) {
 	}
 	doc.closers = append(doc.closers, z)
 	return doc, nil
+}
+
+func archiveParts(z *zip.ReadCloser) (document *zip.File, files map[string]*zip.File) {
+	files = map[string]*zip.File{}
+	for _, f := range z.File {
+		switch {
+		case strings.HasSuffix(f.Name, "data.json"), strings.HasSuffix(f.Name, "data.pgp"):
+			if document == nil {
+				document = f
+			}
+		default:
+			if base := zipBase(f.Name); base != "" {
+				files[base] = f
+			}
+		}
+	}
+	return document, files
 }
 
 func decryptDocument(in source, body []byte) ([]byte, error) {
@@ -133,8 +127,6 @@ func readProtonJSON(in source, body []byte, files map[string]*zip.File) (*Docume
 	return doc, nil
 }
 
-// archived matches an item's attachments against the archive, and names the ones
-// the file turned out not to hold.
 func (d *Document) archived(item ExportedItem, files map[string]*zip.File) []File {
 	var out []File
 	for _, entry := range item.Files {
@@ -192,8 +184,6 @@ func protonEntry(in ExportedItem, version string) (*Entry, error) {
 	return out, nil
 }
 
-// protonContent parses an item's content and brings what an older app wrote up
-// to the shape this one stores.
 func protonContent(kind string, raw json.RawMessage, version string) (*pb.Content, error) {
 	if kind == "login" {
 		var err error
@@ -213,13 +203,6 @@ func protonContent(kind string, raw json.RawMessage, version string) (*pb.Conten
 	return content, nil
 }
 
-// loginBeforeEmailAndUsername moves what an export older than Pass 1.18 called
-// the username.
-//
-// Pass kept one field for what you sign in with until it split it in two, and
-// the one it kept held an address, so that is where an old export's value
-// belongs. Dropping it instead would read the file back with every login
-// anonymous.
 func loginBeforeEmailAndUsername(raw json.RawMessage, version string) (json.RawMessage, error) {
 	if !versionBefore(version, "1.18.0") {
 		return raw, nil
@@ -242,7 +225,6 @@ func loginBeforeEmailAndUsername(raw json.RawMessage, version string) (json.RawM
 	return out, nil
 }
 
-// DecodeContent rebuilds the stored message for one kind of item.
 func DecodeContent(kind string, raw json.RawMessage) (*pb.Content, error) {
 	out := &pb.Content{}
 	switch kind {
@@ -282,11 +264,6 @@ func DecodeContent(kind string, raw json.RawMessage) (*pb.Content, error) {
 	return nil, fmt.Errorf("%q is a kind of item this version does not know how to read", kind)
 }
 
-// decodeInto reads one message out of the document.
-//
-// Proton writes a field it has no value for as an empty one rather than leaving
-// it out, and a newer app may write fields this one has never heard of. Neither
-// is a reason to refuse the item.
 func decodeInto(raw json.RawMessage, into proto.Message) error {
 	if len(raw) == 0 {
 		return nil
@@ -298,7 +275,6 @@ func decodeInto(raw json.RawMessage, into proto.Message) error {
 	return nil
 }
 
-// versionBefore compares the versions Proton Pass stamps on its exports.
 func versionBefore(version, than string) bool {
 	left, right := versionParts(version), versionParts(than)
 	for i := range right {
@@ -331,8 +307,6 @@ func versionParts(v string) [3]int {
 	return out
 }
 
-// readProtonCSV reads the spreadsheet the app exports, which is also the one it
-// hands out as a template to fill in by hand.
 func readProtonCSV(in source, raw []byte) (*Document, error) {
 	t, err := readCSV(raw)
 	if err != nil {
@@ -341,8 +315,6 @@ func readProtonCSV(in source, raw []byte) (*Document, error) {
 	if !t.has(protonCSVColumns...) {
 		return nil, notInProtonColumns(in, t)
 	}
-	// A file written before Pass split the two apart has one column, and it held
-	// an address.
 	identifierIsEmail := !t.has("email")
 
 	doc := &Document{}
@@ -409,8 +381,6 @@ func protonCSVEntry(r row, kind string, identifierIsEmail bool) (*Entry, error) 
 	}
 }
 
-// cardFields is a card as the app's CSV carries it: every field of the item, and
-// its note, in one column.
 type cardFields struct {
 	CardholderName     string `json:"cardholderName"`
 	Number             string `json:"number"`
@@ -428,10 +398,6 @@ func noteOf(column string) string {
 	return fields.Note
 }
 
-// splitList reads the addresses out of whichever column the file carries them
-// in, with the rule each one fills under: the structured column the app writes
-// now carries the rules, and the plain list beside it holds only addresses under
-// the default rule.
 func splitList(structured, plain string) ([]string, map[string]pb.AutofillUrl_Mode) {
 	var urls []autofillURL
 	if err := json.Unmarshal([]byte(structured), &urls); err == nil && len(urls) > 0 {

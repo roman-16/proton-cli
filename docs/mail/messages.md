@@ -211,6 +211,8 @@ A message Proton flagged carries a Flagged line reading phishing or suspicious; 
 
 While `mail settings set image-proxy` is on, links come without their tracking and a Links line counts the ones that had some. `--render raw` prints the body as it was sent.
 
+Reading somebody's answer to an invitation you sent records it on your event.
+
 ```
 proton mail messages get REF
 ```

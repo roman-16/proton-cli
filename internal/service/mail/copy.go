@@ -3,6 +3,8 @@ package mail
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -54,7 +56,12 @@ func (l listed) content() string { return fmt.Sprintf("%d.%d", l.meta.Time, l.me
 func (l listed) state() string {
 	labels := slices.Clone(l.meta.LabelIDs)
 	slices.Sort(labels)
-	return export.Version(labels, l.meta.Unread, l.meta.Flags)
+	sum := sha256.New()
+	enc := json.NewEncoder(sum)
+	for _, v := range []any{labels, l.meta.Unread, l.meta.Flags} {
+		_ = enc.Encode(v)
+	}
+	return hex.EncodeToString(sum.Sum(nil)[:12])
 }
 
 func (l listed) version() string { return l.content() + stateSeparation + l.state() }

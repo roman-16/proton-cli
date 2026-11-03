@@ -41,7 +41,7 @@ type Event struct {
 	Number      int                    `json:"occurrence_number,omitempty"`
 	Count       *int                   `json:"occurrence_count,omitempty"`
 	Reminders   []string               `json:"reminders"`
-	Attendees   []string               `json:"attendees"`
+	Attendees   []Attendee             `json:"attendees"`
 	Status      string                 `json:"status"`
 	Organizer   string                 `json:"organizer,omitempty"`
 	Color       string                 `json:"color,omitempty"`
@@ -49,6 +49,28 @@ type Event struct {
 }
 
 func (e Event) Recurring() bool { return e.RRule != "" || e.Occurrence != "" }
+
+type Attendee struct {
+	Answer string `json:"answer"`
+	Email  string `json:"email"`
+	Role   string `json:"role"`
+}
+
+func attendeesOf(v ical.VEvent) []Attendee {
+	out := make([]Attendee, 0, len(v.Attendees))
+	for _, a := range v.Attendees {
+		out = append(out, Attendee{Answer: answerOfPartstat(a.PartStat).word, Email: a.Email, Role: RoleWord(a.Role)})
+	}
+	return out
+}
+
+func (e Event) attendeeEmails() string {
+	emails := make([]string, 0, len(e.Attendees))
+	for _, a := range e.Attendees {
+		emails = append(emails, a.Email)
+	}
+	return strings.Join(emails, " ")
+}
 
 const eventsPageSize = 100
 
@@ -88,9 +110,58 @@ type rawEvent struct {
 }
 
 type rawAttendee struct {
-	ID     string
-	Token  string
-	Status int
+	ID         string
+	Token      string
+	Status     int
+	UpdateTime *int64
+}
+
+func (s *Service) withEveryAttendee(ctx context.Context, raws []rawEvent) error {
+	for i := range raws {
+		if err := s.everyAttendee(ctx, &raws[i]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Service) everyAttendee(ctx context.Context, raw *rawEvent) error {
+	if raw.AttendeesInfo.MoreAttendees != 1 {
+		return nil
+	}
+	more, err := proton.All(ctx, func(ctx context.Context, page int) ([]rawAttendee, bool, error) {
+		var r struct {
+			Attendees     []rawAttendee
+			MoreAttendees int
+		}
+		if err := s.C.Decode(ctx, proton.Request{
+			Method: "GET", Path: fmt.Sprintf("/calendar/v1/%s/events/%s/attendees", raw.CalendarID, raw.ID),
+			Query: proton.Query("Page", fmt.Sprintf("%d", page+1)),
+		}, &r); err != nil {
+			return nil, false, err
+		}
+		return r.Attendees, r.MoreAttendees == 1 && len(r.Attendees) > 0, nil
+	})
+	if err != nil {
+		return err
+	}
+	raw.AttendeesInfo.Attendees = append(raw.AttendeesInfo.Attendees, more...)
+	raw.AttendeesInfo.MoreAttendees = 0
+	return nil
+}
+
+func answered(attendees []ical.Attendee, info []rawAttendee) []ical.Attendee {
+	status := make(map[string]int, len(info))
+	for _, a := range info {
+		status[a.Token] = a.Status
+	}
+	out := slices.Clone(attendees)
+	for i, a := range out {
+		if code, ok := status[a.Token]; ok && a.Token != "" {
+			out[i].PartStat = answerOfCode(code).partstat
+		}
+	}
+	return out
 }
 
 func (e rawEvent) notifications() []map[string]any {
@@ -137,8 +208,11 @@ func (s *Service) decrypt(ctx context.Context, ck *calKeys, raw rawEvent) stored
 		cardSet{raw.SharedEvents, packet, decKR},
 		cardSet{raw.CalendarEvents, raw.CalendarKeyPacket, ck.calKR})
 	if err == nil && len(raw.AttendeesEvents) > 0 {
-		if attendees, _, aerr := decryptEvent(raw.AttendeesEvents, packet, decKR, ck.addr.Read); aerr == nil {
-			model.Attendees = attendees.Attendees
+		attendees, _, aerr := decryptEvent(raw.AttendeesEvents, packet, decKR, ck.addr.Read)
+		if aerr != nil {
+			skip.Record(ctx, skip.KindEvent, raw.ID, skip.Undecryptable, aerr)
+		} else {
+			model.Attendees = answered(attendees.Attendees, raw.AttendeesInfo.Attendees)
 		}
 	}
 	return stored{raw: raw, model: model, sig: sig, readErr: err}
@@ -259,6 +333,9 @@ func (s *Service) rawEventsBetween(ctx context.Context, calendarID string, w ica
 			seen[e.ID] = true
 			out = append(out, e)
 		}
+	}
+	if err := s.withEveryAttendee(ctx, out); err != nil {
+		return nil, err
 	}
 	return out, nil
 }
@@ -428,9 +505,7 @@ func (e stored) row() Event {
 	ev.RRule = e.model.RRule
 	ev.Organizer = e.model.Organizer
 	ev.Status = StatusText(e.model.Status)
-	for _, a := range e.model.Attendees {
-		ev.Attendees = append(ev.Attendees, AttendeeText(a.Email, a.Role))
-	}
+	ev.Attendees = attendeesOf(e.model)
 	return ev
 }
 
@@ -564,6 +639,9 @@ func (s *Service) rawEvent(ctx context.Context, calendarID, eventID string) (raw
 	}, &r); err != nil {
 		return rawEvent{}, err
 	}
+	if err := s.everyAttendee(ctx, &r.Event); err != nil {
+		return rawEvent{}, err
+	}
 	return r.Event, nil
 }
 
@@ -689,7 +767,7 @@ func (s *Service) attachAttendees(ctx context.Context, body *eventBody, emails [
 
 func inviteMail(v ical.VEvent, recipients []string) *Mail {
 	return &Mail{
-		ICS:        v.Document("REQUEST"),
+		ICS:        v.Unanswered().Document("REQUEST"),
 		Recipients: recipients,
 		Subject:    "Invitation: " + v.Summary,
 		Body: fmt.Sprintf("You have been invited to %q.\n\nThe calendar invitation is attached.",
@@ -700,7 +778,7 @@ func inviteMail(v ical.VEvent, recipients []string) *Mail {
 
 func updateMail(v ical.VEvent, recipients []string) *Mail {
 	return &Mail{
-		ICS:        v.Document("REQUEST"),
+		ICS:        v.Unanswered().Document("REQUEST"),
 		Recipients: recipients,
 		Subject:    "Updated invitation: " + v.Summary,
 		Body: fmt.Sprintf("%q has been updated.\n\nThe updated calendar invitation is attached.",
@@ -829,6 +907,11 @@ const (
 	roleOptional = "OPT-PARTICIPANT"
 )
 
+const (
+	RoleOptional = "optional"
+	RoleRequired = "required"
+)
+
 func ParseAttendee(raw string) (email, role string, err error) {
 	email = strings.TrimSpace(raw)
 	i := strings.LastIndex(email, ":")
@@ -838,19 +921,19 @@ func ParseAttendee(raw string) (email, role string, err error) {
 	suffix := strings.ToLower(strings.TrimSpace(email[i+1:]))
 	email = strings.TrimSpace(email[:i])
 	switch suffix {
-	case "optional":
+	case RoleOptional:
 		return email, roleOptional, nil
-	case "required":
+	case RoleRequired:
 		return email, roleRequired, nil
 	}
 	return email, "", fmt.Errorf("attendee %q: after the colon write required or optional", raw)
 }
 
-func AttendeeText(email, role string) string {
-	if role == roleOptional {
-		return email + ":optional"
+func RoleWord(role string) string {
+	if strings.EqualFold(role, roleOptional) {
+		return RoleOptional
 	}
-	return email
+	return RoleRequired
 }
 
 var eventStatuses = map[string]string{
@@ -995,8 +1078,6 @@ func (s *Service) EventsImport(ctx context.Context, calendarID string, events []
 		}
 		color := accent.Nearest(v.Color)
 		if v.Color != "" && color == "" {
-			// The event still lands and nothing is missing from the import, so this
-			// is recorded and not counted.
 			slog.DebugContext(ctx, "calendar: an imported event named a colour that is not one",
 				"reason", "unreadable color")
 		}

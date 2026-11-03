@@ -10,6 +10,7 @@ import (
 	"mime/multipart"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -22,8 +23,6 @@ import (
 	"github.com/roman-16/proton-cli/internal/units"
 )
 
-// ConversationAttachment carries its parent MessageID so callers can
-// disambiguate and download against the correct message.
 type ConversationAttachment struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
@@ -55,7 +54,6 @@ func (s *Service) ConversationAttachmentsList(ctx context.Context, convID string
 	return out, nil
 }
 
-// AttachmentsList drops inline attachments unless includeInline is set.
 func (s *Service) AttachmentsList(ctx context.Context, msgID string, includeInline bool) ([]Attachment, error) {
 	var r struct {
 		Message struct {
@@ -78,20 +76,11 @@ func (s *Service) AttachmentsList(ctx context.Context, msgID string, includeInli
 	return out, nil
 }
 
-// sealedAttachment is one attachment as a message carries it, with the key
-// packets that open its contents.
 type sealedAttachment struct {
 	ID, Name, MIMEType, Disposition, KeyPackets string
 	Size                                        int64
 }
 
-// MatchAttachment finds the attachment a reference names: the ID outright, or
-// the name regardless of case. A name two of them answer to is refused with the
-// IDs to choose from, rather than guessed at.
-//
-// describe is how the caller's own kind of attachment says what it is, so the
-// one on a message, the one in a thread and the one on a draft are all named the
-// same way.
 func MatchAttachment[T any](where, reference string, atts []T, describe func(T) Attachment) (T, error) {
 	for _, a := range atts {
 		if describe(a).ID == reference {
@@ -104,9 +93,6 @@ func MatchAttachment[T any](where, reference string, atts []T, describe func(T) 
 			matches = append(matches, a)
 		}
 	}
-	// The same lookup runs over one message, over a whole thread and over a
-	// draft, and only the caller knows which. Nothing was there is the one answer
-	// where that matters, so it is the one this states itself.
 	if len(matches) == 0 {
 		var zero T
 		return zero, &errs.NotFound{Kind: "attachment", Where: where, Ref: reference}
@@ -119,8 +105,6 @@ func MatchAttachment[T any](where, reference string, atts []T, describe func(T) 
 		})
 }
 
-// AttachmentDownload decrypts one attachment of a message, named by its ID or
-// by its own name.
 func (s *Service) AttachmentDownload(ctx context.Context, msgID, reference string) ([]byte, string, error) {
 	var r struct {
 		Message struct {
@@ -169,8 +153,18 @@ func (s *Service) AttachmentDownload(ctx context.Context, msgID, reference strin
 	return dec.Bytes(), name, nil
 }
 
-// ReadLocalAttachment reads a file into a LocalAttachment, typed by its name.
-// inline marks an image to embed in an HTML body.
+var calendarExtensions = []string{".ical", ".icalendar", ".ics", ".ifb"}
+
+func CalendarAttachments(atts []Attachment) []Attachment {
+	var out []Attachment
+	for _, a := range atts {
+		if slices.Contains(calendarExtensions, strings.ToLower(filepath.Ext(a.Name))) {
+			out = append(out, a)
+		}
+	}
+	return out
+}
+
 func ReadLocalAttachment(path string, inline bool) (LocalAttachment, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -224,8 +218,6 @@ func newContentID(senderEmail string) (string, error) {
 	return hex.EncodeToString(b) + "@" + domain, nil
 }
 
-// uploadAttachments uploads each local attachment against a draft, returning
-// them with the server IDs and session keys the send path needs.
 func (s *Service) uploadAttachments(ctx context.Context, addrKR *pgp.KeyRing, messageID string, atts []LocalAttachment) ([]*draftAttachment, error) {
 	out := make([]*draftAttachment, 0, len(atts))
 	for _, a := range atts {
@@ -238,9 +230,6 @@ func (s *Service) uploadAttachments(ctx context.Context, addrKR *pgp.KeyRing, me
 	return out, nil
 }
 
-// uploadAttachment encrypts an attachment with a fresh session key (key packet
-// wrapped to the draft's address key), detached-signs it, and uploads it as a
-// multipart form against the draft.
 func (s *Service) uploadAttachment(ctx context.Context, addrKR *pgp.KeyRing, messageID string, a LocalAttachment) (*draftAttachment, error) {
 	sk, err := pgphelper.PGP.GenerateSessionKey()
 	if err != nil {
@@ -291,10 +280,6 @@ func (s *Service) uploadAttachment(ctx context.Context, addrKR *pgp.KeyRing, mes
 	}, nil
 }
 
-// formField and formFile are one part of a multipart body each. They are given
-// in order rather than keyed, because a form can carry the same name more than
-// once: an answer to a password-protected message names each of its
-// attachments under Filename[], and the packets line up with that order.
 type formField struct{ Name, Value string }
 
 type formFile struct {
@@ -325,8 +310,6 @@ func buildAttachmentForm(fields []formField, files []formFile) (body []byte, con
 	return buf.Bytes(), w.FormDataContentType(), nil
 }
 
-// attachmentKeyPackets wraps each attachment session key to an internal
-// recipient's key ring (Type-1 per-recipient packets).
 func attachmentKeyPackets(recKR *pgp.KeyRing, atts []*draftAttachment) (map[string]string, error) {
 	if len(atts) == 0 {
 		return nil, nil
@@ -345,8 +328,6 @@ func attachmentKeyPackets(recKR *pgp.KeyRing, atts []*draftAttachment) (map[stri
 	return out, nil
 }
 
-// attachmentPasswordKeyPackets wraps each attachment session key with the EO
-// password (symmetric packets), for encrypted-for-outside recipients.
 func attachmentPasswordKeyPackets(atts []*draftAttachment, password string) (map[string]string, error) {
 	if len(atts) == 0 {
 		return nil, nil
@@ -365,8 +346,6 @@ func attachmentPasswordKeyPackets(atts []*draftAttachment, password string) (map
 	return out, nil
 }
 
-// attachmentCleartextKeys exposes raw attachment session keys for external
-// (Type-4 cleartext) packages.
 func attachmentCleartextKeys(atts []*draftAttachment) map[string]any {
 	if len(atts) == 0 {
 		return nil

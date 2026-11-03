@@ -41,9 +41,9 @@ Write a copy of the account to a directory.
 
 Name the apps to export, or none for all of them: calendar, contacts, drive, mail and pass. The directory has to be new, empty, or one this command wrote before.
 
-Run it again into the same directory to continue a run that stopped, or later to bring the copy up to date. Only what is missing or changed is fetched, and nothing is removed from the copy.
+Run it again into the same directory to continue a run that stopped, or later to bring the copy up to date. Only what is missing or changed is fetched, and nothing is removed from the copy, not even what you deleted in Proton.
 
-Everything is written decrypted. Only the Pass archive can be locked, with --passphrase-file.
+Everything is written decrypted. Only the Pass archive can be locked, with --passphrase-file, and every later run needs the same passphrase.
 
 ```
 proton account export [APP...]

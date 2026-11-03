@@ -2,6 +2,10 @@ package calendar
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"io/fs"
+	"log/slog"
 	"os"
 	"slices"
 	"strings"
@@ -42,12 +46,10 @@ func own(cals []Calendar) []Calendar {
 }
 
 type calendarFile struct {
-	cal      Calendar
-	events   []ical.VEvent
-	versions map[string]string
-	gone     []string
-	changed  int
-	version  string
+	cal     Calendar
+	events  []ical.VEvent
+	changed int
+	text    string
 }
 
 func (p copyPart) Run(ctx context.Context, c *export.Copy, sink progress.Sink) (res export.Result, err error) {
@@ -78,13 +80,21 @@ func (p copyPart) Run(ctx context.Context, c *export.Copy, sink progress.Sink) (
 			return res, err
 		}
 		f, owed, err := p.compare(c, ledger, cal, events)
+		if errors.Is(err, errUnreadableCopy) {
+			slog.WarnContext(ctx, fmt.Sprintf("%s does not read back, so it is left as it is. Move it away and run the export again to write it afresh.",
+				c.Path(fileKeyPath(ledger, cal.ID))), "reason", "unreadable")
+			continue
+		}
 		if err != nil {
 			return res, err
 		}
 		if owed {
 			due = append(due, f)
-			total += len(events)
+			total += len(f.events)
 		}
+	}
+	if err := ledger.Retain(func(id string) bool { return strings.HasPrefix(id, fileKeyPrefix) }); err != nil {
+		return res, err
 	}
 	if len(due) == 0 {
 		return res, nil
@@ -103,18 +113,26 @@ func (p copyPart) Run(ctx context.Context, c *export.Copy, sink progress.Sink) (
 	return res, nil
 }
 
-func eventKey(calID string, v ical.VEvent) string {
-	key := "event:" + calID + ":" + v.UID
-	if v.RecurrenceID != nil {
-		key += ":" + v.RecurrenceID.String()
+func eventKey(v ical.VEvent) string {
+	if v.RecurrenceID == nil {
+		return v.UID
 	}
-	return key
+	return v.UID + ":" + v.RecurrenceID.String()
 }
 
-func fileKey(calID string) string { return "calendar:" + calID }
+const fileKeyPrefix = "calendar:"
+
+func fileKey(calID string) string { return fileKeyPrefix + calID }
+
+func fileKeyPath(ledger *export.Ledger, calID string) string {
+	e, _ := ledger.Get(fileKey(calID))
+	return e.Path
+}
+
+var errUnreadableCopy = errors.New("calendar: the copy's file does not read back")
 
 func (copyPart) compare(c *export.Copy, ledger *export.Ledger, cal Calendar, events []ical.VEvent) (calendarFile, bool, error) {
-	f := calendarFile{cal: cal, events: events, versions: make(map[string]string, len(events))}
+	f := calendarFile{cal: cal}
 	want := copyDir + localfile.SafeName(cal.Name) + ".ics"
 	now, was, err := ledger.Place(fileKey(cal.ID), want)
 	if err != nil {
@@ -125,47 +143,45 @@ func (copyPart) compare(c *export.Copy, ledger *export.Ledger, cal Calendar, eve
 			return f, false, err
 		}
 	}
-	all := make([]string, 0, len(events))
+	before, err := os.ReadFile(c.Path(now))
+	present := err == nil
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return f, false, err
+	}
+	previous, err := ical.ParseCalendar(string(before))
+	if err != nil {
+		return f, false, errUnreadableCopy
+	}
+
+	written := make(map[string]string, len(previous))
+	for _, v := range previous {
+		written[eventKey(v)] = ical.Calendar([]ical.VEvent{v})
+	}
+	held := make(map[string]bool, len(events))
 	for _, v := range events {
-		key := eventKey(cal.ID, v)
-		version := export.Version(ical.Calendar([]ical.VEvent{v}))
-		f.versions[key] = version
-		all = append(all, version)
-		if had, ok := ledger.Get(key); !ok || had.Version != version {
+		held[v.UID] = true
+		if was, ok := written[eventKey(v)]; !ok || was != ical.Calendar([]ical.VEvent{v}) {
 			f.changed++
 		}
 	}
-	prefix := "event:" + cal.ID + ":"
-	for _, id := range ledger.IDs() {
-		if _, held := f.versions[id]; strings.HasPrefix(id, prefix) && !held {
-			f.gone = append(f.gone, id)
+	f.events = slices.Clone(events)
+	for _, v := range previous {
+		if !held[v.UID] {
+			f.events = append(f.events, v)
 		}
 	}
-	slices.Sort(all)
-	f.version = export.Version(all)
-	file, _ := ledger.Get(fileKey(cal.ID))
-	present := localfile.Exists(c.Path(now))
+	slices.SortStableFunc(f.events, func(a, b ical.VEvent) int { return a.Start.Time.Compare(b.Start.Time) })
+	f.text = ical.Calendar(f.events)
 	if !present {
 		f.changed = len(events)
 	}
-	f.changed += len(f.gone)
-	return f, !present || file.Version != f.version, nil
+	return f, !present || f.text != string(before), nil
 }
 
 func (copyPart) write(c *export.Copy, ledger *export.Ledger, f calendarFile) error {
 	file, _ := ledger.Get(fileKey(f.cal.ID))
-	if err := localfile.Publish(c.Path(file.Path), []byte(ical.Calendar(f.events)), time.Time{}); err != nil {
+	if err := localfile.Publish(c.Path(file.Path), []byte(f.text), time.Time{}); err != nil {
 		return err
 	}
-	for key, version := range f.versions {
-		if err := ledger.Put(export.Entry{ID: key, Version: version}); err != nil {
-			return err
-		}
-	}
-	for _, id := range f.gone {
-		if err := ledger.Forget(id); err != nil {
-			return err
-		}
-	}
-	return ledger.Put(export.Entry{ID: fileKey(f.cal.ID), Version: f.version, Path: file.Path, Want: file.Want})
+	return ledger.Put(export.Entry{ID: fileKey(f.cal.ID), Path: file.Path, Want: file.Want})
 }

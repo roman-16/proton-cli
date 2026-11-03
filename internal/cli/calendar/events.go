@@ -141,6 +141,10 @@ func eventsGetCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "get REF",
 		Short: "Show one event, decrypted",
+		Long: "Show one event, decrypted.\n\n" +
+			"Each attendee is listed with their answer: accepted, tentative, declined or\n" +
+			"pending. Somebody outside Proton answers by email, and the answer shows once\n" +
+			"that email is opened in Proton Mail or with `mail messages get`.",
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			calID, eventID, occurrence, err := resolveEvent(c, c.Args[0])
 			if err != nil {
@@ -177,7 +181,7 @@ func eventsGetCmd() *cobra.Command {
 					{Label: "Reminders", Value: strings.Join(ev.Reminders, ", ")},
 					{Label: "Status", Value: ev.Status, Always: true},
 					{Label: "Organizer", Value: ev.Organizer},
-					{Label: "Attendees", Value: strings.Join(ev.Attendees, ", ")},
+					{Label: "Attendees", Value: attendeeLines(ev.Attendees)},
 					kit.ColorField(ev.Color),
 					{Label: "Calendar", Value: name},
 					kit.SignatureField(string(ev.Signature)),
@@ -186,6 +190,18 @@ func eventsGetCmd() *cobra.Command {
 			})
 		}),
 	}
+}
+
+func attendeeLines(attendees []calsvc.Attendee) string {
+	lines := make([]string, 0, len(attendees))
+	for _, a := range attendees {
+		detail := a.Answer
+		if a.Role == calsvc.RoleOptional {
+			detail = a.Role + ", " + a.Answer
+		}
+		lines = append(lines, a.Email+" ("+detail+")")
+	}
+	return strings.Join(lines, "\n")
 }
 
 func occurrenceLabel(e calsvc.Event) string {
@@ -729,17 +745,13 @@ const composerDefaultMinutes = 30
 func eventsRespondCmd() *cobra.Command {
 	answer := &kit.Enum{
 		Name: "answer", Usage: "Your reply to the invitation",
-		Values: []string{"accept", "tentative", "decline"},
+		Values: calsvc.Replies(),
 	}
 	c := &cobra.Command{
 		Use:   "respond REF",
 		Short: "Answer an invitation, telling the organizer",
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			reply, err := answer.Value()
-			if err != nil {
-				return err
-			}
-			code, err := calsvc.StatusFromFlag(reply)
 			if err != nil {
 				return err
 			}
@@ -760,7 +772,7 @@ func eventsRespondCmd() *cobra.Command {
 				Detail: reply, IDs: []string{kit.JoinPair(calID, eventID)},
 			}, func() error {
 				var err error
-				res, err = c.App.Calendar.EventRespond(c.Ctx, calID, eventID, code)
+				res, err = c.App.Calendar.EventRespond(c.Ctx, calID, eventID, reply)
 				return err
 			}); err != nil {
 				return err

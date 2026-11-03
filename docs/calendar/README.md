@@ -93,6 +93,27 @@ Proton users are added directly. External addresses get an emailed invitation.
 
 A bare address invites somebody as required, and `--attendee jane@example.com:optional` as optional. A value that is not an address, or a role other than `optional` or `required`, is refused before anything is sent.
 
+`events get` lists each attendee with their answer: `accepted`, `tentative`, `declined` or `pending`. With `--output json` each attendee carries `answer`, `email` and `role`.
+
+```console
+$ proton calendar events get "Design review"
+Title:      Design review
+Start:      2026-04-20 10:00
+End:        2026-04-20 10:45
+Duration:   45m
+Status:     confirmed
+Organizer:  alice@proton.me
+Attendees:  jane@example.com (accepted)
+            bob@example.com (optional, tentative)
+            carol@proton.me (pending)
+Calendar:   Work
+ID:         4f2a1b9c/8d3e7a21
+```
+
+Somebody outside Proton answers by email. Reading that email with `proton mail messages get` or `proton mail conversations get` records the answer on your event, and so does opening it in Proton Mail. `--dry-run` shows the answer without recording it.
+
+An answer stays out of the event, with a note saying why, when it is about one occurrence, about another version of the event, or older than the answer already recorded. An answer from somebody who is not invited is left out too.
+
 ### Proton Meet links
 
 `--meet` gives an event a Proton Meet link, printed below the confirmation. `--no-meet` takes it off again.

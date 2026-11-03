@@ -80,7 +80,8 @@ func convGetCmd() *cobra.Command {
 		Long: "Show a whole thread, decrypted.\n\n" +
 			"While `mail settings set image-proxy` is on, links come without their\n" +
 			"tracking and each message's Links line counts the ones that had some.\n" +
-			"`--render raw` prints the bodies as they were sent.",
+			"`--render raw` prints the bodies as they were sent.\n\n" +
+			"Reading somebody's answer to an invitation you sent records it on your event.",
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			shape, err := render.Value()
 			if err != nil {
@@ -113,7 +114,7 @@ func convGetCmd() *cobra.Command {
 			for i := range conv.Messages {
 				overruleHint(c, &conv.Messages[i])
 			}
-			return nil
+			return recordAnswers(c, conv.Messages)
 		}),
 	}
 	render.Register(c)
@@ -144,7 +145,6 @@ func threadDocument(conv *mailsvc.ConversationFull, shape string, bodyOnly, stri
 	}
 }
 
-// threadPreview is one message reduced to a line, for --summary.
 type threadPreview struct {
 	Position    string `json:"position"`
 	Date        string `json:"date"`
@@ -156,8 +156,6 @@ type threadPreview struct {
 	countdown   int64
 }
 
-// threadSummary renders a thread as a table, which is what a one-line-per-message
-// view actually is - so it aligns, and survives jq.
 func threadSummary(c *kit.Invocation, conv *mailsvc.ConversationFull) error {
 	n := len(conv.Messages)
 	rows := make([]threadPreview, 0, n)
@@ -188,8 +186,6 @@ func threadSummary(c *kit.Invocation, conv *mailsvc.ConversationFull) error {
 		},
 	}, rows)
 }
-
-// ── organising ──
 
 func convMoveCmd() *cobra.Command {
 	var f filters
@@ -306,11 +302,6 @@ func convMarkCmd() *cobra.Command {
 	return c
 }
 
-// convSimpleVerb builds a thread verb that needs no argument beyond the selection.
-//
-// The apply function receives the scope label, because Proton applies two of these
-// - marking unread, and deleting - within a mailbox rather than globally: a thread
-// can have messages in several places at once.
 func convSimpleVerb(use, short string, action ui.Action, detail string,
 	apply func(*kit.Invocation, []string, string) ([]mailsvc.Refused, error)) *cobra.Command {
 	var f filters
@@ -347,8 +338,6 @@ func threadScope(c *kit.Invocation, f *filters) (string, error) {
 	return mailbox.ID, nil
 }
 
-// ── replying to a thread ──
-
 func convReplyCmd() *cobra.Command {
 	return convAnswerCmd("reply", "Reply to the newest message in a thread", false)
 }
@@ -357,8 +346,6 @@ func convForwardCmd() *cobra.Command {
 	return convAnswerCmd("forward", "Forward the newest message in a thread", true)
 }
 
-// convAnswerCmd answers the newest message in a thread, which is what the web
-// client's Reply and Forward buttons do from the thread view.
 func convAnswerCmd(use, short string, forward bool) *cobra.Command {
 	var f composeFlags
 	var d deliveryFlags
@@ -409,8 +396,6 @@ func convAnswerCmd(use, short string, forward bool) *cobra.Command {
 	}
 	return c
 }
-
-// ── attachments across a thread ──
 
 func convAttachmentsCmd() *cobra.Command {
 	c := &cobra.Command{Use: "attachments", Short: "Files attached anywhere in a thread"}
@@ -522,13 +507,6 @@ func convAttachmentsDownloadCmd() *cobra.Command {
 	return c
 }
 
-// ── snooze ──
-
-// Snooze takes threads out of the inbox until a moment and brings them back
-// then, which is what the web's snooze does.
-//
-// It is on threads and not on messages because that is what Proton snoozes: a
-// conversation leaves the inbox as a whole and returns as a whole.
 func convSnoozeCmd() *cobra.Command {
 	var f filters
 	var until string
@@ -563,7 +541,6 @@ func convSnoozeCmd() *cobra.Command {
 	return c
 }
 
-// snoozeMoment reads either spelling of "when", judged before the network.
 func snoozeMoment(until string) (int64, error) {
 	if until == "" {
 		return 0, kit.Fail("Until when?").

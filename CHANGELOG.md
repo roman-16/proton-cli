@@ -6,6 +6,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 Adding a version section here is what publishes a release, so this file is the one place a version is decided: see [Releases](CONTRIBUTING.md#releases). Versions that shipped before this file existed are on the [releases page](https://github.com/roman-16/proton-cli/releases).
 
+## [5.4.0] - 2026-11-03
+
+### Highlights
+
+- **See who is coming** - `calendar events get` shows each attendee's answer. Answers that guests outside Proton send by email are recorded when you read them with `mail messages get`.
+- **A copy that keeps what you delete** - `account export` keeps the events, contacts and Pass items you delete in Proton, so putting the copy back brings them back.
+
+### Added
+
+- `calendar events get` shows each attendee's answer: `accepted`, `tentative`, `declined` or `pending`.
+- `mail messages get` and `mail conversations get` record an answer to an invitation you sent on your event. `--dry-run` shows the answer without recording it.
+
+### Changed
+
+- **Breaking.** `attendees` in the JSON of `calendar events get` and `events list` holds objects with `answer`, `email` and `role` instead of addresses with `:optional` after them. Read the address from `.attendees[].email`.
+- **Breaking.** `account export` refuses a locked Pass archive when it runs without the passphrase the archive was locked with, instead of replacing the archive. Move the archive away to start one with a new passphrase.
+- `account export` keeps events, contacts and Pass items you deleted in Proton.
+- `calendar events export` and the calendars `account export` writes carry each attendee's answer.
+
+### Fixed
+
+- `calendar events list --keyword` with a calendar index stopped finding an event that changed after the index was made.
+
+### Security
+
+- A locked Pass archive from `account export` no longer has a fingerprint of each item stored beside it, which let a guessed password be checked without the passphrase.
+
 ## [5.3.0] - 2026-10-30
 
 ### Highlights

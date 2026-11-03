@@ -2,9 +2,6 @@ package export
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
 	"errors"
 
 	"github.com/roman-16/proton-cli/internal/progress"
@@ -53,15 +50,6 @@ type Held struct {
 }
 
 const Uncounted = -1
-
-func Version(of ...any) string {
-	sum := sha256.New()
-	enc := json.NewEncoder(sum)
-	for _, v := range of {
-		_ = enc.Encode(v)
-	}
-	return hex.EncodeToString(sum.Sum(nil)[:12])
-}
 
 func Stops(ctx context.Context, err error) bool {
 	if ctx.Err() != nil {

@@ -367,25 +367,38 @@ func (v VEvent) AttendeesEncrypted() string {
 	}
 	lines := []contentline.Line{{Name: "UID", Value: v.UID}}
 	for _, a := range v.Attendees {
-		lines = append(lines, attendeeLine(a))
+		lines = append(lines, attendeeLine(a, ""))
 	}
 	return component(lines)
 }
 
-func attendeeLine(a Attendee) contentline.Line {
+func (a Attendee) answer() string {
+	if a.PartStat == "" {
+		return "NEEDS-ACTION"
+	}
+	return a.PartStat
+}
+
+func (v VEvent) Unanswered() VEvent {
+	v.Attendees = slices.Clone(v.Attendees)
+	for i := range v.Attendees {
+		v.Attendees[i].PartStat = ""
+	}
+	return v
+}
+
+func attendeeLine(a Attendee, partstat string) contentline.Line {
 	role := a.Role
 	if role == "" {
 		role = "REQ-PARTICIPANT"
-	}
-	partstat := a.PartStat
-	if partstat == "" {
-		partstat = "NEEDS-ACTION"
 	}
 	params := contentline.Params{
 		{Name: "CN", Value: a.Email},
 		{Name: "ROLE", Value: role},
 		{Name: "RSVP", Value: "TRUE"},
-		{Name: "PARTSTAT", Value: partstat},
+	}
+	if partstat != "" {
+		params = append(params, contentline.Param{Name: "PARTSTAT", Value: partstat})
 	}
 	if a.Token != "" {
 		params = append(params, contentline.Param{Name: "X-PM-TOKEN", Value: a.Token})

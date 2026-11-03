@@ -2,16 +2,14 @@ package live
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
-)
 
-// Answering an invitation, and the invitations this account has been sent.
-//
-// The full round trip needs two Proton users: the secondary organizes an event
-// and invites the primary, the primary answers, and the organizer's own copy is
-// where the answer shows up.
+	"github.com/roman-16/proton-cli/tests/account"
+)
 
 func TestCalendarEventsRespondDryRun(t *testing.T) {
 	calID := firstCalendarID(t)
@@ -26,7 +24,6 @@ func TestCalendarEventsRespondDryRun(t *testing.T) {
 	_, stderr := runOKStderr(t, "--dry-run", "calendar", "events", "respond",
 		"--answer", "accept", eventID)
 	assertContains(t, stderr, "Dry run")
-	// The event still reads back (no mutation happened).
 	assertContains(t, runOK(t, "calendar", "events", "get", eventID), title)
 }
 
@@ -34,7 +31,6 @@ func TestCalendarEventsRespondRejectsOrganizer(t *testing.T) {
 	calID := firstCalendarID(t)
 	title := testID() + "-rsvp-org"
 	start := time.Now().Add(48 * time.Hour).Format("2006-01-02T15:04")
-	// We create the event, so we are its organizer; RSVP must be refused.
 	eventID := strings.TrimSpace(runOK(t, "calendar", "events", "create",
 		"--calendar", calID, "--title", title, "--start", start, "--duration", "30m",
 		"--attendee", selfEmail()))
@@ -56,22 +52,16 @@ func eventField(ev map[string]interface{}, key string) interface{} {
 	return e[key]
 }
 
-func firstAttendeeStatus(ev map[string]interface{}) (int, bool) {
-	e, _ := ev["Event"].(map[string]interface{})
-	if e == nil {
-		return 0, false
+func answerOf(ev map[string]interface{}, email string) string {
+	attendees, _ := ev["attendees"].([]interface{})
+	for _, a := range attendees {
+		m, _ := a.(map[string]interface{})
+		if e, _ := m["email"].(string); strings.EqualFold(e, email) {
+			answer, _ := m["answer"].(string)
+			return answer
+		}
 	}
-	ai, _ := e["AttendeesInfo"].(map[string]interface{})
-	if ai == nil {
-		return 0, false
-	}
-	atts, _ := ai["Attendees"].([]interface{})
-	if len(atts) == 0 {
-		return 0, false
-	}
-	a, _ := atts[0].(map[string]interface{})
-	s, ok := a["Status"].(float64)
-	return int(s), ok
+	return ""
 }
 
 func TestCalendarEventsRespondRoundTrip(t *testing.T) {
@@ -94,8 +84,6 @@ func TestCalendarEventsRespondRoundTrip(t *testing.T) {
 		t.Fatal("could not read the event UID")
 	}
 
-	// The Proton-to-Proton invite lands on the primary's calendar as a shared
-	// event (IsOrganizer=0). Find our copy by matching the UID.
 	primaryCal := firstCalendarID(t)
 	var primaryEventID string
 	waitFor(45*time.Second, 3*time.Second, func() bool {
@@ -120,21 +108,19 @@ func TestCalendarEventsRespondRoundTrip(t *testing.T) {
 	if primaryEventID == "" {
 		t.Fatal("invitation did not appear on the primary's calendar")
 	}
-	// `events list` reports the two halves separately, so this one has to be
-	// joined into the single reference every event verb takes.
 	primaryRef := primaryCal + "/" + primaryEventID
 	cleanupRun(t, fmt.Sprintf("Delete primary event copy: proton calendar events delete %s", primaryRef),
 		"calendar", "events", "delete", primaryRef)
 
 	runOK(t, "calendar", "events", "respond", "--answer", "accept", primaryRef)
 
-	// The primary's own attendee record now shows ACCEPTED (ATTENDEE_STATUS_API 3).
-	got := runJSON(t, "api", "GET", "/calendar/v1/"+primaryCal+"/events/"+primaryEventID)
-	if status, ok := firstAttendeeStatus(got); !ok || status != 3 {
-		t.Errorf("primary attendee Status = %d (ok=%v), want 3 (accepted)", status, ok)
+	if got := answerOf(runJSON(t, "calendar", "events", "get", primaryRef), selfEmail()); got != "accepted" {
+		t.Errorf("the invitee's own copy says %q, want accepted", got)
+	}
+	if got := answerOf(runJSONSecondary(t, "calendar", "events", "get", secondaryEventID), selfEmail()); got != "accepted" {
+		t.Errorf("the organizer's copy says %q, want accepted", got)
 	}
 
-	// The organizer receives the METHOD:REPLY email naming the title.
 	var replyID string
 	waitFor(45*time.Second, 3*time.Second, func() bool {
 		replyID = secondaryMailContaining(t, selfEmail(), title)
@@ -148,8 +134,6 @@ func TestCalendarEventsRespondRoundTrip(t *testing.T) {
 	}
 }
 
-// An answer applies to a whole invitation, so a reference naming one occurrence is
-// refused rather than half-honoured.
 func TestCalendarRespondRefusesAnOccurrenceReference(t *testing.T) {
 	title := testID() + "-rsvpocc"
 	createSeries(t, title, seriesAnchor+"T09:00", "FREQ=WEEKLY;COUNT=2")
@@ -165,8 +149,6 @@ func TestCalendarRespondRefusesAnOccurrenceReference(t *testing.T) {
 	assertContains(t, stderr, "whole series")
 }
 
-// An invitation can be turned down, which takes it out of the way without
-// opening anything.
 func TestCalendarInvitationDeclined(t *testing.T) {
 	name := testID() + "-declined"
 	out, stderr, code := runPaid(t, "--yes", "calendar", "settings", "calendars", "create", "--name", name)
@@ -196,11 +178,63 @@ func TestCalendarInvitationDeclined(t *testing.T) {
 	}
 	runOKSecondary(t, "calendar", "invitations", "decline", "--", invitationID)
 
-	// Turning it down does not put the calendar on that account.
 	for _, row := range runJSONArraySecondary(t, "calendar", "settings", "calendars", "list") {
 		m, _ := row.(map[string]interface{})
 		if n, _ := m["name"].(string); n == name {
 			t.Error("a declined calendar turned up on the account anyway")
 		}
+	}
+}
+
+func TestCalendarAnEmailedAnswerIsRecordedWhenRead(t *testing.T) {
+	title := testID() + "-emailed-answer"
+	start := time.Now().Add(96 * time.Hour).Truncate(time.Minute)
+	eventID := strings.TrimSpace(runOK(t, "calendar", "events", "create",
+		"--calendar", firstCalendarID(t), "--title", title, "--start", start.Format("2006-01-02T15:04"),
+		"--duration", "30m", "--attendee", secondaryEmail(), "--no-meet"))
+	cleanupRun(t, "Delete event: proton calendar events delete "+eventID, "calendar", "events", "delete", eventID)
+	uid, _ := eventField(runJSON(t, "api", "GET", eventPath(t, eventID)), "UID").(string)
+	if uid == "" {
+		t.Fatal("could not read the event UID")
+	}
+
+	reply := filepath.Join(t.TempDir(), "invite.ics")
+	ics := strings.Join([]string{
+		"BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//proton-cli live test//EN", "METHOD:REPLY",
+		"BEGIN:VEVENT", "UID:" + uid, "DTSTAMP:" + time.Now().UTC().Format("20060102T150405Z"),
+		"DTSTART:" + start.UTC().Format("20060102T150405Z"), "SEQUENCE:0",
+		"ORGANIZER:mailto:" + selfEmail(), "ATTENDEE;PARTSTAT=TENTATIVE:mailto:" + secondaryEmail(),
+		"END:VEVENT", "END:VCALENDAR", "",
+	}, "\r\n")
+	if err := os.WriteFile(reply, []byte(ics), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	subject := title + " answer"
+	runOKSecondary(t, "mail", "messages", "send", "--to", selfEmail(), "--subject", subject,
+		"--body", "Tentatively.", "--attach", reply)
+	if sentID := findMessageAs(t, account.Secondary, "sent", subject); sentID != "" {
+		cleanupRunSecondary(t, "Delete sent mail (secondary): proton --profile secondary mail messages delete "+sentID,
+			"mail", "messages", "delete", "--", sentID)
+	}
+	inboxID := findMessage(t, "inbox", subject)
+	if inboxID == "" {
+		t.Fatal("the answer never reached the organizer's inbox")
+	}
+	cleanupRun(t, "Delete inbox mail: proton mail messages delete "+inboxID, "mail", "messages", "delete", "--", inboxID)
+
+	_, stderr := runOKStderr(t, "--dry-run", "mail", "messages", "get", inboxID)
+	assertContains(t, stderr, "Dry run")
+	if got := answerOf(runJSON(t, "calendar", "events", "get", eventID), secondaryEmail()); got != "pending" {
+		t.Errorf("a dry run recorded %q", got)
+	}
+
+	_, stderr = runOKStderr(t, "mail", "messages", "get", inboxID)
+	assertContains(t, stderr, "tentative")
+	if got := answerOf(runJSON(t, "calendar", "events", "get", eventID), secondaryEmail()); got != "tentative" {
+		t.Errorf("after reading the answer the event says %q, want tentative", got)
+	}
+
+	if _, stderr = runOKStderr(t, "mail", "messages", "get", inboxID); strings.Contains(stderr, "Updated") {
+		t.Errorf("reading the answer again recorded it again: %s", stderr)
 	}
 }

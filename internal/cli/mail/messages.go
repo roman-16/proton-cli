@@ -28,15 +28,6 @@ func messagesCmd() *cobra.Command {
 	return c
 }
 
-// ── reading ──
-
-// list is where a set of messages is worked out.
-//
-// Paging a folder and asking a question about its contents are one command,
-// because the selection either produces is the same one the bulk verbs take.
-// Where the question is answered differs: a folder and a page are Proton's to
-// answer, and anything about what a message says is answered by the copy on
-// this machine when there is one, since Proton cannot read a body.
 func listCmd() *cobra.Command {
 	var f filters
 	c := &cobra.Command{
@@ -67,8 +58,6 @@ func listCmd() *cobra.Command {
 			}, msgs); err != nil {
 				return err
 			}
-			// What the answer did not cover is said after the answer, so the rows
-			// and the count come first and the caveat reads as being about them.
 			if len(msgs) == 0 {
 				addressOnlyHint(c, cover, opts)
 			}
@@ -95,7 +84,8 @@ func getCmd() *cobra.Command {
 			"to come from may not be the address it came from.\n\n" +
 			"While `mail settings set image-proxy` is on, links come without their\n" +
 			"tracking and a Links line counts the ones that had some. `--render raw`\n" +
-			"prints the body as it was sent.",
+			"prints the body as it was sent.\n\n" +
+			"Reading somebody's answer to an invitation you sent records it on your event.",
 		RunE: kit.Run([]kit.Step{kit.StepExpand}, func(c *kit.Invocation) error {
 			shape, err := render.Value()
 			if err != nil {
@@ -121,9 +111,7 @@ func getCmd() *cobra.Command {
 				msg.BlockTracking()
 			}
 			if err := kit.Read(c, ui.DocumentSpec{
-				Object: msg,
-				// Asking for html or raw means asking for the body as it is, so the
-				// header block and attachment list would only get in the way.
+				Object:   msg,
 				BodyOnly: bodyOnly || shape != "text",
 				Parts:    []ui.Part{messagePart(msg, shape, stripQuotes, includeInline)},
 			}); err != nil {
@@ -131,7 +119,7 @@ func getCmd() *cobra.Command {
 			}
 			overruleHint(c, msg)
 			receiptHint(c, msg)
-			return nil
+			return recordAnswers(c, []mailsvc.Full{*msg})
 		}),
 	}
 	render.Register(c)
@@ -141,9 +129,6 @@ func getCmd() *cobra.Command {
 	return c
 }
 
-// alongsideTrackingSetting makes a read at the same time as it learns whether
-// the account blocks email tracking, which a body printed as it was sent has no
-// use for.
 func alongsideTrackingSetting(c *kit.Invocation, shape string, read func(context.Context) error) (bool, error) {
 	if shape == "raw" {
 		return false, read(c.Ctx)
@@ -157,19 +142,10 @@ func alongsideTrackingSetting(c *kit.Invocation, shape string, read func(context
 	return blocked, err
 }
 
-// messagePart turns a decrypted message into the header block, body and
-// attachment table that make up one part of a document. A single message is one
-// part; a thread is several.
 func messagePart(msg *mailsvc.Full, shape string, stripQuotes, includeInline bool) ui.Part {
 	return bodyPart(msg, messageHeader(msg), shape, stripQuotes, includeInline)
 }
 
-// bodyPart is a message laid out for reading: the header block it was given,
-// the body in the shape that was asked for, and what it carries underneath.
-//
-// The header is passed in because what belongs above a body depends on where
-// the message came from - one in the mailbox has an ID and a signature verdict,
-// and one behind a password has neither.
 func bodyPart(msg *mailsvc.Full, header []ui.Field, shape string, stripQuotes, includeInline bool) ui.Part {
 	body := msg.Body
 	if stripQuotes {
@@ -197,8 +173,6 @@ func bodyPart(msg *mailsvc.Full, header []ui.Field, shape string, stripQuotes, i
 	return part
 }
 
-// messageHeader is the block above a message body: the date, the full recipient
-// lists, and what Proton made of the message.
 func messageHeader(msg *mailsvc.Full) []ui.Field {
 	fields := []ui.Field{
 		{Label: "Subject", Value: msg.Subject, Handle: true},
@@ -232,9 +206,6 @@ func messageHeader(msg *mailsvc.Full) []ui.Field {
 	return append(fields, ui.Field{Label: "ID", Value: msg.ID, ID: true})
 }
 
-// verdictLine names what Proton's filters concluded, and says when the reader
-// has already overruled it - which is what stops a message somebody has cleared
-// from looking exactly like one nobody has looked at.
 func verdictLine(msg *mailsvc.Full) string {
 	var found []string
 	if msg.Phishing {
@@ -257,8 +228,6 @@ func verdictRole(msg *mailsvc.Full) ui.Role {
 	return ui.Danger
 }
 
-// receiptLine says where a message stands with read receipts: a request that is
-// still open, or one that has been answered.
 func receiptLine(msg *mailsvc.Full) string {
 	if msg.ReceiptSent {
 		return "sent"
@@ -266,10 +235,6 @@ func receiptLine(msg *mailsvc.Full) string {
 	return "requested"
 }
 
-// receiptHint offers the answer beside the message that asked for it.
-//
-// A message this account sent carries the request it made rather than one to
-// answer, so it gets the line above and nothing to act on.
 func receiptHint(c *kit.Invocation, msg *mailsvc.Full) {
 	if !msg.ReceiptDue {
 		return
@@ -278,12 +243,6 @@ func receiptHint(c *kit.Invocation, msg *mailsvc.Full) {
 		kit.Program + " mail messages receipt " + ui.Short(msg.ID, c.UI().ShortIDs()))
 }
 
-// overruleHint offers the way out of a wrong verdict, beside the message it is
-// about.
-//
-// A reader who has just read the thing and can see it is their accountant is the
-// one person able to settle it, and the line is on the commentary stream, so a
-// body being piped somewhere is still only the body.
 func overruleHint(c *kit.Invocation, msg *mailsvc.Full) {
 	if !msg.SpamFlagged() || msg.MarkedLegitimate {
 		return
@@ -292,8 +251,6 @@ func overruleHint(c *kit.Invocation, msg *mailsvc.Full) {
 		kit.Program + " mail messages mark legitimate " + ui.Short(msg.ID, c.UI().ShortIDs()))
 }
 
-// addressLine renders one recipient the way mail does: a display name with the
-// address in angle brackets, or the bare address when there is no name.
 func addressLine(a map[string]any) string {
 	addr, _ := a["Address"].(string)
 	name, _ := a["Name"].(string)
@@ -302,8 +259,6 @@ func addressLine(a map[string]any) string {
 	}
 	return name + " <" + addr + ">"
 }
-
-// ── organising ──
 
 func moveCmd() *cobra.Command {
 	var f filters
@@ -353,12 +308,6 @@ func unlabelCmd() *cobra.Command {
 		})
 }
 
-// labelVerb builds `label` and `unlabel`.
-//
-// Attaching a label and moving a message are separate actions, as they are in the
-// web client and in the API's own /label and /unlabel endpoints. Folding them
-// together would mean `move` could take a label and report a move that never
-// happened.
 func labelVerb(use, short string, action ui.Action,
 	apply func(*kit.Invocation, []string, string) ([]mailsvc.Refused, error)) *cobra.Command {
 	var f filters
@@ -403,8 +352,6 @@ func unstarCmd() *cobra.Command {
 		})
 }
 
-// starVerb builds `star` and `unstar`, which are `label` and `unlabel` with the
-// one label Proton gives a button of its own.
 func starVerb(use, short string, action ui.Action, apply func(*kit.Invocation, []string) ([]mailsvc.Refused, error)) *cobra.Command {
 	var f filters
 	c := &cobra.Command{
@@ -425,9 +372,6 @@ func starVerb(use, short string, action ui.Action, apply func(*kit.Invocation, [
 	return c
 }
 
-// markCmd is a group with real subcommands rather than a verb taking a verb as
-// an argument. `mark read` therefore has its own help and completion, and no
-// hand-written check that the word was one of a few.
 func markCmd() *cobra.Command {
 	c := &cobra.Command{Use: "mark", Short: "Set what messages count as"}
 	c.AddCommand(
@@ -472,12 +416,6 @@ func phishingCmd() *cobra.Command {
 		})
 }
 
-// verdictVerb builds the two verdicts a reader can give a message, against
-// Proton's own.
-//
-// Both name their messages and take no filters: each is a judgement on something
-// that was read, rather than on everything matching a pattern. The standing
-// decision about a sender is `settings senders`, which is where a rule belongs.
 func verdictVerb(use, short, long string, action ui.Action, detail string,
 	apply func(*kit.Invocation, []string) error) *cobra.Command {
 	return &cobra.Command{
@@ -588,8 +526,6 @@ func unscheduleCmd() *cobra.Command {
 	return c
 }
 
-// scheduled resolves what to unschedule. References resolve within the Scheduled
-// folder only, so a subject can never reach something already sent.
 func scheduled(c *kit.Invocation, all bool) ([]string, []mailsvc.Message, error) {
 	if len(c.Args) == 0 && !all {
 		return nil, nil, kit.Fail("Nothing selected.").
@@ -617,15 +553,6 @@ func scheduled(c *kit.Invocation, all bool) ([]string, []mailsvc.Message, error)
 	return kit.Dedupe(ids), rows, nil
 }
 
-// ── shared flag registration ──
-
-// bodyFormat is how a message body should be rendered. Declaring it as an enum
-// gives it one error wording and shell completion, which a hand-checked string
-// never had.
-// The word is "render", not "format", because export already uses --format for
-// the file layout it writes - eml or mbox - and a container on disk is not the
-// same question as which representation of a body to print. One flag name, one
-// question.
 func bodyRendering() *kit.Enum {
 	return &kit.Enum{
 		Name: "render", Usage: "Which representation of the body to print", Default: "text",
@@ -633,9 +560,6 @@ func bodyRendering() *kit.Enum {
 	}
 }
 
-// registerFolder adds --folder. The flag's own default is empty so that a
-// command can tell a folder nobody named from one that was; shown names the
-// folder used in that case, which is what the help has to say.
 func registerFolder(c *cobra.Command, target *string, def, shown string) {
 	usage := "Folder or label to look in"
 	if shown != "" {
@@ -649,12 +573,6 @@ func completeMoveTargets(c *cobra.Command) {
 	kit.Completes(c, "into", mailsvc.MoveTargetNames(), "mail settings folders")
 }
 
-// addressOnlyHint explains an empty result that a different flag would have
-// found, since Proton's --from matches the address alone.
-//
-// An index answers the same question over display names as well, so the hint is
-// for the server's answer only: offered where it does not apply, it would send
-// somebody to a flag that searches exactly what they just searched.
 func addressOnlyHint(c *kit.Invocation, cover mailsvc.Coverage, opts mailsvc.ListOptions) {
 	if cover.Indexed || opts.Keyword != "" {
 		return
@@ -673,15 +591,6 @@ func addressOnlyHint(c *kit.Invocation, cover mailsvc.Coverage, opts mailsvc.Lis
 
 func quoted(s string) string { return strconv.Quote(s) }
 
-// ── emptying a folder ──
-
-// Empty removes everything in a folder, which is what the web calls "Empty
-// trash" and "Delete all".
-//
-// It is not `delete --all`, and the difference matters: a filtered delete
-// enumerates what it will touch and shows you, while this asks Proton to clear a
-// folder without ever naming its contents. So the folder is required and there is
-// no filter to narrow it - saying "everything in trash" is the whole command.
 func emptyCmd() *cobra.Command {
 	var folder string
 	c := &cobra.Command{
@@ -692,8 +601,6 @@ func emptyCmd() *cobra.Command {
 			"listed first. This takes no filters and always asks for confirmation.\n\n" +
 			"Only " + emptiableFolders() + " and your own folders and labels can be\n" +
 			"emptied.",
-		// Which folder to clear is on the command line or it is nowhere, so it is
-		// settled before the sign-in rather than after it.
 		RunE: kit.Run([]kit.Step{func(*kit.Invocation) error {
 			if folder == "" {
 				return kit.Fail("Which folder?").
@@ -708,8 +615,6 @@ func emptyCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			// What was emptied is the folder, which is the only thing this command
-			// knows: nothing was enumerated, so a number of messages would be invented.
 			kind := "folders"
 			if !box.Folder {
 				kind = "labels"
@@ -737,14 +642,6 @@ func notEmptiable(folder string) error {
 		folder, emptiableFolders()).Hint(try)
 }
 
-// ── self-destructing messages ──
-
-// Update changes a field of messages that already exist, which for a message is
-// when it deletes itself and nothing else: the rest of what a message is was
-// settled by whoever sent it.
-//
-// Proton stores the moment rather than the duration, so this takes a duration
-// and works out the moment - which is what a person means by "in a week".
 func updateCmd() *cobra.Command {
 	var f filters
 	var expires string
@@ -860,13 +757,6 @@ func (e expirable) warn(c *kit.Invocation) {
 	}
 }
 
-// ── read receipts ──
-
-// Receipt answers a message that asked to have its reading confirmed.
-//
-// It names its messages and takes no filters, for the reason the two verdicts
-// do: it is a decision about something that was read, and here one that cannot
-// be taken back once the sender has been told.
 func receiptCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "receipt REF...",
@@ -912,8 +802,6 @@ func receiptCmd() *cobra.Command {
 	}
 }
 
-// receiptDetail names who is about to be told, for the one message where there
-// is a single answer to that.
 func receiptDetail(due []mailsvc.Receipt) string {
 	if len(due) != 1 || due[0].To == "" {
 		return ""
@@ -921,9 +809,6 @@ func receiptDetail(due []mailsvc.Receipt) string {
 	return "to " + due[0].To
 }
 
-// noReceiptToSend says which of the three ways a message has nothing to answer.
-// Whether anything was asked for comes first, because a message that asked for
-// nothing is answered by nobody, whichever end of it this account is on.
 func noReceiptToSend(r mailsvc.Receipt) error {
 	switch {
 	case !r.Requested:
@@ -937,11 +822,6 @@ func noReceiptToSend(r mailsvc.Receipt) error {
 		"A read receipt has already been sent for %q.", r.Subject).Exit(3))
 }
 
-// ── mailing lists ──
-
-// Unsubscribe asks the list a message came from to stop, the same three ways
-// `mailing-lists unsubscribe` does - this one addressed by the mail that
-// arrived rather than by the sender behind it.
 func unsubscribeCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "unsubscribe REF...",

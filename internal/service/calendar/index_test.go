@@ -19,10 +19,6 @@ import (
 	"github.com/roman-16/proton-cli/internal/search"
 )
 
-// What the index holds has to be the event the account holds: a record goes in
-// as a decrypted event and has to come back out as one, because everything a
-// search answers is read off what comes back.
-
 func indexedStored(t *testing.T, summary, location, description string) stored {
 	t.Helper()
 	start := atVienna(t, 6, 3, 9)
@@ -46,7 +42,6 @@ func indexedStored(t *testing.T, summary, location, description string) stored {
 	}
 }
 
-// An event written to the index and read back is the event it was.
 func TestAnIndexedEventReadsBackAsItself(t *testing.T) {
 	want := indexedStored(t, "Dentist", "Mariahilf", "bring the referral")
 	rec, readable, err := record(want)
@@ -85,8 +80,6 @@ func TestAnIndexedEventReadsBackAsItself(t *testing.T) {
 	}
 }
 
-// An event this account cannot open is indexed by the times Proton keeps beside
-// it, so it is still on the right day and still says nothing it does not know.
 func TestAnEventThatWouldNotOpenIsIndexedByItsFrame(t *testing.T) {
 	unreadable := unreadableStored(atVienna(t, 6, 3, 9))
 	rec, readable, err := record(unreadable)
@@ -109,8 +102,6 @@ func TestAnEventThatWouldNotOpenIsIndexedByItsFrame(t *testing.T) {
 	}
 }
 
-// A series is stored once and searched as the series: a keyword matches its
-// text, and what the answer holds is every occurrence in the window.
 func TestASearchOverTheIndexExpandsASeries(t *testing.T) {
 	series := seriesStored(t, "FREQ=WEEKLY;COUNT=4")
 	rec, _, err := record(series)
@@ -123,12 +114,6 @@ func TestASearchOverTheIndexExpandsASeries(t *testing.T) {
 	}
 }
 
-// The window a keyword search covers when nobody names one reaches back before
-// any account existed and forward as far as a repeating event is listed.
-//
-// The far end is a choice rather than a limit: a weekly series generates fifty
-// rows a year, so covering a lifetime of them would answer a question about a
-// dentist with thousands of standups.
 func TestTheSearchWindowCoversWhateverIsThere(t *testing.T) {
 	w := SearchWindow()
 	longAgo := ical.Timed(time.Date(1999, time.March, 2, 10, 0, 0, 0, time.UTC), "UTC")
@@ -154,12 +139,6 @@ func storedFrom(t *testing.T, data []byte) stored {
 	return in.event()
 }
 
-// A calendar that is in the account and will not open for it, and the Proton
-// that answers for it.
-//
-// It is the state a calendar shared from another account, or one whose key a
-// password reset left shut, is in: Proton hands over the events and nothing
-// here can read a word of them.
 func sealedCalendar(t *testing.T, events string) (*Service, *routeDoer) {
 	t.Helper()
 	d := &routeDoer{handler: func(r proton.Request) ([]byte, error) {
@@ -187,18 +166,28 @@ func sealedCalendar(t *testing.T, events string) (*Service, *routeDoer) {
 	return s, d
 }
 
-// feed puts one page of the calendar's history in front of the next sync.
-func feed(d *routeDoer, page string) {
+func feed(d *routeDoer, page string, events ...string) {
+	whole := map[string]string{}
+	for _, event := range events {
+		var e struct{ ID string }
+		_ = json.Unmarshal([]byte(event), &e)
+		whole["/calendar/v1/cal1/events/"+e.ID] = `{"Event":` + event + `}`
+	}
 	inner := d.handler
 	d.handler = func(r proton.Request) ([]byte, error) {
 		if strings.HasSuffix(r.Path, "/modelevents/cursor-0") {
 			return []byte(page), nil
 		}
+		if body, ok := whole[r.Path]; ok {
+			return []byte(body), nil
+		}
+		if strings.Contains(r.Path, "/events/") {
+			return nil, &proton.APIError{HTTPStatus: 404, Code: 2501, Message: "Event does not exist"}
+		}
 		return inner(r)
 	}
 }
 
-// indexKeyRing is the account key an index is sealed to.
 func indexKeyRing(t *testing.T) *pgp.KeyRing {
 	t.Helper()
 	key, err := pgphelper.GenerateKey("test", "test@example.invalid")
@@ -212,9 +201,6 @@ func indexKeyRing(t *testing.T) *pgp.KeyRing {
 	return kr
 }
 
-// A calendar whose key will not open is indexed by the times Proton keeps in the
-// clear beside each event, so a search covers the days it holds and says nothing
-// about what is on them.
 func TestACalendarThatWillNotOpenIsIndexedByItsFrames(t *testing.T) {
 	s, _ := sealedCalendar(t, `{"Events":[
 		{"ID":"ev1","CalendarID":"cal1","StartTime":1700000000,"EndTime":1700003600},
@@ -236,8 +222,6 @@ func TestACalendarThatWillNotOpenIsIndexedByItsFrames(t *testing.T) {
 		t.Errorf("status = %+v, want a complete index that says what it could not read", st)
 	}
 
-	// What is says it could not read is what it holds, so reading the calendar
-	// again says the same thing rather than twice as much.
 	x.log.State.Stale = true
 	if _, err := x.Build(t.Context(), progress.Nop{}); err != nil {
 		t.Fatalf("build again: %v", err)
@@ -247,9 +231,6 @@ func TestACalendarThatWillNotOpenIsIndexedByItsFrames(t *testing.T) {
 	}
 }
 
-// A calendar whose key will not open still follows its history: what changed
-// goes in by the frame Proton keeps in the clear, the way reading the calendar
-// whole puts it in, and the catch-up moves past it.
 func TestACalendarThatWillNotOpenFollowsItsHistory(t *testing.T) {
 	s, d := sealedCalendar(t, `{"Events":[{"ID":"ev1","CalendarID":"cal1","StartTime":1700000000,"EndTime":1700003600}]}`)
 	x, err := s.openIndex(t.Context())
@@ -260,8 +241,8 @@ func TestACalendarThatWillNotOpenFollowsItsHistory(t *testing.T) {
 		t.Fatalf("build: %v", err)
 	}
 	feed(d, `{"CalendarModelEventID":"cursor-1","More":0,"CalendarEvents":[
-		{"ID":"ev2","Action":1,"Event":{"ID":"ev2","CalendarID":"cal1","StartTime":1700090000,"EndTime":1700093600}}
-	]}`)
+		{"ID":"ev2","Action":1,"Event":{"ID":"ev2","CalendarID":"cal1"}}
+	]}`, `{"ID":"ev2","CalendarID":"cal1","StartTime":1700090000,"EndTime":1700093600}`)
 
 	got, err := x.Sync(t.Context())
 	if err != nil {
@@ -289,9 +270,6 @@ func TestACalendarThatWillNotOpenFollowsItsHistory(t *testing.T) {
 	}
 }
 
-// A calendar that could not be read leaves the build unfinished, and keeps no
-// cursor: a catch-up from a moment nothing was ever read at would report a
-// calendar as current that has never been indexed.
 func TestACalendarThatWouldNotBeReadLeavesTheBuildUnfinished(t *testing.T) {
 	s, _ := sealedCalendar(t, "")
 	x, err := s.openIndex(t.Context())
@@ -309,15 +287,12 @@ func TestACalendarThatWouldNotBeReadLeavesTheBuildUnfinished(t *testing.T) {
 	}
 }
 
-// What a calendar no longer has leaves the index, and so does everything of a
-// calendar the account no longer has.
 func TestWhatACalendarNoLongerHasLeavesTheIndex(t *testing.T) {
 	s, _ := sealedCalendar(t, `{"Events":[{"ID":"ev1","CalendarID":"cal1","StartTime":1700000000,"EndTime":1700003600}]}`)
 	x, err := s.openIndex(t.Context())
 	if err != nil {
 		t.Fatalf("open the index: %v", err)
 	}
-	// Two events of a calendar that is gone, and one of a calendar that is not.
 	for _, in := range []indexed{
 		{ID: "old1", CalendarID: "cal-gone"},
 		{ID: "old2", CalendarID: "cal-gone"},
@@ -354,9 +329,6 @@ func TestWhatACalendarNoLongerHasLeavesTheIndex(t *testing.T) {
 	}
 }
 
-// A page of a calendar's history that could not be written down is asked for
-// again rather than skipped: the cursor stays where the index last caught up,
-// in the open session and on disk alike, and the next catch-up applies it.
 func TestAPageACalendarCouldNotWriteDownIsAskedForAgain(t *testing.T) {
 	s, d := sealedCalendar(t, `{"Events":[{"ID":"ev1","CalendarID":"cal1","StartTime":1700000000,"EndTime":1700003600}]}`)
 	x, err := s.openIndex(t.Context())
@@ -367,8 +339,8 @@ func TestAPageACalendarCouldNotWriteDownIsAskedForAgain(t *testing.T) {
 		t.Fatalf("build: %v", err)
 	}
 	feed(d, `{"CalendarModelEventID":"cursor-1","More":0,"CalendarEvents":[
-		{"ID":"ev2","Action":1,"Event":{"ID":"ev2","CalendarID":"cal1","StartTime":1700090000,"EndTime":1700093600}}
-	]}`)
+		{"ID":"ev2","Action":1,"Event":{"ID":"ev2","CalendarID":"cal1"}}
+	]}`, `{"ID":"ev2","CalendarID":"cal1","StartTime":1700090000,"EndTime":1700093600}`)
 	restore := unwritable(t, filepath.Join(s.index.Dir(), "calendar.bin"))
 
 	for range 2 {
@@ -408,8 +380,6 @@ func TestAPageACalendarCouldNotWriteDownIsAskedForAgain(t *testing.T) {
 	}
 }
 
-// unwritable puts something no write can get past in the way of the index's
-// log, and gives back what puts the log back as it was.
 func unwritable(t *testing.T, path string) func() {
 	t.Helper()
 	data, err := os.ReadFile(path)
@@ -430,5 +400,30 @@ func unwritable(t *testing.T, path string) func() {
 		if err := os.WriteFile(path, data, 0600); err != nil {
 			t.Fatalf("put the log back: %v", err)
 		}
+	}
+}
+
+func TestACatchUpTakesOutAChangeTheCalendarNoLongerHolds(t *testing.T) {
+	s, d := sealedCalendar(t, `{"Events":[{"ID":"ev1","CalendarID":"cal1","StartTime":1700000000,"EndTime":1700003600}]}`)
+	x, err := s.openIndex(t.Context())
+	if err != nil {
+		t.Fatalf("open the index: %v", err)
+	}
+	if _, err := x.Build(t.Context(), progress.Nop{}); err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	feed(d, `{"CalendarModelEventID":"cursor-1","More":0,"CalendarEvents":[
+		{"ID":"ev1","Action":2,"Event":{"ID":"ev1","CalendarID":"cal1"}}
+	]}`)
+
+	got, err := x.Sync(t.Context())
+	if err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	if got.Removed != 1 {
+		t.Errorf("sync = %+v, want the event Proton no longer holds taken out", got)
+	}
+	if _, held := x.log.Get("ev1"); held {
+		t.Error("the index still holds an event the calendar no longer has")
 	}
 }

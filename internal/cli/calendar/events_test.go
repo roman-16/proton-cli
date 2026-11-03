@@ -11,9 +11,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// A reference names an event and, for a recurring one, which occurrence. The
-// occurrence half is only read as one when it is shaped like a time, so a title or
-// an address containing an "@" is still a whole reference.
 func TestSplitOccurrence(t *testing.T) {
 	for _, tc := range []struct{ in, base, occ string }{
 		{"cal/ev", "cal/ev", ""},
@@ -22,7 +19,6 @@ func TestSplitOccurrence(t *testing.T) {
 		{"cal/ev@2026-04-16T09:00:30", "cal/ev", "2026-04-16T09:00:30"},
 		{"cal/ev@2026-04-16T09:00+02:00", "cal/ev", "2026-04-16T09:00+02:00"},
 		{"4f2a1b9c@2026-04-16T09:00", "4f2a1b9c", "2026-04-16T09:00"},
-		// A handle that merely contains an "@".
 		{"standup@10", "standup@10", ""},
 		{"jane@example.test", "jane@example.test", ""},
 		{"Lunch @ Anna's", "Lunch @ Anna's", ""},
@@ -79,10 +75,6 @@ func TestSeriesLabelOnlyNamesASeriesFromOneOfItsOccurrences(t *testing.T) {
 	}
 }
 
-// The clause is what a preview, a confirmation and a result all describe the
-// scope with, so it has to say the same thing the reference and the flag asked
-// for - including the case the reference says nothing about, where one word
-// reaches every meeting a series will ever hold.
 func TestTheReachClauseDescribesWhatTheReferenceAndTheFlagAskedFor(t *testing.T) {
 	series := func(total *int) *reach { return &reach{series: true, total: total} }
 	for _, tc := range []struct {
@@ -105,14 +97,6 @@ func TestTheReachClauseDescribesWhatTheReferenceAndTheFlagAskedFor(t *testing.T)
 	}
 }
 
-// A result says where a change put an event, in the zone it is anchored to,
-// because the zone is the one part of a written time the command line does not
-// state and nothing else would reveal in time.
-//
-// Every change that touches the times says so, including the one that names no
-// time at all: an event losing its time of day has moved as surely as one given
-// a new date, and it is the case where a silent result reads as nothing having
-// happened.
 func TestAMovedEventSaysWhenAndWhere(t *testing.T) {
 	vienna, err := time.LoadLocation("Europe/Vienna")
 	if err != nil {
@@ -153,8 +137,6 @@ func TestAMovedEventSaysWhenAndWhere(t *testing.T) {
 	}
 }
 
-// The length is on screen exactly when the command line did not state it, which
-// is the only time it is news.
 func TestOnlyALengthNobodyStatedIsSaidOutLoud(t *testing.T) {
 	if got := lengthClause(30*time.Minute, true); got != "30m long" {
 		t.Errorf("a length taken from the calendar reads %q", got)
@@ -166,9 +148,6 @@ func TestOnlyALengthNobodyStatedIsSaidOutLoud(t *testing.T) {
 
 func count(n int) *int { return &n }
 
-// Whether an event has a time of day is settled by what was written, so every way
-// of writing something that cannot be true at once is refused before a single
-// request - and a person who wrote it is told which flag says the other thing.
 func TestATimeOfDayIsJudgedBeforeAnythingIsAskedOfProton(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -246,10 +225,6 @@ func assertCheck(t *testing.T, needsStart bool, name string, args []string, want
 	}
 }
 
-// A whole-day row has no time of day, and it lasts a day rather than the hours a day
-// happens to have. It is also printed on the date it carries: the service hands out
-// times already read in the reader's zone, so a column that converted them again
-// would move a whole-day event to the day before in every zone behind UTC.
 func TestEventColumnsRenderAnAllDayRow(t *testing.T) {
 	loc, err := time.LoadLocation("America/New_York")
 	if err != nil {
@@ -272,8 +247,6 @@ func TestEventColumnsRenderAnAllDayRow(t *testing.T) {
 	}
 }
 
-// A whole day lasts a day on the day the clocks change too, which a length taken
-// in hours between two midnights would make 23 or 25 of them.
 func TestAWholeDayLastsADayWhenTheClocksChange(t *testing.T) {
 	loc, err := time.LoadLocation("Europe/Vienna")
 	if err != nil {
@@ -301,8 +274,6 @@ func TestAWholeDayLastsADayWhenTheClocksChange(t *testing.T) {
 	}
 }
 
-// Whom an event invites is judged before the calendar is resolved, so a
-// mistyped attendee costs no sign-in to find out about.
 func TestAnAttendeeIsJudgedBeforeAnythingIsAskedOfProton(t *testing.T) {
 	for _, tc := range []struct {
 		name      string
@@ -326,5 +297,19 @@ func TestAnAttendeeIsJudgedBeforeAnythingIsAskedOfProton(t *testing.T) {
 		case tc.want != "" && !strings.Contains(err.Error(), tc.want):
 			t.Errorf("%s was refused with %q, want it to say %q", tc.name, err, tc.want)
 		}
+	}
+}
+
+func TestAttendeeLinesNameEachGuestsAnswer(t *testing.T) {
+	got := attendeeLines([]calsvc.Attendee{
+		{Answer: "accepted", Email: "jane@example.com", Role: calsvc.RoleRequired},
+		{Answer: "tentative", Email: "bob@example.com", Role: calsvc.RoleOptional},
+	})
+	want := "jane@example.com (accepted)\nbob@example.com (optional, tentative)"
+	if got != want {
+		t.Errorf("attendeeLines = %q, want %q", got, want)
+	}
+	if got := attendeeLines(nil); got != "" {
+		t.Errorf("no guests gave %q", got)
 	}
 }

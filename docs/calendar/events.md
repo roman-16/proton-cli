@@ -102,6 +102,8 @@ proton calendar events export --calendar Work --all --dest-dir .
 
 Show one event, decrypted.
 
+Each attendee is listed with their answer: accepted, tentative, declined or pending. Somebody outside Proton answers by email, and the answer shows once that email is opened in Proton Mail or with `mail messages get`.
+
 ```
 proton calendar events get REF
 ```

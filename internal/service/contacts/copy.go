@@ -2,6 +2,9 @@ package contacts
 
 import (
 	"context"
+	"errors"
+	"io/fs"
+	"os"
 	"strings"
 	"time"
 
@@ -14,7 +17,6 @@ import (
 const (
 	copyFile    = "contacts/contacts.vcf"
 	copyFileKey = "file"
-	contactKey  = "contact:"
 )
 
 type copyPart struct{ s *Service }
@@ -51,62 +53,82 @@ func (p copyPart) Run(ctx context.Context, c *export.Copy, sink progress.Sink) (
 	if err != nil {
 		return res, err
 	}
-	cards := make([]string, 0, len(all))
-	versions := make(map[string]string, len(all))
-	ordered := make([]string, 0, len(all))
-	changed := 0
-	for _, ct := range all {
-		card := vcard.Document(ct.Cards, groups[ct.ID])
-		cards = append(cards, card)
-		version := export.Version(card)
-		versions[contactKey+ct.ID] = version
-		ordered = append(ordered, version)
-		if had, ok := ledger.Get(contactKey + ct.ID); !ok || had.Version != version {
-			changed++
-		}
-	}
-	var gone []string
-	for _, id := range ledger.IDs() {
-		if _, held := versions[id]; strings.HasPrefix(id, contactKey) && !held {
-			gone = append(gone, id)
-		}
-	}
-	fileVersion := export.Version(ordered)
 	now, _, err := ledger.Place(copyFileKey, copyFile)
 	if err != nil {
 		return res, err
 	}
-	file, _ := ledger.Get(copyFileKey)
-	present := localfile.Exists(c.Path(now))
-	if present && file.Version == fileVersion {
-		return res, nil
+	before, err := os.ReadFile(c.Path(now))
+	present := err == nil
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return res, err
 	}
-	if !present {
-		changed = len(all)
+	written := map[string]string{}
+	previous := splitCards(string(before))
+	for _, card := range previous {
+		written[cardKey(card)] = card
 	}
-	res.Owed = changed + len(gone)
-	progress.Counting(sink, "contacts")
-	sink.Start(int64(len(all)), "Exporting contacts")
-	defer sink.Done()
+	cards := make([]string, 0, len(all)+len(previous))
+	held := make(map[string]bool, len(all))
+	changed := 0
+	for _, ct := range all {
+		card := vcard.Document(ct.Cards, groups[ct.ID])
+		cards = append(cards, card)
+		held[cardKey(card)] = true
+		if written[cardKey(card)] != card {
+			changed++
+		}
+	}
+	for _, card := range previous {
+		if !held[cardKey(card)] {
+			cards = append(cards, card)
+		}
+	}
 	var doc strings.Builder
 	for _, card := range cards {
 		doc.WriteString(card)
 		doc.WriteString("\r\n")
 	}
+	if err := ledger.Retain(func(id string) bool { return id == copyFileKey }); err != nil {
+		return res, err
+	}
+	if present && doc.String() == string(before) {
+		return res, nil
+	}
+	if !present {
+		changed = len(all)
+	}
+	res.Owed = changed
+	progress.Counting(sink, "contacts")
+	sink.Start(int64(len(cards)), "Exporting contacts")
+	defer sink.Done()
 	if err := localfile.Publish(c.Path(now), []byte(doc.String()), time.Time{}); err != nil {
 		return res, err
 	}
-	for id, version := range versions {
-		if err := ledger.Put(export.Entry{ID: id, Version: version}); err != nil {
-			return res, err
-		}
-	}
-	for _, id := range gone {
-		if err := ledger.Forget(id); err != nil {
-			return res, err
-		}
-	}
-	sink.Add(int64(len(all)))
+	sink.Add(int64(len(cards)))
 	res.Exported = res.Owed
-	return res, ledger.Put(export.Entry{ID: copyFileKey, Version: fileVersion, Path: now, Want: copyFile})
+	return res, ledger.Put(export.Entry{ID: copyFileKey, Path: now, Want: copyFile})
+}
+
+func cardKey(card string) string {
+	if uid := vcard.Field(card, "UID"); uid != "" {
+		return uid
+	}
+	return card
+}
+
+func splitCards(text string) []string {
+	var out, card []string
+	for _, line := range strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n") {
+		switch {
+		case strings.EqualFold(line, "BEGIN:VCARD"):
+			card = []string{line}
+		case card == nil:
+		case strings.EqualFold(line, "END:VCARD"):
+			out = append(out, strings.Join(append(card, line), "\r\n"))
+			card = nil
+		default:
+			card = append(card, line)
+		}
+	}
+	return out
 }

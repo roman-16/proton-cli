@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/roman-16/proton-cli/internal/contentline"
 )
 
 const storedCards = "BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\n" +
@@ -144,9 +146,6 @@ func TestSpanLeavesTheStoredValuesAlone(t *testing.T) {
 	}
 }
 
-// The property split is Proton's: recurrence lives in the signed card, the words
-// people read live in the encrypted one. An event rebuilt without the recurrence
-// properties is an event silently turned back into a one-off.
 func TestSharedSignedCarriesEveryRecurrenceProperty(t *testing.T) {
 	v, err := Parse(storedCards)
 	if err != nil {
@@ -180,8 +179,6 @@ func TestSharedEncryptedCarriesTheWordsAndTheIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 	card := v.SharedEncrypted()
-	// Proton lists uid and dtstamp in both parts, so a card without them is not
-	// the shape its own clients write.
 	for _, want := range []string{"UID:uid-1", "DTSTAMP:", "SUMMARY:Standup", "LOCATION:Meet"} {
 		if !strings.Contains(card, want) {
 			t.Errorf("encrypted card is missing %q:\n%s", want, card)
@@ -234,6 +231,29 @@ func TestAttendeesCardCarriesTokensAndIsEmptyWithoutAttendees(t *testing.T) {
 	}
 }
 
+func TestAnswersGoInFilesAndNotInTheAttendeesCard(t *testing.T) {
+	v := VEvent{UID: "u", Attendees: []Attendee{
+		{Email: "jane@example.com", Token: "tok-j", PartStat: "ACCEPTED"},
+		{Email: "bob@example.com", Token: "tok-b"},
+	}}
+	if card := v.AttendeesEncrypted(); strings.Contains(card, "PARTSTAT") {
+		t.Errorf("the attendees card carries an answer: %s", card)
+	}
+	doc := strings.Join(contentline.Unfold(Calendar([]VEvent{v})), "\n")
+	for _, want := range []string{"PARTSTAT=ACCEPTED", "PARTSTAT=NEEDS-ACTION"} {
+		if !strings.Contains(doc, want) {
+			t.Errorf("the file does not say %s:\n%s", want, doc)
+		}
+	}
+	asked := v.Unanswered()
+	if strings.Contains(strings.Join(contentline.Unfold(asked.Document("REQUEST")), "\n"), "PARTSTAT=ACCEPTED") {
+		t.Error("an invitation keeps an answer it should ask for again")
+	}
+	if v.Attendees[0].PartStat != "ACCEPTED" {
+		t.Error("Unanswered changed the event it was asked about")
+	}
+}
+
 func TestEventUIDDoesNotRepeat(t *testing.T) {
 	seen := map[string]bool{}
 	for range 100 {
@@ -266,8 +286,6 @@ func TestCalendarFileCarriesNoMethod(t *testing.T) {
 	}
 }
 
-// An exported reminder has to survive the trip: every other client reads VALARM,
-// and Proton's two kinds map onto its two actions.
 func TestAlarmsRenderAsValarmComponents(t *testing.T) {
 	doc := Calendar([]VEvent{{
 		UID: "a", Summary: "Standup",
@@ -292,9 +310,6 @@ func TestAlarmsRenderAsValarmComponents(t *testing.T) {
 	}
 }
 
-// An event's colour travels in the file and never in a card: it is Proton's own
-// cleartext field, and writing it into the content would encrypt something the
-// API reads for itself.
 func TestColourTravelsInTheFileAndNotInTheCards(t *testing.T) {
 	v := VEvent{UID: "a", Summary: "Deadline", Color: "#EC3E7C"}
 	for _, card := range []string{v.SharedSigned(), v.SharedEncrypted()} {

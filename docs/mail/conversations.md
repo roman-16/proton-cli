@@ -157,6 +157,8 @@ Show a whole thread, decrypted.
 
 While `mail settings set image-proxy` is on, links come without their tracking and each message's Links line counts the ones that had some. `--render raw` prints the bodies as they were sent.
 
+Reading somebody's answer to an invitation you sent records it on your event.
+
 ```
 proton mail conversations get REF
 ```

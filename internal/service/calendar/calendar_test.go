@@ -93,51 +93,53 @@ func TestBuildRemindersMapsToDeviceNotifications(t *testing.T) {
 	}
 }
 
-// ── RSVP: pure seams ──
-
-func TestStatusFromFlag(t *testing.T) {
-	cases := map[string]int{"accept": partstatAccepted, "tentative": partstatTentative, "decline": partstatDeclined}
-	for in, want := range cases {
-		got, err := StatusFromFlag(in)
-		if err != nil || got != want {
-			t.Errorf("StatusFromFlag(%q) = %d,%v; want %d,nil", in, got, err, want)
+func TestAnswersReadEveryWayTheyAreWritten(t *testing.T) {
+	for _, c := range []struct {
+		reply, partstat, word string
+		code                  int
+	}{
+		{"accept", "ACCEPTED", "accepted", 3},
+		{"tentative", "TENTATIVE", "tentative", 1},
+		{"decline", "DECLINED", "declined", 2},
+	} {
+		a, ok := answerOfReply(c.reply)
+		if !ok || a.code != c.code {
+			t.Errorf("answerOfReply(%q) = %d,%v; want %d", c.reply, a.code, ok, c.code)
+		}
+		if got := answerOfCode(c.code); got.partstat != c.partstat || got.word != c.word {
+			t.Errorf("answerOfCode(%d) = %q/%q, want %q/%q", c.code, got.partstat, got.word, c.partstat, c.word)
+		}
+		if got := answerOfPartstat(strings.ToLower(c.partstat)); got.code != c.code {
+			t.Errorf("answerOfPartstat(%q) = %d, want %d", c.partstat, got.code, c.code)
 		}
 	}
-	if _, err := StatusFromFlag("maybe"); err == nil {
-		t.Error("StatusFromFlag(\"maybe\") should error")
+	if _, ok := answerOfReply("maybe"); ok {
+		t.Error("answerOfReply(\"maybe\") should not be an answer")
 	}
-}
-
-func TestPartstatICS(t *testing.T) {
-	cases := map[int]string{
-		partstatAccepted:    "ACCEPTED",
-		partstatTentative:   "TENTATIVE",
-		partstatDeclined:    "DECLINED",
-		partstatNeedsAction: "NEEDS-ACTION",
-	}
-	for status, want := range cases {
-		if got := partstatICS(status); got != want {
-			t.Errorf("partstatICS(%d) = %q, want %q", status, got, want)
+	for _, partstat := range []string{"", "NEEDS-ACTION", "DELEGATED"} {
+		if got := answerOfPartstat(partstat); got.word != "pending" {
+			t.Errorf("answerOfPartstat(%q) = %q, want pending", partstat, got.word)
 		}
+	}
+	if got := answerOfCode(0); got.partstat != "NEEDS-ACTION" || got.word != "pending" {
+		t.Errorf("answerOfCode(0) = %q/%q, want NEEDS-ACTION/pending", got.partstat, got.word)
 	}
 }
 
 func TestReplyBodyMatchesWebClientsWording(t *testing.T) {
-	cases := map[int]string{
-		partstatAccepted:  "me@proton.me accepted your invitation to Sync",
-		partstatTentative: "me@proton.me tentatively accepted your invitation to Sync",
-		partstatDeclined:  "me@proton.me declined your invitation to Sync",
+	cases := map[string]string{
+		"accept":    "me@proton.me accepted your invitation to Sync",
+		"tentative": "me@proton.me tentatively accepted your invitation to Sync",
+		"decline":   "me@proton.me declined your invitation to Sync",
 	}
-	for status, want := range cases {
-		if got := replyBody("me@proton.me", status, "Sync"); got != want {
-			t.Errorf("replyBody(%d) = %q, want %q", status, got, want)
+	for reply, want := range cases {
+		a, _ := answerOfReply(reply)
+		if got := replyBody("me@proton.me", a, "Sync"); got != want {
+			t.Errorf("replyBody(%s) = %q, want %q", reply, got, want)
 		}
 	}
 }
 
-// The organizer is told which event was answered, so the day named has to be the
-// day the event is on. A whole-day event carries a date and no instant, so reading
-// it as one names the day before in every zone behind UTC.
 func TestReplySubjectNamesTheDayTheEventIsOn(t *testing.T) {
 	loc, err := time.LoadLocation("America/New_York")
 	if err != nil {
@@ -177,9 +179,6 @@ func TestFindSelfAttendee(t *testing.T) {
 	})
 }
 
-// selfTokens asks the server what each of the account's addresses reduces to,
-// so an account whose address carries a dot is named by the same token Proton
-// would compute for it.
 func TestSelfTokensNamesAddressesByTheirCanonicalForm(t *testing.T) {
 	d := &routeDoer{handler: func(r proton.Request) ([]byte, error) {
 		return canonicalJSON(map[string]string{"my.self@proton.me": "myself@proton.me"}), nil
@@ -230,10 +229,6 @@ func TestCanonicalEmailsAsksOnceAndRefusesAnUnanswerableAddress(t *testing.T) {
 	})
 }
 
-// ── RSVP: EventRespond wiring (router fake Doer) ──
-
-// routeDoer routes requests by a handler and records every request, so tests
-// can assert the exact partstat PUT without a live API or PGP fixtures.
 type routeDoer struct {
 	reqs    []proton.Request
 	handler func(proton.Request) ([]byte, error)
@@ -269,7 +264,6 @@ func (d *routeDoer) putTo(substr string) (proton.Request, bool) {
 	return proton.Request{}, false
 }
 
-// canonicalJSON builds the canonical-address endpoint's answer.
 func canonicalJSON(m map[string]string) []byte {
 	var responses []map[string]any
 	for email, canonical := range m {
@@ -282,7 +276,6 @@ func canonicalJSON(m map[string]string) []byte {
 	return b
 }
 
-// eventJSON builds a canned single-event GET body with one attendee.
 func eventJSON(t *testing.T, uid string, isOrganizer int, attendees []map[string]any) []byte {
 	t.Helper()
 	b, err := json.Marshal(map[string]any{"Event": map[string]any{
@@ -310,13 +303,12 @@ func TestEventRespondUpdatesPartstat(t *testing.T) {
 		case strings.Contains(r.Path, "/addresses/canonical"):
 			return canonicalJSON(map[string]string{"me@proton.me": "me@proton.me"}), nil
 		default:
-			// Members lookup etc.: empty so the best-effort reply build bails.
 			return []byte(`{}`), nil
 		}
 	}}
 	u := &keys.Unlocked{Addresses: []keys.Address{{ID: "a1", Email: "me@proton.me"}}}
 
-	res, err := New(d, testKeys(u)).EventRespond(context.Background(), "cal1", "ev1", partstatAccepted)
+	res, err := New(d, testKeys(u)).EventRespond(context.Background(), "cal1", "ev1", "accept")
 	if err != nil {
 		t.Fatalf("EventRespond: %v", err)
 	}
@@ -331,8 +323,8 @@ func TestEventRespondUpdatesPartstat(t *testing.T) {
 	if !ok {
 		t.Fatalf("PUT body is not map[string]any: %T", put.Body)
 	}
-	if body["Status"] != partstatAccepted {
-		t.Errorf("PUT Status = %v, want %d", body["Status"], partstatAccepted)
+	if body["Status"] != 3 {
+		t.Errorf("PUT Status = %v, want 3", body["Status"])
 	}
 	if ut, _ := body["UpdateTime"].(int64); ut <= 0 {
 		t.Errorf("PUT UpdateTime = %v, want a positive unix time", body["UpdateTime"])
@@ -344,7 +336,7 @@ func TestEventRespondRejectsOrganizer(t *testing.T) {
 	d := &routeDoer{handler: func(r proton.Request) ([]byte, error) { return event, nil }}
 	u := &keys.Unlocked{Addresses: []keys.Address{{Email: "me@proton.me"}}}
 
-	_, err := New(d, testKeys(u)).EventRespond(context.Background(), "cal1", "ev1", partstatAccepted)
+	_, err := New(d, testKeys(u)).EventRespond(context.Background(), "cal1", "ev1", "accept")
 	if err == nil {
 		t.Fatal("expected an error when responding as the organizer")
 	}
@@ -368,7 +360,7 @@ func TestEventRespondNotAttendee(t *testing.T) {
 	}}
 	u := &keys.Unlocked{Addresses: []keys.Address{{Email: "me@proton.me"}}}
 
-	_, err := New(d, testKeys(u)).EventRespond(context.Background(), "cal1", "ev1", partstatAccepted)
+	_, err := New(d, testKeys(u)).EventRespond(context.Background(), "cal1", "ev1", "accept")
 	var nf *errs.NotFound
 	if !errors.As(err, &nf) {
 		t.Fatalf("expected *errs.NotFound (exit 3), got %v", err)
@@ -378,8 +370,6 @@ func TestEventRespondNotAttendee(t *testing.T) {
 	}
 }
 
-// testKeys hands a service the key hierarchy a test wants it to decrypt with.
-// A test that decrypts nothing passes nil, which is never asked for.
 func testKeys(u *keys.Unlocked) keys.Get {
 	return func(context.Context) (*keys.Unlocked, error) {
 		if u == nil {
@@ -389,8 +379,6 @@ func testKeys(u *keys.Unlocked) keys.Get {
 	}
 }
 
-// A reminder says how it is delivered by what follows the colon, and a bare
-// duration is the notification the composer defaults to.
 func TestBuildRemindersCarriesTheDeliveryKind(t *testing.T) {
 	out, err := buildReminders([]string{"15m", "1d:email", "2h:notification"})
 	if err != nil {
@@ -410,8 +398,6 @@ func TestBuildRemindersCarriesTheDeliveryKind(t *testing.T) {
 	}
 }
 
-// What a listing prints is what --remind would accept, so an event can be read
-// and recreated without translating anything by hand.
 func TestReminderTextRoundTripsThroughTheTrigger(t *testing.T) {
 	for _, spec := range []string{"15m", "1h", "1d", "2d:email", "90m:email"} {
 		built, err := buildReminders([]string{spec})
@@ -429,8 +415,6 @@ func TestReminderTextRoundTripsThroughTheTrigger(t *testing.T) {
 	}
 }
 
-// Proton's other clients write triggers this one does not, so reading has to
-// cover more shapes than writing.
 func TestTriggerDurationReadsWhatOtherClientsWrite(t *testing.T) {
 	for _, c := range []struct {
 		trigger string
@@ -449,9 +433,6 @@ func TestTriggerDurationReadsWhatOtherClientsWrite(t *testing.T) {
 	}
 }
 
-// An attendee says how much their presence matters by what follows the colon,
-// and a bare address is required - which is what inviting someone ordinarily
-// means.
 func TestParseAttendeeReadsTheSuffix(t *testing.T) {
 	for _, c := range []struct{ in, email, role string }{
 		{"jane@example.com", "jane@example.com", roleRequired},
@@ -473,16 +454,14 @@ func TestParseAttendeeReadsTheSuffix(t *testing.T) {
 	}
 }
 
-// What a listing prints is what --attendee accepts, so a participant can be read
-// back into a command.
-func TestAttendeeTextRoundTrips(t *testing.T) {
-	for _, in := range []string{"jane@example.com", "jane@example.com:optional"} {
-		email, role, err := ParseAttendee(in)
+func TestRoleWordNamesWhatParseAttendeeRead(t *testing.T) {
+	for in, want := range map[string]string{"jane@example.com": RoleRequired, "jane@example.com:optional": RoleOptional} {
+		_, role, err := ParseAttendee(in)
 		if err != nil {
 			t.Fatalf("%q: %v", in, err)
 		}
-		if got := AttendeeText(email, role); got != in {
-			t.Errorf("AttendeeText round-tripped %q as %q", in, got)
+		if got := RoleWord(role); got != want {
+			t.Errorf("RoleWord of %q = %q, want %q", in, got, want)
 		}
 	}
 }

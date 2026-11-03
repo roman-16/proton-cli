@@ -25,9 +25,10 @@ func exportCmd() *cobra.Command {
 			"command wrote before.\n\n" +
 			"Run it again into the same directory to continue a run that stopped, or\n" +
 			"later to bring the copy up to date. Only what is missing or changed is\n" +
-			"fetched, and nothing is removed from the copy.\n\n" +
+			"fetched, and nothing is removed from the copy, not even what you deleted\n" +
+			"in Proton.\n\n" +
 			"Everything is written decrypted. Only the Pass archive can be locked, with\n" +
-			"--passphrase-file.",
+			"--passphrase-file, and every later run needs the same passphrase.",
 		ValidArgsFunction: completeApps,
 		RunE: kit.Run([]kit.Step{passphrase.Supply}, func(c *kit.Invocation) error {
 			apps, err := named(c.Args)

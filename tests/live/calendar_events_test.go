@@ -206,7 +206,11 @@ func TestCalendarEventWithAttendeeOutsideProton(t *testing.T) {
 	if !looksLikeID(eventID) {
 		t.Fatalf("expected an event ID on stdout, got %q", eventID)
 	}
-	assertContains(t, runOK(t, "calendar", "events", "get", eventID), guest)
+	assertContains(t, runOK(t, "calendar", "events", "get", eventID), guest+" (pending)")
+	ev := runJSON(t, "calendar", "events", "get", eventID)
+	if got := answerOf(ev, guest); got != "pending" {
+		t.Errorf("the guest's answer is %q, want pending: %v", got, ev["attendees"])
+	}
 }
 
 const seriesAnchor = "2027-03-01"

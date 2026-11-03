@@ -26,6 +26,8 @@ proton mail messages list --folder all --sort size --limit 10
 
 A `Signature:` line reports the verdict of the signature check against the sender's key.
 
+Reading somebody's answer to an invitation you sent records it on your event; see [Attendees](../calendar/README.md#attendees).
+
 ## Count unread mail
 
 ```bash

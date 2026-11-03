@@ -117,6 +117,18 @@ func (l *Ledger) Forget(id string) error {
 	return l.put(Entry{ID: id, Gone: true})
 }
 
+func (l *Ledger) Retain(keep func(id string) bool) error {
+	for _, id := range l.IDs() {
+		if keep(id) {
+			continue
+		}
+		if err := l.Forget(id); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (l *Ledger) IDs() []string {
 	l.mu.Lock()
 	defer l.mu.Unlock()

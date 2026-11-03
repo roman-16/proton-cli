@@ -517,3 +517,58 @@ B3IAALwCAP44Jm/M79n2m7svoV9utRucsvD6pAXhrn9Z4vGWGaCZ2gD7B1ZJ/xyC
 RNaFQnmm/GZKYXJ2+371ALYPsqZCwuDS0Q0=
 =rm4w
 -----END PGP PUBLIC KEY BLOCK-----`
+
+func TestAnsweredJoinsEachAnswerToItsGuestByToken(t *testing.T) {
+	guests := []ical.Attendee{
+		{Email: "jane@example.com", Token: "tok-j"},
+		{Email: "bob@example.com", Token: "tok-b", Role: roleOptional},
+		{Email: "carol@proton.me", Token: "tok-c", PartStat: "TENTATIVE"},
+	}
+	info := []rawAttendee{{Token: "tok-b", Status: 2}, {Token: "tok-j", Status: 3}}
+	got := attendeesOf(ical.VEvent{Attendees: answered(guests, info)})
+	want := []Attendee{
+		{Answer: "accepted", Email: "jane@example.com", Role: RoleRequired},
+		{Answer: "declined", Email: "bob@example.com", Role: RoleOptional},
+		{Answer: "tentative", Email: "carol@proton.me", Role: RoleRequired},
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("attendee %d = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+	if guests[0].PartStat != "" {
+		t.Error("answered changed the list it was handed")
+	}
+}
+
+func TestEveryAttendeeFetchesThePagesTheEventDidNotCarry(t *testing.T) {
+	d := &routeDoer{handler: func(r proton.Request) ([]byte, error) {
+		switch r.Query.Get("Page") {
+		case "1":
+			return []byte(`{"Attendees":[{"ID":"a2","Token":"t2","Status":3}],"MoreAttendees":1}`), nil
+		case "2":
+			return []byte(`{"Attendees":[{"ID":"a3","Token":"t3","Status":2}],"MoreAttendees":0}`), nil
+		}
+		return nil, fmt.Errorf("page %q was not expected", r.Query.Get("Page"))
+	}}
+	raw := rawEvent{ID: "ev1", CalendarID: "cal1"}
+	raw.AttendeesInfo.Attendees = []rawAttendee{{ID: "a1", Token: "t1"}}
+	raw.AttendeesInfo.MoreAttendees = 1
+	if err := New(d, testKeys(nil)).everyAttendee(context.Background(), &raw); err != nil {
+		t.Fatalf("everyAttendee: %v", err)
+	}
+	if n := len(raw.AttendeesInfo.Attendees); n != 3 {
+		t.Fatalf("holds %d attendees, want 3", n)
+	}
+	if raw.AttendeesInfo.MoreAttendees != 0 {
+		t.Error("still says more attendees are to come")
+	}
+	if path := d.reqs[0].Path; path != "/calendar/v1/cal1/events/ev1/attendees" {
+		t.Errorf("asked %s", path)
+	}
+
+	asked := len(d.reqs)
+	if err := New(d, testKeys(nil)).everyAttendee(context.Background(), &raw); err != nil || len(d.reqs) != asked {
+		t.Errorf("a complete list was asked for again: %v", err)
+	}
+}

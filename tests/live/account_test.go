@@ -266,6 +266,62 @@ func TestAccountExportWritesEachAppAndRunsAgain(t *testing.T) {
 	}
 }
 
+func TestAccountExportKeepsWhatProtonDeleted(t *testing.T) {
+	title := testID() + "-kept-event"
+	eventID := strings.TrimSpace(runOK(t, "calendar", "events", "create", "--calendar", firstCalendarID(t),
+		"--title", title, "--start", "2027-05-04T09:00", "--duration", "30m"))
+	cleanupRun(t, "Delete event: proton calendar events delete "+eventID, "calendar", "events", "delete", eventID)
+	name := testID() + "-kept-contact"
+	contactID := strings.TrimSpace(runOK(t, "contacts", "create", "--name", name, "--email", "kept@x.invalid"))
+	cleanupRun(t, "Delete contact: proton contacts delete -- "+contactID, "contacts", "delete", "--", contactID)
+
+	into := filepath.Join(t.TempDir(), "copy")
+	runOK(t, "account", "export", "calendar", "contacts", "--dest-dir", into)
+	runOK(t, "--yes", "calendar", "events", "delete", eventID)
+	runOK(t, "--yes", "contacts", "delete", "--", contactID)
+
+	again := runJSON(t, "account", "export", "calendar", "contacts", "--dest-dir", into)
+	if again["count"] != float64(0) {
+		t.Errorf("a deletion in Proton exported %v, want nothing: %v", again["count"], again)
+	}
+	calendars, _ := filepath.Glob(filepath.Join(into, "calendar", "*.ics"))
+	var held strings.Builder
+	for _, path := range calendars {
+		body, _ := os.ReadFile(path)
+		held.Write(body)
+	}
+	assertContains(t, held.String(), title)
+	contacts, err := os.ReadFile(filepath.Join(into, "contacts", "contacts.vcf"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertContains(t, string(contacts), name)
+}
+
+func TestAccountExportKeepsTheArchiveLockedWithItsPassphrase(t *testing.T) {
+	into := filepath.Join(t.TempDir(), "copy")
+	first := passwordFile(t, "the first backup passphrase")
+	runOK(t, "account", "export", "pass", "--dest-dir", into, "--passphrase-file", first)
+
+	again := runJSON(t, "account", "export", "pass", "--dest-dir", into, "--passphrase-file", first)
+	if again["count"] != float64(0) {
+		t.Errorf("running it again exported %v, want nothing: %v", again["count"], again)
+	}
+	for _, args := range [][]string{
+		{"--passphrase-file", passwordFile(t, "another backup passphrase")},
+		{},
+	} {
+		_, stderr, code := run(t, append([]string{"account", "export", "pass", "--dest-dir", into}, args...)...)
+		if code != 1 {
+			t.Errorf("%v: exit %d, want 1: %s", args, code, stderr)
+		}
+		assertContains(t, stderr, "The Pass archive")
+	}
+	_, stderr := runOKStderr(t, "--dry-run", "pass", "import", filepath.Join(into, "pass", "proton-pass-export.zip"),
+		"--passphrase-file", first)
+	assertContains(t, stderr, "Dry run")
+}
+
 func TestAccountExportMailIsLaidOutForRestoring(t *testing.T) {
 	msgID, _, subject := plainMail(t)
 	into := filepath.Join(t.TempDir(), "copy")
