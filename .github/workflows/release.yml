@@ -226,86 +226,16 @@ jobs:
           fi
           echo "Release $TAG carries its changelog section."
 
-  apt-repo:
+  apt:
     needs: [resolve, release]
-    runs-on: ubuntu-latest
+    uses: ./.github/workflows/apt.yml
+    with:
+      tag: ${{ needs.resolve.outputs.tag }}
     permissions:
       contents: read
       id-token: write
       pages: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Configure Pages
-        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
-
-      # reprepro keeps no database between runs, so the pool is rebuilt from
-      # scratch every release and whatever is not handed to it is dropped. The
-      # releases are where every .deb this project ever published already lives,
-      # immutably, which makes them the thing to rebuild from: the repository
-      # then holds a run of versions rather than only the newest, and `apt
-      # install proton-cli=X.Y.Z` can undo a bad release.
-      #
-      # The tag being released must arrive; the ones behind it are best-effort,
-      # since a tag old enough to predate the .deb packages has none to give.
-      - name: Collect the .deb assets to publish
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ needs.resolve.outputs.tag }}
-        run: |
-          mkdir -p debs
-          gh release download "$TAG" \
-            --repo "$GITHUB_REPOSITORY" \
-            --pattern '*.deb' \
-            --dir debs
-
-          # Ten is a deep enough run to roll back through and shallow enough
-          # that the download stays a few seconds rather than growing without
-          # bound as the project ages.
-          gh release list --repo "$GITHUB_REPOSITORY" --limit 10 --json tagName \
-            | jq --raw-output --arg tag "$TAG" '.[] | select(.tagName != $tag) | .tagName' \
-            | while read -r previous; do
-                gh release download "$previous" \
-                  --repo "$GITHUB_REPOSITORY" \
-                  --pattern '*.deb' \
-                  --dir debs \
-                  --clobber \
-                  || echo "::notice title=No packages::$previous ships no .deb"
-              done
-
-          ls -la debs/
-
-      - name: Build signed APT repository
-        id: apt
-        uses: morph027/apt-repo-action@b891498be5731844ce362eec9c07e929fe68f4fa # v3.10
-        with:
-          repo-name: proton-cli
-          scan-dir: debs
-          codename: stable
-          components: main
-          architectures: amd64 arm64
-          signing-key: ${{ secrets.GPG_PRIVATE_KEY }}
-          signing-key-passphrase: ${{ secrets.GPG_PRIVATE_KEY_PASSPHRASE }}
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
-        with:
-          path: ${{ steps.apt.outputs.dir }}
-
-  apt-deploy:
-    needs: apt-repo
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      pages: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deploy
-        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+    secrets: inherit
 
   npm-publish:
     needs: [resolve, release]
@@ -348,7 +278,7 @@ jobs:
         run: node scripts/publish-npm.mjs
 
   report:
-    needs: [resolve, release, apt-repo, apt-deploy, npm-publish]
+    needs: [resolve, release, apt, npm-publish]
     if: always() && needs.resolve.outputs.release == 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -356,8 +286,7 @@ jobs:
     steps:
       - name: Channel status report
         env:
-          APT_DEPLOY_RESULT: ${{ needs.apt-deploy.result }}
-          APT_REPO_RESULT: ${{ needs.apt-repo.result }}
+          APT_RESULT: ${{ needs.apt.result }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GORELEASER_RESULT: ${{ needs.release.outputs.goreleaser }}
           NPM_RESULT: ${{ needs.npm-publish.result }}
@@ -429,9 +358,7 @@ jobs:
             fi
           }
 
-          if [ "$APT_REPO_RESULT" != success ]; then apt_job="$APT_REPO_RESULT"; else apt_job="$APT_DEPLOY_RESULT"; fi
-
-          check "apt" "$v" "${apt:-}" "$apt_job"
+          check "apt" "$v" "${apt:-}" "$APT_RESULT"
           check "AUR" "$v" "$aur" "$GORELEASER_RESULT"
           check "Homebrew" "$v" "$brew" "$GORELEASER_RESULT"
           check "npm" "$v" "$npm" "$NPM_RESULT"
