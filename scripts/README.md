@@ -11,7 +11,6 @@ Everything the maintainer or CI runs, in whatever language suits it: shell insta
 | `mimetypes/` | Writes the table `internal/mimetype` types a file by its name with, from the mime-types release WebClients' Drive pins (`just mimetypes`) |
 | `openapi-generator/` | Generates `openapi.yaml` from the WebClients and Drive SDK TypeScript source (`just openapi`) |
 | `openapi-guard/` | Checks a regenerated `openapi.yaml` before the weekly sync commits it |
-| `stats/` | Records the public counters the Stats page charts (`just stats`) |
 | `tidyurl/` | Writes the link-cleaning rules `internal/tidyurl` embeds, and the cases its parity test checks, from the TidyURL release WebClients pins (`just tidyurl`) |
 | `terminal-demo/` | Records the README panel against the primary account (`just demo`) |
 | `publish-npm.mjs` | Publishes the npm package on release |
@@ -35,22 +34,6 @@ Where a command is published is `kit.ReferencePage`'s answer, and a help screen 
 CI regenerates the whole directory and fails on a diff, so a command that exists is a command that is documented, under its current name and with its current flags.
 
 It shares the tree with `internal/cli/conformance_test.go`, which checks the same commands against the rules the interface is meant to obey. Both call `cli.Root()`.
-
-## Stats
-
-Writes down what the distribution channels publish about the project, onto the `data` branch the documentation site reads at `/stats/`. Nothing here comes from the program: proton-cli has no telemetry, and this reads only counters GitHub, npm, Repology and the AUR make public.
-
-```bash
-just stats /path/to/data-branch
-```
-
-It runs at midnight UTC from `.github/workflows/stats.yml`, because two of its sources cannot be read late. A release asset's downloads are a lifetime total, so a rate exists only where one reading is subtracted from the next - which is why the first run records a baseline and no rate at all. GitHub's traffic endpoints are stricter still: they answer with the last fourteen days and delete the rest, so a fortnight without a run loses those days for good. Stars and forks are read as the repository's current totals and recorded a point a day, so their series grow forward from the first run; npm carries its own dated history and needs no catching up.
-
-A download counts as one of two channels, because that is as far as the counters tell acquisitions apart: the unversioned executable, which both install scripts, `proton update` and a hand download all fetch, and the versioned artifact the AUR, Homebrew and winget build on. `checksums.txt` accompanies a scripted fetch rather than being one, and counts for nothing. Each row is named for the day its interval began, so a run GitHub starts late still describes the day it measured.
-
-Those traffic endpoints require `STATS_TOKEN` - a personal access token with classic `repo` scope, or a fine-grained one with `Administration: read`. GitHub refuses them to the token a workflow is handed by default, whatever its permissions say, so the collector treats a refusal as fatal rather than recording everything except the part that expires. Any other source failing leaves its last reading in place and the run continues, which is why every source also records when it was last read and the page says which of its panels is standing still.
-
-`state.json` is the previous reading of every cumulative counter and exists only to be subtracted from. `stats.json` is what the browser fetches.
 
 ## Changelog
 

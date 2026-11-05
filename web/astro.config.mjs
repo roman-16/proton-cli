@@ -71,7 +71,6 @@ export default defineConfig({
             { label: "Docs", link: "/install/" },
             { label: "Commands", link: "/about/commands/" },
             { label: "FAQ", link: "/about/faq/" },
-            { label: "Stats", link: "/stats/" },
           ],
         }),
         starlightLlmsTxt({

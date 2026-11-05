@@ -29,10 +29,6 @@ demo: build
 docs:
     go run ./scripts/gendocs
 
-[doc("Record today's reading of the public counters the Stats page charts")]
-stats dir=".":
-    go run ./scripts/stats --dir {{ dir }}
-
 [doc("Build the nix package from the working tree, which a flake only sees once tracked")]
 flake:
     #!/usr/bin/env bash

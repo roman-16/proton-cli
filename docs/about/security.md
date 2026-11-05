@@ -20,7 +20,7 @@ Signing in runs [Secure Remote Password](https://en.wikipedia.org/wiki/Secure_Re
 
 **What never leaves:** your password, your second password if you have one, your Pass extra password, your key password, and an unlocked private key.
 
-There is no telemetry, and there is nothing to turn off. proton-cli never reports a command you ran, a feature you used, or the fact that you ran it at all. The diagnostic log is written to your disk and read by nobody unless you run `proton report` and paste it somewhere yourself ([Reporting a bug](../help/troubleshooting.md#reporting-a-bug)). What is known about how the tool is used comes from counters the distribution channels publish, and is [on the site](https://proton-cli.lerchster.dev/stats/) in full.
+There is no telemetry, and there is nothing to turn off. proton-cli never reports a command you ran, a feature you used, or the fact that you ran it at all. The diagnostic log is written to your disk and read by nobody unless you run `proton report` and paste it somewhere yourself ([Reporting a bug](../help/troubleshooting.md#reporting-a-bug)).
 
 **What you export is plaintext.** `mail messages export` and `contacts export` decrypt on the way out, so the files they write are readable by anything. Put them where you would be comfortable putting the mail itself. A private key from `account keys export --private` is the exception: it is written locked with the passphrase you give.
 
