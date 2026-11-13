@@ -12,6 +12,7 @@ Everything the maintainer or CI runs, in whatever language suits it: shell insta
 | `openapi-generator/` | Generates `openapi.yaml` from the WebClients and Drive SDK TypeScript source (`just openapi`) |
 | `openapi-guard/` | Checks a regenerated `openapi.yaml` before the weekly sync commits it |
 | `tidyurl/` | Writes the link-cleaning rules `internal/tidyurl` embeds, and the cases its parity test checks, from the TidyURL release WebClients pins (`just tidyurl`) |
+| `webclients.ts` | Reads which version of a dependency a WebClients package resolves to, for `mimetypes/` and `tidyurl/` |
 | `terminal-demo/` | Records the README panel against the primary account (`just demo`) |
 | `publish-npm.mjs` | Publishes the npm package on release |
 

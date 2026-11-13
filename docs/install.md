@@ -142,7 +142,7 @@ Uninstalling cannot be undone from here, so it asks first, like every other perm
 
 ## Build from source
 
-Needs Go 1.27 or newer:
+Needs Go 1.27.3 or newer:
 
 ```bash
 git clone https://github.com/roman-16/proton-cli.git

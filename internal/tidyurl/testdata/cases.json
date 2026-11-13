@@ -10880,7 +10880,7 @@
   },
   {
     "link": "https://urldefense.proofpoint.com/v2/url?u=https-3A__example.com_path_-3Futm-5Fsource-3Dx-26id-3D1&d=DwMF&c=x",
-    "cleaned": "https://example.com/path/?utm/source=x&id=1",
+    "cleaned": "https://example.com/path/?id=1",
     "tracked": true,
     "removed": []
   },

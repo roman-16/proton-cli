@@ -46,11 +46,11 @@ var handlers = map[string]handler{
 		if !ok {
 			return handlerResult{url: a.originalURL, err: errHandler}
 		}
-		target, err := decodeURIComponent(strings.ReplaceAll(arg, "-", "%"))
+		target, err := decodeURIComponent(strings.ReplaceAll(strings.ReplaceAll(arg, "_", "/"), "-", "%"))
 		if err != nil {
 			return handlerResult{url: a.originalURL, err: err}
 		}
-		return handlerResult{url: strings.ReplaceAll(strings.ReplaceAll(target, "_", "/"), "%2F", "/")}
+		return handlerResult{url: target}
 	},
 	"stardockentertainment.info": func(link string, _ handlerArgs) handlerResult {
 		target := decodeBase64(lastSegment(link))

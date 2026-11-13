@@ -2,6 +2,7 @@ package live
 
 import (
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -86,11 +87,19 @@ func TestMailMessagesListWiderThanAPage(t *testing.T) {
 	}
 }
 
+// One page holds the whole inbox, so the footer is a plain count: no "of", no
+// next-page instruction, and never a page number the reader did not ask for. The
+// page is sized from the inbox itself, with room for mail the tests before this
+// one sent and that is still arriving.
 func TestMailMessagesListFooterSinglePage(t *testing.T) {
-	_, stderr := runOKStderr(t, "mail", "messages", "list", "--limit", "150")
+	const stillArriving = 32
+	data := runJSON(t, "mail", "messages", "list", "--limit", "1")
+	total, ok := data["total"].(float64)
+	if !ok {
+		t.Fatalf("no total in the answer: %v", keysOf(data))
+	}
+	_, stderr := runOKStderr(t, "mail", "messages", "list", "--limit", strconv.Itoa(int(total)+stillArriving))
 	last := footerOf(stderr)
-	// One page holds everything, so the footer is a plain count: no "of", no
-	// next-page instruction, and never a page number the reader did not ask for.
 	if !strings.HasSuffix(last, "messages.") && !strings.HasSuffix(last, "message.") {
 		t.Errorf("expected a plain count footer, got: %q", last)
 	}

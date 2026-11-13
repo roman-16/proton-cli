@@ -88,6 +88,8 @@ Never start one to find out.
 5. **Packaging, when the release surface moved** - `just snapshot` builds every artifact a tag would, without publishing. Run it after touching `.goreleaser.yaml`, the completions or the embedded helpers.
 6. **Coverage, when the CLI's requests moved** - `just test-fast` fails when the CLI can send a request no test has ever sent, which is how an agent finds out. It is recorded by a live run, so it takes the `live-test` skill: **the coverage option over the same subset the change wanted confirmed** adds what it reached to `tests/api-coverage.golden`. The full coverage run rewrites the file, which is what it takes to *remove* a line a subset cannot know is stale. Either way the diff is committed, so it is read together. See [Testing](#testing).
 
+**After every push, watch the GitHub Actions runs it started until they finish** - `gh run list --commit "$(git rev-parse HEAD)"` finds them (a short SHA matches nothing), `gh run watch RUN --exit-status --compact` follows each - and report how they ended, the failing step for any that did not pass. A green CI run on `main` is what starts Release, so a push is not done when it leaves the machine.
+
 ## Testing
 
 There are **two tiers, and one thing separates them: does answering the question need Proton.** Nothing else - not a subscription, not which account, not how fast it is. `tests/AGENTS.md` is the whole story; the parts that decide what an agent may do:

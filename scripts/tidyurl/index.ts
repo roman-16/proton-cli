@@ -11,21 +11,13 @@
  * Usage: bun tidyurl/index.ts WEBCLIENTS_DIR
  */
 
-import { readFileSync, writeFileSync } from "fs";
+import { writeFileSync } from "fs";
 import * as path from "path";
 import { TidyURL } from "@protontech/tidy-url";
 import rules from "@protontech/tidy-url/data/rules.js";
 import pkg from "@protontech/tidy-url/package.json";
 
-function webClientsVersion(dir: string): string {
-  const lock = readFileSync(path.join(dir, "yarn.lock"), "utf8");
-  const found = lock.match(/"@protontech\/tidy-url@npm:[^"]*":\s*\n\s*version: ([^\s]+)/);
-  if (!found) {
-    process.stderr.write("WebClients' yarn.lock names no @protontech/tidy-url\n");
-    process.exit(1);
-  }
-  return found[1];
-}
+import { resolvedVersion } from "../webclients";
 
 type Pattern = { source: string; flags: string };
 
@@ -252,7 +244,7 @@ function main() {
     process.exit(1);
   }
 
-  const pinned = webClientsVersion(webClientsDir);
+  const pinned = resolvedVersion(webClientsDir, "packages/shared", "@protontech/tidy-url");
   if (pinned !== pkg.version) {
     process.stderr.write(
       `WebClients cleans links with @protontech/tidy-url ${pinned}, scripts/package.json pins ${pkg.version}\n`

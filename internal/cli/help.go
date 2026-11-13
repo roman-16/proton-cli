@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 
 	"github.com/roman-16/proton-cli/internal/cli/kit"
@@ -132,7 +133,7 @@ func usage(b *strings.Builder, c *cobra.Command) {
 	// A group's only flag is the one that got you here, and a block holding
 	// nothing else says nothing.
 	if local := c.LocalFlags(); hasFlagsOfItsOwn(local) {
-		fmt.Fprintf(b, "\nFlags:\n%s", local.FlagUsages())
+		fmt.Fprintf(b, "\nFlags:\n%s", flagBlock(local))
 	}
 
 	writeTail(b, c)
@@ -229,6 +230,68 @@ func indent(block string) string {
 		}
 	}
 	return strings.Join(lines, "\n")
+}
+
+func flagBlock(set *pflag.FlagSet) string {
+	type row struct{ head, usage string }
+	var rows []row
+	width := 0
+	set.VisitAll(func(f *pflag.Flag) {
+		if f.Hidden {
+			return
+		}
+		head := "      --" + f.Name
+		if f.Shorthand != "" {
+			head = "  -" + f.Shorthand + ", --" + f.Name
+		}
+		name, usage := pflag.UnquoteUsage(f)
+		if name != "" {
+			head += " " + name
+		}
+		head += optionalValue(f)
+		if !defaultIsZero(f) {
+			usage += defaultNote(f)
+		}
+		rows = append(rows, row{head: head, usage: usage})
+		width = max(width, len(head))
+	})
+	var b strings.Builder
+	continuation := "\n" + strings.Repeat(" ", width+3)
+	for _, r := range rows {
+		fmt.Fprintf(&b, "%-*s   %s\n", width, r.head, strings.ReplaceAll(r.usage, "\n", continuation))
+	}
+	return b.String()
+}
+
+func optionalValue(f *pflag.Flag) string {
+	switch kind := f.Value.Type(); {
+	case f.NoOptDefVal == "", kind == "bool" && f.NoOptDefVal == "true", kind == "count" && f.NoOptDefVal == "+1":
+		return ""
+	case kind == "string":
+		return `[="` + f.NoOptDefVal + `"]`
+	default:
+		return "[=" + f.NoOptDefVal + "]"
+	}
+}
+
+func defaultIsZero(f *pflag.Flag) bool {
+	switch f.Value.Type() {
+	case "duration":
+		return f.DefValue == "0" || f.DefValue == "0s"
+	case "intSlice", "stringArray", "stringSlice":
+		return f.DefValue == "[]"
+	case "string":
+		return f.DefValue == ""
+	default:
+		return slices.Contains([]string{"", "0", "<nil>", "false"}, f.DefValue)
+	}
+}
+
+func defaultNote(f *pflag.Flag) string {
+	if f.Value.Type() == "string" {
+		return fmt.Sprintf(" (default %q)", f.DefValue)
+	}
+	return " (default " + f.DefValue + ")"
 }
 
 func hasFlagsOfItsOwn(set *pflag.FlagSet) bool {

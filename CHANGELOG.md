@@ -6,6 +6,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 Adding a version section here is what publishes a release, so this file is the one place a version is decided: see [Releases](CONTRIBUTING.md#releases). Versions that shipped before this file existed are on the [releases page](https://github.com/roman-16/proton-cli/releases).
 
+## [5.5.0] - 2026-11-13
+
+### Highlights
+
+- **Signing out ends the session** - `account logout` and `account profiles delete` end the session at Proton, so a copy of the session file stops working too.
+- **Signed releases** - `proton update` installs only a release signed with the key that signs the APT repository, and each release carries `checksums.txt.sig` for checking a download by hand.
+
+### Added
+
+- `checksums.txt.sig` on every release, a signature over `checksums.txt` from the key that signs the APT repository.
+- `account logout --local` and `account profiles delete --local` remove a session from this machine only, leaving it valid at Proton.
+
+### Changed
+
+- **Breaking.** `account logout` ends the session at Proton instead of only removing it from this machine, and `--revoke` is gone. When Proton cannot be reached, the profile keeps its session and the command fails. Remove `--revoke` from scripts that pass it.
+- `account profiles delete` ends the profile's session at Proton before removing it.
+- `proton update` installs a release only when it carries a signature from the proton-cli release key, and refuses 5.4.0 and earlier, which have none.
+- An expired session says so and names the command that signs in again.
+- A damaged or unreadable session file is reported as such instead of as not being signed in.
+- A flag given a value it cannot take says what it expects, such as `must be an integer`, instead of showing a Go parse error.
+- Building from source needs Go 1.27.3 or newer.
+
+### Fixed
+
+- A renewed session that could not be saved was lost without a word, and the next command failed with an expired session. It now warns that the next command will need a new sign-in.
+- Commands sharing a profile could renew its session at the same moment, and one would fail with an expired session. They now take turns.
+- A command still running when you signed out, such as `mail messages watch`, wrote the session back and signed you in again.
+- Links wrapped by Proofpoint URL Defense turned each underscore in the address into `/`, so they pointed at the wrong page.
+- A malformed message, key or signature from somebody else could crash the command reading it. Now it is refused.
+
+### Security
+
+- Releases are built with Go 1.27.4 and golang.org/x/net 0.62.0, which carry fixes to HTTP, TLS, certificate checks and HTML parsing that 5.4.0 was built without.
+- A saved session is sent only to the API it was signed in at, and never across a redirect to another host.
+
 ## [5.4.0] - 2026-11-03
 
 ### Highlights

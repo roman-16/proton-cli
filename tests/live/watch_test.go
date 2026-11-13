@@ -181,9 +181,11 @@ func (w *watch) stop(t *testing.T) {
 type pendingSignIn struct {
 	cmd  *exec.Cmd
 	errb *bytes.Buffer
-	// code carries the sign-in code as soon as it is printed, and done the exit.
-	code chan string
-	done chan error
+	// code carries the sign-in code as soon as it is printed; done closes once
+	// the sign-in has exited, and exitErr is then what that exit reported.
+	code    chan string
+	done    chan struct{}
+	exitErr error
 
 	// dir is the config directory this sign-in writes its session to, profile
 	// the environment it runs under, and args, started what the trace records.
@@ -209,7 +211,7 @@ func signingIn(profile, dir string) (*pendingSignIn, error) {
 		cmd:  exec.Command(binaryPath, args...),
 		errb: &bytes.Buffer{},
 		code: make(chan string, 1),
-		done: make(chan error, 1),
+		done: make(chan struct{}),
 		dir:  dir, profile: profile, args: args, started: time.Now(),
 	}
 	// Both names for one thing: os.UserConfigDir reads XDG_CONFIG_HOME on Linux
@@ -230,7 +232,10 @@ func signingIn(profile, dir string) (*pendingSignIn, error) {
 	if err := s.cmd.Start(); err != nil {
 		return nil, err
 	}
-	go func() { s.done <- s.cmd.Wait() }()
+	go func() {
+		s.exitErr = s.cmd.Wait()
+		close(s.done)
+	}()
 	go func() {
 		scanner := bufio.NewScanner(errPipe)
 		for scanner.Scan() {
@@ -253,9 +258,9 @@ func (s *pendingSignIn) waitForCode(t *testing.T, timeout time.Duration) string 
 	select {
 	case code := <-s.code:
 		return code
-	case err := <-s.done:
+	case <-s.done:
 		s.record(s.cmd.ProcessState.ExitCode())
-		t.Fatalf("the sign-in ended before it showed a code: %v\nstderr:\n%s", err, s.errb.String())
+		t.Fatalf("the sign-in ended before it showed a code: %v\nstderr:\n%s", s.exitErr, s.errb.String())
 	case <-time.After(timeout):
 		t.Fatalf("no code within %s\nstderr:\n%s", timeout, s.errb.String())
 	}
@@ -267,10 +272,10 @@ func (s *pendingSignIn) waitForCode(t *testing.T, timeout time.Duration) string 
 func (s *pendingSignIn) waitForSession(t *testing.T, timeout time.Duration) string {
 	t.Helper()
 	select {
-	case err := <-s.done:
+	case <-s.done:
 		s.record(s.cmd.ProcessState.ExitCode())
-		if err != nil {
-			t.Fatalf("the sign-in failed: %v\nstderr:\n%s", err, s.errb.String())
+		if s.exitErr != nil {
+			t.Fatalf("the sign-in failed: %v\nstderr:\n%s", s.exitErr, s.errb.String())
 		}
 	case <-time.After(timeout):
 		t.Fatalf("the sign-in did not finish within %s of the code being approved\nstderr:\n%s",
