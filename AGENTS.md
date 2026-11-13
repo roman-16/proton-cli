@@ -7,6 +7,7 @@ This is an open-source CLI tool used by other people. All changes should conside
 - **Cross-platform** - must work on Linux, macOS, and Windows (amd64 + arm64)
 - **User-facing quality** - README, help text, and error messages should be clear and helpful
 - **Distribution** - binaries are published as GitHub Releases via GoReleaser; users install by downloading a binary or via `go install`. A release is caused by `CHANGELOG.md`, see below
+- **Release signing** - the `GPG_PRIVATE_KEY` secret signs both the APT repository and each release's `checksums.txt`, and its public half is embedded in `internal/selfmanage/release-key.asc` for `proton update`. Replacing the key means embedding the new one, and binaries built before that can no longer update themselves
 
 ## Feature Scope
 

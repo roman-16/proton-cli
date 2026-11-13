@@ -4,7 +4,6 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/roman-16/proton-cli/internal/app"
 	"github.com/roman-16/proton-cli/internal/cli/kit"
 	"github.com/roman-16/proton-cli/internal/proton"
 	acctsvc "github.com/roman-16/proton-cli/internal/service/account"
@@ -72,7 +71,7 @@ func deleteCmd() *cobra.Command {
 					relock()
 					return err
 				}
-				return app.Forget(c.App.Profile)
+				return c.App.Forget(c.Ctx, c.App.Profile, true)
 			}); err != nil {
 				return err
 			}

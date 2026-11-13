@@ -61,11 +61,14 @@ environment.systemPackages = [
 
 ## Download a binary
 
-Every release ships raw binaries, archives and `checksums.txt` on the [releases page](https://github.com/roman-16/proton-cli/releases/latest), named `proton-cli_<os>_<arch>` for `linux`, `darwin` and `windows` on `amd64` and `arm64`.
+Every release ships raw binaries, archives, `checksums.txt` and its signature `checksums.txt.sig` on the [releases page](https://github.com/roman-16/proton-cli/releases/latest). The binaries are named `proton-cli_<os>_<arch>` for `linux`, `darwin` and `windows` on `amd64` and `arm64`.
 
 ```bash
 curl -LO https://github.com/roman-16/proton-cli/releases/latest/download/proton-cli_linux_amd64
 curl -LO https://github.com/roman-16/proton-cli/releases/latest/download/checksums.txt
+curl -LO https://github.com/roman-16/proton-cli/releases/latest/download/checksums.txt.sig
+curl -fsSL https://roman-16.github.io/proton-cli/gpg.key | gpg --import
+gpg --verify checksums.txt.sig checksums.txt
 sha256sum --check --ignore-missing checksums.txt
 chmod +x proton-cli_linux_amd64
 sudo mv proton-cli_linux_amd64 /usr/local/bin/proton
@@ -123,7 +126,7 @@ It stays quiet when a package manager owns this copy, when stderr is not a termi
 `proton changelog` prints what each release changed: the whole file, one version, or a range with `--since 2.3.0 --until 2.4.0`.
 
 > [!NOTE]
-> `proton update` checks the download against `checksums.txt` from the same release, and neither is signed. An install from a package manager is verified by the package manager.
+> `proton update` installs only a release signed with the key that also signs the APT repository, and only a download that matches its checksum. Releases up to 5.4.0 carry no signature, so download those by hand. An install from a package manager is verified by the package manager.
 
 ## Uninstalling
 

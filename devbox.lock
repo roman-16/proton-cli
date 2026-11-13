@@ -359,6 +359,44 @@
         }
       }
     },
+    "govulncheck@latest": {
+      "last_modified": "2026-11-12T14:50:34Z",
+      "resolved": "github:NixOS/nixpkgs/2074cc672349f14240fb7ea90d509e0b643e9dd4#govulncheck",
+      "source": "devbox-search",
+      "version": "1.9.0",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/78jr56xwri07650a55vl7l1g06a3fl47-govulncheck-1.9.0",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/78jr56xwri07650a55vl7l1g06a3fl47-govulncheck-1.9.0"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/3jg8gbz3nh3kbr8ki7nh0m4vibnh69xi-govulncheck-1.9.0",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/3jg8gbz3nh3kbr8ki7nh0m4vibnh69xi-govulncheck-1.9.0"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/py5im09i3f05yidr4w0vsc8drz3gvvxz-govulncheck-1.9.0",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/py5im09i3f05yidr4w0vsc8drz3gvvxz-govulncheck-1.9.0"
+        }
+      }
+    },
     "jetbrains-mono@latest": {
       "last_modified": "2026-08-29T00:50:12Z",
       "resolved": "github:NixOS/nixpkgs/e8be7818e19ada32105a8af937a6a473b38167ca#jetbrains-mono",

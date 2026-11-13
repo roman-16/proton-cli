@@ -401,3 +401,34 @@ func TestAccountExportRefusesAnotherAccountsCopy(t *testing.T) {
 	}
 	assertContains(t, stderr, "is a copy of")
 }
+
+func TestAccountLogoutAllEndsEverySessionOnThisMachine(t *testing.T) {
+	dir := t.TempDir()
+	var uids []string
+	for _, name := range []string{"first", "second"} {
+		_, _, saved, path := signInAnotherDevice(t, dir)
+		if err := os.Rename(path, filepath.Join(filepath.Dir(path), name+".json")); err != nil {
+			t.Fatal(err)
+		}
+		uids = append(uids, saved.UID)
+	}
+
+	stdout, stderr, code := runWithEnv(t, map[string]string{
+		"HOME":            dir,
+		"XDG_CONFIG_HOME": filepath.Join(dir, "config"),
+	}, "account", "logout", "--all")
+	if code != 0 {
+		t.Fatalf("logout --all exited %d:\n%s", code, stderr)
+	}
+	assertContains(t, stdout+stderr, "Signed out 2 profiles")
+
+	listed := map[string]bool{}
+	for _, s := range runJSONArray(t, "account", "sessions", "list") {
+		listed[s.(map[string]interface{})["uid"].(string)] = true
+	}
+	for _, uid := range uids {
+		if listed[uid] {
+			t.Errorf("session %s is still valid at Proton after signing out", uid)
+		}
+	}
+}

@@ -418,12 +418,14 @@ A calendar file that no longer reads back is left as it is and named in a warnin
 ## Sign out
 
 ```bash
-proton account logout              # forget the session on this machine
-proton account logout --revoke     # also invalidate it at Proton
+proton account logout              # end the session at Proton and remove it here
 proton account logout --all        # every profile on this machine
+proton account logout --local      # remove it here only; it stays valid at Proton
 ```
 
-Revoking also makes a leaked copy of the session file worthless.
+Signing out makes a leaked copy of the session file worthless. `proton account profiles delete` ends the session the same way before it removes the profile.
+
+When Proton cannot be reached, the profile keeps its session and the error names it. Run the command again once Proton answers, or pass `--local`.
 
 ## More than one account
 

@@ -28,11 +28,7 @@ import (
 //     blockMaxRateLimit ~ MAX_TOO_MANY_REQUESTS_WAIT), and refreshes an
 //     expired storage token (blockTokenTTL ~ TOKEN_EXPIRATION_TIME).
 const (
-	driveBlockSize = 4 * 1024 * 1024
-	// storedBlockLimit is how much of a block storage may answer with. A block is
-	// 4 MiB plus its encryption overhead, and the bytes are held whole in memory
-	// while they are decrypted, so an answer that keeps coming is refused rather
-	// than read.
+	driveBlockSize     = 4 * 1024 * 1024
 	storedBlockLimit   = driveBlockSize + 1024*1024
 	uploadBufferBlocks = 15
 	uploadLinkBatch    = 10
@@ -43,30 +39,9 @@ const (
 	blockMaxRateLimit  = time.Hour
 )
 
-// blockRetryBaseDelay is the base backoff between block-transfer retries. It is
-// a package var so tests can shrink it; production keeps a real backoff.
 var blockRetryBaseDelay = 500 * time.Millisecond
 
-// blockClient carries the storage token, and carries it nowhere else.
-//
-// Block transfers do not go through the API client: they are signed URLs on
-// Proton's storage hosts, authorised by a pm-storage-token header. net/http
-// strips a header it recognises as sensitive when a redirect crosses origins,
-// and its list is Authorization and Cookie - not this one - so the rule is
-// stated here: a redirect off the host Proton named is not followed with the
-// token in hand.
-var blockClient = &http.Client{
-	CheckRedirect: func(req *http.Request, via []*http.Request) error {
-		if len(via) == 0 {
-			return nil
-		}
-		origin := via[0].URL
-		if !strings.EqualFold(origin.Scheme, req.URL.Scheme) || !strings.EqualFold(origin.Host, req.URL.Host) {
-			return http.ErrUseLastResponse
-		}
-		return nil
-	},
-}
+var blockClient = &http.Client{CheckRedirect: proton.SameOrigin}
 
 // storageError is what a block transfer failed with, said without quoting what
 // failed.
@@ -92,23 +67,16 @@ func (e *storageError) Error() string {
 
 func (e *storageError) Unwrap() error { return e.cause }
 
-// storageFailed wraps a block-transfer failure as a network error, which is what
-// decides the exit code: the request left this machine and did not come back
-// with an answer, whoever is at fault.
 func storageFailed(operation string, status int, cause error) error {
 	return &proton.NetworkError{Err: &storageError{operation: operation, status: status, cause: cause}}
 }
 
-// uploadLink is a block storage upload target plus the time its token was
-// issued, so a long-running upload can proactively refresh a stale token.
 type uploadLink struct {
 	Token   string
 	BareURL string
 	created time.Time
 }
 
-// sleepCtx waits for d, returning early with ctx's error if it is cancelled.
-// A non-positive d is a no-op (returns ctx.Err(), nil while the ctx is live).
 func sleepCtx(ctx context.Context, d time.Duration) error {
 	if d <= 0 {
 		return ctx.Err()
@@ -123,7 +91,6 @@ func sleepCtx(ctx context.Context, d time.Duration) error {
 	}
 }
 
-// backoffDelay is exponential (base, doubling per attempt) capped at 30s.
 func backoffDelay(attempt int) time.Duration {
 	d := blockRetryBaseDelay << attempt
 	if d <= 0 || d > 30*time.Second {
@@ -132,9 +99,6 @@ func backoffDelay(attempt int) time.Duration {
 	return d
 }
 
-// retryAfter parses a Retry-After header (delta-seconds), bounded to
-// blockMaxRateLimit. A missing or malformed header falls back to the backoff
-// for attempt.
 func retryAfter(header string, attempt int) time.Duration {
 	if secs, err := strconv.Atoi(strings.TrimSpace(header)); err == nil && secs >= 0 {
 		d := time.Duration(secs) * time.Second
@@ -185,9 +149,6 @@ func putBlock(ctx context.Context, link uploadLink, data []byte) (status int, re
 	return resp.StatusCode, resp.Header.Get("Retry-After"), nil
 }
 
-// uploadBlock uploads one block, retrying transient failures with backoff,
-// honouring 429 Retry-After, and calling refresh for a new link when the
-// storage token is rejected or has aged past its TTL.
 func uploadBlock(ctx context.Context, index int, data []byte, link uploadLink, refresh func(context.Context) (uploadLink, error)) error {
 	for attempt := 0; ; attempt++ {
 		if time.Since(link.created) > blockTokenTTL {
@@ -237,8 +198,6 @@ func uploadBlock(ctx context.Context, index int, data []byte, link uploadLink, r
 	}
 }
 
-// getBlock downloads one block's bytes, returning the HTTP status and
-// Retry-After header on a non-2xx response instead of the body.
 func getBlock(ctx context.Context, url, token string) (data []byte, status int, retryAfterHdr string, err error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
@@ -264,12 +223,8 @@ func getBlock(ctx context.Context, url, token string) (data []byte, status int, 
 	return b, resp.StatusCode, "", nil
 }
 
-// errBlockTooLarge is a block that did not stop arriving. Retrying would ask for
-// the same thing again, so it is not one of the failures that is retried.
 var errBlockTooLarge = storageFailed("download block", 0, errors.New("the block exceeds the size a block can be"))
 
-// downloadBlock fetches one block's bytes, retrying transient failures with
-// backoff and honouring 429 Retry-After.
 func downloadBlock(ctx context.Context, url, token string) ([]byte, error) {
 	for attempt := 0; ; attempt++ {
 		attemptCtx, cancel := context.WithTimeout(ctx, blockTransferQuery)
@@ -308,8 +263,6 @@ func downloadBlock(ctx context.Context, url, token string) ([]byte, error) {
 	}
 }
 
-// requestBlockLinks asks the API for upload links for a batch of blocks. The
-// returned links are positional (link i belongs to batch[i]).
 func (s *Service) requestBlockLinks(ctx context.Context, dc *Context, linkID, revisionID string, by author, batch []*encBlock) ([]uploadLink, error) {
 	blockList := make([]map[string]any, len(batch))
 	for i, b := range batch {

@@ -169,6 +169,11 @@ jobs:
           fi
           cat "$notes"
 
+      - name: Import the release signing key
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+        run: printf '%s\n' "$GPG_PRIVATE_KEY" | gpg --batch --import
+
       # GoReleaser builds the binaries and publishes to third-party package
       # repositories in one step, and AUR being unreachable must not stop a release
       # that built correctly. So this step is allowed to fail and the verification
@@ -198,7 +203,7 @@ jobs:
           assets=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
           echo "Assets on $TAG:"; echo "$assets"
           missing=()
-          for a in checksums.txt \
+          for a in checksums.txt checksums.txt.sig \
                    proton-cli_linux_amd64 proton-cli_linux_arm64 \
                    proton-cli_darwin_amd64 proton-cli_darwin_arm64 \
                    proton-cli_windows_amd64.exe proton-cli_windows_arm64.exe; do

@@ -116,11 +116,9 @@ proton account login --qr
 
 ## `logout`
 
-Discard the saved session for this profile.
+Sign out, ending the session at Proton and removing it from this machine.
 
-The key password on disk is sealed with a key held by Proton, so deleting the session file is enough to make it unreadable.
-
---revoke also invalidates the session at Proton, the same as signing out in a Proton app. Use it if the file may have been copied.
+When Proton cannot be reached, the profile keeps its session and nothing after it is signed out. Run the command again, or pass --local to remove the session from this machine only, leaving it valid at Proton.
 
 ```
 proton account logout
@@ -128,14 +126,14 @@ proton account logout
 
 ```bash
 proton account logout
-proton account logout --revoke
 proton account logout --all
+proton account logout --local
 ```
 
 | Flag | Description |
 | --- | --- |
 | `--all` | Act on everything in scope, rather than a subset |
-| `--revoke` | Also invalidate the session at Proton |
+| `--local` | Remove the session from this machine only, leaving it valid at Proton |
 
 ---
 

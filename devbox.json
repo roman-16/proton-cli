@@ -9,6 +9,7 @@
     "golangci-lint":  "latest",
     "gopls":          "latest",
     "goreleaser":     "latest",
+    "govulncheck":    "latest",
     "jetbrains-mono": "latest",
     "jq":             "latest",
     "just":           "latest",

@@ -1,5 +1,3 @@
-// Package app wires the Proton services, renderer and session together for
-// the CLI. One App instance per invocation.
 package app
 
 import (
@@ -8,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
@@ -51,8 +50,6 @@ type App struct {
 	Contacts *contacts.Service
 	Pass     *pass.Service
 
-	// Index is the encrypted copy of the account this machine keeps, which is
-	// what answers a question Proton cannot read the answer to.
 	Index *search.Store
 
 	UI *ui.UI
@@ -79,9 +76,11 @@ type App struct {
 	stdinMu    sync.Mutex
 	stdinClaim string
 
-	sessionMu sync.Mutex
-	userID    string
-	email     string
+	sessionMu  sync.Mutex
+	userID     string
+	email      string
+	sessionErr error
+	foreign    bool
 }
 
 type Options struct {
@@ -119,13 +118,21 @@ func New(opts Options) (*App, error) {
 	})
 	slog.SetDefault(u.Log)
 	c := proton.New(proton.Options{
-		BaseURL: apiURL, Logger: u.Log, Profile: profileName.String(),
+		BaseURL: apiURL, Logger: u.Log, Profile: profileName,
 		UserAgent: userAgent, DryRun: opts.DryRun,
 	})
 
 	var userID, email string
-	if sess, err := session.Load(profileName); err == nil && sess != nil {
-		c.SetTokens(sess.UID, sess.AccessToken, sess.RefreshToken)
+	sess, sessionErr := session.Load(profileName)
+	foreign := false
+	switch {
+	case sessionErr != nil:
+		sessionErr = unreadableSession(profileName, sessionErr)
+	case sess == nil:
+	case !sameAPI(sess.BaseURL, c.BaseURL()):
+		sessionErr, foreign = foreignSession(profileName, sess.BaseURL, c.BaseURL()), true
+	default:
+		c.Resume(proton.SavedTokens{UID: sess.UID, Access: sess.AccessToken, Refresh: sess.RefreshToken})
 		c.SetEncKeyBlob(sess.EncKeyBlob)
 		userID, email = sess.UserID, sess.Email
 	}
@@ -147,6 +154,8 @@ func New(opts Options) (*App, error) {
 		IDCache:       Seen(profileName),
 		userID:        userID,
 		email:         email,
+		sessionErr:    sessionErr,
+		foreign:       foreign,
 	}
 	a.zone.name = opts.Zone
 	adoptZone(opts.Zone)
@@ -162,21 +171,8 @@ func New(opts Options) (*App, error) {
 	a.Calendar.SetMeetings(a.Meet)
 	a.Contacts = contacts.New(c, a.Unlock)
 	a.Pass = pass.New(c, a.Unlock)
-	// The client persists the session file whenever its tokens change (e.g. a
-	// mid-request refresh); it stays free of the persistence format by calling
-	// back into saveSession, which owns the DTO assembly. It reads them back the
-	// same way, so a session refreshed by a command running alongside this one is
-	// picked up rather than refreshed a second time with a token Proton has already
-	// spent.
-	c.SetPersistHook(func() { _ = a.saveSession() })
+	c.SetStore(profileStore{a})
 	c.SetSessionGuard(func() error { return a.Authenticate(context.Background()) })
-	c.SetReloadHook(func() (string, string, bool) {
-		stored, err := session.Load(profileName)
-		if err != nil || stored == nil {
-			return "", "", false
-		}
-		return stored.AccessToken, stored.RefreshToken, true
-	})
 	a.Creds.stdinOwner = a.Stdin
 	a.installScopeResolver()
 	a.installSecondFactorResolver()
@@ -209,20 +205,65 @@ func elsewhere(claims ...string) string {
 	return "read one of them from a path rather than -"
 }
 
-func (a *App) saveSession() error {
-	uid, acc, refresh := a.API.Tokens()
-	a.sessionMu.Lock()
-	defer a.sessionMu.Unlock()
-	return session.Save(a.Profile, &session.Session{
+type profileStore struct{ a *App }
+
+func (s profileStore) Hold(ctx context.Context) (func(), error) {
+	return session.Hold(ctx, s.a.Profile)
+}
+
+func (s profileStore) Saved() (proton.SavedTokens, error) {
+	sess, err := session.Load(s.a.Profile)
+	if err != nil || sess == nil {
+		return proton.SavedTokens{}, err
+	}
+	return proton.SavedTokens{UID: sess.UID, Access: sess.AccessToken, Refresh: sess.RefreshToken}, nil
+}
+
+func (s profileStore) Save() error {
+	uid, acc, refresh := s.a.API.Tokens()
+	s.a.sessionMu.Lock()
+	defer s.a.sessionMu.Unlock()
+	return session.Save(s.a.Profile, &session.Session{
 		UID:          uid,
 		AccessToken:  acc,
 		RefreshToken: refresh,
-		UserID:       a.userID,
-		Email:        a.email,
-		EncKeyBlob:   a.API.EncKeyBlob(),
-		AppVersion:   a.API.AppVersion(),
-		BaseURL:      a.API.BaseURL(),
+		UserID:       s.a.userID,
+		Email:        s.a.email,
+		EncKeyBlob:   s.a.API.EncKeyBlob(),
+		BaseURL:      s.a.API.BaseURL(),
 	})
+}
+
+func sameAPI(a, b string) bool {
+	ua, errA := url.Parse(a)
+	ub, errB := url.Parse(b)
+	if errA != nil || errB != nil {
+		return a == b
+	}
+	return strings.EqualFold(ua.Scheme, ub.Scheme) && strings.EqualFold(ua.Host, ub.Host) &&
+		strings.TrimSuffix(ua.Path, "/") == strings.TrimSuffix(ub.Path, "/")
+}
+
+func unreadableSession(name profile.Name, err error) error {
+	if errors.Is(err, session.ErrDamaged) {
+		if name.IsDefault() {
+			return errs.Problemf("Your saved session is damaged.").Hint(name.SignIn()).Exit(2)
+		}
+		return errs.Problemf("The saved session of profile %q is damaged.", name).Hint(name.SignIn()).Exit(2)
+	}
+	if name.IsDefault() {
+		return errs.Problemf("Your saved session could not be read: %v", err).Exit(2)
+	}
+	return errs.Problemf("The saved session of profile %q could not be read: %v", name, err).Exit(2)
+}
+
+func foreignSession(name profile.Name, saved, asked string) error {
+	hint := "proton --profile NAME account login"
+	if name.IsDefault() {
+		return errs.Problemf("Your saved session was signed in at %s, not %s.", saved, asked).Hint(hint).Exit(2)
+	}
+	return errs.Problemf("The saved session of profile %q was signed in at %s, not %s.", name, saved, asked).
+		Hint(hint).Exit(2)
 }
 
 func (a *App) rememberIdentity(userID, email string) {
@@ -241,8 +282,11 @@ func idCachePath(name profile.Name) string {
 	return filepath.Join(dir, "idcache", name.FileName(".json"))
 }
 
-func Forget(name profile.Name) error {
-	if err := session.Clear(name); err != nil {
+func (a *App) Forget(ctx context.Context, name profile.Name, local bool) error {
+	if err := a.SignOut(ctx, name, local); err != nil {
+		return err
+	}
+	if err := session.DropLock(name); err != nil {
 		return err
 	}
 	if err := Seen(name).Clear(); err != nil {
@@ -252,6 +296,57 @@ func Forget(name profile.Name) error {
 		return err
 	}
 	return nil
+}
+
+func (a *App) SignOut(ctx context.Context, name profile.Name, local bool) error {
+	release, err := session.Hold(ctx, name)
+	if err != nil {
+		return err
+	}
+	defer release()
+	if !local {
+		if err := a.revokeSaved(ctx, name); err != nil {
+			return err
+		}
+	}
+	return session.Clear(name)
+}
+
+type RevokeError struct {
+	Profile profile.Name
+	Err     error
+}
+
+func (e *RevokeError) Error() string {
+	return fmt.Sprintf("revoke the session of profile %q: %v", e.Profile, e.Err)
+}
+
+func (e *RevokeError) Unwrap() error { return e.Err }
+
+func (a *App) revokeSaved(ctx context.Context, name profile.Name) error {
+	sess, err := session.Load(name)
+	if errors.Is(err, session.ErrDamaged) {
+		// Recorded and not counted: a damaged file holds no session to revoke,
+		// and discarding it is what signing out asks for.
+		slog.DebugContext(ctx, "a damaged session was discarded without revoking", "error", err.Error())
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if sess == nil {
+		return nil
+	}
+	c := proton.New(proton.Options{
+		BaseURL: sess.BaseURL, Profile: name, Logger: a.UI.Log,
+		UserAgent: defaultUserAgent(a.version),
+	})
+	c.SetTokens(sess.UID, sess.AccessToken, sess.RefreshToken)
+	err = c.Revoke(ctx)
+	if err == nil || errors.Is(err, proton.ErrUnauthorized) {
+		return nil
+	}
+	return &RevokeError{Profile: name, Err: err}
 }
 
 func indexDir(name profile.Name) string {
@@ -274,11 +369,6 @@ func (a *App) indexKeys(ctx context.Context) (search.Keys, error) {
 	return search.Keys{Seal: primary, Open: u.UserKR}, nil
 }
 
-// SignedIn reports whether this profile holds a session.
-// UserID is the account this profile is signed in as, as Proton names it.
-//
-// A Pass export records it, because an alias belongs to the account that made
-// it and a reader has to be able to tell whether it is looking at its own.
 func (a *App) UserID() string { return a.userID }
 
 func (a *App) Email() string { return a.email }
@@ -292,12 +382,13 @@ func (a *App) Authenticate(context.Context) error {
 	if a.SignedIn() {
 		return nil
 	}
-	if a.Profile.IsDefault() {
-		return errs.Problemf("You are not signed in.").
-			Hint("proton account login").Exit(2)
+	if a.sessionErr != nil {
+		return a.sessionErr
 	}
-	return errs.Problemf("Profile %q is not signed in.", a.Profile).
-		Hint(fmt.Sprintf("proton account login --profile %s", a.Profile)).Exit(2)
+	if a.Profile.IsDefault() {
+		return errs.Problemf("You are not signed in.").Hint(a.Profile.SignIn()).Exit(2)
+	}
+	return errs.Problemf("Profile %q is not signed in.", a.Profile).Hint(a.Profile.SignIn()).Exit(2)
 }
 
 func (a *App) Login(ctx context.Context, user string) error {
@@ -324,6 +415,9 @@ func (a *App) Login(ctx context.Context, user string) error {
 }
 
 func (a *App) resume(ctx context.Context, user string) (bool, error) {
+	if a.foreign {
+		return true, a.sessionErr
+	}
 	if !a.SignedIn() {
 		return false, nil
 	}
@@ -347,14 +441,13 @@ func (a *App) attach(ctx context.Context) error {
 	}
 	if a.userID != "" && acct.ID != a.userID {
 		slog.DebugContext(ctx, "sign-in refused", "reason", "another account")
-		uid, _, _ := a.API.Tokens()
-		if err := a.API.RevokeSession(ctx, uid); err != nil {
+		if err := a.API.Revoke(ctx); err != nil {
 			slog.DebugContext(ctx, "the refused session could not be revoked", "error", err.Error())
 		}
 		return a.refuseAnotherAccount()
 	}
 	a.rememberIdentity(acct.ID, acct.Email)
-	return a.saveSession()
+	return a.API.Establish(ctx)
 }
 
 func (a *App) settle(ctx context.Context) error {
@@ -364,7 +457,7 @@ func (a *App) settle(ctx context.Context) error {
 	if err := a.unlockPass(ctx); err != nil {
 		return err
 	}
-	return a.saveSession()
+	return a.API.Establish(ctx)
 }
 
 // forkPoll is how often an unapproved fork is asked about again, and forkLife is
@@ -421,7 +514,7 @@ func (a *App) LoginQR(ctx context.Context, show func(code string) error) error {
 func (a *App) AccessInto(ctx context.Context, target profile.Name, sess account.AccessSession) (string, error) {
 	c := proton.New(proton.Options{
 		BaseURL: a.API.BaseURL(), AppVersion: a.API.AppVersion(),
-		Profile: target.String(), Logger: a.UI.Log,
+		Profile: target, Logger: a.UI.Log, UserAgent: defaultUserAgent(a.version),
 	})
 	c.SetTokens(sess.UID, sess.AccessToken, sess.RefreshToken)
 	acct, err := account.New(c, nil).Get(ctx)
@@ -440,10 +533,15 @@ func (a *App) AccessInto(ctx context.Context, target profile.Name, sess account.
 		return "", err
 	}
 	uid, acc, ref := c.Tokens()
+	release, err := session.Hold(ctx, target)
+	if err != nil {
+		return "", err
+	}
+	defer release()
 	if err := session.Save(target, &session.Session{
 		UID: uid, AccessToken: acc, RefreshToken: ref,
 		UserID: acct.ID, Email: acct.Email, EncKeyBlob: blob,
-		AppVersion: c.AppVersion(), BaseURL: c.BaseURL(),
+		BaseURL: c.BaseURL(),
 	}); err != nil {
 		return "", err
 	}
@@ -473,12 +571,6 @@ func (a *App) awaitFork(ctx context.Context, selector string) (*proton.ForkedSes
 	}
 }
 
-// SignInDevice signs another device in as this account, by the code it is
-// showing.
-//
-// The passphrase that opens this account's keys is sealed under a key that
-// device made and Proton never sees, which is what lets it read anything at all
-// once it is signed in.
 func (a *App) SignInDevice(ctx context.Context, code fork.Code) error {
 	unlocked, err := a.Unlock(ctx)
 	if err != nil {
@@ -524,25 +616,6 @@ func (a *App) ReachesPass(ctx context.Context) (bool, error) {
 	return slices.Contains(scopes, string(proton.ScopePass)), nil
 }
 
-// Elevate proves the account password for a scope before the work starts, and
-// hands back what drops the elevation again.
-//
-// Almost nothing calls this: an endpoint that wants an elevated session says so
-// when it is asked, and the client answers that by itself, which is why no
-// command knows which endpoints are guarded. What this is for is the handful
-// whose guard is not an endpoint's. Some go on to ask for a *second* secret - a
-// new password, a code from an authenticator app - where the order is the whole
-// point: proving the current password first means a person is never asked to
-// invent one and then told they could not have, and a code is never typed before
-// a prompt that outlives it. And one sends nothing at all that Proton could
-// guard - an exported private key is written here - so the password Proton's
-// clients prove before handing one out is proved here instead.
-//
-// reason completes "Your password is required to <reason>".
-//
-// A dry run proves nothing: it changes nothing, so there is nothing to
-// authorise, and a preview that asked for a password would be the one path that
-// costs more than the change it is previewing.
 func (a *App) Elevate(ctx context.Context, scope proton.Scope, reason string) (func(), error) {
 	if a.DryRun {
 		return func() {}, nil

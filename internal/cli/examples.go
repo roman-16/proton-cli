@@ -88,11 +88,14 @@ var examples = map[string][]string{
 	},
 	"proton account logout": {
 		"proton account logout",
-		"proton account logout --revoke",
 		"proton account logout --all",
+		"proton account logout --local",
 	},
-	"proton account profiles list":   {"proton account profiles list"},
-	"proton account profiles delete": {"proton account profiles delete work"},
+	"proton account profiles list": {"proton account profiles list"},
+	"proton account profiles delete": {
+		"proton account profiles delete work",
+		"proton account profiles delete work --local",
+	},
 	"proton account security-log list": {
 		"proton account security-log list",
 		"proton account security-log list --limit 0 --output json",

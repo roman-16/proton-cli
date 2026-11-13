@@ -1,6 +1,7 @@
 package proton
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"log/slog"
@@ -11,10 +12,11 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/roman-16/proton-cli/internal/errs"
+	"github.com/roman-16/proton-cli/internal/profile"
 )
 
-// newHeaderCaptureServer records the headers of every request and replies with
-// a minimal Proton-OK body.
 func newHeaderCaptureServer(t *testing.T) (*httptest.Server, *[]http.Header) {
 	t.Helper()
 	var received []http.Header
@@ -67,8 +69,6 @@ func TestDoIdentityHeadersHonorOverrides(t *testing.T) {
 	}
 }
 
-// The clock everything this build dates is dated by comes off the responses,
-// because a key dated by a machine whose clock is out is a key Proton refuses.
 func TestNowFollowsWhatProtonDatedItsAnswer(t *testing.T) {
 	served := time.Now().Add(-48 * time.Hour).Truncate(time.Second)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -90,9 +90,6 @@ func TestNowFollowsWhatProtonDatedItsAnswer(t *testing.T) {
 	}
 }
 
-// An answer that says nothing about the time leaves this machine's clock in
-// charge, and says so in the log: it is the difference between a key dated by a
-// clock somebody else keeps right and one dated by this.
 func TestNowKeepsThisMachinesClockWhenAnAnswerIsUndated(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header()["Date"] = nil
@@ -138,8 +135,6 @@ func TestRetryDelayBacksOffWithJitterWhenTheServerNamesNothing(t *testing.T) {
 	}
 }
 
-// shrinkBackoff makes the waits negligible for the duration of a test, so a test
-// of what gets asked again does not also spend the backoff.
 func shrinkBackoff(t *testing.T) {
 	t.Helper()
 	floor, ceiling := backoffFloor, backoffCeiling
@@ -147,10 +142,6 @@ func shrinkBackoff(t *testing.T) {
 	t.Cleanup(func() { backoffFloor, backoffCeiling = floor, ceiling })
 }
 
-// A server that broke says nothing about whether the request arrived. Asking
-// again is right for something that changes nothing and wrong for anything else:
-// Proton has no idempotency keys, so a POST it may already have applied would be
-// applied twice.
 func TestAServerThatBrokeIsAskedAgainOnlyForWhatMayArriveTwice(t *testing.T) {
 	shrinkBackoff(t)
 
@@ -217,13 +208,9 @@ func TestAReadRidesOutAPassingServerFailure(t *testing.T) {
 	}
 }
 
-// A deadline is not a bad moment: the request was given its time and used it, so
-// starting the clock again would spend it over and over.
 func TestARequestOutOfTimeIsNotAskedAgain(t *testing.T) {
 	shrinkBackoff(t)
 
-	// The handler outlives the request it is answering, so what it counts is
-	// read while it is still running.
 	var asked atomic.Int64
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		asked.Add(1)
@@ -247,9 +234,6 @@ func TestARequestOutOfTimeIsNotAskedAgain(t *testing.T) {
 	}
 }
 
-// An attempt is weighed on what it reports, and an attempt that reports nothing
-// at all is over. Reading a status off an answer that is not there is how a
-// successful scope elevation once took the whole command down with it.
 func TestAnAttemptThatReportsNothingIsSettled(t *testing.T) {
 	c := New(Options{Logger: slog.New(slog.DiscardHandler)})
 
@@ -312,10 +296,6 @@ func TestRateLimitedRequestIsWaitedOutRatherThanFailed(t *testing.T) {
 	}
 }
 
-// Proton turns some requests away with a status that everywhere else means the
-// request itself was wrong: a lock it is holding over the account, a pace it
-// wants writes kept to. A request that names that answer waits it out, whether
-// or not it is one that may simply arrive twice.
 func TestARefusalARequestDeclaredIsWaitedOutRatherThanReported(t *testing.T) {
 	shrinkBackoff(t)
 
@@ -373,9 +353,6 @@ func TestARefusalARequestDeclaredIsWaitedOutRatherThanReported(t *testing.T) {
 	}
 }
 
-// Everywhere it was not declared, the same answer means the request was wrong,
-// and a mistyped ID asked about again is the same refusal four times over and
-// seconds before somebody is told about the typo.
 func TestARefusalNobodyDeclaredIsReportedAtOnce(t *testing.T) {
 	shrinkBackoff(t)
 
@@ -398,10 +375,6 @@ func TestARefusalNobodyDeclaredIsReportedAtOnce(t *testing.T) {
 	}
 }
 
-// What a wait that ran out of patience reports is what Proton said, not that the
-// waiting stopped: a lock nothing releases and a folder that cannot be emptied
-// at all reach this the same way, and the answer is the only thing telling them
-// apart.
 func TestARefusalThatNeverClearsIsReportedAsItStands(t *testing.T) {
 	shrinkBackoff(t)
 
@@ -487,8 +460,8 @@ func TestUnauthorizedAdoptsASessionRefreshedElsewhere(t *testing.T) {
 	defer srv.Close()
 
 	c := New(Options{BaseURL: srv.URL, Logger: slog.New(slog.DiscardHandler)})
-	c.SetTokens("uid", "stale", "stale-refresh")
-	c.SetReloadHook(func() (string, string, bool) { return "fresh", "fresh-refresh", true })
+	store := savedAs(c, SavedTokens{UID: "uid", Access: "stale", Refresh: "stale-refresh"})
+	store.saved = SavedTokens{UID: "uid", Access: "fresh", Refresh: "fresh-refresh"}
 
 	resp, err := c.Do(context.Background(), Request{Method: "GET", Path: "/x"})
 	if err != nil {
@@ -505,10 +478,218 @@ func TestUnauthorizedAdoptsASessionRefreshedElsewhere(t *testing.T) {
 	}
 }
 
-// Concurrent requests discover an expired session at the same moment. A refresh
-// token is single-use, so the second and third refresh would spend one the first
-// had already replaced: the web clients guard this with a once-handler, and so
-// does this.
+func TestARenewedSessionIsSavedForTheNextCommand(t *testing.T) {
+	srv := refreshingServer(t)
+	c := New(Options{BaseURL: srv.URL, Logger: slog.New(slog.DiscardHandler)})
+	store := savedAs(c, SavedTokens{UID: "uid", Access: "stale", Refresh: "stale-refresh"})
+
+	if _, err := c.Do(context.Background(), Request{Method: "GET", Path: "/x"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if store.saved != (SavedTokens{UID: "uid", Access: "fresh", Refresh: "fresh-refresh"}) {
+		t.Errorf("saved %+v, want the renewed pair", store.saved)
+	}
+}
+
+func TestASessionThatCouldNotBeSavedSaysSoAndTheRequestStillAnswers(t *testing.T) {
+	srv := refreshingServer(t)
+	var logged bytes.Buffer
+	c := New(Options{BaseURL: srv.URL, Logger: slog.New(slog.NewTextHandler(&logged, nil))})
+	store := savedAs(c, SavedTokens{UID: "uid", Access: "stale", Refresh: "stale-refresh"})
+	store.saveErr = errors.New("permission denied")
+
+	resp, err := c.Do(context.Background(), Request{Method: "GET", Path: "/x"})
+	if err != nil {
+		t.Fatalf("err = %v, want the answer the renewed session got", err)
+	}
+	if resp.Status != http.StatusOK {
+		t.Errorf("status = %d, want success", resp.Status)
+	}
+	if !strings.Contains(logged.String(), "level=WARN") || !strings.Contains(logged.String(), "permission denied") {
+		t.Errorf("log = %q, want a warning naming why the session was not saved", logged.String())
+	}
+}
+
+func TestASessionSignedOutElsewhereIsNotRenewedBack(t *testing.T) {
+	refreshes := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/auth/v4/refresh" {
+			refreshes++
+		}
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer srv.Close()
+
+	for _, tc := range []struct {
+		name  string
+		saved SavedTokens
+	}{
+		{"signed out", SavedTokens{}},
+		{"signed in again as another session", SavedTokens{UID: "other", Access: "a", Refresh: "r"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c := New(Options{BaseURL: srv.URL, Profile: profile.MustParse("work"), Logger: slog.New(slog.DiscardHandler)})
+			store := savedAs(c, SavedTokens{UID: "uid", Access: "stale", Refresh: "stale-refresh"})
+			store.saved = tc.saved
+
+			_, err := c.Do(context.Background(), Request{Method: "GET", Path: "/x"})
+			if !errors.Is(err, ErrUnauthorized) {
+				t.Fatalf("err = %v, want the session reported as ended", err)
+			}
+			if store.saves != 0 {
+				t.Error("a session signed out elsewhere was written back")
+			}
+		})
+	}
+	if refreshes != 0 {
+		t.Errorf("the session was refreshed %d times, want not at all", refreshes)
+	}
+}
+
+func TestASessionNotSavedYetIsRenewedWithoutTouchingTheSavedOne(t *testing.T) {
+	srv := refreshingServer(t)
+	c := New(Options{BaseURL: srv.URL, Logger: slog.New(slog.DiscardHandler)})
+	store := savedAs(c, SavedTokens{UID: "saved", Access: "a", Refresh: "r"})
+	c.SetTokens("uid", "stale", "stale-refresh")
+
+	if _, err := c.Do(context.Background(), Request{Method: "GET", Path: "/x"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if store.saves != 0 || store.saved.UID != "saved" {
+		t.Errorf("the saved session became %+v after %d saves, want it left alone", store.saved, store.saves)
+	}
+}
+
+func TestPersistTakesUpTokensRenewedElsewhereBeforeSaving(t *testing.T) {
+	c := New(Options{Logger: slog.New(slog.DiscardHandler)})
+	store := savedAs(c, SavedTokens{UID: "uid", Access: "old", Refresh: "old-refresh"})
+	store.saved = SavedTokens{UID: "uid", Access: "new", Refresh: "new-refresh"}
+
+	if err := c.Persist(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if store.saved != (SavedTokens{UID: "uid", Access: "new", Refresh: "new-refresh"}) {
+		t.Errorf("saved %+v, want the tokens renewed elsewhere kept", store.saved)
+	}
+
+	store.saved = SavedTokens{}
+	if err := c.Persist(context.Background()); !errors.Is(err, ErrUnauthorized) {
+		t.Errorf("Persist after a sign-out elsewhere = %v, want the session reported as ended", err)
+	}
+	if store.saved != (SavedTokens{}) {
+		t.Error("Persist wrote back a session that was signed out")
+	}
+}
+
+func TestAnExpiredSessionSaysHowToSignIn(t *testing.T) {
+	for _, tc := range []struct {
+		profile, message, hint string
+	}{
+		{"", "Your session has expired.", "proton account login"},
+		{"work", `The session of profile "work" has expired.`, "proton account login --profile work"},
+	} {
+		err := error(unauthorized{profile: profile.MustParse(tc.profile)})
+		if err.Error() != tc.message {
+			t.Errorf("message = %q, want %q", err.Error(), tc.message)
+		}
+		var hinter errs.Hinter
+		if !errors.As(err, &hinter) || len(hinter.Hints()) != 1 || hinter.Hints()[0] != tc.hint {
+			t.Errorf("hints = %v, want %q", hinter, tc.hint)
+		}
+		if !errors.Is(err, ErrUnauthorized) {
+			t.Error("an expired session does not match ErrUnauthorized")
+		}
+	}
+}
+
+func TestARedirectIsFollowedOnlyWithinItsHost(t *testing.T) {
+	var leaked bool
+	elsewhere := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		leaked = r.Header.Get("x-pm-uid") != ""
+		_, _ = w.Write([]byte(`{"Code":1000}`))
+	}))
+	defer elsewhere.Close()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/here":
+			http.Redirect(w, r, "/there", http.StatusTemporaryRedirect)
+		case "/there":
+			_, _ = w.Write([]byte(`{"Code":1000}`))
+		default:
+			http.Redirect(w, r, elsewhere.URL+"/x", http.StatusTemporaryRedirect)
+		}
+	}))
+	defer srv.Close()
+
+	c := New(Options{BaseURL: srv.URL, Logger: slog.New(slog.DiscardHandler)})
+	c.SetTokens("uid", "token", "refresh")
+
+	resp, err := c.Do(context.Background(), Request{Method: "GET", Path: "/here"})
+	if err != nil || resp.Status != http.StatusOK {
+		t.Fatalf("a redirect within the host = %v, %v; want it followed", resp, err)
+	}
+	_, err = c.Do(context.Background(), Request{Method: "POST", Path: "/away", Body: map[string]string{"RefreshToken": "secret"}})
+	var refused *APIError
+	if !errors.As(err, &refused) || refused.HTTPStatus != http.StatusTemporaryRedirect {
+		t.Errorf("err = %v, want the redirect itself rather than what is behind it", err)
+	}
+	if leaked {
+		t.Error("the session went to another host")
+	}
+}
+
+type memoryStore struct {
+	mu      sync.Mutex
+	client  *Client
+	saved   SavedTokens
+	saves   int
+	saveErr error
+}
+
+func savedAs(c *Client, saved SavedTokens) *memoryStore {
+	store := &memoryStore{client: c, saved: saved}
+	c.SetStore(store)
+	c.Resume(saved)
+	return store
+}
+
+func (m *memoryStore) Hold(context.Context) (func(), error) { return func() {}, nil }
+
+func (m *memoryStore) Saved() (SavedTokens, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.saved, nil
+}
+
+func (m *memoryStore) Save() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.saveErr != nil {
+		return m.saveErr
+	}
+	uid, acc, ref := m.client.Tokens()
+	m.saved = SavedTokens{UID: uid, Access: acc, Refresh: ref}
+	m.saves++
+	return nil
+}
+
+func refreshingServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/auth/v4/refresh" {
+			_, _ = w.Write([]byte(`{"AccessToken":"fresh","RefreshToken":"fresh-refresh"}`))
+			return
+		}
+		if r.Header.Get("Authorization") != "Bearer fresh" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		_, _ = w.Write([]byte(`{"Code":1000}`))
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
 func TestConcurrentUnauthorizedRequestsRefreshOnce(t *testing.T) {
 	var mu sync.Mutex
 	refreshes := 0
@@ -556,7 +737,6 @@ func TestConcurrentUnauthorizedRequestsRefreshOnce(t *testing.T) {
 	}
 }
 
-// A rate-limited refresh means the server is busy, not that the session is gone.
 func TestRateLimitedRefreshIsWaitedOutRatherThanReportedAsSignedOut(t *testing.T) {
 	var attempts int
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -592,31 +772,25 @@ func TestRateLimitedRefreshIsWaitedOutRatherThanReportedAsSignedOut(t *testing.T
 	}
 }
 
-// Several commands can share one session, so by the time this one has taken up
-// the tokens another process wrote, a third may have replaced them again. One
-// renewal is not always enough.
 func TestASessionReplacedTwiceUnderARequestStillSucceeds(t *testing.T) {
-	stored := []string{"second", "third"}
+	c := New(Options{Logger: slog.New(slog.DiscardHandler)})
+	var store *memoryStore
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Authorization") == "Bearer third" {
+		switch r.Header.Get("Authorization") {
+		case "Bearer third":
 			_, _ = w.Write([]byte(`{"Code":1000}`))
 			return
+		case "Bearer second":
+			store.mu.Lock()
+			store.saved = SavedTokens{UID: "uid", Access: "third", Refresh: "third-refresh"}
+			store.mu.Unlock()
 		}
 		w.WriteHeader(http.StatusUnauthorized)
 	}))
 	defer srv.Close()
-
-	c := New(Options{BaseURL: srv.URL, Logger: slog.New(slog.DiscardHandler)})
-	c.SetTokens("uid", "first", "first-refresh")
-	// Each look finds what somebody else has since written.
-	c.SetReloadHook(func() (string, string, bool) {
-		if len(stored) == 0 {
-			return "", "", false
-		}
-		next := stored[0]
-		stored = stored[1:]
-		return next, next + "-refresh", true
-	})
+	c.base = srv.URL
+	store = savedAs(c, SavedTokens{UID: "uid", Access: "first", Refresh: "first-refresh"})
+	store.saved = SavedTokens{UID: "uid", Access: "second", Refresh: "second-refresh"}
 
 	resp, err := c.Do(context.Background(), Request{Method: "GET", Path: "/x"})
 	if err != nil {
@@ -627,11 +801,6 @@ func TestASessionReplacedTwiceUnderARequestStillSucceeds(t *testing.T) {
 	}
 }
 
-// What a failed refresh says about the session is what a scheduled job branches
-// on: one answer means sign in again and nothing else will do, the other means
-// come back later. Proton refuses a session it has ended; anything else is the
-// refresh not getting through, and reading that as an expired session sends
-// somebody to re-enter a credential that is fine.
 func TestARefreshThatFailedIsOnlyTheSessionWhenProtonSaysSo(t *testing.T) {
 	shrinkBackoff(t)
 
@@ -675,8 +844,6 @@ func TestARefreshThatFailedIsOnlyTheSessionWhenProtonSaysSo(t *testing.T) {
 	}
 }
 
-// A network that never reached the refresh says nothing about the session
-// either, and a job that waits on 5 has to be able to tell.
 func TestARefreshThatNeverArrivedIsANetworkFailure(t *testing.T) {
 	shrinkBackoff(t)
 
@@ -703,7 +870,6 @@ func TestARefreshThatNeverArrivedIsANetworkFailure(t *testing.T) {
 	}
 }
 
-// A session that is genuinely gone is reported rather than renewed forever.
 func TestAnUnrecoverableSessionIsReportedRatherThanRetriedForever(t *testing.T) {
 	var asked int
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -726,9 +892,6 @@ func TestAnUnrecoverableSessionIsReportedRatherThanRetriedForever(t *testing.T) 
 	}
 }
 
-// Proton answers some refusals with 401 and a code of its own - a feature the
-// plan does not include, for one. Refreshing the session cannot change that
-// answer, and doing so spends a refresh token and loses Proton's reason.
 func TestA401WithProtonsOwnCodeIsAnAnswerRatherThanAStaleSession(t *testing.T) {
 	var refreshes, asked int
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

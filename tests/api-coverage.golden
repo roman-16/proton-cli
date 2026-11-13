@@ -6,6 +6,7 @@ DELETE /calendar/v1/{id}/invitations/{id}
 DELETE /calendar/v1/{id}/managed
 DELETE /calendar/v1/{id}/members/{id}
 DELETE /calendar/v1/{id}/urls/{id}
+DELETE /core/v4/auth
 DELETE /core/v4/labels
 DELETE /core/v4/labels/{id}
 DELETE /core/v4/settings/breachalerts

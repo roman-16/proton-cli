@@ -7,23 +7,15 @@ import "context"
 // (packages/shared/lib/api/auth.ts: querySessions, revokeSession,
 // revokeOtherSessions).
 
-// Session is one authenticated session Proton holds for the account.
 type Session struct {
-	UID string `json:"uid"`
-	// LocalID distinguishes sessions belonging to the same account within one
-	// client.
-	LocalID int `json:"local_id"`
-	// ClientID names the app that created it, e.g. "web-mail" or "ios-mail".
-	ClientID string `json:"client_id"`
-	// MemberID is set for sessions created by an organisation member.
+	UID        string `json:"uid"`
+	LocalID    int    `json:"local_id"`
+	ClientID   string `json:"client_id"`
 	MemberID   string `json:"member_id,omitempty"`
 	CreateTime int64  `json:"create_time"`
-	// Current marks the session this client is using.
-	Current bool `json:"current"`
+	Current    bool   `json:"current"`
 }
 
-// Sessions lists the sessions Proton holds for the account, marking the one this
-// client is using.
 func (c *Client) Sessions(ctx context.Context) ([]Session, error) {
 	var r struct {
 		Sessions []struct {
@@ -49,14 +41,17 @@ func (c *Client) Sessions(ctx context.Context) ([]Session, error) {
 	return out, nil
 }
 
-// RevokeSession invalidates one session server-side. Revoking the current
-// session also makes the sealed key password on disk permanently undecryptable,
-// which is the property that makes a leaked session file worthless.
+// Revoke ends the session the client is signed in with, as signing out of a
+// Proton app does (packages/shared/lib/api/auth.ts: revoke). Revoking it by UID
+// instead asks for the account password.
+func (c *Client) Revoke(ctx context.Context) error {
+	return c.Decode(ctx, Request{Method: "DELETE", Path: "/core/v4/auth"}, nil)
+}
+
 func (c *Client) RevokeSession(ctx context.Context, uid string) error {
 	return c.Decode(ctx, Request{Method: "DELETE", Path: "/auth/v4/sessions/" + uid}, nil)
 }
 
-// RevokeOtherSessions invalidates every session except this one.
 func (c *Client) RevokeOtherSessions(ctx context.Context) error {
 	return c.Decode(ctx, Request{Method: "DELETE", Path: "/auth/v4/sessions"}, nil)
 }

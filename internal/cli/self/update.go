@@ -1,6 +1,8 @@
 package self
 
 import (
+	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -11,13 +13,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// UpdateCmd replaces this binary in place with a published release.
-//
-// It is a mutation like any other and reports through kit.Mutate, which is what
-// gives it --dry-run. That matters more here than almost anywhere else: this is
-// the one command that rewrites the program the user is running, so "show me
-// what you would do" has to be answerable without doing it - and a preview is
-// the whole of what a check is, so there is no second flag for one.
 func UpdateCmd(version string) *cobra.Command {
 	var force bool
 	cmd := &cobra.Command{
@@ -26,8 +21,10 @@ func UpdateCmd(version string) *cobra.Command {
 		Annotations: map[string]string{kit.SignedOut: "yes"},
 		Short:       "Update proton to the latest release",
 		Long: `Replace this proton binary in place with the latest GitHub release
-(or a specific version), verifying the download against the published
-SHA-256 checksums.
+(or a specific version). The release has to carry a signature from the
+proton-cli release key, and the download has to match its SHA-256
+checksum, or nothing is installed. Releases up to 5.4.0 carry no
+signature, so download those from the releases page instead.
 
 --dry-run reports what it would install without installing it.
 
@@ -52,7 +49,6 @@ type updateStatus struct {
 	UpdateAvailable bool   `json:"update_available"`
 }
 
-// releaseNotes is where a reader goes to find out what they just installed.
 const releaseNotes = "https://github.com/roman-16/proton-cli/releases/tag/v"
 
 func runUpdate(c *kit.Invocation, version, target string, force bool) error {
@@ -93,8 +89,6 @@ func runUpdate(c *kit.Invocation, version, target string, force bool) error {
 		return err
 	}
 
-	// A preview reports the version still running and the one it would bring; the
-	// change itself reports the version now on disk and nothing left to fetch.
 	installed := map[string]any{"current": latest, "latest": latest, "update_available": false}
 	if c.App.DryRun {
 		installed = map[string]any{"current": version, "latest": latest, "update_available": true}
@@ -106,14 +100,12 @@ func runUpdate(c *kit.Invocation, version, target string, force bool) error {
 	}, func() error {
 		bin, err := selfmanage.Download(c.Ctx, client, latest, ui.NewProgress(u))
 		if err != nil {
-			return err
+			return refusedRelease(c, latest, err)
 		}
-		c.Note("%s Checksum verified.", ui.GlyphSuccess)
+		c.Note("%s Signature and checksum verified.", ui.GlyphSuccess)
 		if err := selfmanage.Apply(bin, exe); err != nil {
 			return selfManageError(err, exe, actionUpdate)
 		}
-		// An install answers to both names, so writing a release into one is
-		// only half of it until the other is there beside it.
 		linkAlias(c, exe)
 		return nil
 	}); err != nil {
@@ -123,4 +115,17 @@ func runUpdate(c *kit.Invocation, version, target string, force bool) error {
 		c.Note("  Release notes: %s%s", releaseNotes, latest)
 	}
 	return nil
+}
+
+func refusedRelease(c *kit.Invocation, version string, err error) error {
+	switch {
+	case errors.Is(err, selfmanage.ErrUnsigned):
+		return kit.Fail("Release %s carries no signature, so it was not installed.", version).
+			Hint("download it from " + releaseNotes + version)
+	case errors.Is(err, selfmanage.ErrForged):
+		slog.DebugContext(c.Ctx, "release refused", "error", err.Error())
+		return kit.Fail("The signature on release %s does not match the %s release key, so it was not installed.",
+			version, kit.Alias)
+	}
+	return err
 }

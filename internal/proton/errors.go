@@ -4,32 +4,36 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
+	"github.com/roman-16/proton-cli/internal/profile"
 )
 
-// ErrUnauthorized signals that auth failed and token refresh did not recover.
-//
-// It carries its own exit code rather than being recognised by the layer that
-// classifies errors. An expired session is the most ordinary failure there is,
-// and a classifier that has to know this particular value by sight is one that
-// answers "a bug in the CLI" for it the moment anything else asks the question.
 var ErrUnauthorized error = unauthorized{}
 
-type unauthorized struct{}
+type unauthorized struct{ profile profile.Name }
 
-func (unauthorized) Error() string { return "unauthorized: session expired" }
+func (e unauthorized) Error() string {
+	if e.profile.IsDefault() {
+		return "Your session has expired."
+	}
+	return fmt.Sprintf("The session of profile %q has expired.", e.profile)
+}
+
+func (e unauthorized) Hints() []string { return []string{e.profile.SignIn()} }
+
 func (unauthorized) ExitCode() int { return 2 }
 
-// NetworkError wraps a transport-level failure (DNS, connection refused, TLS,
-// timeout) where the request never received an HTTP response. It carries exit
-// code 5, matching the documented "network/server" contract - distinct from an
-// APIError (a response with a non-2xx status).
+func (unauthorized) Is(target error) bool {
+	_, ok := target.(unauthorized)
+	return ok
+}
+
 type NetworkError struct{ Err error }
 
 func (e *NetworkError) Error() string { return "request failed: " + e.Err.Error() }
 func (e *NetworkError) Unwrap() error { return e.Err }
 func (e *NetworkError) ExitCode() int { return 5 }
 
-// APIError is returned for non-2xx responses that carry a Proton error code.
 type APIError struct {
 	HTTPStatus int
 	Code       int
@@ -80,12 +84,6 @@ const wrongLinkPasswordCode = 2026
 // (API_CUSTOM_ERROR_CODES.BANNED, packages/shared/lib/errors.ts).
 const jailedCode = 2028
 
-// Succeeded reports whether a Proton code is one of the ways of saying it worked:
-// done, one answer per item, or accepted and being carried out in the background.
-//
-// It is exported because the per-item codes inside a batch answer are read by
-// the service that sent the batch, and which codes mean success is this
-// package's to know rather than each caller's to remember.
 func Succeeded(code int) bool {
 	switch code {
 	case okCode, multiCode, acceptedCode:
@@ -121,8 +119,6 @@ func NoSuchAddress(err error) bool {
 	return errors.As(err, &apiErr) && apiErr.Code == noSuchAddressCode
 }
 
-// DoesNotExist reports whether err is Proton saying that what was named is not
-// there, so a caller holding the reference can say so in its own words.
 func DoesNotExist(err error) bool {
 	var apiErr *APIError
 	if !errors.As(err, &apiErr) {
@@ -135,26 +131,16 @@ func DoesNotExist(err error) bool {
 	return apiErr.HTTPStatus == 404
 }
 
-// WrongTwoFactorCode reports whether err is Proton refusing a two-factor code.
-//
-// It is the one refusal in these flows that the next code would fix, and what
-// to say about it depends on which code was asked for: one proving the person
-// is there, or one confirming a secret they have just been shown.
 func WrongTwoFactorCode(err error) bool {
 	var apiErr *APIError
 	return errors.As(err, &apiErr) && apiErr.Code == wrongTOTPCode
 }
 
-// WrongLinkPassword reports whether err is a public link refusing the password
-// it was opened with, which is the one failure a different password would fix.
 func WrongLinkPassword(err error) bool {
 	var apiErr *APIError
 	return errors.As(err, &apiErr) && apiErr.Code == wrongLinkPasswordCode
 }
 
-// AlreadyExists reports whether err is Proton refusing to write a second thing
-// under a name that is taken, so a caller that knows which name and which folder
-// can say so instead of passing the code on.
 func AlreadyExists(err error) bool {
 	var apiErr *APIError
 	return errors.As(err, &apiErr) && apiErr.Code == alreadyExistsCode
@@ -171,7 +157,6 @@ func AtFilterLimit(err error) bool {
 	return errors.As(err, &apiErr) && apiErr.Code == tooManyActiveFiltersCode
 }
 
-// ExitCode maps an HTTP failure to the CLI's exit-code scheme.
 func (e *APIError) ExitCode() int {
 	switch e.Code {
 	case invalidIDCode, notFoundCode, conversationNotFoundCode:
@@ -179,7 +164,6 @@ func (e *APIError) ExitCode() int {
 	case invalidLoginCode, wrongTOTPCode:
 		return 2
 	case jailedCode:
-		// The wait a 429 asks for, arriving in the body rather than the status.
 		return 5
 	}
 	switch e.HTTPStatus {
@@ -200,16 +184,10 @@ func (e *APIError) ExitCode() int {
 	return 1
 }
 
-// HumanVerificationError is returned when the API requires human verification
-// (Proton code 9001). Callers typically display WebURL, run the resolver, and
-// retry with Token + Methods[0] set on the next Request.
 type HumanVerificationError struct {
 	Token   string
 	Methods []string
 	WebURL  string
-	// Refused marks a challenge raised against a request that already carried a
-	// verification. The two failures need different words: one asks somebody to
-	// verify, the other says the verification they did was not accepted.
 	Refused bool
 }
 
@@ -217,24 +195,18 @@ func (e *HumanVerificationError) Error() string {
 	return fmt.Sprintf("human verification required: %s", e.WebURL)
 }
 
-// hvDetails is the shared shape of the Details object Proton returns on a
-// 9001 (human-verification) response.
 type hvDetails struct {
 	HumanVerificationToken   string
 	HumanVerificationMethods []string
 	WebUrl                   string
 }
 
-// errorCode is the code Proton named in an answer, and zero when it named none
-// - an error page from the edge carries no body it could be read out of.
 func errorCode(body []byte) int {
 	var env struct{ Code int }
 	_ = json.Unmarshal(body, &env)
 	return env.Code
 }
 
-// classifyErrorBody decodes a non-2xx Proton response body into either a
-// *HumanVerificationError (Code 9001) or a generic *APIError.
 func classifyErrorBody(status int, body []byte) (*HumanVerificationError, *APIError) {
 	var env struct {
 		Code    int

@@ -119,7 +119,7 @@ proton uninstall --yes --purge
 
 ## `update`
 
-Replace this proton binary in place with the latest GitHub release (or a specific version), verifying the download against the published SHA-256 checksums.
+Replace this proton binary in place with the latest GitHub release (or a specific version). The release has to carry a signature from the proton-cli release key, and the download has to match its SHA-256 checksum, or nothing is installed. Releases up to 5.4.0 carry no signature, so download those from the releases page instead.
 
 --dry-run reports what it would install without installing it.
 

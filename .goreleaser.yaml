@@ -186,6 +186,10 @@ checksum:
   name_template: "checksums.txt"
   algorithm: sha256
 
+signs:
+  - artifacts: checksum
+    args: ["--batch", "--output", "${signature}", "--detach-sign", "${artifact}"]
+
 # There is deliberately no `changelog` section: the release notes are the
 # CHANGELOG.md section for the version being released, handed to goreleaser with
 # `--release-notes`. `changelog.disable` would not express that - it overrides

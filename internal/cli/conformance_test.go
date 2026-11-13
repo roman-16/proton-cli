@@ -1131,7 +1131,7 @@ func grepGo(t *testing.T, dirs []string, match func(string) bool) []string {
 
 var layers = map[string][]string{
 	"ui":          {"units", "progress", "errs", "inflect", "ref", "redact"},
-	"proton":      {"errs", "units", "crypto/aead", "hv", "hv/hvexit"},
+	"proton":      {"errs", "units", "crypto/aead", "hv", "hv/hvexit", "profile"},
 	"errs":        {"inflect"},
 	"inflect":     {},
 	"units":       {},

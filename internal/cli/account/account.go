@@ -1,12 +1,15 @@
 package account
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
 
 	"github.com/roman-16/proton-cli/internal/account/session"
+	"github.com/roman-16/proton-cli/internal/app"
 	"github.com/roman-16/proton-cli/internal/cli/kit"
+	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/profile"
 	"github.com/roman-16/proton-cli/internal/proton"
 	acctsvc "github.com/roman-16/proton-cli/internal/service/account"
@@ -234,15 +237,14 @@ func refuseCredentials(c *kit.Invocation) error {
 }
 
 func logoutCmd() *cobra.Command {
-	var all, revoke bool
+	var all, local bool
 	c := &cobra.Command{
 		Use:   "logout",
-		Short: "Discard the saved session for this profile",
-		Long: "Discard the saved session for this profile.\n\n" +
-			"The key password on disk is sealed with a key held by Proton, so deleting\n" +
-			"the session file is enough to make it unreadable.\n\n" +
-			"--revoke also invalidates the session at Proton, the same as signing out in\n" +
-			"a Proton app. Use it if the file may have been copied.",
+		Short: "Sign out, ending the session at Proton",
+		Long: "Sign out, ending the session at Proton and removing it from this machine.\n\n" +
+			"When Proton cannot be reached, the profile keeps its session and nothing\n" +
+			"after it is signed out. Run the command again, or pass --local to remove\n" +
+			"the session from this machine only, leaving it valid at Proton.",
 		RunE: kit.Run(nil, func(c *kit.Invocation) error {
 			targets := []profile.Name{c.App.Profile}
 			if all {
@@ -271,17 +273,9 @@ func logoutCmd() *cobra.Command {
 				Action: ui.SignedOut, Kind: "profiles", Count: len(targets),
 				Name: single(refs), IDs: refs,
 			}, func() error {
-				if revoke {
-					if err := c.App.Authenticate(c.Ctx); err == nil {
-						uid, _, _ := c.App.API.Tokens()
-						if err := c.App.API.RevokeSession(c.Ctx, uid); err != nil {
-							return err
-						}
-					}
-				}
 				for _, name := range targets {
-					if err := session.Clear(name); err != nil {
-						return err
+					if err := c.App.SignOut(c.Ctx, name, local); err != nil {
+						return revokeFailed(err, logoutAgain(c.App.Profile, all))
 					}
 				}
 				return nil
@@ -289,8 +283,32 @@ func logoutCmd() *cobra.Command {
 		}),
 	}
 	kit.All(c.Flags(), &all)
-	c.Flags().BoolVar(&revoke, "revoke", false, "Also invalidate the session at Proton")
+	c.Flags().BoolVar(&local, "local", false, "Remove the session from this machine only, leaving it valid at Proton")
 	return c
+}
+
+func logoutAgain(current profile.Name, all bool) string {
+	switch {
+	case all:
+		return kit.Program + " account logout --all"
+	case current.IsDefault():
+		return kit.Program + " account logout"
+	}
+	return kit.Program + " account logout --profile " + current.String()
+}
+
+func revokeFailed(err error, again string) error {
+	var refused *app.RevokeError
+	if !errors.As(err, &refused) {
+		return err
+	}
+	code := 1
+	var coder errs.ExitCoder
+	if errors.As(refused.Err, &coder) {
+		code = coder.ExitCode()
+	}
+	return kit.Fail("Could not revoke the session of profile %q: %v", refused.Profile, refused.Err).
+		Hint(again, again+" --local").Exit(code)
 }
 
 func single(ss []string) string {

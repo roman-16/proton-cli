@@ -1,6 +1,3 @@
-// Package proton is the low-level Proton HTTP client: request building,
-// response decoding, typed errors, auth, token refresh, rate-limit and
-// human-verification retries. No domain logic lives here.
 package proton
 
 import (
@@ -19,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/roman-16/proton-cli/internal/profile"
 	"github.com/roman-16/proton-cli/internal/units"
 )
 
@@ -31,24 +29,11 @@ const (
 
 	sessionRenewals = 3
 
-	// transientWaits is how many times a request is waited out before what it
-	// failed with is reported. Proton throttles a client it considers demanding
-	// and its edge has bad moments, and the only civil answer to either is to slow
-	// down rather than to fail and be retried by a human immediately.
 	transientWaits = 4
 
-	// notAnswering is why a wait happens when a server broke or a connection
-	// failed, and rateLimited why it happens when Proton refuses to be asked
-	// again this soon. Both are announced, for the same reason: the run is about
-	// to sit still for seconds and the person watching should know what for.
 	notAnswering = "Proton is not answering"
 	rateLimited  = "Proton is rate limiting this run"
 
-	// maxInFlight bounds how many requests one invocation has outstanding.
-	// Independent requests are made at the same time, which is what keeps a
-	// command's wall time to the depth of its request graph; this is what keeps
-	// that from becoming a way to flood Proton. Uploads already run five blocks
-	// at once, so the bound has to leave room for them.
 	maxInFlight = 8
 )
 
@@ -81,21 +66,33 @@ type Client struct {
 	offset        time.Duration // this machine's clock against Proton's, from the last response
 	link          *linkSession
 	encKeyBlob    string
-	profile       string
+	profile       profile.Name
 	dryRun        bool
 	hvResolver    HVResolver
 	scopeResolver ScopeResolver
 	secondFactor  SecondFactorFunc
-	persist       func()
-	reload        func() (acc, ref string, ok bool)
+	store         Store
+	savedUID      string
 	sessionGuard  func() error
+}
+
+type Store interface {
+	Hold(ctx context.Context) (release func(), err error)
+	Saved() (SavedTokens, error)
+	Save() error
+}
+
+type SavedTokens struct {
+	UID     string
+	Access  string
+	Refresh string
 }
 
 type Options struct {
 	BaseURL    string
 	AppVersion string
 	UserAgent  string
-	Profile    string
+	Profile    profile.Name
 	HTTPClient *http.Client
 	Logger     *slog.Logger
 	DryRun     bool
@@ -111,10 +108,12 @@ func New(opts Options) *Client {
 	if opts.UserAgent == "" {
 		opts.UserAgent = DefaultUserAgent
 	}
-	hc := opts.HTTPClient
-	if hc == nil {
-		hc = &http.Client{Timeout: 5 * time.Minute}
+	hc := &http.Client{Timeout: 5 * time.Minute}
+	if opts.HTTPClient != nil {
+		given := *opts.HTTPClient
+		hc = &given
 	}
+	hc.CheckRedirect = SameOrigin
 	log := opts.Logger
 	if log == nil {
 		log = slog.Default()
@@ -142,8 +141,6 @@ func readOnlyMethod(method string) bool {
 	}
 	return false
 }
-
-func (c *Client) Profile() string { return c.profile }
 
 func (c *Client) SetTokens(uid, acc, ref string) {
 	c.mu.Lock()
@@ -173,57 +170,106 @@ func (c *Client) AppVersion() string { return c.app }
 
 func (c *Client) BaseURL() string { return c.base }
 
-func (c *Client) SetPersistHook(fn func()) {
+func (c *Client) SetStore(store Store) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.persist = fn
+	c.store = store
 }
 
-func (c *Client) Persist() {
-	c.mu.RLock()
-	fn := c.persist
-	c.mu.RUnlock()
-	if fn != nil {
-		fn()
-	}
+func (c *Client) Resume(saved SavedTokens) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.uid, c.acc, c.ref = saved.UID, saved.Access, saved.Refresh
+	c.savedUID = saved.UID
 }
+
+func (c *Client) Establish(ctx context.Context) error {
+	store := c.sessionStore()
+	if store == nil {
+		return nil
+	}
+	release := c.hold(ctx, store)
+	defer release()
+	if err := store.Save(); err != nil {
+		return err
+	}
+	c.mu.Lock()
+	c.savedUID = c.uid
+	c.mu.Unlock()
+	return nil
+}
+
+func (c *Client) Persist(ctx context.Context) error {
+	store := c.sessionStore()
+	if store == nil || !c.sessionSaved() {
+		return nil
+	}
+	release := c.hold(ctx, store)
+	defer release()
+	if c.reconcile(ctx, store) == standingGone {
+		return c.expired()
+	}
+	return store.Save()
+}
+
+func (c *Client) sessionStore() Store {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.store
+}
+
+func (c *Client) sessionSaved() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.uid != "" && c.uid == c.savedUID
+}
+
+func (c *Client) hold(ctx context.Context, store Store) func() {
+	release, err := store.Hold(ctx)
+	if err != nil {
+		// Recorded and not counted: the session is changed without the lock, and
+		// a save that fails for the same reason says so on screen.
+		c.log.DebugContext(ctx, "the session is changed without its lock", "error", err.Error())
+		return func() {}
+	}
+	return release
+}
+
+type standing int
+
+const (
+	standingSame standing = iota
+	standingNewer
+	standingGone
+)
+
+func (c *Client) reconcile(ctx context.Context, store Store) standing {
+	saved, err := store.Saved()
+	if err != nil {
+		// Recorded and not counted: this run carries on with the session it
+		// holds, and a save that fails for the same reason says so on screen.
+		c.log.DebugContext(ctx, "the saved session could not be read", "error", err.Error())
+		return standingSame
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	switch {
+	case saved.UID != c.uid:
+		return standingGone
+	case saved.Access != c.acc:
+		c.acc, c.ref = saved.Access, saved.Refresh
+		c.log.DebugContext(ctx, "adopted a session refreshed elsewhere")
+		return standingNewer
+	}
+	return standingSame
+}
+
+func (c *Client) expired() error { return unauthorized{profile: c.profile} }
 
 func (c *Client) SetSessionGuard(fn func() error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.sessionGuard = fn
-}
-
-// SetReloadHook installs a callback that re-reads the tokens from where they are
-// stored, so a session another process has just refreshed can be picked up rather
-// than refreshed again.
-//
-// Proton hands out a new refresh token each time and stops honouring the old one,
-// so two processes refreshing the same session at once leaves one of them holding
-// a token that no longer works. Looking first is what makes running two commands
-// at the same time safe.
-func (c *Client) SetReloadHook(fn func() (acc, ref string, ok bool)) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.reload = fn
-}
-
-func (c *Client) adoptStoredTokens() bool {
-	c.mu.RLock()
-	fn, current := c.reload, c.acc
-	c.mu.RUnlock()
-	if fn == nil {
-		return false
-	}
-	acc, ref, ok := fn()
-	if !ok || acc == "" || acc == current {
-		return false
-	}
-	c.mu.Lock()
-	c.acc, c.ref = acc, ref
-	c.mu.Unlock()
-	c.log.Debug("adopted a session refreshed elsewhere")
-	return true
 }
 
 type Request struct {
@@ -264,14 +310,6 @@ type Request struct {
 	// which one it is naming.
 	Reads bool
 
-	// Repeatable says that sending this twice cannot change what the account ends
-	// up in, so a failure that leaves it unclear whether it arrived is worth
-	// asking about again.
-	//
-	// A method defined to leave the resource alone needs no such claim. Anything
-	// else does, because Proton has no idempotency keys: whether a POST that may
-	// already have been applied is safe to send again is something only the caller
-	// knows.
 	Repeatable bool
 
 	// Transient are the answers this endpoint gives that mean "not now", which are
@@ -290,41 +328,13 @@ type Request struct {
 
 	omitBearer bool
 
-	// opensLink marks one of the two requests that open a public link. They name
-	// the link like every other request about it, and are the exception to what
-	// that means: they carry the account when there is one, because Proton is
-	// being told whose access grants the link, and nobody when there is not -
-	// which is what lets a link be opened without an account, and what keeps a
-	// session being proved again from carrying the one it is replacing.
 	opensLink bool
 
-	// anonymous sends the request with no session on it at all, whoever is signed
-	// in. What answers for it is the secret it carries in its own headers, and an
-	// account's UID beside that would only claim for somebody a request that is
-	// not about them: a message sent to an address outside Proton is read by
-	// whoever holds its password, and Proton neither knows nor asks who that is.
 	anonymous bool
 }
 
-// authorisedWithoutASession reports that nobody has to be signed in for Proton
-// to answer this request: the two that open a public link prove its password,
-// and the ones about a password-protected message carry the token that
-// message's password unwrapped.
 func (r Request) authorisedWithoutASession() bool { return r.opensLink || r.anonymous }
 
-// Refusal is Proton declining to do something now that it is still going to do:
-// a lock it is holding over the account, a pace it wants writes kept to.
-//
-// Declaring one is a claim that nothing was applied, the same claim a 429
-// carries, which is what makes it safe to ask again whether or not the request
-// is Repeatable. Status is matched exactly; Code narrows it to one of Proton's
-// own codes, and zero matches whatever the body says. Within bounds how long
-// asking again stays worth it, measured from the first attempt, because how long
-// Proton takes to come free is a property of what it is doing rather than of
-// this run; a refusal is waited out for a stated time or not at all, so a zero
-// Within declares nothing. Reason is what the person sitting through the wait is
-// told, as a sentence: the client knows only that the request was refused, and
-// the caller knows what for.
 type Refusal struct {
 	Status int
 	Code   int
@@ -344,14 +354,6 @@ type credential struct {
 
 func (c credential) nobody() bool { return c.uid == "" && c.token == "" }
 
-// credentialFor is what a request goes out as.
-//
-// A request about an opened public link carries that link's session, which is
-// all Proton grants it and all Proton will answer it for. Everything else is
-// about the account, whether or not a link is open, so a run that opened one
-// still has to be signed in to save it - except the ones that bring their own
-// credential, which go out as nobody so that what they carry is the only thing
-// answering for them.
 func (c *Client) credentialFor(req Request) credential {
 	if req.anonymous {
 		return credential{}
@@ -454,12 +456,6 @@ const (
 
 var doorSubdomains = map[Door]string{AccountDoor: "account", MeetDoor: "meet"}
 
-// guardRefuses asks the guard about a request that would go out as nobody.
-//
-// That is the whole of what the guard is for: putting a sentence to a command
-// that has nothing to act as. A request carrying a session has an answer to give
-// whatever the guard would have said, and one Proton answers to whoever holds a
-// secret needs no account for the guard to send somebody after.
 func (c *Client) guardRefuses(req Request) error {
 	if !c.credentialFor(req).nobody() || req.authorisedWithoutASession() {
 		return nil
@@ -504,21 +500,6 @@ func (c *Client) attempt(ctx context.Context, req Request) (*Response, error) {
 	return c.retrying(ctx, req, func() (*Response, error) { return c.doOnce(ctx, req) })
 }
 
-// retrying runs one attempt at a time until the request settles: either the
-// answer is one worth returning, or asking again cannot change it.
-//
-// Three things are worth asking about again. A 429 is Proton refusing without
-// having done anything, so it is always waited out. A server that broke or a
-// connection that failed says nothing about whether the request arrived, so it
-// is only sent again when arriving twice would change nothing. A refusal the
-// request declared is Proton asking for room in a status that usually means
-// something else, and is waited out for as long as the declaration says.
-//
-// req is the request the attempts are trying to get through, which is not always
-// all an attempt sends: an SRP exchange has to ask for fresh parameters each
-// time, because the SRPSession the last set carried is spent. Either way once
-// yields that request's answer, or the failure that stopped the attempt reaching
-// one.
 func (c *Client) retrying(ctx context.Context, req Request, once func() (*Response, error)) (*Response, error) {
 	started := time.Now()
 	for attempt := 1; ; attempt++ {
@@ -553,21 +534,11 @@ func (c *Client) retrying(ctx context.Context, req Request, once func() (*Respon
 
 type pause struct {
 	reason string
-	// code is the Proton code a declared refusal was recognised by, which is what
-	// tells one refusal of a status apart from another in the log.
 	code   int
 	waits  int
 	within time.Duration
 }
 
-// over reports whether waiting any longer has stopped being worth it.
-//
-// The two bounds answer different questions. A bad moment at Proton's edge is
-// over in seconds or it is not a bad moment, so what the client decides by
-// itself is counted in attempts. A refusal a request declared is Proton working
-// through something it has already started, and how long that takes is a fact
-// about the endpoint rather than about this run, so the declaration bounds it by
-// the clock.
 func (p pause) over(attempt int, elapsed time.Duration) bool {
 	if p.within > 0 {
 		return elapsed >= p.within
@@ -604,12 +575,6 @@ func repeatable(req Request) bool {
 	return req.Repeatable || readOnlyMethod(req.Method)
 }
 
-// worthRepeating reports whether a failure might not happen again.
-//
-// A refused connection, a name that did not resolve, a handshake that failed and
-// a server that broke are the network or Proton having a bad moment. A deadline
-// is not one: the request was given its time and used it, and starting the clock
-// again spends it twice. Cancellation is the user changing their mind.
 func worthRepeating(err error) bool {
 	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 		return false
@@ -639,14 +604,6 @@ func tokenRejected(resp *Response) bool {
 	return env.Code == 0 || env.Code == http.StatusUnauthorized
 }
 
-// renewSession gets the session working again, preferring whatever somebody else
-// has already put in its place.
-//
-// failed is the access token whose refusal prompted this, so a caller that queued
-// behind another's refresh can see that the answer has already arrived and ask
-// for nothing. This mirrors how the web clients guard the same route, with a
-// once-handler inside a context and a lock between them
-// (packages/shared/lib/api/helpers/refreshHandlers.ts).
 func (c *Client) renewSession(ctx context.Context, failed string) error {
 	c.renewMu.Lock()
 	defer c.renewMu.Unlock()
@@ -654,16 +611,28 @@ func (c *Client) renewSession(ctx context.Context, failed string) error {
 	if _, acc, _ := c.Tokens(); acc != failed {
 		return nil
 	}
-	if c.adoptStoredTokens() {
+	store := c.sessionStore()
+	if store == nil || !c.sessionSaved() {
+		if err := c.refreshAuth(ctx); err != nil {
+			return c.sessionRefused(err)
+		}
 		return nil
 	}
-	if err := c.refreshAuth(ctx); err != nil {
-		if c.adoptStoredTokens() {
-			return nil
-		}
-		return sessionRefused(err)
+	release := c.hold(ctx, store)
+	defer release()
+	switch c.reconcile(ctx, store) {
+	case standingNewer:
+		return nil
+	case standingGone:
+		return c.expired()
 	}
-	c.Persist()
+	if err := c.refreshAuth(ctx); err != nil {
+		return c.sessionRefused(err)
+	}
+	if err := store.Save(); err != nil {
+		c.log.WarnContext(ctx, fmt.Sprintf(
+			"The renewed session could not be saved (%v), so the next command will have to sign in again.", err))
+	}
 	return nil
 }
 
@@ -677,14 +646,14 @@ func (c *Client) renewSession(ctx context.Context, failed string) error {
 // expired one sends somebody to re-enter a credential that is fine. Mirrors
 // SESSION_INVALID_REFRESH_STATUSES in WebClients
 // (packages/shared/lib/api/helpers/refreshHandlers.ts).
-func sessionRefused(err error) error {
+func (c *Client) sessionRefused(err error) error {
 	var apiErr *APIError
 	if !errors.As(err, &apiErr) {
 		return err
 	}
 	switch apiErr.HTTPStatus {
 	case http.StatusBadRequest, http.StatusUnauthorized, http.StatusUnprocessableEntity:
-		return ErrUnauthorized
+		return c.expired()
 	}
 	return err
 }
@@ -779,12 +748,6 @@ func (c *Client) doOnce(ctx context.Context, req Request) (*Response, error) {
 	return &Response{Status: resp.StatusCode, Header: resp.Header, Body: buf}, nil
 }
 
-// observeTime learns Proton's clock from what a response was dated.
-//
-// A response that does not say leaves the machine's own clock in charge, which
-// is worth a line: it is the difference between a key this account will hold
-// for years being dated by a clock somebody else keeps right and by one that
-// may be days out.
 func (c *Client) observeTime(header string) {
 	if header == "" {
 		c.log.Debug("api clock", "reason", "undated")

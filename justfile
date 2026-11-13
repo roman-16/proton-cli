@@ -52,7 +52,10 @@ lint:
     actionlint
     goreleaser check
     shellcheck scripts/*.sh scripts/terminal-demo/*.sh .agents/skills/*/scripts/*.sh
-    golangci-lint run ./...
+    # golangci-lint reads only the export data of the Go it was built with, which is
+    # devbox's rather than the toolchain go.mod names.
+    GOTOOLCHAIN=local golangci-lint run ./...
+    govulncheck ./...
     GOOS=windows go build ./...
     GOOS=windows go build -tags=webauthn ./...
     GOOS=darwin go build ./...
@@ -144,7 +147,7 @@ snapshot: build
     set -euo pipefail
     export AUR_KEY="${AUR_KEY:-unused}"
     export TAP_WINGET_TOKEN="${TAP_WINGET_TOKEN:-unused}"
-    goreleaser release --snapshot --clean --skip=publish
+    goreleaser release --snapshot --clean --skip=publish,sign
 
 # There are two tiers, and one thing separates them: does answering the question
 # need Proton.
@@ -232,6 +235,7 @@ update:
     crypto=$(grep --only-matching 'github.com/ProtonMail/go-crypto v[^ ]*' \
         "$(go mod download -json "github.com/ProtonMail/gopenpgp/v3@$pgp" | jq --raw-output .GoMod)" | cut -d' ' -f2)
     go get "github.com/ProtonMail/gopenpgp/v3@$pgp" "github.com/ProtonMail/go-crypto@$crypto"
+    go get toolchain@patch
     go mod tidy
     nix flake update
     just vendor-hash

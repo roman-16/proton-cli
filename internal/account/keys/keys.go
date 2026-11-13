@@ -1,4 +1,3 @@
-// Package keys unlocks the Proton user/address/key hierarchy for a session.
 package keys
 
 import (
@@ -20,18 +19,6 @@ import (
 	"github.com/roman-16/proton-cli/internal/skip"
 )
 
-// Rings are the two key rings a set of keys opens into.
-//
-// Reading goes under every key that opened, because what arrived years ago was
-// sealed to whichever key was primary then - and a key another account derived
-// for a forwarding is one of them, so it opens what that forwarding re-wrapped.
-// Writing goes under the primary alone, which is what Proton's own clients seal
-// and sign with.
-//
-// The two are separate because an address holds keys it cannot write with. A
-// forwarding key carries no encryption subkey, and a ring encrypts to every key
-// in it, so one of them in the ring an address writes with is an address that
-// can send nothing at all.
 type Rings struct {
 	Read  *pgp.KeyRing
 	Write *pgp.KeyRing
@@ -41,54 +28,25 @@ type Unlocked struct {
 	UserKR    *pgp.KeyRing
 	AddrKRs   map[string]Rings
 	Addresses []Address
-	// UserKeys is every user key record Proton holds, open or not: the ones a
-	// reactivation looks for are the ones that did not open.
-	UserKeys []Key
-	// PaidMail says whether the account's plan includes Mail, which is what
-	// Proton gates setting up a forwarding behind.
-	PaidMail bool
-	PaidMeet bool
-	// Username is what the account signs in as, and the local part Proton fixes
-	// its short-domain address to.
-	Username string
-	// Now is the time as Proton keeps it, which is what every key and signature
-	// this build writes is dated by. Nil falls back to this machine's clock.
-	Now func() time.Time
+	UserKeys  []Key
+	PaidMail  bool
+	PaidMeet  bool
+	Username  string
+	Now       func() time.Time
 
-	// keyPass is the passphrase the hierarchy opened with, kept because a key
-	// brought back after a password reset is locked under it before Proton is
-	// handed the key.
-	keyPass []byte
-	// recoveryPhrase says whether the account has a recovery phrase to recover
-	// with, which is asked before a phrase is taken from anybody.
+	keyPass        []byte
 	recoveryPhrase bool
-	// private says the keys are the account's alone, and role is the part it
-	// plays in an organization. Both decide what re-locking the keys would take
-	// with it, which is why they are held beside them.
-	private bool
-	role    int
-	// lockedID is the PGP key IDs the locked keys hold, so that a message which
-	// will not open can be asked whether one of them is the reason. It is the one
-	// thing about them that cannot be read off a record.
-	lockedID map[uint64]bool
+	private        bool
+	role           int
+	lockedID       map[uint64]bool
 }
 
-// LockedKey is a key of the account's that a password reset left shut: Proton
-// still holds it, nothing opens it, and everything sealed to it stays sealed
-// until it is reactivated.
 type LockedKey struct {
-	Key Key
-	// AddressID and Email name the address the key belongs to, and are empty for
-	// a user key.
+	Key       Key
 	AddressID string
 	Email     string
 }
 
-// Locked is every key a password reset left shut, account keys first.
-//
-// A key Proton marks inactive is one nothing opens: the unlock passes over it,
-// so whatever was sealed to it stays sealed. That is what the record says, so
-// this reads it rather than remembering it.
 func (u *Unlocked) Locked() []LockedKey {
 	out := u.LockedAccountKeys()
 	for _, a := range u.Addresses {
@@ -101,9 +59,6 @@ func (u *Unlocked) Locked() []LockedKey {
 	return out
 }
 
-// LockedAccountKeys is the locked keys of the account itself, which are the ones
-// a secret from before the reset opens. Every locked address key comes back with
-// the account key whose token opens it.
 func (u *Unlocked) LockedAccountKeys() []LockedKey {
 	var out []LockedKey
 	for _, k := range u.UserKeys {
@@ -114,14 +69,8 @@ func (u *Unlocked) LockedAccountKeys() []LockedKey {
 	return out
 }
 
-// HasRecoveryPhrase reports whether the account has a recovery phrase for a
-// phrase to be checked against.
 func (u *Unlocked) HasRecoveryPhrase() bool { return u.recoveryPhrase }
 
-// SealedToLocked reports whether a message was encrypted to one of the account's
-// locked keys, which is what tells "a password reset locked this" from "this
-// build could not open it". A message names the keys it is sealed to, so the
-// answer is read off the message rather than guessed from the account.
 func (u *Unlocked) SealedToLocked(msg *pgp.PGPMessage) bool {
 	if msg == nil || len(u.lockedID) == 0 {
 		return false
@@ -135,8 +84,6 @@ func (u *Unlocked) SealedToLocked(msg *pgp.PGPMessage) bool {
 	return false
 }
 
-// Shut names why a message did not open, for the tally: sealed to a key a
-// password reset locked, or something this build could not open.
 func (u *Unlocked) Shut(msg *pgp.PGPMessage) skip.Reason {
 	if u.SealedToLocked(msg) {
 		return skip.Locked
@@ -144,9 +91,6 @@ func (u *Unlocked) Shut(msg *pgp.PGPMessage) skip.Reason {
 	return skip.Undecryptable
 }
 
-// Explain phrases a failure to open one thing for the person who asked for it:
-// a thing sealed to a locked key gets the sentence that says so, and anything
-// else is left as it was, which is what marks it as this build's to answer for.
 func (u *Unlocked) Explain(err error, kind string, msg *pgp.PGPMessage) error {
 	if err == nil || !u.SealedToLocked(msg) {
 		return err
@@ -154,29 +98,13 @@ func (u *Unlocked) Explain(err error, kind string, msg *pgp.PGPMessage) error {
 	return LockedData(kind)
 }
 
-// LockedData is the sentence for a thing sealed to a key a password reset
-// locked: the one decryption failure that is nobody's bug and that this CLI can
-// put right.
 func LockedData(kind string) error {
 	return errs.Problemf("This %s is sealed to a key that a password reset locked.", kind).
 		Hint("proton account keys reactivate")
 }
 
-// Get hands back the unlocked hierarchy, fetching it the first time it is asked
-// for and remembering it after.
-//
-// It is a function rather than a value because keys are one more thing to fetch
-// rather than a state to be in: a command that never decrypts should never pay
-// for them, and one that does should be able to ask for them at the same time as
-// everything else it needs instead of before it.
 type Get func(context.Context) (*Unlocked, error)
 
-// Alongside fetches the hierarchy at the same time as the caller's own request.
-//
-// Nothing about the keys depends on what is being fetched and nothing about the
-// fetch depends on the keys, so a command that decrypts pays for them in time it
-// was spending anyway. Both are always waited for here, which is what keeps the
-// password prompt a first unlock may raise inside the command that asked for it.
 func (get Get) Alongside(ctx context.Context, request func(context.Context) error) (*Unlocked, error) {
 	var u *Unlocked
 	err := fetch.Together(ctx,
@@ -191,18 +119,14 @@ func (get Get) Alongside(ctx context.Context, request func(context.Context) erro
 }
 
 type User struct {
-	ID    string
-	Name  string
-	Email string
-	Keys  []Key
-	// Private says whether the account's keys are the account's alone. An
-	// organization can hold the keys of a member it created, and such an account
-	// has no secret of its own to hand out.
+	ID      string
+	Name    string
+	Email   string
+	Keys    []Key
 	Private int
 	// Role is the part the account plays in an organization, as Proton numbers
 	// it. Mirrors USER_ROLES in WebClients (packages/shared/lib/constants.ts).
-	Role int
-	// Subscribed is which products the account's plan covers, one bit each.
+	Role       int
 	Subscribed int
 	// MnemonicStatus is where the account stands with its recovery phrase, as
 	// Proton numbers it. Mirrors MNEMONIC_STATUS in WebClients
@@ -210,19 +134,13 @@ type User struct {
 	MnemonicStatus int
 }
 
-// adminRole is the account that administers an organization, which is the one
-// account whose password also locks the organization's key.
 const adminRole = 2
 
-// The two states in which a recovery phrase exists to recover with: set and
-// current, or set before the keys it opens were replaced - which still opens
-// the keys it was set for, and those are exactly the ones a reset left locked.
 const (
 	mnemonicOutdated = 2
 	mnemonicSet      = 3
 )
 
-// hasRecoveryPhrase reports whether the account has a recovery phrase at all.
 func (u User) hasRecoveryPhrase() bool {
 	return u.MnemonicStatus == mnemonicOutdated || u.MnemonicStatus == mnemonicSet
 }
@@ -233,7 +151,6 @@ const productMail = 1
 
 const productMeet = 256
 
-// paidMail reports whether the account's plan covers Mail.
 func (u User) paidMail() bool { return u.Subscribed&productMail != 0 }
 
 func (u User) paidMeet() bool { return u.Subscribed&productMeet != 0 }
@@ -243,25 +160,18 @@ func (u User) paidMeet() bool { return u.Subscribed&productMeet != 0 }
 // from an address that is active and both sendable and receivable, and presents
 // them in Order.
 type Address struct {
-	ID          string
-	Email       string
-	DisplayName string
-	Signature   string
-	Order       int
-	Status      int
-	Send        int
-	Receive     int
-	Type        int
-	Keys        []Key
-	// Flags is what Proton holds about how mail to this address is protected:
-	// whether it is end-to-end encrypted, and whether a signature is expected on
-	// what arrives.
-	Flags int
-	// ProtonMX says whether the address's domain points its mail at Proton,
-	// which is what decides whether end-to-end encryption can be on at all.
-	ProtonMX bool
-	// SignedKeyList is what Proton publishes as the keys this address has. An
-	// address nothing has ever published one for has none.
+	ID            string
+	Email         string
+	DisplayName   string
+	Signature     string
+	Order         int
+	Status        int
+	Send          int
+	Receive       int
+	Type          int
+	Keys          []Key
+	Flags         int
+	ProtonMX      bool
 	SignedKeyList *SignedKeyList
 }
 
@@ -272,16 +182,8 @@ const (
 	addressExpectSignedOff = 1 << 5
 )
 
-// EndToEnd reports whether mail arriving at an address with these flags is
-// end-to-end encrypted.
-//
-// It is off for an address that forwards to somewhere outside Proton, since a
-// forwardee who holds no Proton key cannot be handed anything only they can
-// read.
 func EndToEnd(flags int) bool { return flags&addressEncryptionOff == 0 }
 
-// ExpectsSigned reports whether Proton expects mail arriving at an address with
-// these flags to be signed.
 func ExpectsSigned(flags int) bool { return flags&addressExpectSignedOff == 0 }
 
 // SignedKeyList is the account's own statement of which keys an address holds:
@@ -295,22 +197,18 @@ type SignedKeyList struct {
 	Signature string
 }
 
-// CanSend reports whether Proton permits composing from this address.
 func (a Address) CanSend() bool {
 	return a.Status == 1 && a.Send == 1 && a.Receive == 1
 }
 
 type Key struct {
-	ID         string
-	PrivateKey string
-	Token      string
-	Signature  string
-	Primary    int
-	Active     int
-	// Flags is what the key may be used for, as Proton's key lists carry it.
-	Flags int
-	// RecoverySecret is what a recovery file downloaded for this account is
-	// encrypted with. Only a user key carries one.
+	ID             string
+	PrivateKey     string
+	Token          string
+	Signature      string
+	Primary        int
+	Active         int
+	Flags          int
 	RecoverySecret string
 }
 
@@ -319,27 +217,10 @@ type salt struct {
 	KeySalt string
 }
 
-// KeyPassword supplies the secret the key hierarchy is locked with: the account
-// password, or - where Proton's two-password mode keeps the two apart - the
-// account's second password.
-//
-// Which of them is wanted is the account's to say and not the command's, so it
-// is passed in rather than asked about. It is called only when the session
-// carries no usable key password, so a resumed session unlocks without asking
-// for anything.
 type KeyPassword func(twoPassword bool) (string, error)
 
-// errWrongKeyPass reports that the user keys did not open with the passphrase
-// given. It is the one unlocking failure a different secret would fix, which is
-// what makes it worth telling apart from the rest.
 var errWrongKeyPass = errors.New("the key password did not open the user keys")
 
-// Unlock fetches the user and address keys and unlocks them.
-//
-// The key password sealed into the session, the user and the addresses are asked
-// for at the same time: none of the three answers is needed to ask for another.
-// Only the unlocking that follows them has an order - the user keys open the
-// address keys - and only a session without a usable seal reaches the person.
 func Unlock(ctx context.Context, c *proton.Client, ask KeyPassword) (*Unlocked, error) {
 	var (
 		sealed string
@@ -374,12 +255,6 @@ func Unlock(ctx context.Context, c *proton.Client, ask KeyPassword) (*Unlocked, 
 		if err == nil {
 			return u, nil
 		}
-		// The user keys opened and the address keys did not follow. The sealed
-		// passphrase is therefore the right one, so deriving it again would try
-		// the same secret and fail the same way: this is the answer, not a step
-		// on the way to one. Whether the account keeps two passwords has to be
-		// asked for here, which is a request worth making only now that
-		// something has gone wrong.
 		var unopened *unopenable
 		if errors.As(err, &unopened) {
 			return nil, unopenedKeys(ctx, askTwoPassword(ctx, c), unopened)
@@ -387,8 +262,6 @@ func Unlock(ctx context.Context, c *proton.Client, ask KeyPassword) (*Unlocked, 
 		if !errors.Is(err, errWrongKeyPass) {
 			return nil, err
 		}
-		// The seal opened and what it held is stale, which is what a password
-		// changed elsewhere leaves behind. Deriving again is the repair.
 		slog.Debug("keys: the sealed key password no longer opens the keys; deriving a fresh one")
 	}
 
@@ -403,7 +276,6 @@ func Unlock(ctx context.Context, c *proton.Client, ask KeyPassword) (*Unlocked, 
 		}
 		var unopened *unopenable
 		if errors.As(err, &unopened) {
-			// Deriving already asked, so nothing is asked twice.
 			return nil, unopenedKeys(ctx, d.twoPassword, unopened)
 		}
 		return nil, err
@@ -499,12 +371,6 @@ func (u *Unlocked) noteLocked(ctx context.Context, k LockedKey) {
 	}
 }
 
-// unopenable is the account's shape when the user keys opened and not one
-// address key followed.
-//
-// It carries the counts rather than a sentence, because the sentence depends on
-// something open cannot know without a request - see unopenedKeys - and because
-// the counts are what somebody reading a report diagnoses this from.
 type unopenable struct {
 	addresses, active, userKeys, addressKeys int
 }
@@ -513,22 +379,6 @@ func (e *unopenable) Error() string {
 	return fmt.Sprintf("none of %d addresses' keys could be opened", e.addresses)
 }
 
-// unopenedKeys is the only place this failure is phrased. Both ways of reaching
-// it come through here, so one failure cannot wear two faces.
-//
-// Nothing typed at a terminal reaches it: a secret that does not open the user
-// keys fails earlier and by name, so what is left is a hierarchy this CLI cannot
-// walk. That is its own fault, which is the exit code it takes and the reason
-// the screen asks for a report - the log is the only thing that says which key
-// it was, and somebody has to send it. In two-password mode the second password
-// is worth naming as a possibility, because it is the one secret involved that
-// Proton never proves over SRP - it opened the user keys, which is why the run
-// got this far, and can still be wrong for keys that were re-encrypted
-// elsewhere.
-//
-// The counts stay in the log rather than the sentence. How many addresses there
-// were changes nothing about what the reader does next, and a report carries
-// them either way.
 func unopenedKeys(ctx context.Context, twoPassword bool, shape *unopenable) error {
 	slog.DebugContext(ctx, "keys: no address key opened",
 		"addresses", shape.addresses, "addresses_active", shape.active,
@@ -542,11 +392,6 @@ func unopenedKeys(ctx context.Context, twoPassword bool, shape *unopenable) erro
 	return problem
 }
 
-// askTwoPassword asks whether this account keeps its sign-in and its keys
-// behind separate passwords, for the one caller that has not already been told.
-//
-// A failure to ask is not a failure to report: the answer decides one line of
-// advice, so not knowing costs that line and nothing else.
 func askTwoPassword(ctx context.Context, c *proton.Client) bool {
 	twoPassword, err := twoPasswordMode(ctx, c)
 	if err != nil {
@@ -557,7 +402,6 @@ func askTwoPassword(ctx context.Context, c *proton.Client) bool {
 	return twoPassword
 }
 
-// reasonFor names which of the ways unlocking fails happened, for the log.
 func reasonFor(err error) skip.Reason {
 	switch {
 	case errors.Is(err, errNoActiveKey):
@@ -570,11 +414,6 @@ func reasonFor(err error) skip.Reason {
 	return skip.Unlockable
 }
 
-// wrongSecret says which of the account's secrets failed to open its keys.
-//
-// In two-password mode it can only be the second one: the password that signs in
-// has just been proved over SRP, and saying so is the difference between a typo
-// somebody can fix and a mystery.
 func wrongSecret(twoPassword bool) error {
 	if twoPassword {
 		return errs.Problemf("Incorrect second password.")
@@ -607,8 +446,6 @@ func sealedKeyPass(ctx context.Context, c *proton.Client) string {
 	return skp
 }
 
-// derived is a key password worked out from a secret somebody supplied, and
-// which of the account's secrets that was.
 type derived struct {
 	pass        string
 	twoPassword bool
@@ -655,9 +492,6 @@ func derive(ctx context.Context, c *proton.Client, user *User, ask KeyPassword) 
 	return derived{pass: pass, twoPassword: twoPassword}, nil
 }
 
-// stretch is bcrypt over the secret and the key's salt, which is what Proton
-// locks a private key with. A key from an auth version that predates salts is
-// locked with the secret itself.
 func stretch(secret, keySalt string) (string, error) {
 	if keySalt == "" {
 		return secret, nil
@@ -692,14 +526,6 @@ func saltOf(keys []Key, salts []salt) string {
 	return ""
 }
 
-// Seal generates a fresh client key, stores it server-side, wraps the salted key
-// password with it, and rewrites the session file in encrypted form.
-//
-// It is exported for the one sign-in that never derives a passphrase: a session
-// approved on another device arrives with the key password already stretched, so
-// sealing it is the whole of what makes the machine able to read anything - and
-// a failure there leaves a session nothing on this machine can ever unlock, which
-// is worth reporting rather than deferring.
 func Seal(ctx context.Context, c *proton.Client, skp string) error {
 	key, err := localkey.Generate()
 	if err != nil {
@@ -713,45 +539,23 @@ func Seal(ctx context.Context, c *proton.Client, skp string) error {
 		return fmt.Errorf("wrap the key password: %w", err)
 	}
 	c.SetEncKeyBlob(blob)
-	c.Persist()
-	return nil
+	return c.Persist(ctx)
 }
 
-// wrapAndPersist seals the key password an unlock derived.
-//
-// Best-effort: skp is already held in memory for this run, so a failure here
-// never fails the unlock - it only defers persistence to the next run.
 func wrapAndPersist(ctx context.Context, c *proton.Client, skp string) {
 	if err := Seal(ctx, c, skp); err != nil {
-		slog.Debug("localkey: key password not persisted this run", "error", err)
+		// Recorded and not counted: this run is unlocked already, and the next
+		// one asks for the password again.
+		slog.DebugContext(ctx, "localkey: key password not persisted this run", "error", err)
 	}
 }
 
-// PrimaryUserKey is the user key this account writes with.
-//
-// Reading goes under every user key and writing goes under one. UserKR holds all
-// of them because anything sealed years ago was sealed to whichever key was
-// primary then, and it still has to open; sealing something new to all of them
-// would put it under keys the owner has since retired, which is the same reason
-// Published hands back only the primary of somebody else's.
-//
-// Proton returns an account's keys primary first - its own clients rely on that
-// - so the first that opened is it. When the primary did not open, unlockKeyRing
-// has already recorded which key it was and why.
 func (u *Unlocked) PrimaryUserKey() (*pgp.KeyRing, error) {
 	return u.UserKR.FirstKey()
 }
 
-// KeyPassword is the passphrase the hierarchy opened with.
-//
-// One thing asks for it: signing another device in, which seals it under a key
-// that device made so the account's contents open there too. Handing it over is
-// handing over everything the account holds, which is why nothing else takes it
-// out of the hierarchy it belongs to.
 func (u *Unlocked) KeyPassword() string { return string(u.keyPass) }
 
-// PrimaryAddr returns the rings and address record for the user's primary
-// proton.me/pm.me address, falling back to the first unlockable address.
 func (u *Unlocked) PrimaryAddr() (Rings, Address, error) {
 	for _, a := range u.Addresses {
 		if rings, ok := u.AddrKRs[a.ID]; ok {
@@ -764,8 +568,6 @@ func (u *Unlocked) PrimaryAddr() (Rings, Address, error) {
 	return u.FirstAddr()
 }
 
-// FirstAddr returns the rings and address record of the first address whose
-// keys could be unlocked.
 func (u *Unlocked) FirstAddr() (Rings, Address, error) {
 	for _, a := range u.Addresses {
 		if rings, ok := u.AddrKRs[a.ID]; ok {
@@ -829,11 +631,6 @@ func getAddresses(ctx context.Context, c proton.Doer) ([]Address, error) {
 	return r.Addresses, nil
 }
 
-// The ways one key fails to open. They are told apart because the answers
-// differ: a retired key is normal, a token this user key cannot decrypt means
-// the hierarchy itself is wrong, armour that will not parse means Proton sent
-// something unexpected, and a key that will not unlock means the passphrase is
-// not the one it was locked with.
 var (
 	errNoActiveKey        = errors.New("no active key")
 	errTokenUndecryptable = errors.New("token not decryptable by the user key")
@@ -857,11 +654,6 @@ func unlockKeyRing(ctx context.Context, keys []Key, passphrase []byte, userKR *p
 	if err != nil {
 		return Rings{}, err
 	}
-	// The reason the last key failed for, which stands for the owner when the
-	// caller phrases one line about it. Every key's own reason is logged as it
-	// happens, so nothing is lost by the summary being approximate: a reader
-	// with the log has the whole picture and a reader with the line has the
-	// common case, which is an address with one key.
 	last := errNoActiveKey
 	shut := func(k Key, reason skip.Reason, cause error) {
 		detail := ""
@@ -928,38 +720,17 @@ func decryptToken(tokenArm, sigArm string, kr *pgp.KeyRing) ([]byte, error) {
 	return dec.Bytes(), nil
 }
 
-// Unreadable is what a Proton address whose published key will not parse
-// becomes, phrased once for everything that encrypts to somebody else.
-//
-// It is deliberately not the sentence about an address outside Proton. The
-// address is real and Proton does publish a key for it; what failed is this
-// build's reading of that key, which is nothing the sender can act on and
-// everything a report can be built from.
 func Unreadable(email string) error {
 	return errs.Problemf("Proton publishes a key for %s that this build cannot read.", email).
 		Hint("run `proton report`").Exit(errs.ExitBug)
 }
 
-// publicKey is one key Proton publishes for an address.
 type publicKey struct {
 	PublicKey string
 	Primary   int
-	// Flags is what the key may be used for, as its owner's key list says.
-	Flags int
+	Flags     int
 }
 
-// published asks Proton what keys it holds for somebody else's address.
-//
-// It answers two questions at once, and the caller needs them apart:
-//
-//	keys     Proton holds the address and these are its keys
-//	nil, nil Proton publishes no key, so the address is outside Proton
-//
-// Asking with InternalOnly makes Proton refuse an address it does not hold
-// rather than answer with an empty list, and that refusal is this question's
-// answer rather than a failure: whether having no key is a problem is the
-// caller's to decide, and a calendar attendee outside Proton is no problem at
-// all.
 func published(ctx context.Context, c proton.Doer, email string) ([]publicKey, error) {
 	var r struct {
 		Address struct{ Keys []publicKey }
@@ -981,24 +752,6 @@ func published(ctx context.Context, c proton.Doer, email string) ([]publicKey, e
 	return r.Address.Keys, nil
 }
 
-// Published returns the primary key Proton holds for somebody else's address.
-//
-// Handing a person something encrypted - a calendar's passphrase, a vault's key -
-// means encrypting it to the key Proton publishes for them, so this is the place
-// that decides whether a share is possible at all. It answers three different
-// questions at once, and the caller needs all three apart:
-//
-//	a ring   the key to encrypt to
-//	nil, nil Proton publishes no key, so the address is outside Proton
-//	nil, err there is a key and this build cannot read it
-//
-// Collapsing the last into the second is how a real Proton address comes to be
-// called an address outside Proton, which is false and points the reader at the
-// one thing that is not the problem.
-//
-// Only the primary key is returned: it is what Proton's own clients encrypt to,
-// and adding the others would mean sealing a secret under keys the owner may
-// have retired. Signing is the other view of the same answer.
 func Published(ctx context.Context, c proton.Doer, email string) (*pgp.KeyRing, error) {
 	keys, err := published(ctx, c, email)
 	if err != nil {
@@ -1029,20 +782,11 @@ func Published(ctx context.Context, c proton.Doer, email string) (*pgp.KeyRing, 
 	return kr, nil
 }
 
-// Signers is every key Proton holds for somebody else's address, parted by
-// whether its owner still vouches for what it signed.
 type Signers struct {
-	// Trusted is every key whose signatures count, and nil when there is none.
-	Trusted *pgp.KeyRing
-	// Compromised is every key its owner marked compromised: something it
-	// signed was signed by whoever holds it, which may not be them. Nil when
-	// there is none.
+	Trusted     *pgp.KeyRing
 	Compromised *pgp.KeyRing
 }
 
-// Vouching is the ring a signature by the address is checked against, or the
-// refusal for an address whose every key is marked compromised - which is not
-// an address that publishes no key, and must not read as one.
 func (s *Signers) Vouching(email string) (*pgp.KeyRing, error) {
 	if s.Trusted == nil {
 		return nil, errs.Problemf(
@@ -1051,22 +795,6 @@ func (s *Signers) Vouching(email string) (*pgp.KeyRing, error) {
 	return s.Trusted, nil
 }
 
-// Signing returns every key Proton holds for somebody else's address.
-//
-// Checking that a person signed something - a message, the key inside an
-// invitation - means checking against whichever of their keys they signed with,
-// and that may be one they have since retired. So where Published hands back the
-// one key to seal to, this hands back all of them, and answers the same three
-// questions the same way:
-//
-//	signers  the keys a signature by this address is checked against
-//	nil, nil Proton publishes no key, so the address is outside Proton
-//	nil, err Proton publishes keys and this build can read none of them
-//
-// A key its owner marked compromised is set apart rather than trusted, which is
-// what the mark asks of every client: what it signed is not taken as theirs.
-// One key that will not parse among others that do is logged and left out,
-// since the signature may well be by one of the others.
 func Signing(ctx context.Context, c proton.Doer, email string) (*Signers, error) {
 	keys, err := published(ctx, c, email)
 	if err != nil {

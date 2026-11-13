@@ -6,8 +6,6 @@ A refusal that comes from Proton rather than from proton-cli belongs to [Trouble
 
 ## Known gaps
 
-**An update cannot be verified offline.** `proton update` checks the download against `checksums.txt` from the same release, and neither is signed. An install from a package manager is verified by the package manager.
-
 **Only a security key you plug in can be registered.** `proton account settings security-keys create` registers a key over USB. A built-in authenticator - Windows Hello, Touch ID, a machine's own secure element - and a passkey held in a phone are registered in [Proton's own settings](https://account.proton.me).
 
 **Post-quantum keys are read, never generated or imported.** An account that opted in during Proton's rollout signs in, and mail and shares reach others who opted in. Turning the setting on is done in Proton's own settings. On such an account, adding an address and generating a key are refused, and a post-quantum key file is imported in a Proton client.

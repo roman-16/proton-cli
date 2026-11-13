@@ -13,10 +13,6 @@ import (
 	"github.com/roman-16/proton-cli/tests/account"
 )
 
-// The sessions Proton holds for this account, across every device - and the one
-// way a device gets one without a password: a code shown where the sign-in is
-// happening and approved where one already has.
-
 func TestAccountSessionsListMarksTheCurrentOne(t *testing.T) {
 	sessions := runJSONArray(t, "account", "sessions", "list")
 	if len(sessions) == 0 {
@@ -39,37 +35,16 @@ func TestAccountSessionsListMarksTheCurrentOne(t *testing.T) {
 	}
 }
 
-// Both halves of signing in from another device, which is the only way to test
-// either: a sign-in waits with a code, this run approves it as the account it is
-// already signed in as, and the waiting one ends up with a session of its own.
-//
-// It signs in to a config directory of its own, so the session it gets is one
-// this test made rather than the suite's, and it revokes it afterwards.
 func TestAccountSessionsSignAnotherDeviceIn(t *testing.T) {
-	dir := t.TempDir()
-	device, err := signingIn(account.Primary, dir)
-	if err != nil {
-		t.Fatalf("start a sign-in: %v", err)
-	}
-	t.Cleanup(device.stop)
+	code, stderr, saved, _ := signInAnotherDevice(t, t.TempDir())
 
-	code := device.waitForCode(t, time.Minute)
 	if !strings.HasPrefix(code, "0:") {
 		t.Errorf("the code %q is not the shape a Proton app reads", code)
 	}
-
-	runOK(t, "account", "sessions", "create", code)
-	stderr := device.waitForSession(t, time.Minute)
-	saved := signedInSession(t, dir)
-	cleanupRun(t, "Revoke the session this test signed in: proton account sessions revoke "+saved.UID,
-		"account", "sessions", "revoke", saved.UID)
-
 	assertContains(t, stderr, "Signed in as "+selfEmail())
 	if saved.Email != selfEmail() {
 		t.Errorf("the device signed in as %q, want %q", saved.Email, selfEmail())
 	}
-	// The passphrase that opens the keys came over sealed to the code, so the
-	// device reads the account without anybody having typed a password into it.
 	if saved.EncKeyBlob == "" {
 		t.Error("the new session carries no key password, so nothing on that device can be decrypted")
 	}
@@ -83,9 +58,24 @@ func TestAccountSessionsSignAnotherDeviceIn(t *testing.T) {
 	t.Errorf("the session the device was given is not among the %d Proton lists", len(sessions))
 }
 
-// signedInSession reads the session a sign-in wrote, wherever the platform put
-// the config directory it was pointed at.
-func signedInSession(t *testing.T, dir string) session.Session {
+func signInAnotherDevice(t *testing.T, dir string) (code, stderr string, saved session.Session, path string) {
+	t.Helper()
+	device, err := signingIn(account.Primary, dir)
+	if err != nil {
+		t.Fatalf("start a sign-in: %v", err)
+	}
+	t.Cleanup(device.stop)
+
+	code = device.waitForCode(t, time.Minute)
+	runOK(t, "account", "sessions", "create", code)
+	stderr = device.waitForSession(t, time.Minute)
+	saved, path = signedInSession(t, dir)
+	cleanupRun(t, "Revoke the session this test signed in: proton account sessions revoke "+saved.UID,
+		"account", "sessions", "revoke", saved.UID)
+	return code, stderr, saved, path
+}
+
+func signedInSession(t *testing.T, dir string) (session.Session, string) {
 	t.Helper()
 	var found string
 	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
@@ -111,5 +101,5 @@ func signedInSession(t *testing.T, dir string) session.Session {
 	if err := json.Unmarshal(raw, &s); err != nil {
 		t.Fatalf("read %s: %v", found, err)
 	}
-	return s
+	return s, found
 }

@@ -100,7 +100,7 @@ var Verbs = map[string]string{
 	"respond": "reply to an invitation",
 
 	"login":  "authenticate and save a session",
-	"logout": "discard a saved session",
+	"logout": "end a session and discard it here",
 	"revoke": "stop something handed out working: a session, a public link",
 	"rotate": "replace a link with a new one, which stops the old one working",
 

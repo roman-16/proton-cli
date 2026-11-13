@@ -197,6 +197,35 @@ Signing in again as the same account is harmless, so an unattended job can run i
 proton account login --user "$ACCOUNT" --password-file "$CRED"
 ```
 
+## "Your session has expired"
+
+```console
+$ proton mail messages list
+Error: Your session has expired.
+Try:   proton account login
+```
+
+The session was ended at Proton, from another device or by signing out there. Sign in again.
+
+A command that renewed the session and could not save it warns first, and the next command then asks you to sign in:
+
+```console
+$ proton account sessions list
+! The renewed session could not be saved (open /home/you/.config/proton-cli/sessions/.default.json.1216707191: permission denied), so the next command will have to sign in again.
+```
+
+Make the directory writable again, then sign in.
+
+## "Your saved session is damaged"
+
+```console
+$ proton mail messages list
+Error: Your saved session is damaged.
+Try:   proton account login
+```
+
+The session file no longer reads as a session. Signing in again replaces it.
+
 ## It asks for my password again
 
 A few commands ask for your password even when you are signed in; they are listed in [Account](../account/README.md#commands-that-ask-for-the-password-again). They prompt, or take `--password-file` and `--password-file -`.

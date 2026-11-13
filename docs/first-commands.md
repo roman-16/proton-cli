@@ -67,11 +67,10 @@ Anything that removes permanently, or removes what a filter picked out rather th
 ## Sign out
 
 ```bash
-proton account logout             # forget the session on this machine
-proton account logout --revoke    # and invalidate it at Proton
+proton account logout
 ```
 
-Revoking also makes the credentials saved on this machine useless, even to someone who already copied them.
+Signing out ends the session at Proton, so the credentials saved on this machine stop working, even for someone who already copied them.
 
 ## Where to go next
 

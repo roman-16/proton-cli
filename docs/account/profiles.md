@@ -8,7 +8,9 @@ Holds `delete` and `list`.
 
 ## `delete`
 
-Remove a profile and everything it keeps on this machine.
+Remove a profile and everything it keeps on this machine, ending its session at Proton first.
+
+When Proton cannot be reached, that profile and the ones after it stay as they are. Run the command again, or pass --local to remove them from this machine only, leaving their sessions valid at Proton.
 
 ```
 proton account profiles delete REF...
@@ -16,7 +18,12 @@ proton account profiles delete REF...
 
 ```bash
 proton account profiles delete work
+proton account profiles delete work --local
 ```
+
+| Flag | Description |
+| --- | --- |
+| `--local` | Remove the profiles from this machine only, leaving their sessions valid at Proton |
 
 ## `list`
 

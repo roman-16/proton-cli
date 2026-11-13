@@ -14,7 +14,7 @@ Where a command shows `REF`, pass a full ID, the eight-character short ID a list
 | [`proton account export`](../account/account.md#export) | Write a copy of the account to a directory |
 | [`proton account get`](../account/account.md#get) | Show the account, its storage and this machine's session |
 | [`proton account login`](../account/account.md#login) | Sign in and save the session for this profile |
-| [`proton account logout`](../account/account.md#logout) | Discard the saved session for this profile |
+| [`proton account logout`](../account/account.md#logout) | Sign out, ending the session at Proton |
 | [`proton account breaches disable`](../account/breaches.md#disable) | Turn Dark Web Monitoring off |
 | [`proton account breaches enable`](../account/breaches.md#enable) | Turn Dark Web Monitoring on |
 | [`proton account breaches get`](../account/breaches.md#get) | Show one breach, and what it exposed |
