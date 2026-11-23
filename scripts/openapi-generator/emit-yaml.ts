@@ -1,5 +1,5 @@
-import type { Endpoint, EnumInfo } from "./types.js";
-import type { Route } from "./merge.js";
+import type { EnumInfo } from "./types.js";
+import type { Operation, Route } from "./merge.js";
 
 export function generateOpenAPI(routes: Route[], enums: Map<string, EnumInfo>): string {
   const operations = routes.flatMap((route) => [...route.operations.values()]);
@@ -21,7 +21,7 @@ function emitHeader(lines: string[]): void {
   lines.push('  version: "1.0"');
   lines.push("  description: |");
   lines.push("    Auto-generated from Proton's own TypeScript source files.");
-  lines.push("    Sources: https://github.com/ProtonMail/WebClients/tree/main/packages/shared/lib/api");
+  lines.push("    Sources: https://github.com/ProtonMail/WebClients");
   lines.push("             https://github.com/ProtonMail/WebClients/blob/main/packages/pass/types/api/pass.ts");
   lines.push("             https://github.com/ProtonDriveApps/sdk/blob/main/client/js/src/internal/apiService/driveTypes.ts");
   lines.push("");
@@ -78,11 +78,11 @@ function emitPaths(lines: string[], routes: Route[]): void {
   }
 }
 
-function emitOperation(lines: string[], method: string, ep: Endpoint): void {
+function emitOperation(lines: string[], method: string, ep: Operation): void {
   lines.push(`    ${method}:`);
   lines.push(`      tags: [${ep.tag}]`);
   lines.push(`      summary: ${esc(ep.summary || camelToTitle(ep.name))}`);
-  lines.push(`      operationId: ${ep.name}`);
+  lines.push(`      operationId: ${ep.operationId}`);
 
   if (ep.description) lines.push(`      description: ${esc(ep.description)}`);
   if (ep.deprecated) lines.push("      deprecated: true");

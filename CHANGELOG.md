@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 Adding a version section here is what publishes a release, so this file is the one place a version is decided: see [Releases](CONTRIBUTING.md#releases). Versions that shipped before this file existed are on the [releases page](https://github.com/roman-16/proton-cli/releases).
 
+## [5.6.0] - 2026-11-23
+
+### Changed
+
+- **Breaking.** The published `openapi.yaml` gives every operation an ID of its own: operations that shared one carry their app or their item, such as `calendarAcceptInvitation` and `getPassShareByShareId`. Regenerate anything built from the spec.
+- The published `openapi.yaml` documents 119 more operations, among them delegated access, personal access tokens, payments and Proton VPN for business.
+
+### Fixed
+
+- Every command that opens a share link, by `--link` or as a link saved with `drive shared add`, failed with `The link does not exist any more, or has expired.` Proton retired the endpoint behind it.
+- Request bodies in the published `openapi.yaml` listed the arguments of the function that builds a request rather than the fields it sends, and 102 listed none.
+
 ## [5.5.0] - 2026-11-13
 
 ### Highlights

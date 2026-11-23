@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"log/slog"
 	"net/url"
 	"strings"
 
@@ -13,7 +12,6 @@ import (
 	pgphelper "github.com/roman-16/proton-cli/internal/crypto/pgp"
 	"github.com/roman-16/proton-cli/internal/errs"
 	"github.com/roman-16/proton-cli/internal/proton"
-	"github.com/roman-16/proton-cli/internal/skip"
 )
 
 // A public link is a tree like any other, reached by a URL instead of by being
@@ -97,43 +95,18 @@ func (s *Service) openLink(ctx context.Context, token, urlPassword, customPasswo
 	if err != nil {
 		return nil, err
 	}
-	root, err := s.linkRoot(ctx, token)
-	if err != nil {
-		return nil, linkFailure(err)
-	}
 	dc := &Context{
 		Token: token, URL: LinkURL(token, urlPassword), LinkPassword: customPassword,
-		ShareKR: shareKR, VolumeID: share.VolumeID, RootLinkID: root.LinkID, rootLink: root,
+		ShareKR: shareKR, VolumeID: share.VolumeID, RootLinkID: share.LinkID,
 		Permissions: share.PublicPermissions, Anonymous: share.Anonymous,
 		Type:            shareTypeStandard,
 		sharePassphrase: passphrase, linkProof: password,
 	}
-	s.noteLinkRevision(ctx, dc, root)
-	dc.RootName = rootName(ctx, token, dc.Type, root, shareKR)
+	if dc.rootLink, err = s.linkRoot(ctx, dc); err != nil {
+		return nil, linkFailure(err)
+	}
+	dc.RootName = rootName(ctx, token, dc.Type, dc.rootLink, shareKR)
 	return dc, nil
-}
-
-// noteLinkRevision fills in the version a link that points at a file points at.
-//
-// The answer that opens a link names the file, its keys and its size, and says
-// nothing about its versions - so the one a download reads is asked for
-// separately, from where the link's items are served. A folder's contents
-// arrive with theirs, so this is the one item a link leaves half-known.
-func (s *Service) noteLinkRevision(ctx context.Context, dc *Context, root *Link) {
-	if root.FileProperties == nil || root.FileProperties.ActiveRevision.ID != "" {
-		return
-	}
-	details, err := s.linkDetails(ctx, dc, []string{root.LinkID})
-	if err != nil || len(details) == 0 || details[0].File == nil || details[0].File.ActiveRevision == nil {
-		// Recorded and not counted: nothing is missing from a listing, which is
-		// what a link that points at a file mostly answers. What is missing is the
-		// version a download would read, and the download says so itself.
-		slog.DebugContext(ctx, "drive: the version a link points at could not be read",
-			"kind", string(skip.KindItem), "reason", string(skip.Unreadable),
-			"link", root.LinkID, "error", err)
-		return
-	}
-	root.FileProperties.ActiveRevision.ID = details[0].File.ActiveRevision.RevisionID
 }
 
 // composeLinkPassword builds what the link is proved with.
@@ -169,9 +142,13 @@ func linkFailure(err error) error {
 	case proton.WrongLinkPassword(err):
 		return errs.Problemf("That is not this link's password.")
 	case proton.DoesNotExist(err):
-		return errs.Problemf("The link does not exist any more, or has expired.").Exit(3)
+		return errLinkGone()
 	}
 	return err
+}
+
+func errLinkGone() error {
+	return errs.Problemf("The link does not exist any more, or has expired.").Exit(3)
 }
 
 // unlockLinkShare opens the share key a link's password locks, and hands back
@@ -210,40 +187,24 @@ func unlockLinkShare(share *proton.PublicLinkShare, password string) (*pgp.KeyRi
 	return kr, dec, nil
 }
 
-// linkRoot reads what a link points at.
+// linkRoot reads what a link points at, which the proof names and which is
+// served like every other item behind the link: its keys, its name sealed to
+// the share, and for a file the version it holds now.
 //
-// A link names one item and everything under it, so its root arrives whole
-// rather than being looked up by ID: the answer carries the node's keys, its
-// name sealed to the share, and for a file the key packet its content is under.
-func (s *Service) linkRoot(ctx context.Context, token string) (*Link, error) {
-	var r struct {
-		Token struct {
-			LinkID                  string
-			LinkType                int
-			MIMEType                string
-			Name                    string
-			NodeKey                 string
-			NodeHashKey             string
-			NodePassphrase          string
-			NodePassphraseSignature string
-			SignatureEmail          string
-			ContentKeyPacket        string
-			Size                    int64
-		}
-	}
-	if err := s.C.Decode(ctx, proton.Request{Method: "GET", Path: "/drive/urls/" + token}, &r); err != nil {
+// The top of a link has no parent, even where Proton names the folder above it
+// to a reader who can also reach that folder some other way.
+func (s *Service) linkRoot(ctx context.Context, dc *Context) (*Link, error) {
+	details, err := s.linkDetails(ctx, dc, []string{dc.RootLinkID})
+	if err != nil {
 		return nil, err
 	}
-	t := r.Token
-	root := &Link{
-		LinkID: t.LinkID, Type: t.LinkType, Size: t.Size, Name: t.Name,
-		MIMEType: t.MIMEType, NodeKey: t.NodeKey, NodePassphrase: t.NodePassphrase,
-		NodePassphraseSignature: t.NodePassphraseSignature, SignatureEmail: t.SignatureEmail,
+	if len(details) == 0 {
+		return nil, errLinkGone()
 	}
-	if t.LinkType == protonFolder {
-		root.FolderProperties = &FolderProperties{NodeHashKey: t.NodeHashKey}
-		return root, nil
+	root, finished := details[0].link()
+	if !finished {
+		return nil, errLinkGone()
 	}
-	root.FileProperties = &FileProperties{ContentKeyPacket: t.ContentKeyPacket}
-	return root, nil
+	root.ParentLinkID = ""
+	return &root, nil
 }

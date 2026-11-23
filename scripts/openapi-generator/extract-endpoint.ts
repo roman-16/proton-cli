@@ -1,77 +1,56 @@
 import {
-  SyntaxKind,
   Node,
-  type ArrowFunction,
-  type FunctionDeclaration,
+  SyntaxKind,
+  type ObjectLiteralExpression,
+  type SourceFile,
   type Symbol as TsSymbol,
   type Type,
 } from "ts-morph";
 import type { Endpoint } from "./types.js";
-import { findArrowFunction, extractDataParams, typeToProperties } from "./extract-params.js";
+import { typeToProperties } from "./extract-params.js";
 
-/**
- * Extract an endpoint from an arrow function variable declaration.
- */
-export function extractFromArrow(name: string, node: Node, decl: Node): Endpoint | null {
-  const arrow = findArrowFunction(node);
-  if (!arrow) return null;
+const METHODS = new Set(["delete", "get", "head", "patch", "post", "put"]);
 
-  const returnObj = findReturnObject(arrow);
-  if (!returnObj) return null;
-
-  return buildEndpoint(name, returnObj, arrow, decl);
+export interface Requests {
+  declared: Endpoint[];
+  sent: Endpoint[];
 }
 
-/**
- * Extract an endpoint from a function declaration.
- */
-export function extractFromFunction(name: string, decl: FunctionDeclaration): Endpoint | null {
-  const body = decl.getBody();
-  if (!body || !Node.isBlock(body)) return null;
-
-  const ret = body.getFirstDescendantByKind(SyntaxKind.ReturnStatement);
-  if (!ret) return null;
-  const expr = ret.getExpression();
-  if (!expr || !Node.isObjectLiteralExpression(expr)) return null;
-
-  return buildEndpoint(name, expr, decl, decl);
-}
-
-// ── Return object discovery ──
-
-function findReturnObject(arrow: ArrowFunction): Node | null {
-  const body = arrow.getBody();
-
-  if (Node.isParenthesizedExpression(body)) {
-    const inner = body.getExpression();
-    if (Node.isObjectLiteralExpression(inner)) return inner;
+// A request is an object with a `url` and a `method`, wherever the web clients
+// write it. One a function returns or a module keeps in a constant is declared
+// for every caller; one handed straight to the API is sent by the code around
+// it, which may name it after an event handler and send only part of its body.
+export function extractRequests(sf: SourceFile): Requests {
+  const requests: Requests = { declared: [], sent: [] };
+  for (const obj of sf.getDescendantsOfKind(SyntaxKind.ObjectLiteralExpression)) {
+    const endpoint = requestFrom(obj);
+    if (endpoint) (isDeclaration(obj) ? requests.declared : requests.sent).push(endpoint);
   }
-  if (Node.isObjectLiteralExpression(body)) return body;
-  if (Node.isBlock(body)) {
-    for (const stmt of body.getStatements()) {
-      if (Node.isReturnStatement(stmt)) {
-        const expr = stmt.getExpression();
-        if (expr && Node.isObjectLiteralExpression(expr)) return expr;
-      }
-    }
-    const ret = body.getFirstDescendantByKind(SyntaxKind.ReturnStatement);
-    if (ret) {
-      const expr = ret.getExpression();
-      if (expr && Node.isObjectLiteralExpression(expr)) return expr;
-    }
-  }
-  return null;
+  return requests;
 }
 
-// ── Build endpoint from return object ──
+function isDeclaration(obj: Node): boolean {
+  let node = obj;
+  let parent = node.getParent();
+  while (
+    parent &&
+    (Node.isParenthesizedExpression(parent) ||
+      Node.isAsExpression(parent) ||
+      Node.isSatisfiesExpression(parent))
+  ) {
+    node = parent;
+    parent = node.getParent();
+  }
+  if (!parent) return false;
+  if (Node.isReturnStatement(parent) || Node.isArrowFunction(parent)) return true;
+  return Node.isVariableDeclaration(parent) && !parent.getFirstAncestor(isFunctionLike);
+}
 
-function buildEndpoint(name: string, obj: Node, fnNode: Node, declNode: Node): Endpoint | null {
-  if (!Node.isObjectLiteralExpression(obj)) return null;
-
+function requestFrom(obj: ObjectLiteralExpression): Endpoint | null {
   let url: string | null = null;
   let method: string | null = null;
   let hasBody = false;
-  let hasParams = false;
+  let dataType: Type | null = null;
   let paramsType: Type | null = null;
   let inputType = "";
   let outputType = "";
@@ -82,23 +61,26 @@ function buildEndpoint(name: string, obj: Node, fnNode: Node, declNode: Node): E
 
   for (const prop of obj.getProperties()) {
     if (Node.isShorthandPropertyAssignment(prop)) {
-      const propName = prop.getName();
-      if (propName === "data") hasBody = true;
-      if (propName === "params") {
-        hasParams = true;
-        paramsType = prop.getType();
+      switch (prop.getName()) {
+        case "url":
+          url = resolveDeclaredString(prop.getValueSymbol());
+          break;
+        case "data":
+          hasBody = true;
+          dataType = prop.getType();
+          break;
+        case "params":
+          paramsType = prop.getType();
+          break;
       }
-      if (propName === "url") url = resolveDeclaredString(prop.getValueSymbol());
       continue;
     }
-    if (Node.isSpreadAssignment(prop)) continue;
     if (!Node.isPropertyAssignment(prop)) continue;
 
-    const propName = prop.getName();
     const init = prop.getInitializer();
     if (!init) continue;
 
-    switch (propName) {
+    switch (prop.getName()) {
       case "url":
         url = resolveStringValue(init);
         break;
@@ -107,9 +89,9 @@ function buildEndpoint(name: string, obj: Node, fnNode: Node, declNode: Node): E
         break;
       case "data":
         hasBody = true;
+        dataType = init.getType();
         break;
       case "params":
-        hasParams = true;
         paramsType = init.getType();
         break;
       case "input":
@@ -133,35 +115,29 @@ function buildEndpoint(name: string, obj: Node, fnNode: Node, declNode: Node): E
     }
   }
 
-  if (!url || !method) return null;
+  if (!url || !method || !METHODS.has(method)) return null;
+  const route = routeOf(url);
+  if (!route) return null;
+  const declaration = declarationOf(obj);
+  if (!declaration) return null;
 
-  const normalizedUrl = normalizeUrl(url);
-  const pathParams = extractPathParams(normalizedUrl);
-  const description = extractJsDoc(fnNode, declNode);
-
-  const isPublic =
-    credentials === "omit" ||
-    description.toLowerCase().includes("public") ||
-    hasPublicComment(fnNode);
-
-  const deprecated =
-    description.toLowerCase().includes("@deprecated") ||
-    hasDeprecatedTag(fnNode, declNode);
-
-  const bodyParams = hasBody ? extractDataParams(fnNode) : [];
-  const queryParams = hasParams && paramsType ? typeToProperties(paramsType) : [];
+  const { name, node, fn } = declaration;
+  const description = extractJsDoc(fn, node);
 
   return {
     name,
     method,
-    url: normalizedUrl,
-    tag: tagFromUrl(normalizedUrl),
+    url: route,
+    tag: tagFromUrl(route),
     description,
-    deprecated,
-    isPublic,
-    pathParams,
-    queryParams,
-    bodyParams,
+    deprecated: description.toLowerCase().includes("@deprecated") || hasDeprecatedTag(fn, node),
+    isPublic:
+      credentials === "omit" ||
+      description.toLowerCase().includes("public") ||
+      hasPublicComment(fn),
+    pathParams: extractPathParams(route),
+    queryParams: paramsType ? typeToProperties(paramsType) : [],
+    bodyParams: dataType ? typeToProperties(dataType) : [],
     hasBody,
     inputType,
     outputType,
@@ -169,6 +145,50 @@ function buildEndpoint(name: string, obj: Node, fnNode: Node, declNode: Node): E
     keepalive,
     silencedErrors,
   };
+}
+
+// ── The name a request goes by ──
+
+interface Declaration {
+  name: string;
+  node: Node;
+  fn: Node;
+}
+
+// A request is named after the function that sends it, or the constant that
+// holds it. A local value on the way - `const response = await api(...)` - is
+// not a name for it.
+function declarationOf(obj: Node): Declaration | null {
+  for (const node of obj.getAncestors()) {
+    const name = nameOf(node);
+    if (name) return { name, node, fn: obj.getFirstAncestor(isFunctionLike) ?? node };
+  }
+  return null;
+}
+
+function nameOf(node: Node): string | undefined {
+  if (Node.isFunctionDeclaration(node) || Node.isMethodDeclaration(node)) return node.getName();
+  if (
+    Node.isVariableDeclaration(node) ||
+    Node.isPropertyAssignment(node) ||
+    Node.isPropertyDeclaration(node)
+  ) {
+    if (!Node.isIdentifier(node.getNameNode())) return undefined;
+    const init = node.getInitializer();
+    if ((init && isFunctionLike(init)) || !node.getFirstAncestor(isFunctionLike)) {
+      return node.getName();
+    }
+  }
+  return undefined;
+}
+
+function isFunctionLike(node: Node): boolean {
+  return (
+    Node.isArrowFunction(node) ||
+    Node.isFunctionDeclaration(node) ||
+    Node.isFunctionExpression(node) ||
+    Node.isMethodDeclaration(node)
+  );
 }
 
 // ── String/constant resolution ──
@@ -182,11 +202,9 @@ function resolveStringValue(node: Node): string | null {
     let result = node.getHead().getLiteralText();
     for (const span of node.getTemplateSpans()) {
       const expr = span.getExpression();
-      if (Node.isIdentifier(expr)) {
-        result += resolveDeclaredString(expr.getSymbol()) ?? `{${expr.getText()}}`;
-      } else {
-        result += `{${expr.getText()}}`;
-      }
+      if (opensQuery(expr)) return result + "?";
+      const declared = Node.isIdentifier(expr) ? resolveDeclaredString(expr.getSymbol()) : null;
+      result += declared ?? `{${placeholderName(expr)}}`;
       result += span.getLiteral().getLiteralText();
     }
     return result;
@@ -202,6 +220,31 @@ function resolveDeclaredString(symbol: TsSymbol | undefined): string | null {
   const decl = target?.getValueDeclaration();
   const init = decl && Node.isVariableDeclaration(decl) ? decl.getInitializer() : undefined;
   return init ? resolveStringValue(init) : null;
+}
+
+// `${page ? `?${page}` : ''}` adds a query string when there is one.
+function opensQuery(expr: Node): boolean {
+  if (!Node.isConditionalExpression(expr)) return false;
+  return [expr.getWhenTrue(), expr.getWhenFalse()].some((branch) =>
+    resolveStringValue(branch)?.startsWith("?")
+  );
+}
+
+// A placeholder is named after the value that fills it: `${dto.shareId}` and
+// `${encodeURIComponent(shareId)}` are both {shareId}.
+function placeholderName(expr: Node): string {
+  if (Node.isIdentifier(expr)) return expr.getText();
+  if (Node.isPropertyAccessExpression(expr)) return expr.getName();
+  if (Node.isCallExpression(expr)) {
+    const [first] = expr.getArguments();
+    if (first) return placeholderName(first);
+    const callee = expr.getExpression();
+    if (Node.isPropertyAccessExpression(callee)) return placeholderName(callee.getExpression());
+  }
+  if (Node.isAsExpression(expr) || Node.isNonNullExpression(expr) || Node.isParenthesizedExpression(expr)) {
+    return placeholderName(expr.getExpression());
+  }
+  return expr.getText();
 }
 
 function resolveConstantValue(node: Node): string {
@@ -232,10 +275,12 @@ function resolveSilenceArray(node: Node): string[] {
 
 // ── URL handling ──
 
-function normalizeUrl(url: string): string {
-  let n = url.replace(/\?.*$/, "");
-  if (!n.startsWith("/")) n = "/" + n;
-  return n;
+// routeOf is the path a URL names on the API, or null for one that is not on it:
+// an absolute address, or a path whose root is only known at run time.
+function routeOf(url: string): string | null {
+  if (/^[a-z][a-z0-9+.-]*:/i.test(url)) return null;
+  const route = "/" + url.replace(/\?.*$/, "").replace(/^\//, "");
+  return route.startsWith("/{") ? null : route;
 }
 
 function tagFromUrl(url: string): string {

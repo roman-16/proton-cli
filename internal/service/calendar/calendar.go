@@ -100,12 +100,14 @@ type member struct {
 }
 
 // bootstrap is everything needed to open a calendar: the membership that names
-// it, the passphrase that unlocks its keys, and the keys.
+// it, the passphrase that unlocks its keys, the keys, and the defaults it gives
+// new events.
 //
 // One request answers all of it, which is how the web client opens a calendar
-// (getFullCalendar, packages/shared/lib/api/calendars.ts).
+// and reads its defaults (getFullCalendar, packages/shared/lib/api/calendars.ts).
 type bootstrap struct {
-	Keys []struct {
+	CalendarSettings rawCalendarSettings
+	Keys             []struct {
 		PrivateKey string
 		Flags      int
 	}

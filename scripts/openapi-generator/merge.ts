@@ -11,9 +11,13 @@ import type { Endpoint } from "./types.js";
  * and the rest only fill in what they alone know.
  */
 
+export interface Operation extends Endpoint {
+  operationId: string;
+}
+
 export interface Route {
   url: string;
-  operations: Map<string, Endpoint>;
+  operations: Map<string, Operation>;
 }
 
 export function merge(sources: Endpoint[][]): Route[] {
@@ -34,13 +38,16 @@ export function merge(sources: Endpoint[][]): Route[] {
         ...endpoint,
         url: route.url,
         pathParams: placeholdersOf(route.url),
+        operationId: endpoint.name,
       });
     }
   }
 
-  return [...routes.values()]
+  const merged = [...routes.values()]
     .sort((a, b) => byCodeUnit(a.url, b.url))
     .map((route) => ({ url: route.url, operations: sortByMethod(route.operations) }));
+  assignOperationIds(merged);
+  return merged;
 }
 
 function supplement(defined: Endpoint, also: Endpoint): void {
@@ -53,7 +60,52 @@ function supplement(defined: Endpoint, also: Endpoint): void {
   if (defined.silencedErrors.length === 0) defined.silencedErrors = also.silencedErrors;
 }
 
-function sortByMethod(operations: Map<string, Endpoint>): Map<string, Endpoint> {
+// OpenAPI holds an operation ID to one operation in the whole document.
+function assignOperationIds(routes: Route[]): void {
+  const operations = routes.flatMap((route) => [...route.operations.values()]);
+
+  const byName = new Map<string, Operation[]>();
+  for (const operation of operations) {
+    byName.set(operation.name, [...(byName.get(operation.name) ?? []), operation]);
+  }
+  for (const [name, sharing] of byName) {
+    if (sharing.length < 2) continue;
+    const apps = new Set(sharing.map((operation) => operation.tag));
+    const fewest = Math.min(...sharing.map((operation) => operation.pathParams.length));
+    for (const operation of sharing) {
+      if (apps.size === sharing.length) {
+        operation.operationId = lowerFirst(camelCase(operation.tag)) + upperFirst(name);
+        continue;
+      }
+      const item = operation.pathParams.at(-1);
+      if (item && operation.pathParams.length > fewest) {
+        operation.operationId = name + "By" + upperFirst(item);
+      }
+    }
+  }
+
+  const taken = new Set<string>();
+  for (const operation of operations) {
+    let id = operation.operationId;
+    for (let n = 2; taken.has(id); n++) id = operation.operationId + n;
+    operation.operationId = id;
+    taken.add(id);
+  }
+}
+
+function camelCase(s: string): string {
+  return s.replace(/[^A-Za-z0-9]+(.)/g, (_, c: string) => c.toUpperCase());
+}
+
+function lowerFirst(s: string): string {
+  return s.charAt(0).toLowerCase() + s.slice(1);
+}
+
+function upperFirst(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function sortByMethod(operations: Map<string, Operation>): Map<string, Operation> {
   return new Map([...operations.entries()].sort((a, b) => byCodeUnit(a[0], b[0])));
 }
 

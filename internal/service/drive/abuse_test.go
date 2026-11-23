@@ -137,11 +137,7 @@ func TestYourOwnFilesAreNotReported(t *testing.T) {
 // the link and the whole of its password, under the share its root names.
 func TestAReportInALinkCarriesTheLinkAndItsPassword(t *testing.T) {
 	tree := newPublicTree(t, testURLPassword+"hunter2", "Project", protonFolder)
-	tree.items[testRootID] = map[string]any{
-		"Link":    map[string]any{"LinkID": testRootID, "Type": protonFolder},
-		"Folder":  map[string]any{},
-		"Sharing": map[string]any{"ShareID": "link-share", "ShareURLID": "url-1"},
-	}
+	tree.items[testRootID]["Sharing"] = map[string]any{"ShareID": "link-share", "ShareURLID": "url-1"}
 	s, doer := publicService(t, tree, proton.PublicLinkCustomPassword|proton.PublicLinkGeneratedPassword, nil, nil)
 	tree.hold(t, testRootID, uploadedFile("invoice.exe", testLinkSigner, uploadedJustNow()))
 	dc, err := s.OpenLink(context.Background(), LinkURL(testToken, testURLPassword), "hunter2")

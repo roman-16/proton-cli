@@ -518,13 +518,11 @@ type rawCalendarSettings struct {
 }
 
 func (s *Service) CalendarDefaults(ctx context.Context, calendarID string) (*CalendarDefaults, error) {
-	var r struct{ CalendarSettings rawCalendarSettings }
-	if err := s.C.Decode(ctx, proton.Request{
-		Method: "GET", Path: "/calendar/v1/" + calendarID + "/settings",
-	}, &r); err != nil {
+	b, err := s.calendarBootstrap(ctx, calendarID)
+	if err != nil {
 		return nil, err
 	}
-	cs := r.CalendarSettings
+	cs := b.CalendarSettings
 	return &CalendarDefaults{
 		Duration:        cs.DefaultEventDuration,
 		Reminders:       reminderTexts(cs.DefaultPartDayNotifications),

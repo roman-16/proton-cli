@@ -76,7 +76,6 @@ func TestLinkURLCarriesThePasswordItWasMadeWith(t *testing.T) {
 // the way a real one does.
 type publicTree struct {
 	share *proton.PublicLinkShare
-	root  string
 	// rootKR is the key ring of what the link points at, which is what the names
 	// and passphrases of everything written directly into it are signed with when
 	// nobody is behind the writing. rootHashKey is what those names are hashed
@@ -84,7 +83,8 @@ type publicTree struct {
 	rootKR      *pgp.KeyRing
 	rootHashKey []byte
 	// children is what each folder of the tree holds and items is what each of
-	// those is, which are the two answers a link's tree is read through.
+	// those is, the root included, which are the two answers a link's tree is
+	// read through.
 	children map[string][]string
 	items    map[string]map[string]any
 	// keys are the folders inside the link, which hold what is sealed to them.
@@ -141,21 +141,28 @@ func newPublicTree(t *testing.T, password, rootName string, rootType int) *publi
 	if err != nil {
 		t.Fatalf("encrypt the root name: %v", err)
 	}
+	root := map[string]any{"Link": map[string]any{
+		"LinkID": testRootID, "Type": rootType, "Name": encName,
+		"NodeKey": rootKey, "NodePassphrase": rootPass, "NodePassphraseSignature": rootPassSig,
+		"SignatureEmail": testLinkSigner,
+	}}
+	if rootType == protonFolder {
+		root["Folder"] = map[string]any{"NodeHashKey": armouredRootHashKey}
+	} else {
+		root["File"] = map[string]any{
+			"ContentKeyPacket": "", "MediaType": "application/pdf",
+			"ActiveRevision": map[string]any{"RevisionID": "rev-1", "EncryptedSize": 1234},
+		}
+	}
 	return &publicTree{
 		share: &proton.PublicLinkShare{
 			ShareKey: armoredKey, SharePassphrase: armoredPassphrase,
 			SharePasswordSalt: base64.StdEncoding.EncodeToString([]byte(testLinkSalt)),
 			VolumeID:          testVolumeID, LinkID: testRootID, PublicPermissions: permEdit,
 		},
-		root: object(t, map[string]any{"Token": map[string]any{
-			"Token": testToken, "LinkID": testRootID, "LinkType": rootType, "Name": encName,
-			"NodeKey": rootKey, "NodePassphrase": rootPass, "NodePassphraseSignature": rootPassSig,
-			"NodeHashKey":    armouredRootHashKey,
-			"SignatureEmail": testLinkSigner, "ContentKeyPacket": "", "Size": 1234,
-		}}),
 		rootKR: rootKR, rootHashKey: rootHashKey,
 		children: map[string][]string{},
-		items:    map[string]map[string]any{},
+		items:    map[string]map[string]any{testRootID: root},
 		keys:     map[string]folderKeys{},
 	}
 }
@@ -314,7 +321,7 @@ func signedInAs(t *testing.T, email string) *keys.Unlocked {
 // was never given fails rather than quietly signing as somebody.
 func publicService(t *testing.T, tree *publicTree, flags int, u *keys.Unlocked, extra map[string]string) (*Service, *stubDoer) {
 	t.Helper()
-	routes := map[string]string{"GET /drive/urls/" + testToken: tree.root}
+	routes := map[string]string{}
 	for path, body := range extra {
 		routes[path] = body
 	}
@@ -429,7 +436,6 @@ func TestALinkIsOpenedByTokenAndReadWithoutAnAccount(t *testing.T) {
 	for _, want := range []string{
 		"GET /drive/urls/" + testToken + "/info",
 		"POST /drive/urls/" + testToken + "/auth",
-		"GET /drive/urls/" + testToken,
 		"GET /drive/unauth/v2/volumes/" + testVolumeID + "/folders/" + testRootID + "/children",
 		"POST /drive/unauth/v2/volumes/" + testVolumeID + "/links",
 	} {
@@ -874,21 +880,14 @@ func TestSplitLinkPassword(t *testing.T) {
 	}
 }
 
-// A link that points straight at a file knows which version of it to read.
-//
-// What opens a link names the file, its keys and its size, and says nothing
-// about its versions - so the version is asked for from where the link's items
-// are served, and a download has it without looking anything up.
+// A link that points straight at a file knows which version of it to read,
+// from the same answer that names the file.
 func TestALinkToAFileCarriesTheVersionItPointsAt(t *testing.T) {
 	tree := newPublicTree(t, testURLPassword, "Q3-report.pdf", 2)
-	tree.items[testRootID] = map[string]any{
-		"Link": map[string]any{"LinkID": testRootID, "Type": 2},
-		"File": map[string]any{
-			"ContentKeyPacket": "", "MediaType": "application/pdf",
-			"ActiveRevision": map[string]any{"RevisionID": "rev-7", "EncryptedSize": 4096},
-		},
+	tree.items[testRootID]["File"].(map[string]any)["ActiveRevision"] = map[string]any{
+		"RevisionID": "rev-7", "EncryptedSize": 4096,
 	}
-	s, doer := publicService(t, tree, proton.PublicLinkGeneratedPassword, nil, nil)
+	s, _ := publicService(t, tree, proton.PublicLinkGeneratedPassword, nil, nil)
 
 	dc, err := s.OpenLink(context.Background(), LinkURL(testToken, testURLPassword), "")
 	if err != nil {
@@ -897,18 +896,25 @@ func TestALinkToAFileCarriesTheVersionItPointsAt(t *testing.T) {
 	if got := activeRevisionID(dc.rootLink); got != "rev-7" {
 		t.Errorf("the link points at revision %q, want the one the file holds", got)
 	}
-	if !doer.sent("POST", "/drive/unauth/v2/volumes/"+testVolumeID+"/links") {
-		t.Error("the version was never asked for")
-	}
+}
 
-	// A folder link holds its items' versions already, so it asks for nothing.
-	folders := newPublicTree(t, testURLPassword, "Project", protonFolder)
-	only, doerFolder := publicService(t, folders, proton.PublicLinkGeneratedPassword, nil, nil)
-	if _, err := only.OpenLink(context.Background(), LinkURL(testToken, testURLPassword), ""); err != nil {
+// The top of a link is the top of the reader's tree, even where Proton names the
+// folder above it to somebody who can reach that folder another way.
+func TestTheTopOfALinkHasNoParent(t *testing.T) {
+	tree := newPublicTree(t, testURLPassword, "Project", protonFolder)
+	tree.items[testRootID]["Link"].(map[string]any)["ParentLinkID"] = "owners-folder"
+	s, _ := publicService(t, tree, proton.PublicLinkGeneratedPassword, signedInAs(t, testLinkSigner), nil)
+
+	dc, err := s.OpenLink(context.Background(), LinkURL(testToken, testURLPassword), "")
+	if err != nil {
 		t.Fatalf("OpenLink: %v", err)
 	}
-	if doerFolder.sent("POST", "/drive/unauth/v2/volumes/"+testVolumeID+"/links") {
-		t.Error("opening a folder link asked for a version it has no file to read")
+	res, err := s.ResolvePath(context.Background(), dc, "/")
+	if err != nil {
+		t.Fatalf("ResolvePath: %v", err)
+	}
+	if !res.IsRoot() {
+		t.Errorf("the top of the link resolved with parent %q", res.Link.ParentLinkID)
 	}
 }
 

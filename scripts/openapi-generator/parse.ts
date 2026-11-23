@@ -1,25 +1,22 @@
 import { Project } from "ts-morph";
 import * as path from "path";
-import { readdirSync, statSync } from "fs";
+import { readdirSync, readFileSync, statSync } from "fs";
 import type { Endpoint, EnumInfo } from "./types.js";
 import { collectEnums, ENUM_MAP } from "./registry.js";
-import { extractFromArrow, extractFromFunction } from "./extract-endpoint.js";
+import { extractRequests } from "./extract-endpoint.js";
 import { merge, type Route } from "./merge.js";
 import { parseDriveSdk } from "./parse-drive-sdk.js";
 import { parsePass } from "./parse-pass.js";
 
-const SKIP_FILES = new Set([
-  "createApi.ts",
-  "apiEnvironmentConfig.ts",
-  "apiRateLimiter.ts",
-  "interface.ts",
-  "docs.ts",
-]);
+const ROOTS = ["applications", "packages"];
 
-// Where the web clients declare their requests. Most of the API is in the shared
-// package; Easy Switch - importing mail, calendars and contacts from another
-// provider - is declared in its own package and nowhere else.
-const API_PACKAGES = ["packages/shared/lib", "packages/activation/src"];
+// A test declares the same literals as the request it checks, and a mock
+// answers requests rather than sending them.
+const TEST_FILE = /\.(spec|stories|test)\.tsx?$/;
+const TEST_DIRS = new Set(["__mocks__", "__tests__", "mock", "mocks", "test", "testing", "tests"]);
+
+// The web clients keep the enums their requests take in the shared package.
+const ENUM_PACKAGE = "packages/shared/lib";
 
 export function parseAll(
   webClientsDir: string,
@@ -28,59 +25,51 @@ export function parseAll(
   const project = new Project({
     tsConfigFilePath: path.join(webClientsDir, "tsconfig.base.json"),
     skipAddingFilesFromTsConfig: true,
+    compilerOptions: { paths: { "@proton/*": [path.join(webClientsDir, "packages/*")] } },
   });
 
-  for (const pkg of API_PACKAGES) {
-    addFilesRecursive(project, path.join(webClientsDir, pkg));
+  const requestFiles = ROOTS.flatMap((root) => sourceFiles(path.join(webClientsDir, root)))
+    .filter((file) => mayDeclareRequest(file))
+    .sort();
+  for (const file of [...typeScriptFiles(path.join(webClientsDir, ENUM_PACKAGE)), ...requestFiles]) {
+    if (!project.getSourceFile(file)) project.addSourceFileAtPath(file);
   }
 
   for (const sf of project.getSourceFiles()) {
     collectEnums(sf);
   }
 
-  // Parse endpoints from api/ files only. A test beside them asserts what a
-  // request is built from and declares the same literals, so it would be read
-  // as a second source for routes that are already there.
-  const apiFiles = project
-    .getSourceFiles()
-    .filter((sf) => sf.getFilePath().includes("/api/") && !sf.getFilePath().includes("/helpers/"))
-    .filter((sf) => !SKIP_FILES.has(path.basename(sf.getFilePath())))
-    .filter((sf) => !sf.getFilePath().endsWith(".test.ts"));
-
-  // A request is declared by the object a function returns, whether or not the
-  // module lets anyone else call it: upstream keeps helpers behind exported
-  // wrappers, and the endpoint is the same endpoint either way.
-  const endpoints: Endpoint[] = [];
-  for (const sf of apiFiles) {
-    for (const decl of sf.getVariableDeclarations()) {
-      const init = decl.getInitializer();
-      if (!init) continue;
-      const ep = extractFromArrow(decl.getName(), init, decl);
-      if (ep) endpoints.push(ep);
-    }
-    for (const decl of sf.getFunctions()) {
-      const name = decl.getName();
-      if (!name) continue;
-      const ep = extractFromFunction(name, decl);
-      if (ep) endpoints.push(ep);
-    }
-  }
+  const requests = requestFiles.map((file) => extractRequests(project.getSourceFileOrThrow(file)));
+  const declared: Endpoint[] = requests.flatMap((r) => r.declared);
+  const sent: Endpoint[] = requests.flatMap((r) => r.sent);
 
   // Drive's own spec says more about Drive than the web client does, and Pass
-  // declares its API as types rather than as functions, in a package of its own.
-  const routes = merge([parseDriveSdk(driveSdkDir), endpoints, parsePass(webClientsDir)]);
+  // declares its API as types in a package of its own, which say more than
+  // the requests its client writes.
+  const routes = merge([parseDriveSdk(driveSdkDir), parsePass(webClientsDir), declared, sent]);
 
   return { routes, enums: ENUM_MAP };
 }
 
-function addFilesRecursive(project: Project, dir: string): void {
+function sourceFiles(dir: string): string[] {
+  const files: string[] = [];
   for (const entry of readdirSync(dir)) {
+    if (entry === "node_modules" || entry.startsWith(".") || TEST_DIRS.has(entry)) continue;
     const full = path.join(dir, entry);
-    const stat = statSync(full);
-    if (stat.isDirectory()) {
-      addFilesRecursive(project, full);
-    } else if (entry.endsWith(".ts") && !entry.endsWith(".d.ts")) {
-      project.addSourceFileAtPath(full);
+    if (statSync(full).isDirectory()) {
+      files.push(...sourceFiles(full));
+    } else if (/\.tsx?$/.test(entry) && !entry.endsWith(".d.ts") && !TEST_FILE.test(entry)) {
+      files.push(full);
     }
   }
+  return files;
+}
+
+function typeScriptFiles(dir: string): string[] {
+  return sourceFiles(dir).filter((file) => file.endsWith(".ts"));
+}
+
+function mayDeclareRequest(file: string): boolean {
+  const text = readFileSync(file, "utf8");
+  return /\burl\b/.test(text) && /\bmethod\b/.test(text);
 }

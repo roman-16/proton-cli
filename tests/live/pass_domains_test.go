@@ -24,10 +24,12 @@ import (
 func aPassDomainTheRunMade(t *testing.T) string {
 	t.Helper()
 	name := testID() + "." + paidDomainSuffix(t)
-	stdout, stderr := runOKStderrPaid(t, "pass", "settings", "domains", "create", name)
-	assertBareRef(t, stdout, "domains create", looksLikeNumber)
+	// Proton can refuse a domain and keep it all the same, so the cleanup is
+	// registered before the create rather than after one that succeeded.
 	cleanupRunPaid(t, "Delete alias domain: proton pass settings domains delete "+name,
 		"pass", "settings", "domains", "delete", name)
+	stdout, stderr := runOKStderrPaid(t, "pass", "settings", "domains", "create", name)
+	assertBareRef(t, stdout, "domains create", looksLikeNumber)
 	// What comes back with the domain is the one entry that proves it is yours.
 	assertContains(t, stderr, "TXT")
 	assertContains(t, stderr, "pass settings domains get "+name)

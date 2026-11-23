@@ -56,9 +56,11 @@ Auto-generates `openapi.yaml` from Proton's own TypeScript using [ts-morph](http
 
 | Source | Declares |
 |---|---|
-| [ProtonMail/WebClients](https://github.com/ProtonMail/WebClients) `packages/shared/lib/api` | One function per endpoint, for every app |
+| [ProtonMail/WebClients](https://github.com/ProtonMail/WebClients) `packages/` and `applications/` | Every request the web clients write, as an object with a `url` and a `method` |
 | [ProtonMail/WebClients](https://github.com/ProtonMail/WebClients) `packages/pass/types/api/pass.ts` | Pass, as two conditional types |
 | [ProtonDriveApps/sdk](https://github.com/ProtonDriveApps/sdk) `client/js/src/internal/apiService/driveTypes.ts` | Drive, as Proton's own OpenAPI |
+
+Requests are found by what a file holds, not by where it is. Upstream moves them between packages, and writes them as a function's return value, as a constant, or inline where a thunk or a component hands them to the API - so every `.ts` and `.tsx` file is read that mentions a `url` and a `method`. Tests, stories and mocks are left out: they declare the same literals as the requests they stand in for.
 
 Drive's web app calls `@protontech/drive-sdk` rather than the shared package, so the shared package declares little of Drive any more - albums, the photo timeline and the public-link operations are only in the SDK.
 
@@ -76,12 +78,12 @@ Per endpoint:
 
 | Source | OpenAPI |
 |---|---|
-| Function name | `operationId`, `summary` |
-| `url` property | `paths`, with every name in it resolved to what it was declared as, through imports |
+| The function that sends it, or the constant that holds it | `operationId`, `summary` |
+| `url` property | `paths`, with every name in it resolved to what it was declared as, through imports. A URL with a scheme, or one whose root is only known at run time, is not a route on the API and is left out |
 | `method` property | HTTP method |
-| `data` parameter type | `requestBody` schema (types resolved through imports) |
-| `params` type, whether written out, held in a variable or spread | `parameters` (query), with their types |
-| Template literal `${vars}` | `parameters` (path) |
+| `data` property type | `requestBody` schema (types resolved through imports) |
+| `params` property type, whether written out, held in a variable or spread | `parameters` (query), with their types |
+| Template literal `${vars}` | `parameters` (path), named after the value that fills them: `${dto.shareId}` and `${encodeURIComponent(shareId)}` are both `{shareId}`. A `${…}` that adds either `?…` or nothing starts the query |
 | `input: 'form'\|'binary'` | Request `content-type` (`multipart/form-data`, `application/octet-stream`) |
 | `output: 'stream'\|'arrayBuffer'\|'text'` | Response `content-type` |
 | JSDoc comments | `description` |
@@ -92,7 +94,7 @@ Per endpoint:
 | `silence` array | `x-expected-errors` |
 | All enums | Comment block in components section |
 
-A function is read whether or not it is exported: upstream keeps helpers behind exported wrappers, and the endpoint is the same endpoint either way.
+A request is read whether or not anything exports it: upstream keeps helpers behind exported wrappers, and the endpoint is the same endpoint either way. A local value on the way to it - `const response = await api(...)` - does not name it; the function around it does.
 
 Drive's SDK carries Proton's OpenAPI written out by `openapi-typescript`, so it is read as the structure that is:
 
@@ -120,17 +122,17 @@ Global:
 
 | Source | OpenAPI |
 |---|---|
-| All `enum` declarations | Enum reference comments with all values |
+| Every `enum` in `packages/shared/lib` and in the files that hold a request | Enum reference comments with all values |
 | TypeScript interfaces | Resolved for request body and query property types, optionality, and comments; an optional or nullable field has the type it holds otherwise |
 
 ### How It Works
 
 1. **Checkout** - `just sources` puts the current upstream main of each repository in `/tmp`, and both directories are passed to the generator
-2. **Project setup** - creates a ts-morph `Project` with `tsconfig.base.json` for path resolution
-3. **Registry** - scans all source files for enum declarations
-4. **Parse** - walks all declarations in `api/**/*.ts`, extracts endpoint metadata from the AST, then walks the Drive SDK's `paths` interface and the Pass `ApiRequestBody` and `ApiResponse` type chains
-5. **Type resolution** - follows TypeScript imports to resolve `data: SomeType` to actual property lists (including `extends`, `Partial<>`, `Omit<>`, etc.)
-6. **Merge** - a route is a URL with every placeholder blanked, so `{shareID}` and `{shareId}` are one route rather than two. Sources are ordered Drive SDK, then shared, then Pass: the first to declare an operation defines it, and the rest only fill in what they alone say - `deprecated`, `security: []`, `x-timeout`, `x-keepalive`, `x-expected-errors`
+2. **Project setup** - creates a ts-morph `Project` with `tsconfig.base.json`, and `@proton/*` mapped to `packages/*`: the checkout has no installed workspace to resolve a package name through, and a type imported by one would otherwise come out empty
+3. **Registry** - scans the files it read for enum declarations
+4. **Parse** - finds every object with a `url` and a `method`, in file path order, extracts endpoint metadata from the AST, then walks the Drive SDK's `paths` interface and the Pass `ApiRequestBody` and `ApiResponse` type chains
+5. **Type resolution** - follows TypeScript imports to resolve what `data` holds to actual property lists (including `extends`, `Partial<>`, `Omit<>`, etc.)
+6. **Merge** - a route is a URL with every placeholder blanked, so `{shareID}` and `{shareId}` are one route rather than two. Sources are ordered Drive SDK, then Pass, then the web clients' requests: the first to declare an operation defines it, and the rest only fill in what they alone say - `deprecated`, `security: []`, `x-timeout`, `x-keepalive`, `x-expected-errors`. Each operation then gets an `operationId` of its own: operations that share a name are told apart by their app when each is in a different one (`calendarAcceptInvitation`, `coreAcceptInvitation`), otherwise by the placeholder that makes one an item of another (`getPassShare`, `getPassShareByShareId`), and by a number when neither does
 7. **Emit** - generates OpenAPI 3.1 YAML to stdout
 
 ### File Structure
@@ -140,9 +142,9 @@ openapi-generator/
 ├── index.ts              - entry point
 ├── parse.ts              - ts-morph project setup, file discovery
 ├── registry.ts           - enum collection
-├── extract-endpoint.ts   - endpoint extraction from AST nodes
+├── extract-endpoint.ts   - a request from each object that declares one
 ├── extract-params.ts     - body/query param type resolution
-├── merge.ts              - one operation per route, from overlapping sources
+├── merge.ts              - one operation per route from overlapping sources, one ID per operation
 ├── parse-drive-sdk.ts    - the Drive API, declared as Proton's own OpenAPI
 ├── parse-pass.ts         - the Pass API, declared as conditional types
 ├── emit-yaml.ts          - OpenAPI YAML output

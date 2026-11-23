@@ -26,6 +26,10 @@ const (
 	linkPassword = "kQ81mDx4T9wL"
 )
 
+// readTheLink asks what is behind the link, which is a request about the link
+// rather than about an account.
+var readTheLink = Request{Method: "POST", Path: "/drive/unauth/v2/volumes/volume-1/links"}
+
 // linkServer is Proton for one public link: it proves the link over SRP for real
 // and records who each request came as.
 //
@@ -222,9 +226,7 @@ func TestALinkSessionIsUsedAndNeverBecomesTheAccounts(t *testing.T) {
 		t.Errorf("the account's tokens are %q/%q/%q, want a link to leave them alone", uid, acc, ref)
 	}
 
-	if _, err := c.Do(context.Background(), Request{
-		Method: "GET", Path: "/drive/urls/" + linkToken,
-	}); err != nil {
+	if _, err := c.Do(context.Background(), readTheLink); err != nil {
 		t.Fatalf("read the link: %v", err)
 	}
 	if last := srv.lastRequest(); last.uid != "link-uid" || last.bearer != "link-token" {
@@ -265,7 +267,7 @@ func TestALinkSessionThatExpiredIsProvedAgain(t *testing.T) {
 	openLink(t, c)
 	srv.grants = "second-token"
 
-	resp, err := c.Do(context.Background(), Request{Method: "GET", Path: "/drive/urls/" + linkToken})
+	resp, err := c.Do(context.Background(), readTheLink)
 	if err != nil {
 		t.Fatalf("read the link: %v", err)
 	}
@@ -301,9 +303,7 @@ func TestASignedInCallerOpensALinkAsItself(t *testing.T) {
 		}
 	}
 
-	if _, err := c.Do(context.Background(), Request{
-		Method: "GET", Path: "/drive/urls/" + linkToken,
-	}); err != nil {
+	if _, err := c.Do(context.Background(), readTheLink); err != nil {
 		t.Fatalf("read the link: %v", err)
 	}
 	if last := srv.lastRequest(); last.uid != "account-uid" || last.bearer != "account-token" {
